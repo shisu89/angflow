@@ -1,0 +1,58 @@
+{
+  "name": "@xyflow/angular",
+  "version": "0.0.1",
+  "description": "Angular Flow - A highly customizable Angular library for building node-based editors and interactive flow charts.",
+  "keywords": [
+    "angular",
+    "node-based UI",
+    "graph",
+    "diagram",
+    "workflow",
+    "angular-flow",
+    "xyflow"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xyflow/xyflow.git",
+    "directory": "packages/angular"
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "dist/esm/angular/src/index.js",
+  "module": "dist/esm/angular/src/index.js",
+  "types": "dist/esm/angular/src/index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/esm/angular/src/index.d.ts",
+      "default": "./dist/esm/angular/src/index.js"
+    },
+    "./dist/style.css": "./dist/style.css"
+  },
+  "sideEffects": [
+    "*.css"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "ngc -p tsconfig.lib.json",
+    "lint": "eslint --ext .ts src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@xyflow/system": "workspace:*"
+  },
+  "peerDependencies": {
+    "@angular/core": ">=17.0.0",
+    "@angular/common": ">=17.0.0",
+    "rxjs": ">=7.0.0"
+  },
+  "devDependencies": {
+    "@angular/compiler": ">=17.0.0",
+    "@angular/compiler-cli": ">=17.0.0",
+    "typescript": "5.4.5"
+  }
+}

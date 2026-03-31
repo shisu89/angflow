@@ -1,0 +1,429 @@
+import {
+  Component,
+  ChangeDetectionStrategy,
+  inject,
+  computed,
+  output,
+  input,
+  Type,
+  NO_ERRORS_SCHEMA,
+} from '@angular/core';
+import { CommonModule, NgComponentOutlet } from '@angular/common';
+import {
+  getMarkerId,
+  MarkerType,
+  Position,
+  XYHandle,
+  getBezierPath,
+  getSmoothStepPath,
+  getStraightPath,
+  type EdgeMarker,
+  type HandleType,
+  type Connection,
+  type FinalConnectionState,
+} from '@xyflow/system';
+import { FlowStore } from '../../services/flow-store.service';
+import { BezierEdgeComponent } from '../../components/edges/bezier-edge.component';
+import { StraightEdgeComponent } from '../../components/edges/straight-edge.component';
+import { StepEdgeComponent } from '../../components/edges/step-edge.component';
+import { SmoothStepEdgeComponent } from '../../components/edges/smooth-step-edge.component';
+import { SimpleBezierEdgeComponent } from '../../components/edges/simple-bezier-edge.component';
+import type { Edge, EdgeTypes } from '../../types';
+
+const builtInEdgeTypeNames = new Set(['default', 'bezier', 'straight', 'step', 'smoothstep', 'simplebezier']);
+
+const builtInEdgeTypes: EdgeTypes = {
+  default: BezierEdgeComponent,
+  bezier: BezierEdgeComponent,
+  straight: StraightEdgeComponent,
+  step: StepEdgeComponent,
+  smoothstep: SmoothStepEdgeComponent,
+  simplebezier: SimpleBezierEdgeComponent,
+};
+
+@Component({
+  selector: 'ng-flow-edge-renderer',
+  standalone: true,
+  imports: [CommonModule, NgComponentOutlet],
+  schemas: [NO_ERRORS_SCHEMA],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    'class': 'ng-flow__edges xy-flow__edges',
+    'style': 'position: absolute; width: 100%; height: 100%; top: 0; left: 0; pointer-events: none;',
+  },
+  template: `
+    <svg style="position: absolute; width: 100%; height: 100%; overflow: visible; pointer-events: none;">
+      <defs>
+        @for (marker of markers(); track marker.id) {
+          <marker
+            [id]="marker.id"
+            [attr.markerWidth]="marker.width ?? 12.5"
+            [attr.markerHeight]="marker.height ?? 12.5"
+            viewBox="-10 -10 20 20"
+            markerUnits="strokeWidth"
+            orient="auto-start-reverse"
+            refX="0"
+            refY="0"
+          >
+            <polyline
+              class="xy-flow__arrowhead"
+              [class.arrowclosed]="marker.type === 'arrowclosed'"
+              [attr.stroke]="marker.color || 'currentColor'"
+              [attr.fill]="marker.type === 'arrowclosed' ? (marker.color || 'currentColor') : 'none'"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1"
+              points="-5,-4 0,0 -5,4"
+            />
+          </marker>
+        }
+      </defs>
+    </svg>
+    @for (edge of visibleEdges(); track edge.id) {
+      @let ei = getEdgeInputs(edge);
+      <svg
+        class="ng-flow__edge xy-flow__edge"
+        [class]="'xy-flow__edge-' + (edge.type || 'default')"
+        [class.selected]="edge.selected"
+        [class.animated]="edge.animated"
+        [class.selectable]="edge.selectable !== false"
+        [style.z-index]="edge.zIndex ?? 0"
+        [attr.aria-label]="getEdgeAriaLabel(edge)"
+        role="img"
+        style="overflow: visible; position: absolute; width: 100%; height: 100%; pointer-events: none;"
+      >
+        <g
+          [attr.data-id]="edge.id"
+          style="pointer-events: visibleStroke;"
+          (click)="onEdgeEvent($event, edge, 'click')"
+          (dblclick)="onEdgeEvent($event, edge, 'dblclick')"
+          (contextmenu)="onEdgeEvent($event, edge, 'contextmenu')"
+          (mouseenter)="onEdgeEvent($event, edge, 'mouseenter')"
+          (mousemove)="onEdgeEvent($event, edge, 'mousemove')"
+          (mouseleave)="onEdgeEvent($event, edge, 'mouseleave')"
+        >
+          @if (isCustomEdge(edge.type)) {
+            <ng-container
+              *ngComponentOutlet="getEdgeComponent(edge.type); inputs: ei"
+            />
+          } @else {
+            <path
+              class="xy-flow__edge-interaction"
+              [attr.d]="getEdgePath(ei)"
+              fill="none"
+              stroke="transparent"
+              stroke-width="20"
+            />
+            <path
+              class="xy-flow__edge-path"
+              [attr.d]="getEdgePath(ei)"
+              [attr.marker-start]="ei['markerStart']"
+              [attr.marker-end]="ei['markerEnd']"
+            />
+          }
+          @if (isEdgeReconnectable(edge)) {
+            <circle
+              class="xy-flow__edgeupdater xy-flow__edgeupdater-source"
+              [attr.cx]="shiftX(ei['sourceX'], reconnectRadius(), ei['sourcePosition'])"
+              [attr.cy]="shiftY(ei['sourceY'], reconnectRadius(), ei['sourcePosition'])"
+              [attr.r]="reconnectRadius()"
+              stroke="transparent"
+              fill="transparent"
+              (mousedown)="onReconnectSourceMouseDown($event, edge)"
+            />
+            <circle
+              class="xy-flow__edgeupdater xy-flow__edgeupdater-target"
+              [attr.cx]="shiftX(ei['targetX'], reconnectRadius(), ei['targetPosition'])"
+              [attr.cy]="shiftY(ei['targetY'], reconnectRadius(), ei['targetPosition'])"
+              [attr.r]="reconnectRadius()"
+              stroke="transparent"
+              fill="transparent"
+              (mousedown)="onReconnectTargetMouseDown($event, edge)"
+            />
+          }
+        </g>
+      </svg>
+    }
+    <div class="xy-flow__edgelabel-renderer" style="position: absolute; width: 100%; height: 100%; pointer-events: none; top: 0; left: 0;">
+      @for (edge of visibleEdges(); track edge.id) {
+        @if (edge.label) {
+          @let ei = getEdgeInputs(edge);
+          <div
+            class="xy-flow__edge-label"
+            [style.position]="'absolute'"
+            [style.transform]="'translate(-50%, -50%) translate(' + getEdgeCenterX(ei) + 'px, ' + getEdgeCenterY(ei) + 'px)'"
+            [style.pointer-events]="'all'"
+          >
+            {{ edge.label }}
+          </div>
+        }
+      }
+    </div>
+  `,
+})
+export class EdgeRendererComponent {
+  readonly store = inject(FlowStore);
+
+  readonly reconnectRadius = input(10);
+
+  readonly edgeClick = output<{ event: MouseEvent; edge: any }>();
+  readonly edgeDoubleClick = output<{ event: MouseEvent; edge: any }>();
+  readonly edgeContextMenu = output<{ event: MouseEvent; edge: any }>();
+  readonly edgeMouseEnter = output<{ event: MouseEvent; edge: any }>();
+  readonly edgeMouseMove = output<{ event: MouseEvent; edge: any }>();
+  readonly edgeMouseLeave = output<{ event: MouseEvent; edge: any }>();
+  readonly customEdgeTypes = input<EdgeTypes>({});
+
+  readonly reconnect = output<{ edge: any; connection: Connection }>();
+  readonly reconnectStart = output<{ event: MouseEvent; edge: any; handleType: HandleType }>();
+  readonly reconnectEnd = output<{ event: MouseEvent | TouchEvent; edge: any; handleType: HandleType; connectionState: FinalConnectionState }>();
+
+  readonly visibleEdges = computed(() => {
+    const visibleIds = this.store.visibleEdgeIds();
+    return this.store.edges().filter((e) => visibleIds.has(e.id));
+  });
+
+  readonly markers = computed(() => {
+    const edges = this.store.edges();
+    const markerMap = new Map<string, any>();
+
+    for (const edge of edges) {
+      this.addMarker(markerMap, edge.markerStart as EdgeMarker | undefined);
+      this.addMarker(markerMap, edge.markerEnd as EdgeMarker | undefined);
+    }
+
+    return Array.from(markerMap.values());
+  });
+
+  isCustomEdge(type?: string): boolean {
+    const resolvedType = type || 'default';
+    // It's custom if the user registered a type AND it's not a built-in name,
+    // OR the user explicitly overrode a built-in name with their own component
+    const customTypes = this.customEdgeTypes();
+    return resolvedType in customTypes;
+  }
+
+  getEdgePath(ei: Record<string, any>): string {
+    const type = ei['type'] || 'default';
+    const params = {
+      sourceX: ei['sourceX'],
+      sourceY: ei['sourceY'],
+      targetX: ei['targetX'],
+      targetY: ei['targetY'],
+      sourcePosition: ei['sourcePosition'] ?? Position.Bottom,
+      targetPosition: ei['targetPosition'] ?? Position.Top,
+    };
+
+    switch (type) {
+      case 'straight':
+        return getStraightPath(params)[0];
+      case 'step':
+        return getSmoothStepPath({ ...params, borderRadius: 0 })[0];
+      case 'smoothstep':
+        return getSmoothStepPath(params)[0];
+      case 'default':
+      case 'bezier':
+      default:
+        return getBezierPath(params)[0];
+    }
+  }
+
+  getEdgeComponent(type?: string): Type<any> {
+    const resolvedType = type || 'default';
+    return this.customEdgeTypes()[resolvedType] ?? builtInEdgeTypes[resolvedType] ?? BezierEdgeComponent;
+  }
+
+  getEdgeInputs(edge: any): Record<string, any> {
+    const sourceNode = this.store.nodeLookup.get(edge.source);
+    const targetNode = this.store.nodeLookup.get(edge.target);
+
+    const sourceHandle = sourceNode?.internals?.handleBounds?.source?.find(
+      (h: any) => h.id === edge.sourceHandle || (!edge.sourceHandle && h.id === null)
+    ) ?? sourceNode?.internals?.handleBounds?.source?.[0];
+
+    const targetHandle = targetNode?.internals?.handleBounds?.target?.find(
+      (h: any) => h.id === edge.targetHandle || (!edge.targetHandle && h.id === null)
+    ) ?? targetNode?.internals?.handleBounds?.target?.[0];
+
+    const sourcePos = sourceNode?.internals?.positionAbsolute ?? sourceNode?.position ?? { x: 0, y: 0 };
+    const targetPos = targetNode?.internals?.positionAbsolute ?? targetNode?.position ?? { x: 0, y: 0 };
+
+    const sourceW = sourceNode?.measured?.width ?? (sourceNode as any)?.width ?? 150;
+    const sourceH = sourceNode?.measured?.height ?? (sourceNode as any)?.height ?? 40;
+    const targetW = targetNode?.measured?.width ?? (targetNode as any)?.width ?? 150;
+    const targetH = targetNode?.measured?.height ?? (targetNode as any)?.height ?? 40;
+
+    let sourceX: number, sourceY: number, targetX: number, targetY: number;
+    let srcPos = sourceHandle?.position ?? edge.sourcePosition ?? Position.Bottom;
+    let tgtPos = targetHandle?.position ?? edge.targetPosition ?? Position.Top;
+
+    if (sourceHandle) {
+      sourceX = sourcePos.x + sourceHandle.x + (sourceHandle.width ?? 0) / 2;
+      sourceY = sourcePos.y + sourceHandle.y + (sourceHandle.height ?? 0) / 2;
+    } else {
+      sourceX = sourcePos.x + sourceW / 2;
+      sourceY = sourcePos.y + sourceH;
+    }
+
+    if (targetHandle) {
+      targetX = targetPos.x + targetHandle.x + (targetHandle.width ?? 0) / 2;
+      targetY = targetPos.y + targetHandle.y + (targetHandle.height ?? 0) / 2;
+    } else {
+      targetX = targetPos.x + targetW / 2;
+      targetY = targetPos.y;
+    }
+
+    return {
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      type: edge.type,
+      data: edge.data,
+      selected: edge.selected ?? false,
+      animated: edge.animated ?? false,
+      label: edge.label,
+      selectable: edge.selectable,
+      deletable: edge.deletable,
+      sourceX,
+      sourceY,
+      targetX,
+      targetY,
+      sourcePosition: srcPos,
+      targetPosition: tgtPos,
+      markerStart: this.getMarkerUrl(edge.markerStart as EdgeMarker | undefined),
+      markerEnd: this.getMarkerUrl(edge.markerEnd as EdgeMarker | undefined),
+      interactionWidth: edge.interactionWidth,
+      pathOptions: (edge as any).pathOptions,
+      sourceHandleId: edge.sourceHandle,
+      targetHandleId: edge.targetHandle,
+    };
+  }
+
+  onEdgeEvent(event: MouseEvent, edge: any, eventType: string): void {
+    switch (eventType) {
+      case 'click':
+        if (this.store.elementsSelectable()) {
+          this.store.addSelectedEdges([edge.id]);
+        }
+        this.edgeClick.emit({ event, edge });
+        break;
+      case 'dblclick':
+        this.edgeDoubleClick.emit({ event, edge });
+        break;
+      case 'contextmenu':
+        this.edgeContextMenu.emit({ event, edge });
+        break;
+      case 'mouseenter':
+        this.edgeMouseEnter.emit({ event, edge });
+        break;
+      case 'mousemove':
+        this.edgeMouseMove.emit({ event, edge });
+        break;
+      case 'mouseleave':
+        this.edgeMouseLeave.emit({ event, edge });
+        break;
+    }
+  }
+
+  getEdgeCenterX(ei: Record<string, any>): number {
+    return (ei['sourceX'] + ei['targetX']) / 2;
+  }
+
+  getEdgeCenterY(ei: Record<string, any>): number {
+    return (ei['sourceY'] + ei['targetY']) / 2;
+  }
+
+  getEdgeAriaLabel(edge: any): string {
+    if (edge.ariaLabel) return edge.ariaLabel;
+    return `Edge from ${edge.source} to ${edge.target}`;
+  }
+
+  isEdgeReconnectable(edge: any): boolean {
+    if (edge.reconnectable !== undefined) return !!edge.reconnectable;
+    return this.store.edgesReconnectable();
+  }
+
+  shiftX(x: number, shift: number, position: string): number {
+    if (position === Position.Left) return x - shift;
+    if (position === Position.Right) return x + shift;
+    return x;
+  }
+
+  shiftY(y: number, shift: number, position: string): number {
+    if (position === Position.Top) return y - shift;
+    if (position === Position.Bottom) return y + shift;
+    return y;
+  }
+
+  onReconnectSourceMouseDown(event: MouseEvent, edge: any): void {
+    if (event.button !== 0) return;
+    this.handleEdgeReconnect(event, edge, {
+      nodeId: edge.target,
+      id: edge.targetHandle ?? null,
+      type: 'target',
+    });
+  }
+
+  onReconnectTargetMouseDown(event: MouseEvent, edge: any): void {
+    if (event.button !== 0) return;
+    this.handleEdgeReconnect(event, edge, {
+      nodeId: edge.source,
+      id: edge.sourceHandle ?? null,
+      type: 'source',
+    });
+  }
+
+  private handleEdgeReconnect(
+    event: MouseEvent,
+    edge: any,
+    oppositeHandle: { nodeId: string; id: string | null; type: HandleType }
+  ): void {
+    const store = this.store;
+    const isTarget = oppositeHandle.type === 'target';
+
+    this.reconnectStart.emit({ event, edge, handleType: oppositeHandle.type });
+
+    XYHandle.onPointerDown(event, {
+      autoPanOnConnect: store.autoPanOnConnect(),
+      connectionMode: store.connectionMode(),
+      connectionRadius: store.connectionRadius(),
+      domNode: store.domNode(),
+      handleId: oppositeHandle.id,
+      nodeId: oppositeHandle.nodeId,
+      nodeLookup: store.nodeLookup,
+      isTarget,
+      edgeUpdaterType: oppositeHandle.type,
+      lib: 'ng',
+      flowId: store.rfId(),
+      cancelConnection: () => store.cancelConnection(),
+      panBy: (delta: any) => store.panBy(delta),
+      updateConnection: (conn: any) => store.updateConnection(conn),
+      getTransform: () => store.transform(),
+      getFromHandle: () => (store.connection() as any).fromHandle ?? null,
+      autoPanSpeed: store.autoPanSpeed(),
+      dragThreshold: store.connectionDragThreshold(),
+      handleDomNode: event.currentTarget as Element,
+      isValidConnection: store.isValidConnection(),
+      onConnect: (connection: Connection) => {
+        this.reconnect.emit({ edge, connection });
+      },
+      onReconnectEnd: (evt: MouseEvent | TouchEvent, connectionState: FinalConnectionState) => {
+        this.reconnectEnd.emit({ event: evt, edge, handleType: oppositeHandle.type, connectionState });
+      },
+    } as any);
+  }
+
+  private addMarker(map: Map<string, any>, marker: EdgeMarker | undefined): void {
+    if (!marker || typeof marker === 'string') return;
+    const id = getMarkerId(marker, undefined);
+    if (!map.has(id)) {
+      map.set(id, { ...marker, id });
+    }
+  }
+
+  private getMarkerUrl(marker: EdgeMarker | string | undefined): string | undefined {
+    if (!marker) return undefined;
+    if (typeof marker === 'string') return marker;
+    return `url(#${getMarkerId(marker, undefined)})`;
+  }
+}
