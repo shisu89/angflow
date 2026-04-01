@@ -38,7 +38,7 @@ import {
   type ZIndexMode,
   type AriaLabelConfig,
   type FitViewOptionsBase,
-} from '@xyflow/system';
+} from '@ngflow/system';
 
 import type { Node, Edge, InternalNode } from '../types';
 import { applyNodeChanges, applyEdgeChanges, createSelectionChange, getSelectionChanges } from '../utils/changes';
@@ -98,7 +98,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
   readonly connectionMode = signal<ConnectionMode>(ConnectionMode.Strict);
   readonly connection = signal<ConnectionState>({ ...initialConnection });
-  readonly connectionClickStartHandle = signal<{ nodeId: string; handleId: string | null; type: import('@xyflow/system').HandleType } | null>(null);
+  readonly connectionClickStartHandle = signal<{ nodeId: string; handleId: string | null; type: import('@ngflow/system').HandleType } | null>(null);
   readonly connectOnClick = signal(true);
   readonly connectionRadius = signal(20);
 
@@ -110,7 +110,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   readonly autoPanOnNodeFocus = signal(true);
   readonly autoPanSpeed = signal(15);
 
-  readonly isValidConnection = signal<((connection: EdgeType | import('@xyflow/system').Connection) => boolean) | undefined>(undefined);
+  readonly isValidConnection = signal<((connection: EdgeType | import('@ngflow/system').Connection) => boolean) | undefined>(undefined);
   readonly onError = signal<OnError>(devWarn);
 
   readonly lib = signal('ng');
@@ -125,10 +125,10 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   readonly defaultEdgeOptions = signal<import('../types').DefaultEdgeOptions | undefined>(undefined);
 
   // ── Connection callbacks (set by NgFlowComponent) ──────────────────
-  onConnect: ((connection: import('@xyflow/system').Connection) => void) | null = null;
-  onConnectStart: ((event: MouseEvent | TouchEvent, params: import('@xyflow/system').OnConnectStartParams) => void) | null = null;
+  onConnect: ((connection: import('@ngflow/system').Connection) => void) | null = null;
+  onConnectStart: ((event: MouseEvent | TouchEvent, params: import('@ngflow/system').OnConnectStartParams) => void) | null = null;
   onConnectEnd: ((event: MouseEvent | TouchEvent) => void) | null = null;
-  onClickConnectStart: ((event: MouseEvent, params: import('@xyflow/system').OnConnectStartParams) => void) | null = null;
+  onClickConnectStart: ((event: MouseEvent, params: import('@ngflow/system').OnConnectStartParams) => void) | null = null;
   onClickConnectEnd: ((event: MouseEvent) => void) | null = null;
 
   // ── Delete validation callback ────────────────────────────────────
@@ -139,7 +139,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   readonly nodeLookup: NodeLookup<InternalNodeBase<NodeType>> = new Map();
   readonly parentLookup: ParentLookup<InternalNodeBase<NodeType>> = new Map();
   readonly edgeLookup: EdgeLookup<EdgeType> = new Map();
-  readonly connectionLookup: Map<string, Map<string, import('@xyflow/system').HandleConnection>> = new Map();
+  readonly connectionLookup: Map<string, Map<string, import('@ngflow/system').HandleConnection>> = new Map();
 
   // ── Callback references ───────────────────────────────────────────────
 
@@ -613,7 +613,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   }
 
   /**
-   * Returns a snapshot of store items needed by @xyflow/system subsystems (XYDrag, XYHandle, etc.).
+   * Returns a snapshot of store items needed by @ngflow/system subsystems (XYDrag, XYHandle, etc.).
    */
   getStoreItems() {
     return {

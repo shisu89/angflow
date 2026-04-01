@@ -20,7 +20,7 @@ import type {
   NodeConnection,
   FinalConnectionState,
   OnConnectStartParams,
-} from '@xyflow/system';
+} from '@ngflow/system';
 
 import type { Node, Edge, InternalNode, NodeTypes, EdgeTypes } from '.';
 

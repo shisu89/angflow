@@ -12,7 +12,7 @@ import type {
   Position,
   FinalConnectionState,
   XYPosition,
-} from '@xyflow/system';
+} from '@ngflow/system';
 
 import type { InternalNode, Node } from './nodes';
 

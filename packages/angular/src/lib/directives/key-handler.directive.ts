@@ -6,7 +6,7 @@ import {
   OnInit,
   OnDestroy,
 } from '@angular/core';
-import { isInputDOMNode, type NodeChange, type EdgeChange } from '@xyflow/system';
+import { isInputDOMNode, type NodeChange, type EdgeChange } from '@ngflow/system';
 import { FlowStore } from '../services/flow-store.service';
 import { elementToRemoveChange } from '../utils/changes';
 import type { Node, Edge } from '../types';

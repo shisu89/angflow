@@ -1,7 +1,7 @@
 /**
  * Basic Angular Flow Example
  *
- * Demonstrates the simplest usage of @xyflow/angular:
+ * Demonstrates the simplest usage of @ngflow/angular:
  * - Default nodes with drag, pan, zoom
  * - Built-in node types (default, input, output)
  * - Bezier edges

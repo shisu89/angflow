@@ -15,7 +15,7 @@ import {
   type NodeBase,
   type EdgeBase,
   type InternalNodeUpdate,
-} from '@xyflow/system';
+} from '@ngflow/system';
 
 import { FlowStore } from './flow-store.service';
 import type { Node, Edge, InternalNode, NgFlowInstance, NgFlowJsonObject, DeleteElementsOptions } from '../types';
@@ -98,12 +98,13 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     return this.store.setCenter(x, y, options);
   }
 
-  fitBounds(bounds: Rect, options?: { padding?: number; duration?: number }) {
+  async fitBounds(bounds: Rect, options?: { padding?: number; duration?: number }): Promise<boolean> {
     const pz = this.store.panZoom();
-    if (!pz) return Promise.resolve(false);
+    if (!pz) return false;
 
     const { x, y, zoom } = this.getViewportForBoundsInternal(bounds, options?.padding ?? 0.1);
-    return pz.setViewport({ x, y, zoom }, { duration: options?.duration });
+    await pz.setViewport({ x, y, zoom }, { duration: options?.duration });
+    return true;
   }
 
   // ── Coordinate Conversion ─────────────────────────────────────────────

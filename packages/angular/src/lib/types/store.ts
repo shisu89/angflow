@@ -24,7 +24,7 @@ import type {
   ColorMode,
   NodeChange,
   EdgeChange,
-} from '@xyflow/system';
+} from '@ngflow/system';
 
 import type { Node, Edge, NodeTypes, EdgeTypes, DefaultEdgeOptions } from '.';
 

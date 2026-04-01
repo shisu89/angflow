@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, output, inject, signal } from '@angular/core';
-import type { PanelPosition, FitViewOptionsBase } from '@xyflow/system';
+import type { PanelPosition, FitViewOptionsBase } from '@ngflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 import { NgFlowService } from '../../services/ng-flow.service';
 import { PanelComponent } from '../panel/panel.component';

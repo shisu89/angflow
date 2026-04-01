@@ -9,7 +9,7 @@ import {
   OnDestroy,
   SimpleChanges,
 } from '@angular/core';
-import { XYDrag, type XYDragInstance, type NodeBase, type NodeDragItem } from '@xyflow/system';
+import { XYDrag, type XYDragInstance, type NodeBase, type NodeDragItem } from '@ngflow/system';
 import { FlowStore } from '../services/flow-store.service';
 import type { Node } from '../types';
 

@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, inject, computed, Optional, Inject } from '@angular/core';
-import { Position } from '@xyflow/system';
+import { Position } from '@ngflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 import { NODE_ID } from '../../services/tokens';
 

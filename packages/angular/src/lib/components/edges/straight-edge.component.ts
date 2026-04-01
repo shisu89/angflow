@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, computed } from '@angular/core';
-import { getStraightPath, Position } from '@xyflow/system';
+import { getStraightPath, Position } from '@ngflow/system';
 import { BaseEdgeComponent } from './base-edge.component';
 
 @Component({

@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, computed } from '@angular/core';
-import type { PanelPosition } from '@xyflow/system';
+import type { PanelPosition } from '@ngflow/system';
 
 @Component({
   selector: 'ng-flow-panel',

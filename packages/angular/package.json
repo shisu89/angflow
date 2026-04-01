@@ -1,5 +1,5 @@
 {
-  "name": "@xyflow/angular",
+  "name": "@ngflow/angular",
   "version": "0.0.1",
   "type": "module",
   "description": "Angular Flow - A highly customizable Angular library for building node-based editors and interactive flow charts.",
@@ -10,11 +10,11 @@
     "diagram",
     "workflow",
     "angular-flow",
-    "xyflow"
+    "ngflow"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/xyflow/xyflow.git",
+    "url": "https://github.com/ngflow/ngflow.git",
     "directory": "packages/angular"
   },
   "files": [
@@ -45,7 +45,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@xyflow/system": "workspace:*"
+    "@ngflow/system": ">=0.0.76"
   },
   "peerDependencies": {
     "@angular/core": ">=17.0.0",

@@ -1,5 +1,5 @@
 /**
- * Bundles CSS files for @xyflow/angular dist output.
+ * Bundles CSS files for @ngflow/angular dist output.
  *
  * Resolves @import statements relative to each file's directory,
  * inlines imported content, deduplicates files already included,

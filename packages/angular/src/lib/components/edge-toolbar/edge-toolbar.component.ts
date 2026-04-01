@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, inject, computed } from '@angular/core';
-import { getEdgeToolbarTransform } from '@xyflow/system';
+import { getEdgeToolbarTransform } from '@ngflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 
 @Component({

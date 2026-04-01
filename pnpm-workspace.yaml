@@ -1,5 +1,4 @@
 packages:
-  - 'packages/*'
-  - 'examples/*'
+  - 'packages/system'
+  - 'packages/angular'
   - 'tooling/*'
-  - 'tests/*'

@@ -53,7 +53,7 @@ export { applyNodeChanges, applyEdgeChanges } from './utils/changes';
 // Wrapper utility functions for Angular-specific typing
 export { isNode, isEdge } from './utils/type-guards';
 
-// Re-export everything from @xyflow/system
+// Re-export everything from @ngflow/system
 export {
   // Enums / Constants
   ConnectionMode,
@@ -94,9 +94,9 @@ export {
 
   // Constants
   infiniteExtent,
-} from '@xyflow/system';
+} from '@ngflow/system';
 
-// Re-export all types from @xyflow/system
+// Re-export all types from @ngflow/system
 export type {
   // Core types
   XYPosition,
@@ -198,4 +198,4 @@ export type {
 
   // Aria
   AriaLabelConfig,
-} from '@xyflow/system';
+} from '@ngflow/system';

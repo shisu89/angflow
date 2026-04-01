@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, computed } from '@angular/core';
-import { getSmoothStepPath, Position, type SmoothStepPathOptions } from '@xyflow/system';
+import { getSmoothStepPath, Position, type SmoothStepPathOptions } from '@ngflow/system';
 import { BaseEdgeComponent } from './base-edge.component';
 
 @Component({

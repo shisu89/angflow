@@ -1,5 +1,5 @@
 {
-  "name": "@xyflow/system",
+  "name": "@ngflow/system",
   "version": "0.0.76",
   "description": "xyflow core system that powers React Flow and Svelte Flow.",
   "keywords": [
@@ -9,7 +9,7 @@
     "workflow",
     "reactflow",
     "svelteflow",
-    "xyflow"
+    "ngflow"
   ],
   "files": [
     "dist"
@@ -40,12 +40,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/xyflow/xyflow.git",
+    "url": "https://github.com/ngflow/ngflow.git",
     "directory": "packages/system"
   },
   "scripts": {
-    "dev": "concurrently \"rollup --config node:@xyflow/rollup-config --watch\"",
-    "build": "rollup --config node:@xyflow/rollup-config --environment NODE_ENV:production",
+    "dev": "concurrently \"rollup --config node:@ngflow/rollup-config --watch\"",
+    "build": "rollup --config node:@ngflow/rollup-config --environment NODE_ENV:production",
     "lint": "eslint --ext .js,.ts src",
     "typecheck": "tsc --noEmit"
   },
@@ -62,9 +62,9 @@
   },
   "devDependencies": {
     "@types/node": "^18.7.16",
-    "@xyflow/eslint-config": "workspace:*",
-    "@xyflow/rollup-config": "workspace:*",
-    "@xyflow/tsconfig": "workspace:*",
+    "@ngflow/eslint-config": "workspace:*",
+    "@ngflow/rollup-config": "workspace:*",
+    "@ngflow/tsconfig": "workspace:*",
     "typescript": "5.4.5"
   },
   "rollup": {

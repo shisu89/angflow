@@ -1,5 +1,5 @@
 import type { Type } from '@angular/core';
-import type { NodeBase, InternalNodeBase, NodeProps as NodePropsBase, CoordinateExtent, OnError } from '@xyflow/system';
+import type { NodeBase, InternalNodeBase, NodeProps as NodePropsBase, CoordinateExtent, OnError } from '@ngflow/system';
 
 /**
  * The Node type represents everything Angular Flow needs to know about a given node.
@@ -62,7 +62,7 @@ export interface NodeComponentInputs<NodeType extends Node = Node> {
   isConnectable: boolean;
   positionAbsoluteX: number;
   positionAbsoluteY: number;
-  sourcePosition: import('@xyflow/system').Position;
-  targetPosition: import('@xyflow/system').Position;
+  sourcePosition: import('@ngflow/system').Position;
+  targetPosition: import('@ngflow/system').Position;
   dragHandle?: string;
 }

@@ -51,7 +51,7 @@ import {
   type NodeChange,
   type EdgeChange,
   type OnConnectStartParams,
-} from '@xyflow/system';
+} from '@ngflow/system';
 
 import { FlowStore } from '../../services/flow-store.service';
 import { NgFlowService } from '../../services/ng-flow.service';

@@ -11,7 +11,7 @@ import {
   Optional,
   Inject,
 } from '@angular/core';
-import { Position, XYHandle, type HandleType, type Connection, type ConnectionState } from '@xyflow/system';
+import { Position, XYHandle, type HandleType, type Connection, type ConnectionState } from '@ngflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 import { NODE_ID } from '../../services/tokens';
 
