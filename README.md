@@ -1,36 +1,127 @@
-![xyflow-header](https://user-images.githubusercontent.com/2857535/279643999-ffda9f91-6b6d-447d-82be-fcbd6103edb6.svg#gh-light-mode-only)
-![xyflow-header-dark](https://user-images.githubusercontent.com/2857535/279644026-a01c231c-6c6e-4b41-96e0-a85c75c9acee.svg#gh-dark-mode-only)
+# xyflow + Angular
 
-<div align="center">
-
-![GitHub License MIT](https://img.shields.io/github/license/wbkd/react-flow?color=%23ff0072)
-![npm downloads](https://img.shields.io/npm/dt/reactflow?color=%23FF0072&label=React%20Flow%20downloads)
-![npm downloads](https://img.shields.io/npm/dt/@xyflow/svelte?color=%23FF3E00&label=Svelte%20Flow%20downloads)
-
-Powerful open source libraries for building node-based UIs with React or Svelte. Ready out-of-the-box and infinitely customizable.
-
-[React Flow](https://reactflow.dev/) · [Svelte Flow](https://svelteflow.dev/) · [React Flow Pro](https://reactflow.dev/pro) · [Discord](https://discord.gg/Bqt6xrs)
-</div>
+This is a fork of [xyflow](https://github.com/xyflow/xyflow) that adds an **Angular port** of React Flow. It builds on `@xyflow/system`, the same framework-agnostic core that powers React Flow and Svelte Flow.
 
 ---
 
-## The xyflow mono repo
+## Packages
 
-The xyflow repository is the home of four packages:
-* React Flow 12 `@xyflow/react` [packages/react](./packages/react)
-* React Flow 11 `reactflow` [v11 branch](https://github.com/xyflow/xyflow/tree/v11)
-* Svelte Flow `@xyflow/svelte` [packages/svelte](./packages/svelte)
-* Shared helper library `@xyflow/system` [packages/system](./packages/system)
+| Package | Path | Description |
+|---------|------|-------------|
+| **Angular Flow** `@xyflow/angular` | [packages/angular](./packages/angular) | Angular 17+ library for node-based UIs |
+| React Flow 12 `@xyflow/react` | [packages/react](./packages/react) | Original React implementation |
+| Svelte Flow `@xyflow/svelte` | [packages/svelte](./packages/svelte) | Svelte implementation |
+| Shared core `@xyflow/system` | [packages/system](./packages/system) | Framework-agnostic drag, pan/zoom, handles, resize |
 
-## Commercial usage
+## Angular Flow
 
-**Are you using React Flow or Svelte Flow for a personal project?** Great! No sponsorship needed, you can support us by reporting any bugs you find, sending us screenshots of your projects, and starring us on Github 🌟
+The Angular port provides full feature parity with React Flow:
 
-**Are you using React Flow or Svelte Flow at your organization and making money from it?** Awesome! We rely on your support to keep our libraries developed and maintained under an MIT License, just how we like it. For React Flow you can do that on the [React Flow Pro website](https://reactflow.dev/pro) and for both of our libraries you can do it through [Github Sponsors](https://github.com/sponsors/xyflow).
+- Drag & drop nodes with snap-to-grid
+- Multiple edge types (bezier, straight, step, smooth-step)
+- Custom node components (forms, charts, any Angular component)
+- Custom edge components
+- Connections (drag or click-to-connect)
+- Selection (click, box select with partial mode, multi-select)
+- Keyboard shortcuts (Delete, Ctrl+A, Escape, arrow keys)
+- Pan & zoom (scroll, pinch, double-click)
+- Plugins: minimap, background, controls, node toolbar, edge toolbar, node resizer
+- Signal-based state management (Angular 17+ signals, no RxJS in the store)
+- OnPush change detection throughout
+- Dark mode support
 
-## Getting started
+See the [Angular Flow README](./packages/angular/README.md) for API documentation and usage examples.
 
-The best way to get started is to check out the [React Flow](https://reactflow.dev/learn) or [Svelte Flow](https://svelteflow.dev/learn) learn section. However if you want to get a sneak peek of how to install and use the libraries you can see it here: 
+## Example App
+
+A standalone demo app lives at [`example-app/`](../example-app/) (sibling to this directory). It demonstrates:
+
+- Custom form nodes with text inputs, number inputs, dropdowns, checkboxes, and textareas
+- Color-coded nodes with styled headers
+- Adding/removing nodes, edge connections
+- All plugin components (background, controls, minimap)
+
+To run it:
+
+```bash
+cd example-app
+npm install
+npx ng serve
+```
+
+## Getting Started
+
+<details>
+  <summary><strong>Angular Flow</strong> basic usage</summary>
+
+  ### Installation
+
+  ```sh
+  npm install @xyflow/angular @xyflow/system
+  ```
+
+  ### Basic usage
+
+  ```typescript
+  import { Component } from '@angular/core';
+  import {
+    NgFlowComponent,
+    BackgroundComponent,
+    ControlsComponent,
+    MiniMapComponent,
+    applyNodeChanges,
+    applyEdgeChanges,
+  } from '@xyflow/angular';
+  import type { Node, Edge, Connection } from '@xyflow/angular';
+  import { addEdge } from '@xyflow/system';
+
+  @Component({
+    selector: 'app-root',
+    standalone: true,
+    imports: [NgFlowComponent, BackgroundComponent, ControlsComponent, MiniMapComponent],
+    template: `
+      <div style="width: 100vw; height: 100vh;">
+        <ng-flow
+          [nodes]="nodes"
+          [edges]="edges"
+          [fitView]="true"
+          (nodesChange)="onNodesChange($event)"
+          (edgesChange)="onEdgesChange($event)"
+          (connect)="onConnect($event)"
+        >
+          <ng-flow-background variant="dots" />
+          <ng-flow-controls />
+          <ng-flow-minimap />
+        </ng-flow>
+      </div>
+    `,
+  })
+  export class App {
+    nodes: Node[] = [
+      { id: '1', type: 'input', position: { x: 250, y: 0 }, data: { label: 'Start' } },
+      { id: '2', position: { x: 250, y: 150 }, data: { label: 'Process' } },
+      { id: '3', type: 'output', position: { x: 250, y: 300 }, data: { label: 'End' } },
+    ];
+
+    edges: Edge[] = [
+      { id: 'e1-2', source: '1', target: '2' },
+      { id: 'e2-3', source: '2', target: '3' },
+    ];
+
+    onNodesChange(changes: any[]) {
+      this.nodes = applyNodeChanges(changes, this.nodes);
+    }
+
+    onEdgesChange(changes: any[]) {
+      this.edges = applyEdgeChanges(changes, this.edges);
+    }
+
+    onConnect(connection: Connection) {
+      this.edges = addEdge(connection, this.edges) as Edge[];
+    }
+  }
+  ```
+</details>
 
 <details>
   <summary><strong>React Flow</strong> basic usage</summary>
@@ -150,19 +241,21 @@ npm install @xyflow/svelte
 ```
 </details>
 
-## Releases 
+## Syncing with upstream
 
-For releasing packages we are using [changesets](https://github.com/changesets/changesets) in combination with the [changeset Github action](https://github.com/changesets/action). The rough idea is:
+This repo tracks the original xyflow as `upstream`:
 
-1. create PRs for new features, updates and fixes (with a changeset if relevant for changelog)
-2. merge into main 
-3. changeset creates a PR that bumps all packages based on the changesets 
-4. merge changeset PR if you want to release to Github and npm
+```bash
+git fetch upstream
+git merge upstream/main
+```
 
-## Built by [xyflow](https://xyflow.com)
+The Angular port lives in `packages/angular/` and `../example-app/`, which don't exist upstream, so merges are typically conflict-free. Updates to `@xyflow/system` from upstream are picked up automatically.
 
-React Flow and Svelte Flow are maintained by the [xyflow team](https://xyflow.com/about). If you need help or want to talk to us about a collaboration, reach out through our [contact form](https://xyflow.com/contact) or by joining our [Discord Server](https://discord.gg/Bqt6xrs).
+## Credits
+
+Originally built by [xyflow / webkid GmbH](https://xyflow.com). Angular port built on top of `@xyflow/system`.
 
 ## License
 
-React Flow and Svelte Flow are [MIT licensed](./LICENSE).
+[MIT](./LICENSE)
