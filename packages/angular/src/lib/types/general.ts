@@ -16,6 +16,8 @@ import type {
   Rect,
   Viewport,
   HandleType,
+  HandleConnection,
+  NodeConnection,
   FinalConnectionState,
   OnConnectStartParams,
 } from '@xyflow/system';
@@ -40,6 +42,39 @@ export type OnSelectionChangeParams<NodeType extends Node = Node, EdgeType exten
 export type OnSelectionChangeFunc<NodeType extends Node = Node, EdgeType extends Edge = Edge> = (
   params: OnSelectionChangeParams<NodeType, EdgeType>
 ) => void;
+
+/**
+ * Event payload for node mouse events (click, double-click, context menu, etc.)
+ */
+export type NodeMouseEvent<NodeType extends Node = Node> = {
+  event: MouseEvent;
+  node: NodeType;
+};
+
+/**
+ * Event payload for edge mouse events (click, double-click, context menu, etc.)
+ */
+export type EdgeMouseEvent<EdgeType extends Edge = Edge> = {
+  event: MouseEvent;
+  edge: EdgeType;
+};
+
+/**
+ * Event payload for node drag events (dragStart, drag, dragStop).
+ */
+export type NodeDragEvent<NodeType extends Node = Node> = {
+  event: MouseEvent;
+  node: NodeType;
+  nodes: NodeType[];
+};
+
+/**
+ * Event payload for reconnect events.
+ */
+export type ReconnectEvent<EdgeType extends Edge = Edge> = {
+  oldEdge: EdgeType;
+  newConnection: Connection;
+};
 
 export type FitViewParams<NodeType extends Node = Node> = FitViewParamsBase<NodeType>;
 export type FitViewOptions<NodeType extends Node = Node> = FitViewOptionsBase<NodeType>;
@@ -104,7 +139,7 @@ export type NgFlowInstance<NodeType extends Node = Node, EdgeType extends Edge =
   getNode: (id: string) => NodeType | undefined;
   getInternalNode: (id: string) => InternalNode<NodeType> | undefined;
   updateNode: (id: string, nodeUpdate: Partial<NodeType> | ((node: NodeType) => Partial<NodeType>)) => void;
-  updateNodeData: (id: string, dataUpdate: Record<string, unknown> | ((data: any) => Record<string, unknown>)) => void;
+  updateNodeData: (id: string, dataUpdate: Record<string, unknown> | ((data: NodeType['data']) => Record<string, unknown>)) => void;
 
   // Edge operations
   getEdges: () => EdgeType[];
@@ -112,7 +147,7 @@ export type NgFlowInstance<NodeType extends Node = Node, EdgeType extends Edge =
   addEdges: (edges: EdgeType | EdgeType[]) => void;
   getEdge: (id: string) => EdgeType | undefined;
   updateEdge: (id: string, edgeUpdate: Partial<EdgeType> | ((edge: EdgeType) => Partial<EdgeType>)) => void;
-  updateEdgeData: (id: string, dataUpdate: Record<string, unknown> | ((data: any) => Record<string, unknown>)) => void;
+  updateEdgeData: (id: string, dataUpdate: Record<string, unknown> | ((data: EdgeType['data']) => Record<string, unknown>)) => void;
 
   // Delete
   deleteElements: (params: DeleteElementsOptions) => Promise<{ deletedNodes: NodeType[]; deletedEdges: EdgeType[] }>;
@@ -124,8 +159,8 @@ export type NgFlowInstance<NodeType extends Node = Node, EdgeType extends Edge =
 
   // Connection queries
   getConnectedEdges: (nodeIds: string | string[]) => EdgeType[];
-  getHandleConnections: (params: { nodeId: string; type: 'source' | 'target'; id?: string }) => any[];
-  getNodeConnections: (nodeId: string) => any[];
+  getHandleConnections: (params: { nodeId: string; type: 'source' | 'target'; id?: string }) => HandleConnection[];
+  getNodeConnections: (nodeId: string) => NodeConnection[];
 
   // Serialization
   toObject: () => NgFlowJsonObject<NodeType, EdgeType>;

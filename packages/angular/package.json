@@ -1,6 +1,7 @@
 {
   "name": "@xyflow/angular",
   "version": "0.0.1",
+  "type": "module",
   "description": "Angular Flow - A highly customizable Angular library for building node-based editors and interactive flow charts.",
   "keywords": [
     "angular",
@@ -19,16 +20,17 @@
   "files": [
     "dist"
   ],
-  "main": "dist/esm/angular/src/index.js",
-  "module": "dist/esm/angular/src/index.js",
-  "types": "dist/esm/angular/src/index.d.ts",
+  "main": "dist/esm/index.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
   "exports": {
     "./package.json": "./package.json",
     ".": {
-      "types": "./dist/esm/angular/src/index.d.ts",
-      "default": "./dist/esm/angular/src/index.js"
+      "types": "./dist/esm/index.d.ts",
+      "default": "./dist/esm/index.js"
     },
-    "./dist/style.css": "./dist/style.css"
+    "./dist/style.css": "./dist/style.css",
+    "./dist/base.css": "./dist/base.css"
   },
   "sideEffects": [
     "*.css"
@@ -38,7 +40,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "ngc -p tsconfig.lib.json",
+    "build": "ngc -p tsconfig.lib.json && node scripts/bundle-css.js",
     "lint": "eslint --ext .ts src",
     "typecheck": "tsc --noEmit"
   },
@@ -53,6 +55,6 @@
   "devDependencies": {
     "@angular/compiler": ">=17.0.0",
     "@angular/compiler-cli": ">=17.0.0",
-    "typescript": "5.4.5"
+    "typescript": "5.9.3"
   }
 }

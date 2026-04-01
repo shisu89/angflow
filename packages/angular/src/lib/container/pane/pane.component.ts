@@ -12,6 +12,7 @@ import { FlowStore } from '../../services/flow-store.service';
     '[class.draggable]': 'panOnDrag()',
     '[class.dragging]': 'store.paneDragging()',
     '[class.selection]': 'store.userSelectionActive()',
+    '(wheel)': 'onWheel($event)',
   },
   template: `<ng-content />`,
 })
@@ -27,6 +28,7 @@ export class PaneComponent implements OnDestroy {
 
   readonly selectionStart = output<MouseEvent>();
   readonly selectionEnd = output<MouseEvent>();
+  readonly paneScroll = output<WheelEvent>();
 
   private isSelecting = false;
   private startX = 0;
@@ -34,6 +36,10 @@ export class PaneComponent implements OnDestroy {
   private boundOnMouseMove: ((e: MouseEvent) => void) | null = null;
   private boundOnMouseUp: ((e: MouseEvent) => void) | null = null;
   private nativeMouseDownHandler: ((e: Event) => void) | null = null;
+
+  onWheel(event: WheelEvent): void {
+    this.paneScroll.emit(event);
+  }
 
   /**
    * Call this after d3-zoom is initialized to attach a capture-phase

@@ -20,7 +20,7 @@ import { DefaultNodeComponent } from '../../components/nodes/default-node.compon
 import { InputNodeComponent } from '../../components/nodes/input-node.component';
 import { OutputNodeComponent } from '../../components/nodes/output-node.component';
 import { GroupNodeComponent } from '../../components/nodes/group-node.component';
-import type { Node, NodeTypes } from '../../types';
+import type { Node, InternalNode, NodeTypes } from '../../types';
 
 const builtInNodeTypes: NodeTypes = {
   default: DefaultNodeComponent,
@@ -85,15 +85,15 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
   readonly customNodeTypes = input<NodeTypes>({});
 
   // Node events that bubble up to NgFlowComponent
-  readonly nodeClick = output<{ event: MouseEvent; node: any }>();
-  readonly nodeDoubleClick = output<{ event: MouseEvent; node: any }>();
-  readonly nodeContextMenu = output<{ event: MouseEvent; node: any }>();
-  readonly nodeMouseEnter = output<{ event: MouseEvent; node: any }>();
-  readonly nodeMouseMove = output<{ event: MouseEvent; node: any }>();
-  readonly nodeMouseLeave = output<{ event: MouseEvent; node: any }>();
-  readonly nodeDragStart = output<{ event: MouseEvent; node: any; nodes: any[] }>();
-  readonly nodeDrag = output<{ event: MouseEvent; node: any; nodes: any[] }>();
-  readonly nodeDragStop = output<{ event: MouseEvent; node: any; nodes: any[] }>();
+  readonly nodeClick = output<{ event: MouseEvent; node: Node }>();
+  readonly nodeDoubleClick = output<{ event: MouseEvent; node: Node }>();
+  readonly nodeContextMenu = output<{ event: MouseEvent; node: Node }>();
+  readonly nodeMouseEnter = output<{ event: MouseEvent; node: Node }>();
+  readonly nodeMouseMove = output<{ event: MouseEvent; node: Node }>();
+  readonly nodeMouseLeave = output<{ event: MouseEvent; node: Node }>();
+  readonly nodeDragStart = output<{ event: MouseEvent; node: Node; nodes: Node[] }>();
+  readonly nodeDrag = output<{ event: MouseEvent; node: Node; nodes: Node[] }>();
+  readonly nodeDragStop = output<{ event: MouseEvent; node: Node; nodes: Node[] }>();
 
   readonly visibleNodes = computed(() => this.store.visibleNodes());
 
@@ -181,7 +181,7 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  onNodeFocus(node: any): void {
+  onNodeFocus(node: Node): void {
     // Select the focused node
     if (this.store.elementsSelectable()) {
       this.store.addSelectedNodes([node.id]);
@@ -229,7 +229,7 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
     this.store.panBy({ x: targetX - currentX, y: targetY - currentY });
   }
 
-  getNodeComponent(type?: string): Type<any> {
+  getNodeComponent(type?: string): Type<unknown> {
     const resolvedType = type || 'default';
     return this.customNodeTypes()[resolvedType] ?? builtInNodeTypes[resolvedType] ?? DefaultNodeComponent;
   }
@@ -246,24 +246,24 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
     return injector;
   }
 
-  getNodeZ(node: any): number {
+  getNodeZ(node: InternalNode): number {
     return node.internals?.z ?? 0;
   }
 
-  getNodeTransform(node: any): string {
+  getNodeTransform(node: InternalNode): string {
     const x = node.internals?.positionAbsolute?.x ?? node.position.x;
     const y = node.internals?.positionAbsolute?.y ?? node.position.y;
     return `translate(${x}px, ${y}px)`;
   }
 
-  getNodeAriaLabel(node: any): string {
+  getNodeAriaLabel(node: InternalNode): string {
     if (node.ariaLabel) return node.ariaLabel;
     const label = node.data?.label ?? node.id;
     const type = node.type || 'default';
     return `Node: ${label}, type: ${type}`;
   }
 
-  getNodeInputs(node: any): Record<string, any> {
+  getNodeInputs(node: InternalNode): Record<string, unknown> {
     return {
       id: node.id,
       data: node.data,

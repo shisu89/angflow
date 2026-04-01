@@ -47,3 +47,22 @@ export type NodeProps<NodeType extends Node = Node> = NodePropsBase<NodeType>;
  * Map of node type names to Angular component types.
  */
 export type NodeTypes = Record<string, Type<any>>;
+
+/**
+ * Input contract for custom node components rendered via NgComponentOutlet.
+ * Custom node components should declare signal inputs matching these properties.
+ */
+export interface NodeComponentInputs<NodeType extends Node = Node> {
+  id: string;
+  data: NodeType['data'];
+  type: string;
+  selected: boolean;
+  dragging: boolean;
+  zIndex: number;
+  isConnectable: boolean;
+  positionAbsoluteX: number;
+  positionAbsoluteY: number;
+  sourcePosition: import('@xyflow/system').Position;
+  targetPosition: import('@xyflow/system').Position;
+  dragHandle?: string;
+}

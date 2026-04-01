@@ -11,6 +11,10 @@ import {
   type Rect,
   type FitViewOptionsBase,
   type HandleConnection,
+  type ConnectionState,
+  type NodeBase,
+  type EdgeBase,
+  type InternalNodeUpdate,
 } from '@xyflow/system';
 
 import { FlowStore } from './flow-store.service';
@@ -21,7 +25,46 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   private store = inject(FlowStore) as unknown as FlowStore<NodeType, EdgeType>;
   private destroyRef = inject(DestroyRef);
 
-  // ── Viewport ──────────────────────────────────────────────────────────
+  // ── Reactive signal properties ────────────────────────────────────────
+  // Read-only signals for reactive state access in templates and computed signals.
+  // These are the Angular equivalent of React's useNodes(), useEdges(), etc.
+
+  /** Reactive access to all nodes. */
+  readonly nodes: Signal<NodeType[]> = computed(() => this.store.nodes());
+
+  /** Reactive access to all edges. */
+  readonly edges: Signal<EdgeType[]> = computed(() => this.store.edges());
+
+  /** Reactive access to the current viewport (x, y, zoom). */
+  readonly viewport: Signal<Viewport> = computed(() => this.store.viewport());
+
+  /** Reactive access to currently selected nodes. */
+  readonly selectedNodes: Signal<NodeType[]> = computed(() => this.store.selectedNodes());
+
+  /** Reactive access to currently selected edges. */
+  readonly selectedEdges: Signal<EdgeType[]> = computed(() => this.store.selectedEdges());
+
+  /** Reactive access to the current connection state during drag-connect. Null when idle. */
+  readonly connection: Signal<ConnectionState> = computed(() => this.store.connection());
+
+  /** Reactive signal indicating whether all nodes have been measured and positioned. */
+  readonly nodesInitialized: Signal<boolean> = computed(() => this.store.nodesInitialized());
+
+  /**
+   * Returns a reactive signal containing the data property of specified nodes.
+   * Call once and store the reference — do not call repeatedly in templates.
+   */
+  nodesData(nodeIds: string[]): Signal<{ id: string; data: Record<string, unknown>; type?: string }[]> {
+    return computed(() => {
+      this.store.version();
+      const idSet = new Set(nodeIds);
+      return this.store.nodes()
+        .filter(n => idSet.has(n.id))
+        .map(n => ({ id: n.id, data: n.data as Record<string, unknown>, type: n.type }));
+    });
+  }
+
+  // ── Viewport operations ───────────────────────────────────────────────
 
   zoomIn(options?: { duration?: number }) {
     return this.store.zoomIn(options);
@@ -136,7 +179,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     );
   }
 
-  updateNodeData(id: string, dataUpdate: Record<string, unknown> | ((data: any) => Record<string, unknown>)): void {
+  updateNodeData(id: string, dataUpdate: Record<string, unknown> | ((data: NodeType['data']) => Record<string, unknown>)): void {
     this.store.setNodes(
       this.store.nodes().map((node) => {
         if (node.id === id) {
@@ -179,7 +222,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     );
   }
 
-  updateEdgeData(id: string, dataUpdate: Record<string, unknown> | ((data: any) => Record<string, unknown>)): void {
+  updateEdgeData(id: string, dataUpdate: Record<string, unknown> | ((data: EdgeType['data']) => Record<string, unknown>)): void {
     this.store.setEdges(
       this.store.edges().map((edge) => {
         if (edge.id === id) {
@@ -234,8 +277,8 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     const nodeRect = {
       x: internalNode.internals?.positionAbsolute?.x ?? node.position.x,
       y: internalNode.internals?.positionAbsolute?.y ?? node.position.y,
-      width: internalNode.measured?.width ?? (node as any).width ?? 0,
-      height: internalNode.measured?.height ?? (node as any).height ?? 0,
+      width: internalNode.measured?.width ?? node.width ?? 0,
+      height: internalNode.measured?.height ?? node.height ?? 0,
     };
 
     return this.store.nodes().filter((n) => {
@@ -246,8 +289,8 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
       const otherRect = {
         x: otherNode.internals?.positionAbsolute?.x ?? n.position.x,
         y: otherNode.internals?.positionAbsolute?.y ?? n.position.y,
-        width: otherNode.measured?.width ?? (n as any).width ?? 0,
-        height: otherNode.measured?.height ?? (n as any).height ?? 0,
+        width: otherNode.measured?.width ?? n.width ?? 0,
+        height: otherNode.measured?.height ?? n.height ?? 0,
       };
 
       if (partially) {
@@ -270,8 +313,8 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     const nodeRect = {
       x: internalNode.internals?.positionAbsolute?.x ?? node.position.x,
       y: internalNode.internals?.positionAbsolute?.y ?? node.position.y,
-      width: internalNode.measured?.width ?? (node as any).width ?? 0,
-      height: internalNode.measured?.height ?? (node as any).height ?? 0,
+      width: internalNode.measured?.width ?? node.width ?? 0,
+      height: internalNode.measured?.height ?? node.height ?? 0,
     };
 
     if (partially) {
@@ -287,7 +330,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   }
 
   getNodesBounds(nodes: NodeType[]): Rect {
-    return getNodesBoundsSystem(nodes as any[], { nodeOrigin: this.store.nodeOrigin() } as any);
+    return getNodesBoundsSystem(nodes, { nodeOrigin: this.store.nodeOrigin() });
   }
 
   // ── Connection Queries ────────────────────────────────────────────────
@@ -295,27 +338,24 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   getConnectedEdges(nodeIds: string | string[]): EdgeType[] {
     const ids = Array.isArray(nodeIds) ? nodeIds : [nodeIds];
     // getConnectedEdges expects node objects, but we pass IDs and edges
-    const nodeObjects = ids.map(id => ({ id })) as any[];
-    return getConnectedEdgesSystem(nodeObjects, this.store.edges() as any[]) as unknown as EdgeType[];
+    const nodeObjects = ids.map(id => ({ id })) as NodeBase[];
+    return getConnectedEdgesSystem(nodeObjects, this.store.edges() as EdgeBase[]) as unknown as EdgeType[];
   }
 
-  getHandleConnections(params: { nodeId: string; type: 'source' | 'target'; id?: string }): any[] {
-    const nodeConnections = this.store.connectionLookup.get(params.nodeId);
-    if (!nodeConnections) return [];
-
-    const key = `${params.type}-${params.id ?? ''}`;
-    return Array.from(nodeConnections.get(key)?.values() ?? []);
+  getHandleConnections(params: { nodeId: string; type: 'source' | 'target'; id?: string }): HandleConnection[] {
+    // The connectionLookup is keyed by composite keys: nodeId, nodeId-type, nodeId-type-handleId
+    const lookupKey = params.id
+      ? `${params.nodeId}-${params.type}-${params.id}`
+      : `${params.nodeId}-${params.type}`;
+    const connections = this.store.connectionLookup.get(lookupKey);
+    if (!connections) return [];
+    return Array.from(connections.values());
   }
 
-  getNodeConnections(nodeId: string): any[] {
+  getNodeConnections(nodeId: string): HandleConnection[] {
     const nodeConnections = this.store.connectionLookup.get(nodeId);
     if (!nodeConnections) return [];
-
-    const connections: any[] = [];
-    for (const handleConnections of nodeConnections.values()) {
-      connections.push(...handleConnections.values());
-    }
-    return connections;
+    return Array.from(nodeConnections.values());
   }
 
   // ── Serialization ─────────────────────────────────────────────────────
@@ -353,16 +393,12 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * Returns a signal containing all connections for a node.
    * Equivalent to React's `useNodeConnections()`.
    */
-  selectNodeConnections(nodeId: string): Signal<any[]> {
+  selectNodeConnections(nodeId: string): Signal<HandleConnection[]> {
     return computed(() => {
       this.store.version();
       const nodeConnections = this.store.connectionLookup.get(nodeId);
       if (!nodeConnections) return [];
-      const connections: any[] = [];
-      for (const handleConnections of nodeConnections.values()) {
-        connections.push(...handleConnections.values());
-      }
-      return connections;
+      return Array.from(nodeConnections.values());
     });
   }
 
@@ -370,13 +406,15 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * Returns a signal containing connections for a specific handle.
    * Equivalent to React's `useHandleConnections()`.
    */
-  selectHandleConnections(params: { nodeId: string; type: 'source' | 'target'; id?: string }): Signal<any[]> {
+  selectHandleConnections(params: { nodeId: string; type: 'source' | 'target'; id?: string }): Signal<HandleConnection[]> {
     return computed(() => {
       this.store.version();
-      const nodeConnections = this.store.connectionLookup.get(params.nodeId);
-      if (!nodeConnections) return [];
-      const key = `${params.type}-${params.id ?? ''}`;
-      return Array.from(nodeConnections.get(key)?.values() ?? []);
+      const lookupKey = params.id
+        ? `${params.nodeId}-${params.type}-${params.id}`
+        : `${params.nodeId}-${params.type}`;
+      const connections = this.store.connectionLookup.get(lookupKey);
+      if (!connections) return [];
+      return Array.from(connections.values());
     });
   }
 
@@ -408,7 +446,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     const domNode = this.store.domNode();
     if (!domNode) return;
 
-    const updates = new Map<string, any>();
+    const updates = new Map<string, InternalNodeUpdate>();
     for (const id of ids) {
       const nodeEl = domNode.querySelector(`[data-id="${id}"]`) as HTMLDivElement | null;
       if (nodeEl) {

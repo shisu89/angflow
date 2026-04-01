@@ -11,7 +11,7 @@ import {
   Optional,
   Inject,
 } from '@angular/core';
-import { Position, XYHandle, type HandleType, type Connection } from '@xyflow/system';
+import { Position, XYHandle, type HandleType, type Connection, type ConnectionState } from '@xyflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 import { NODE_ID } from '../../services/tokens';
 
@@ -96,17 +96,20 @@ export class HandleComponent implements OnInit, OnDestroy {
       nodeLookup: store.nodeLookup,
       lib: 'ng',
       flowId: store.rfId(),
-      updateConnection: (connection: any) => store.updateConnection(connection),
-      panBy: (delta: any) => store.panBy(delta),
+      updateConnection: (connection: ConnectionState) => store.updateConnection(connection),
+      panBy: (delta: { x: number; y: number }) => store.panBy(delta),
       cancelConnection: () => store.cancelConnection(),
-      onConnect: (connection: any) => {
+      onConnect: (connection: Connection) => {
         this.handleConnect.emit(connection);
         store.onConnect?.(connection);
       },
-      onConnectStart: (event: any, params: any) => store.onConnectStart?.(event, params),
-      onConnectEnd: (event: any) => store.onConnectEnd?.(event),
+      onConnectStart: (event: MouseEvent | TouchEvent, params: { nodeId: string | null; handleId: string | null; handleType: HandleType | null }) => store.onConnectStart?.(event, params),
+      onConnectEnd: (event: MouseEvent | TouchEvent) => store.onConnectEnd?.(event),
       getTransform: () => store.transform(),
-      getFromHandle: () => (store.connection() as any).fromHandle ?? null,
+      getFromHandle: () => {
+        const conn = store.connection();
+        return conn.inProgress ? conn.fromHandle : null;
+      },
       autoPanSpeed: store.autoPanSpeed(),
       dragThreshold: 0,
       handleDomNode: this.el.nativeElement,
@@ -152,7 +155,7 @@ export class HandleComponent implements OnInit, OnDestroy {
       const storeValidation = store.isValidConnection();
       const validationFn = handleValidation ?? storeValidation;
 
-      if (!validationFn || validationFn(connection as any)) {
+      if (!validationFn || validationFn(connection as Connection)) {
         this.handleConnect.emit(connection as Connection);
         store.onConnect?.(connection);
       }

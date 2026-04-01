@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, computed, input, Type } from '@angular/core';
 import { CommonModule, NgComponentOutlet } from '@angular/common';
-import { getBezierPath, getSmoothStepPath, getStraightPath, ConnectionLineType, Position } from '@xyflow/system';
+import { getBezierPath, getSmoothStepPath, getStraightPath, ConnectionLineType, Position, type ConnectionInProgress } from '@xyflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 
 @Component({
@@ -35,7 +35,7 @@ import { FlowStore } from '../../services/flow-store.service';
 export class ConnectionLineComponent {
   readonly store = inject(FlowStore);
 
-  readonly customComponent = input<Type<any> | null>(null);
+  readonly customComponent = input<Type<unknown> | null>(null);
   readonly connectionLineType = input<ConnectionLineType>(ConnectionLineType.Bezier);
 
   readonly isConnecting = computed(() => {
@@ -65,23 +65,24 @@ export class ConnectionLineComponent {
     const conn = this.store.connection();
     if (!conn?.inProgress) return null;
 
-    const fromX = (conn as any).from?.x ?? 0;
-    const fromY = (conn as any).from?.y ?? 0;
-    const fromPosition = (conn as any).fromPosition ?? Position.Bottom;
+    const activeConn = conn as ConnectionInProgress;
+    const fromX = activeConn.from?.x ?? 0;
+    const fromY = activeConn.from?.y ?? 0;
+    const fromPosition = activeConn.fromPosition ?? Position.Bottom;
 
-    const toScreenX = (conn as any).to?.x ?? 0;
-    const toScreenY = (conn as any).to?.y ?? 0;
+    const toScreenX = activeConn.to?.x ?? 0;
+    const toScreenY = activeConn.to?.y ?? 0;
     const transform = this.store.transform();
     const toX = (toScreenX - transform[0]) / transform[2];
     const toY = (toScreenY - transform[1]) / transform[2];
 
-    const toPosition = (conn as any).toPosition ?? Position.Top;
+    const toPosition = activeConn.toPosition ?? Position.Top;
 
     return {
       fromX, fromY, fromPosition,
       toX, toY, toPosition,
-      fromNode: (conn as any).fromNode ?? null,
-      fromHandle: (conn as any).fromHandle ?? null,
+      fromNode: activeConn.fromNode ?? null,
+      fromHandle: activeConn.fromHandle ?? null,
     };
   });
 

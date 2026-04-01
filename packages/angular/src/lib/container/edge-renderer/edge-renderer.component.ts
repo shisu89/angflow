@@ -20,6 +20,7 @@ import {
   type EdgeMarker,
   type HandleType,
   type Connection,
+  type ConnectionState,
   type FinalConnectionState,
 } from '@xyflow/system';
 import { FlowStore } from '../../services/flow-store.service';
@@ -166,17 +167,17 @@ export class EdgeRendererComponent {
 
   readonly reconnectRadius = input(10);
 
-  readonly edgeClick = output<{ event: MouseEvent; edge: any }>();
-  readonly edgeDoubleClick = output<{ event: MouseEvent; edge: any }>();
-  readonly edgeContextMenu = output<{ event: MouseEvent; edge: any }>();
-  readonly edgeMouseEnter = output<{ event: MouseEvent; edge: any }>();
-  readonly edgeMouseMove = output<{ event: MouseEvent; edge: any }>();
-  readonly edgeMouseLeave = output<{ event: MouseEvent; edge: any }>();
+  readonly edgeClick = output<{ event: MouseEvent; edge: Edge }>();
+  readonly edgeDoubleClick = output<{ event: MouseEvent; edge: Edge }>();
+  readonly edgeContextMenu = output<{ event: MouseEvent; edge: Edge }>();
+  readonly edgeMouseEnter = output<{ event: MouseEvent; edge: Edge }>();
+  readonly edgeMouseMove = output<{ event: MouseEvent; edge: Edge }>();
+  readonly edgeMouseLeave = output<{ event: MouseEvent; edge: Edge }>();
   readonly customEdgeTypes = input<EdgeTypes>({});
 
-  readonly reconnect = output<{ edge: any; connection: Connection }>();
-  readonly reconnectStart = output<{ event: MouseEvent; edge: any; handleType: HandleType }>();
-  readonly reconnectEnd = output<{ event: MouseEvent | TouchEvent; edge: any; handleType: HandleType; connectionState: FinalConnectionState }>();
+  readonly reconnect = output<{ edge: Edge; connection: Connection }>();
+  readonly reconnectStart = output<{ event: MouseEvent; edge: Edge; handleType: HandleType }>();
+  readonly reconnectEnd = output<{ event: MouseEvent | TouchEvent; edge: Edge; handleType: HandleType; connectionState: FinalConnectionState }>();
 
   readonly visibleEdges = computed(() => {
     const visibleIds = this.store.visibleEdgeIds();
@@ -185,7 +186,7 @@ export class EdgeRendererComponent {
 
   readonly markers = computed(() => {
     const edges = this.store.edges();
-    const markerMap = new Map<string, any>();
+    const markerMap = new Map<string, Record<string, unknown>>();
 
     for (const edge of edges) {
       this.addMarker(markerMap, edge.markerStart as EdgeMarker | undefined);
@@ -203,15 +204,15 @@ export class EdgeRendererComponent {
     return resolvedType in customTypes;
   }
 
-  getEdgePath(ei: Record<string, any>): string {
+  getEdgePath(ei: Record<string, unknown>): string {
     const type = ei['type'] || 'default';
     const params = {
-      sourceX: ei['sourceX'],
-      sourceY: ei['sourceY'],
-      targetX: ei['targetX'],
-      targetY: ei['targetY'],
-      sourcePosition: ei['sourcePosition'] ?? Position.Bottom,
-      targetPosition: ei['targetPosition'] ?? Position.Top,
+      sourceX: ei['sourceX'] as number,
+      sourceY: ei['sourceY'] as number,
+      targetX: ei['targetX'] as number,
+      targetY: ei['targetY'] as number,
+      sourcePosition: (ei['sourcePosition'] ?? Position.Bottom) as Position,
+      targetPosition: (ei['targetPosition'] ?? Position.Top) as Position,
     };
 
     switch (type) {
@@ -228,34 +229,34 @@ export class EdgeRendererComponent {
     }
   }
 
-  getEdgeComponent(type?: string): Type<any> {
+  getEdgeComponent(type?: string): Type<unknown> {
     const resolvedType = type || 'default';
     return this.customEdgeTypes()[resolvedType] ?? builtInEdgeTypes[resolvedType] ?? BezierEdgeComponent;
   }
 
-  getEdgeInputs(edge: any): Record<string, any> {
+  getEdgeInputs(edge: Edge): Record<string, any> {
     const sourceNode = this.store.nodeLookup.get(edge.source);
     const targetNode = this.store.nodeLookup.get(edge.target);
 
     const sourceHandle = sourceNode?.internals?.handleBounds?.source?.find(
-      (h: any) => h.id === edge.sourceHandle || (!edge.sourceHandle && h.id === null)
+      (h) => h.id === edge.sourceHandle || (!edge.sourceHandle && h.id === null)
     ) ?? sourceNode?.internals?.handleBounds?.source?.[0];
 
     const targetHandle = targetNode?.internals?.handleBounds?.target?.find(
-      (h: any) => h.id === edge.targetHandle || (!edge.targetHandle && h.id === null)
+      (h) => h.id === edge.targetHandle || (!edge.targetHandle && h.id === null)
     ) ?? targetNode?.internals?.handleBounds?.target?.[0];
 
     const sourcePos = sourceNode?.internals?.positionAbsolute ?? sourceNode?.position ?? { x: 0, y: 0 };
     const targetPos = targetNode?.internals?.positionAbsolute ?? targetNode?.position ?? { x: 0, y: 0 };
 
-    const sourceW = sourceNode?.measured?.width ?? (sourceNode as any)?.width ?? 150;
-    const sourceH = sourceNode?.measured?.height ?? (sourceNode as any)?.height ?? 40;
-    const targetW = targetNode?.measured?.width ?? (targetNode as any)?.width ?? 150;
-    const targetH = targetNode?.measured?.height ?? (targetNode as any)?.height ?? 40;
+    const sourceW = sourceNode?.measured?.width ?? sourceNode?.width ?? 150;
+    const sourceH = sourceNode?.measured?.height ?? sourceNode?.height ?? 40;
+    const targetW = targetNode?.measured?.width ?? targetNode?.width ?? 150;
+    const targetH = targetNode?.measured?.height ?? targetNode?.height ?? 40;
 
     let sourceX: number, sourceY: number, targetX: number, targetY: number;
-    let srcPos = sourceHandle?.position ?? edge.sourcePosition ?? Position.Bottom;
-    let tgtPos = targetHandle?.position ?? edge.targetPosition ?? Position.Top;
+    let srcPos = sourceHandle?.position ?? (edge as Record<string, unknown>).sourcePosition as Position ?? Position.Bottom;
+    let tgtPos = targetHandle?.position ?? (edge as Record<string, unknown>).targetPosition as Position ?? Position.Top;
 
     if (sourceHandle) {
       sourceX = sourcePos.x + sourceHandle.x + (sourceHandle.width ?? 0) / 2;
@@ -293,13 +294,13 @@ export class EdgeRendererComponent {
       markerStart: this.getMarkerUrl(edge.markerStart as EdgeMarker | undefined),
       markerEnd: this.getMarkerUrl(edge.markerEnd as EdgeMarker | undefined),
       interactionWidth: edge.interactionWidth,
-      pathOptions: (edge as any).pathOptions,
+      pathOptions: (edge as Record<string, unknown>).pathOptions,
       sourceHandleId: edge.sourceHandle,
       targetHandleId: edge.targetHandle,
     };
   }
 
-  onEdgeEvent(event: MouseEvent, edge: any, eventType: string): void {
+  onEdgeEvent(event: MouseEvent, edge: Edge, eventType: string): void {
     switch (eventType) {
       case 'click':
         if (this.store.elementsSelectable()) {
@@ -325,20 +326,20 @@ export class EdgeRendererComponent {
     }
   }
 
-  getEdgeCenterX(ei: Record<string, any>): number {
-    return (ei['sourceX'] + ei['targetX']) / 2;
+  getEdgeCenterX(ei: Record<string, unknown>): number {
+    return ((ei['sourceX'] as number) + (ei['targetX'] as number)) / 2;
   }
 
-  getEdgeCenterY(ei: Record<string, any>): number {
-    return (ei['sourceY'] + ei['targetY']) / 2;
+  getEdgeCenterY(ei: Record<string, unknown>): number {
+    return ((ei['sourceY'] as number) + (ei['targetY'] as number)) / 2;
   }
 
-  getEdgeAriaLabel(edge: any): string {
+  getEdgeAriaLabel(edge: Edge): string {
     if (edge.ariaLabel) return edge.ariaLabel;
     return `Edge from ${edge.source} to ${edge.target}`;
   }
 
-  isEdgeReconnectable(edge: any): boolean {
+  isEdgeReconnectable(edge: Edge): boolean {
     if (edge.reconnectable !== undefined) return !!edge.reconnectable;
     return this.store.edgesReconnectable();
   }
@@ -355,7 +356,7 @@ export class EdgeRendererComponent {
     return y;
   }
 
-  onReconnectSourceMouseDown(event: MouseEvent, edge: any): void {
+  onReconnectSourceMouseDown(event: MouseEvent, edge: Edge): void {
     if (event.button !== 0) return;
     this.handleEdgeReconnect(event, edge, {
       nodeId: edge.target,
@@ -364,7 +365,7 @@ export class EdgeRendererComponent {
     });
   }
 
-  onReconnectTargetMouseDown(event: MouseEvent, edge: any): void {
+  onReconnectTargetMouseDown(event: MouseEvent, edge: Edge): void {
     if (event.button !== 0) return;
     this.handleEdgeReconnect(event, edge, {
       nodeId: edge.source,
@@ -375,7 +376,7 @@ export class EdgeRendererComponent {
 
   private handleEdgeReconnect(
     event: MouseEvent,
-    edge: any,
+    edge: Edge,
     oppositeHandle: { nodeId: string; id: string | null; type: HandleType }
   ): void {
     const store = this.store;
@@ -396,10 +397,13 @@ export class EdgeRendererComponent {
       lib: 'ng',
       flowId: store.rfId(),
       cancelConnection: () => store.cancelConnection(),
-      panBy: (delta: any) => store.panBy(delta),
-      updateConnection: (conn: any) => store.updateConnection(conn),
+      panBy: (delta: { x: number; y: number }) => store.panBy(delta),
+      updateConnection: (conn: ConnectionState) => store.updateConnection(conn),
       getTransform: () => store.transform(),
-      getFromHandle: () => (store.connection() as any).fromHandle ?? null,
+      getFromHandle: () => {
+        const conn = store.connection();
+        return conn.inProgress ? conn.fromHandle : null;
+      },
       autoPanSpeed: store.autoPanSpeed(),
       dragThreshold: store.connectionDragThreshold(),
       handleDomNode: event.currentTarget as Element,
@@ -413,7 +417,7 @@ export class EdgeRendererComponent {
     } as any);
   }
 
-  private addMarker(map: Map<string, any>, marker: EdgeMarker | undefined): void {
+  private addMarker(map: Map<string, Record<string, unknown>>, marker: EdgeMarker | undefined): void {
     if (!marker || typeof marker === 'string') return;
     const id = getMarkerId(marker, undefined);
     if (!map.has(id)) {

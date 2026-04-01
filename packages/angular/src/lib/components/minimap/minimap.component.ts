@@ -125,7 +125,7 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
   readonly nodeClassName = input<string | GetMiniMapNodeAttribute>('');
   readonly nodeBorderRadius = input(5);
   readonly nodeStrokeWidth = input(2);
-  readonly nodeComponent = input<Type<any> | null>(null);
+  readonly nodeComponent = input<Type<unknown> | null>(null);
 
   // Appearance
   readonly bgColor = input<string>();
@@ -139,7 +139,7 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
 
   // Events
   readonly minimapClick = output<{ event: MouseEvent; position: { x: number; y: number } }>();
-  readonly minimapNodeClick = output<{ event: MouseEvent; node: any }>();
+  readonly minimapNodeClick = output<{ event: MouseEvent; node: Node }>();
 
   private xyMinimap: ReturnType<typeof XYMinimap> | null = null;
 
@@ -175,28 +175,28 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
     };
   });
 
-  getNodeColor(node: { _userNode?: any }): string {
+  getNodeColor(node: { _userNode?: Node }): string {
     const color = this.nodeColor();
-    if (typeof color === 'function') {
+    if (typeof color === 'function' && node._userNode) {
       return color(node._userNode);
     }
-    return color;
+    return typeof color === 'string' ? color : '#e2e2e2';
   }
 
-  getNodeStrokeColor(node: { _userNode?: any }): string {
+  getNodeStrokeColor(node: { _userNode?: Node }): string {
     const strokeColor = this.nodeStrokeColor();
-    if (typeof strokeColor === 'function') {
+    if (typeof strokeColor === 'function' && node._userNode) {
       return strokeColor(node._userNode);
     }
-    return strokeColor;
+    return typeof strokeColor === 'string' ? strokeColor : 'transparent';
   }
 
-  getNodeClassName(node: { _userNode?: any }): string {
+  getNodeClassName(node: { _userNode?: Node }): string {
     const className = this.nodeClassName();
-    if (typeof className === 'function') {
+    if (typeof className === 'function' && node._userNode) {
       return className(node._userNode);
     }
-    return className;
+    return typeof className === 'string' ? className : '';
   }
 
   ngAfterViewInit(): void {}
@@ -268,9 +268,11 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
     requestAnimationFrame(animate);
   }
 
-  onMinimapNodeClick(event: MouseEvent, node: any): void {
+  onMinimapNodeClick(event: MouseEvent, node: { _userNode?: Node }): void {
     event.stopPropagation();
-    this.minimapNodeClick.emit({ event, node: node._userNode });
+    if (node._userNode) {
+      this.minimapNodeClick.emit({ event, node: node._userNode });
+    }
   }
 
   ngOnDestroy(): void {

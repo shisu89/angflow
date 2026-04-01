@@ -48,6 +48,9 @@ import {
   type FinalConnectionState,
   type HandleType,
   type Connection,
+  type NodeChange,
+  type EdgeChange,
+  type OnConnectStartParams,
 } from '@xyflow/system';
 
 import { FlowStore } from '../../services/flow-store.service';
@@ -124,13 +127,15 @@ import type {
         [selectionOnDrag]="selectionOnDrag()"
         [selectionKeyCode]="selectionKeyCode()"
         [selectionMode]="selectionMode()"
-        (click)="paneClick.emit($event)"
+        (pointerdown)="onPanePointerDown($event)"
+        (click)="onPaneClick($event)"
         (contextmenu)="onPaneContextMenu($event)"
         (mouseenter)="paneMouseEnter.emit($event)"
         (mousemove)="paneMouseMove.emit($event)"
         (mouseleave)="paneMouseLeave.emit($event)"
         (selectionStart)="selectionStart.emit($event)"
         (selectionEnd)="selectionEnd.emit($event)"
+        (paneScroll)="paneScroll.emit($event)"
       >
         <ng-flow-viewport [transform]="store.transform()">
           <ng-flow-edge-renderer
@@ -159,7 +164,7 @@ import type {
             (nodeDragStop)="nodeDragStop.emit($event)"
           />
         </ng-flow-viewport>
-        <ng-flow-selection-box />
+        <ng-flow-selection-box (contextMenu)="selectionContextMenu.emit({ event: $event, nodes: store.selectedNodes() })" />
       </ng-flow-pane>
       <ng-content />
       <div class="xy-flow__a11y-descriptions" aria-live="assertive" aria-atomic="true"
@@ -213,7 +218,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
   readonly connectionMode = input<ConnectionMode>(ConnectionMode.Strict);
   readonly connectionLineType = input<ConnectionLineType>(ConnectionLineType.Bezier);
-  readonly connectionLineComponent = input<Type<any> | null>(null);
+  readonly connectionLineComponent = input<Type<unknown> | null>(null);
   readonly connectionLineStyle = input<Partial<CSSStyleDeclaration>>();
   readonly connectionLineContainerStyle = input<Partial<CSSStyleDeclaration>>();
 
@@ -312,44 +317,44 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   // ── Event outputs ─────────────────────────────────────────────────────
 
   // State change events
-  readonly nodesChange = output<any[]>({ alias: 'nodesChange' });
-  readonly edgesChange = output<any[]>({ alias: 'edgesChange' });
+  readonly nodesChange = output<NodeChange[]>({ alias: 'nodesChange' });
+  readonly edgesChange = output<EdgeChange[]>({ alias: 'edgesChange' });
 
   // Init
   readonly init = output<NgFlowService<NodeType, EdgeType>>({ alias: 'init' });
 
   // Node events
-  readonly nodeClick = output<{ event: MouseEvent; node: NodeType }>({ alias: 'nodeClick' });
-  readonly nodeDoubleClick = output<{ event: MouseEvent; node: NodeType }>({ alias: 'nodeDoubleClick' });
-  readonly nodeMouseEnter = output<{ event: MouseEvent; node: NodeType }>({ alias: 'nodeMouseEnter' });
-  readonly nodeMouseMove = output<{ event: MouseEvent; node: NodeType }>({ alias: 'nodeMouseMove' });
-  readonly nodeMouseLeave = output<{ event: MouseEvent; node: NodeType }>({ alias: 'nodeMouseLeave' });
-  readonly nodeContextMenu = output<{ event: MouseEvent; node: NodeType }>({ alias: 'nodeContextMenu' });
-  readonly nodeDragStart = output<{ event: MouseEvent; node: NodeType; nodes: NodeType[] }>({ alias: 'nodeDragStart' });
-  readonly nodeDrag = output<{ event: MouseEvent; node: NodeType; nodes: NodeType[] }>({ alias: 'nodeDrag' });
-  readonly nodeDragStop = output<{ event: MouseEvent; node: NodeType; nodes: NodeType[] }>({ alias: 'nodeDragStop' });
+  readonly nodeClick = output<{ event: MouseEvent; node: Node }>({ alias: 'nodeClick' });
+  readonly nodeDoubleClick = output<{ event: MouseEvent; node: Node }>({ alias: 'nodeDoubleClick' });
+  readonly nodeMouseEnter = output<{ event: MouseEvent; node: Node }>({ alias: 'nodeMouseEnter' });
+  readonly nodeMouseMove = output<{ event: MouseEvent; node: Node }>({ alias: 'nodeMouseMove' });
+  readonly nodeMouseLeave = output<{ event: MouseEvent; node: Node }>({ alias: 'nodeMouseLeave' });
+  readonly nodeContextMenu = output<{ event: MouseEvent; node: Node }>({ alias: 'nodeContextMenu' });
+  readonly nodeDragStart = output<{ event: MouseEvent; node: Node; nodes: Node[] }>({ alias: 'nodeDragStart' });
+  readonly nodeDrag = output<{ event: MouseEvent; node: Node; nodes: Node[] }>({ alias: 'nodeDrag' });
+  readonly nodeDragStop = output<{ event: MouseEvent; node: Node; nodes: Node[] }>({ alias: 'nodeDragStop' });
 
   // Edge events
-  readonly edgeClick = output<{ event: MouseEvent; edge: EdgeType }>({ alias: 'edgeClick' });
-  readonly edgeDoubleClick = output<{ event: MouseEvent; edge: EdgeType }>({ alias: 'edgeDoubleClick' });
-  readonly edgeContextMenu = output<{ event: MouseEvent; edge: EdgeType }>({ alias: 'edgeContextMenu' });
-  readonly edgeMouseEnter = output<{ event: MouseEvent; edge: EdgeType }>({ alias: 'edgeMouseEnter' });
-  readonly edgeMouseMove = output<{ event: MouseEvent; edge: EdgeType }>({ alias: 'edgeMouseMove' });
-  readonly edgeMouseLeave = output<{ event: MouseEvent; edge: EdgeType }>({ alias: 'edgeMouseLeave' });
+  readonly edgeClick = output<{ event: MouseEvent; edge: Edge }>({ alias: 'edgeClick' });
+  readonly edgeDoubleClick = output<{ event: MouseEvent; edge: Edge }>({ alias: 'edgeDoubleClick' });
+  readonly edgeContextMenu = output<{ event: MouseEvent; edge: Edge }>({ alias: 'edgeContextMenu' });
+  readonly edgeMouseEnter = output<{ event: MouseEvent; edge: Edge }>({ alias: 'edgeMouseEnter' });
+  readonly edgeMouseMove = output<{ event: MouseEvent; edge: Edge }>({ alias: 'edgeMouseMove' });
+  readonly edgeMouseLeave = output<{ event: MouseEvent; edge: Edge }>({ alias: 'edgeMouseLeave' });
 
   // Connection events
   readonly connect = output<Connection>({ alias: 'connect' });
-  readonly connectStart = output<any>({ alias: 'connectStart' });
-  readonly connectEnd = output<any>({ alias: 'connectEnd' });
+  readonly connectStart = output<{ event: MouseEvent | TouchEvent; params: OnConnectStartParams }>({ alias: 'connectStart' });
+  readonly connectEnd = output<MouseEvent | TouchEvent>({ alias: 'connectEnd' });
 
   // Click-connect events
-  readonly clickConnectStart = output<any>({ alias: 'clickConnectStart' });
-  readonly clickConnectEnd = output<any>({ alias: 'clickConnectEnd' });
+  readonly clickConnectStart = output<{ event: MouseEvent; params: OnConnectStartParams }>({ alias: 'clickConnectStart' });
+  readonly clickConnectEnd = output<MouseEvent>({ alias: 'clickConnectEnd' });
 
   // Reconnection events
-  readonly reconnect = output<{ edge: EdgeType; connection: Connection }>({ alias: 'reconnect' });
-  readonly reconnectStart = output<{ event: MouseEvent; edge: EdgeType; handleType: HandleType }>({ alias: 'reconnectStart' });
-  readonly reconnectEnd = output<{ event: MouseEvent | TouchEvent; edge: EdgeType; handleType: HandleType; connectionState: FinalConnectionState }>({ alias: 'reconnectEnd' });
+  readonly reconnect = output<{ edge: Edge; connection: Connection }>({ alias: 'reconnect' });
+  readonly reconnectStart = output<{ event: MouseEvent; edge: Edge; handleType: HandleType }>({ alias: 'reconnectStart' });
+  readonly reconnectEnd = output<{ event: MouseEvent | TouchEvent; edge: Edge; handleType: HandleType; connectionState: FinalConnectionState }>({ alias: 'reconnectEnd' });
 
   // Pane events
   readonly paneClick = output<MouseEvent>({ alias: 'paneClick' });
@@ -366,18 +371,18 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   readonly viewportChange = output<Viewport>({ alias: 'viewportChange' });
 
   // Selection events
-  readonly selectionChange = output<{ nodes: NodeType[]; edges: EdgeType[] }>({ alias: 'selectionChange' });
-  readonly selectionDragStart = output<{ event: MouseEvent; nodes: NodeType[] }>({ alias: 'selectionDragStart' });
-  readonly selectionDrag = output<{ event: MouseEvent; nodes: NodeType[] }>({ alias: 'selectionDrag' });
-  readonly selectionDragStop = output<{ event: MouseEvent; nodes: NodeType[] }>({ alias: 'selectionDragStop' });
+  readonly selectionChange = output<{ nodes: Node[]; edges: Edge[] }>({ alias: 'selectionChange' });
+  readonly selectionDragStart = output<{ event: MouseEvent; nodes: Node[] }>({ alias: 'selectionDragStart' });
+  readonly selectionDrag = output<{ event: MouseEvent; nodes: Node[] }>({ alias: 'selectionDrag' });
+  readonly selectionDragStop = output<{ event: MouseEvent; nodes: Node[] }>({ alias: 'selectionDragStop' });
   readonly selectionStart = output<MouseEvent>({ alias: 'selectionStart' });
   readonly selectionEnd = output<MouseEvent>({ alias: 'selectionEnd' });
-  readonly selectionContextMenu = output<{ event: MouseEvent; nodes: NodeType[] }>({ alias: 'selectionContextMenu' });
+  readonly selectionContextMenu = output<{ event: MouseEvent; nodes: Node[] }>({ alias: 'selectionContextMenu' });
 
   // Delete events
-  readonly nodesDelete = output<NodeType[]>({ alias: 'nodesDelete' });
-  readonly edgesDelete = output<EdgeType[]>({ alias: 'edgesDelete' });
-  readonly deleteEvent = output<{ nodes: NodeType[]; edges: EdgeType[] }>({ alias: 'delete' });
+  readonly nodesDelete = output<Node[]>({ alias: 'nodesDelete' });
+  readonly edgesDelete = output<Edge[]>({ alias: 'edgesDelete' });
+  readonly deleteEvent = output<{ nodes: Node[]; edges: Edge[] }>({ alias: 'delete' });
 
   /**
    * Callback invoked before elements are deleted.
@@ -387,6 +392,12 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
   // Error
   readonly error = output<{ id: string; message: string }>({ alias: 'error' });
+
+  // Auto-pan events (declared for API completeness; not yet wired because
+  // auto-pan detection happens inside XYDrag's internal requestAnimationFrame
+  // loop, which does not currently expose start/end callbacks)
+  readonly autoPanStart = output<void>({ alias: 'autoPanStart' });
+  readonly autoPanEnd = output<void>({ alias: 'autoPanEnd' });
 
   constructor() {
     // Sync inputs → store via effects
@@ -424,6 +435,8 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       this.store.connectionRadius.set(this.connectionRadius());
       this.store.connectionDragThreshold.set(this.connectionDragThreshold());
       this.store.nodeDragThreshold.set(this.nodeDragThreshold());
+      this.store.paneClickDistance.set(this.paneClickDistance());
+      this.store.nodeClickDistance.set(this.nodeClickDistance());
       this.store.autoPanOnConnect.set(this.autoPanOnConnect());
       this.store.autoPanOnNodeDrag.set(this.autoPanOnNodeDrag());
       this.store.autoPanSpeed.set(this.autoPanSpeed());
@@ -451,11 +464,11 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
     effect(() => {
       const isValid = this.isValidConnection();
-      this.store.isValidConnection.set(isValid as any);
+      this.store.isValidConnection.set(isValid);
     });
 
     effect(() => {
-      this.store.onBeforeDelete = this.onBeforeDelete() as any ?? null;
+      this.store.onBeforeDelete = this.onBeforeDelete() ?? null;
     });
 
     effect(() => {
@@ -471,28 +484,28 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     });
 
     // Wire store change callbacks to outputs
-    this.store.onNodesChange = (changes: any[]) => {
+    this.store.onNodesChange = (changes: NodeChange<NodeType>[]) => {
       this.nodesChange.emit(changes);
     };
 
-    this.store.onEdgesChange = (changes: any[]) => {
+    this.store.onEdgesChange = (changes: EdgeChange<EdgeType>[]) => {
       this.edgesChange.emit(changes);
     };
 
     // Wire connection callbacks
-    this.store.onConnect = (connection: any) => {
+    this.store.onConnect = (connection: Connection) => {
       this.connect.emit(connection);
     };
-    this.store.onConnectStart = (event: any, params: any) => {
-      this.connectStart.emit({ event, ...params });
+    this.store.onConnectStart = (event: MouseEvent | TouchEvent, params: OnConnectStartParams) => {
+      this.connectStart.emit({ event, params });
     };
-    this.store.onConnectEnd = (event: any) => {
+    this.store.onConnectEnd = (event: MouseEvent | TouchEvent) => {
       this.connectEnd.emit(event);
     };
-    this.store.onClickConnectStart = (event: any, params: any) => {
-      this.clickConnectStart.emit({ event, ...params });
+    this.store.onClickConnectStart = (event: MouseEvent, params: OnConnectStartParams) => {
+      this.clickConnectStart.emit({ event, params });
     };
-    this.store.onClickConnectEnd = (event: any) => {
+    this.store.onClickConnectEnd = (event: MouseEvent) => {
       this.clickConnectEnd.emit(event);
     };
   }
@@ -572,8 +585,8 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     for (const node of nodes) {
       const x = node.position.x;
       const y = node.position.y;
-      const w = (node as any).width ?? 150;
-      const h = (node as any).height ?? 40;
+      const w = node.width ?? 150;
+      const h = node.height ?? 40;
       minX = Math.min(minX, x);
       minY = Math.min(minY, y);
       maxX = Math.max(maxX, x + w);
@@ -595,6 +608,23 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     this.store.transform.set([vp.x, vp.y, vp.zoom]);
   }
 
+  private panePointerDownPos: { x: number; y: number } | null = null;
+
+  onPanePointerDown(event: PointerEvent): void {
+    this.panePointerDownPos = { x: event.clientX, y: event.clientY };
+  }
+
+  onPaneClick(event: MouseEvent): void {
+    const threshold = this.paneClickDistance();
+    if (threshold > 0 && this.panePointerDownPos) {
+      const dx = event.clientX - this.panePointerDownPos.x;
+      const dy = event.clientY - this.panePointerDownPos.y;
+      if (Math.sqrt(dx * dx + dy * dy) > threshold) return;
+    }
+    this.panePointerDownPos = null;
+    this.paneClick.emit(event);
+  }
+
   onPaneContextMenu(event: MouseEvent): void {
     event.preventDefault();
     this.paneContextMenu.emit(event);
@@ -613,10 +643,10 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       onDraggingChange: (dragging: boolean) => {
         this.store.paneDragging.set(dragging);
       },
-      onPanZoomStart: (event: any, viewport: Viewport) => {
+      onPanZoomStart: (event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
         this.moveStart.emit({ event, viewport });
       },
-      onPanZoom: (event: any, viewport: Viewport) => {
+      onPanZoom: (event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
         this.zone.run(() => {
           const transform: Transform = [viewport.x, viewport.y, viewport.zoom];
           this.store.transform.set(transform);
@@ -625,7 +655,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
           this.viewportChange.emit(viewport);
         });
       },
-      onPanZoomEnd: (event: any, viewport: Viewport) => {
+      onPanZoomEnd: (event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
         this.moveEnd.emit({ event, viewport });
       },
     });

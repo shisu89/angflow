@@ -18,6 +18,10 @@ import {
   type OnResize,
   type OnResizeEnd,
   type ShouldResize,
+  type XYResizerChange,
+  type XYResizerChildChange,
+  type ResizeDragEvent,
+  type ResizeParams,
 } from '@xyflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 import { NODE_ID } from '../../services/tokens';
@@ -117,9 +121,9 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
   readonly onResizeCb = input<OnResize | undefined>(undefined, { alias: 'onResize' });
   readonly onResizeEndCb = input<OnResizeEnd | undefined>(undefined, { alias: 'onResizeEnd' });
 
-  readonly resizeStart = output<any>();
-  readonly resize = output<any>();
-  readonly resizeEnd = output<any>();
+  readonly resizeStart = output<{ event: ResizeDragEvent } & ResizeParams>();
+  readonly resize = output<{ event?: ResizeDragEvent; changes?: XYResizerChange; childChanges?: XYResizerChildChange[] } & Partial<ResizeParams>>();
+  readonly resizeEnd = output<{ event?: ResizeDragEvent; changes?: Required<XYResizerChange> } & Partial<ResizeParams>>();
 
   private nodeId: string = '';
   private resizerInstances: ReturnType<typeof XYResizer>[] = [];
@@ -148,11 +152,11 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
           nodeOrigin: this.store.nodeOrigin(),
           paneDomNode: this.store.domNode(),
         }),
-        onChange: (changes: any, childChanges: any[]) => {
+        onChange: (changes: XYResizerChange, childChanges: XYResizerChildChange[]) => {
           this.resize.emit({ changes, childChanges });
         },
-        onEnd: (change: any) => {
-          this.resizeEnd.emit(change);
+        onEnd: (change: Required<XYResizerChange>) => {
+          this.resizeEnd.emit({ changes: change });
         },
       });
 
@@ -165,17 +169,17 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
           maxHeight: this.maxHeight(),
         },
         keepAspectRatio: this.keepAspectRatio(),
-        onResizeStart: this.onResizeStartCb() ?? ((event: any, params: any) => {
+        onResizeStart: this.onResizeStartCb() ?? ((event: ResizeDragEvent, params: ResizeParams) => {
           this.resizeStart.emit({ event, ...params });
         }),
-        onResize: this.onResizeCb() ?? ((event: any, params: any) => {
+        onResize: this.onResizeCb() ?? ((event: ResizeDragEvent, params: ResizeParams) => {
           this.resize.emit({ event, ...params });
         }),
-        onResizeEnd: this.onResizeEndCb() ?? ((event: any, params: any) => {
+        onResizeEnd: this.onResizeEndCb() ?? ((event: ResizeDragEvent, params: ResizeParams) => {
           this.resizeEnd.emit({ event, ...params });
         }),
         shouldResize: this.shouldResize(),
-      } as any);
+      });
 
       this.resizerInstances.push(resizer);
     });

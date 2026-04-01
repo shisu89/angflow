@@ -67,7 +67,7 @@ export type EdgeProps<EdgeType extends Edge = Edge> = Pick<
     targetHandleId?: string | null;
     markerStart?: string;
     markerEnd?: string;
-    pathOptions?: any;
+    pathOptions?: BezierPathOptions | SmoothStepPathOptions | Record<string, unknown>;
     interactionWidth?: number;
   };
 
@@ -75,6 +75,27 @@ export type EdgeProps<EdgeType extends Edge = Edge> = Pick<
  * Map of edge type names to Angular component types.
  */
 export type EdgeTypes = Record<string, Type<any>>;
+
+/**
+ * Input contract for custom edge components rendered via NgComponentOutlet.
+ * Custom edge components should declare signal inputs matching these properties.
+ */
+export interface EdgeComponentInputs<EdgeType extends Edge = Edge> {
+  id: string;
+  source: string;
+  target: string;
+  sourceX: number;
+  sourceY: number;
+  targetX: number;
+  targetY: number;
+  sourcePosition: Position;
+  targetPosition: Position;
+  data: EdgeType['data'];
+  selected: boolean;
+  type: string;
+  markerStart: string;
+  markerEnd: string;
+}
 
 /**
  * Props for the ConnectionLine component.

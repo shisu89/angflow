@@ -2,9 +2,13 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist/esm",
+    "rootDir": "./src",
     "declaration": true,
     "declarationMap": true,
-    "noImplicitReturns": false
+    "noImplicitReturns": false,
+    "paths": {
+      "@xyflow/system": ["../system/dist/esm/index.d.ts"]
+    }
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/*.spec.ts"]

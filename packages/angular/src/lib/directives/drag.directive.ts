@@ -9,8 +9,9 @@ import {
   OnDestroy,
   SimpleChanges,
 } from '@angular/core';
-import { XYDrag, type XYDragInstance } from '@xyflow/system';
+import { XYDrag, type XYDragInstance, type NodeBase, type NodeDragItem } from '@xyflow/system';
 import { FlowStore } from '../services/flow-store.service';
+import type { Node } from '../types';
 
 @Directive({
   selector: '[ngFlowDrag]',
@@ -27,9 +28,9 @@ export class DragDirective implements OnInit, OnChanges, OnDestroy {
   readonly isSelectable = input(true, { alias: 'ngFlowDragSelectable' });
   readonly nodeClickDistance = input(0, { alias: 'ngFlowDragClickDistance' });
 
-  readonly dragStart = output<{ event: MouseEvent; node: any; nodes: any[] }>();
-  readonly drag = output<{ event: MouseEvent; node: any; nodes: any[] }>();
-  readonly dragStop = output<{ event: MouseEvent; node: any; nodes: any[] }>();
+  readonly dragStart = output<{ event: MouseEvent; node: Node; nodes: Node[] }>();
+  readonly drag = output<{ event: MouseEvent; node: Node; nodes: Node[] }>();
+  readonly dragStop = output<{ event: MouseEvent; node: Node; nodes: Node[] }>();
 
   private dragInstance: XYDragInstance | null = null;
 
@@ -39,17 +40,20 @@ export class DragDirective implements OnInit, OnChanges, OnDestroy {
       onNodeMouseDown: (id: string) => {
         this.handleNodeClick(id);
       },
-      onDragStart: (event: any, _dragItems: any, node: any) => {
+      onDragStart: (event: MouseEvent, _dragItems: Map<string, NodeDragItem>, node: NodeBase) => {
         const selectedNodes = this.store.selectedNodes();
-        this.dragStart.emit({ event, node: node?.internals?.userNode ?? node, nodes: selectedNodes });
+        const userNode = (node as unknown as { internals?: { userNode?: Node } })?.internals?.userNode ?? node as unknown as Node;
+        this.dragStart.emit({ event, node: userNode, nodes: selectedNodes });
       },
-      onDrag: (event: any, _dragItems: any, node: any) => {
+      onDrag: (event: MouseEvent, _dragItems: Map<string, NodeDragItem>, node: NodeBase) => {
         const selectedNodes = this.store.selectedNodes();
-        this.drag.emit({ event, node: node?.internals?.userNode ?? node, nodes: selectedNodes });
+        const userNode = (node as unknown as { internals?: { userNode?: Node } })?.internals?.userNode ?? node as unknown as Node;
+        this.drag.emit({ event, node: userNode, nodes: selectedNodes });
       },
-      onDragStop: (event: any, _dragItems: any, node: any) => {
+      onDragStop: (event: MouseEvent, _dragItems: Map<string, NodeDragItem>, node: NodeBase) => {
         const selectedNodes = this.store.selectedNodes();
-        this.dragStop.emit({ event, node: node?.internals?.userNode ?? node, nodes: selectedNodes });
+        const userNode = (node as unknown as { internals?: { userNode?: Node } })?.internals?.userNode ?? node as unknown as Node;
+        this.dragStop.emit({ event, node: userNode, nodes: selectedNodes });
       },
     });
 

@@ -6,9 +6,10 @@ import {
   OnInit,
   OnDestroy,
 } from '@angular/core';
-import { isInputDOMNode } from '@xyflow/system';
+import { isInputDOMNode, type NodeChange, type EdgeChange } from '@xyflow/system';
 import { FlowStore } from '../services/flow-store.service';
 import { elementToRemoveChange } from '../utils/changes';
+import type { Node, Edge } from '../types';
 
 @Directive({
   selector: '[ngFlowKeyHandler]',
@@ -26,9 +27,9 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
   readonly multiSelectionKeyCode = input<string | string[] | null>('Meta');
   readonly disableKeyboardA11y = input(false);
 
-  readonly nodesDelete = output<any[]>();
-  readonly edgesDelete = output<any[]>();
-  readonly deleteElements = output<{ nodes: any[]; edges: any[] }>();
+  readonly nodesDelete = output<Node[]>();
+  readonly edgesDelete = output<Edge[]>();
+  readonly deleteElements = output<{ nodes: Node[]; edges: Edge[] }>();
 
   private selectionKeyPressed = false;
   private multiSelectionKeyPressed = false;
@@ -93,15 +94,15 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
     if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
 
     // Filter to only deletable elements
-    const deletableNodes = selectedNodes.filter((n: any) => n.deletable !== false);
-    const deletableEdges = selectedEdges.filter((e: any) => e.deletable !== false);
+    const deletableNodes = selectedNodes.filter((n) => n.deletable !== false);
+    const deletableEdges = selectedEdges.filter((e) => e.deletable !== false);
 
     // Collect edges connected to deleted nodes
     const nodeIds = new Set(deletableNodes.map((n) => n.id));
     const connectedEdges = this.store.edges().filter(
-      (e: any) => (nodeIds.has(e.source) || nodeIds.has(e.target)) && e.deletable !== false
+      (e) => (nodeIds.has(e.source) || nodeIds.has(e.target)) && e.deletable !== false
     );
-    const allEdgesToDelete = [...deletableEdges, ...connectedEdges.filter((e) => !deletableEdges.some((se: any) => se.id === e.id))];
+    const allEdgesToDelete = [...deletableEdges, ...connectedEdges.filter((e) => !deletableEdges.some((se) => se.id === e.id))];
 
     if (deletableNodes.length === 0 && allEdgesToDelete.length === 0) return;
 
@@ -119,8 +120,8 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
       const nodeChanges = deletableNodes.map((n) => elementToRemoveChange(n));
       const edgeChanges = allEdgesToDelete.map((e) => elementToRemoveChange(e));
 
-      this.store.triggerNodeChanges(nodeChanges as any);
-      this.store.triggerEdgeChanges(edgeChanges as any);
+      this.store.triggerNodeChanges(nodeChanges as NodeChange[]);
+      this.store.triggerEdgeChanges(edgeChanges as EdgeChange[]);
     };
 
     // Check beforeDelete callback
@@ -138,19 +139,19 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
   }
 
   private handleSelectAll(): void {
-    const nodeChanges = this.store.nodes().map((n: any) => ({
+    const nodeChanges = this.store.nodes().map((n) => ({
       id: n.id,
       type: 'select' as const,
       selected: true,
     }));
-    const edgeChanges = this.store.edges().map((e: any) => ({
+    const edgeChanges = this.store.edges().map((e) => ({
       id: e.id,
       type: 'select' as const,
       selected: true,
     }));
 
-    this.store.triggerNodeChanges(nodeChanges as any);
-    this.store.triggerEdgeChanges(edgeChanges as any);
+    this.store.triggerNodeChanges(nodeChanges as NodeChange[]);
+    this.store.triggerEdgeChanges(edgeChanges as EdgeChange[]);
   }
 
   private handleArrowKey(event: KeyboardEvent): void {
@@ -178,7 +179,7 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
       },
     }));
 
-    this.store.triggerNodeChanges(changes as any);
+    this.store.triggerNodeChanges(changes as NodeChange[]);
   }
 
   private matchesKey(eventKey: string, keyCode: string | string[] | null): boolean {
