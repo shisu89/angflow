@@ -32,10 +32,14 @@ export { MiniMapComponent, type GetMiniMapNodeAttribute } from './components/min
 export { NodeToolbarComponent } from './components/node-toolbar/node-toolbar.component';
 export { EdgeToolbarComponent } from './components/edge-toolbar/edge-toolbar.component';
 export { NodeResizerComponent } from './components/node-resizer/node-resizer.component';
+export { A11yDescriptionsComponent } from './components/a11y-descriptions/a11y-descriptions.component';
+export { AttributionComponent } from './components/attribution/attribution.component';
 
 // Directives
 export { DragDirective } from './directives/drag.directive';
 export { KeyHandlerDirective } from './directives/key-handler.directive';
+export { NgFlowNodeTypeDirective } from './directives/node-type.directive';
+export { NgFlowDropZoneDirective } from './directives/drop-zone.directive';
 
 // Services
 export { FlowStore } from './services/flow-store.service';

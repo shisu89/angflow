@@ -3,15 +3,13 @@ import {
   ElementRef,
   inject,
   input,
-  output,
   OnInit,
   OnChanges,
   OnDestroy,
   SimpleChanges,
 } from '@angular/core';
-import { XYDrag, type XYDragInstance, type NodeBase, type NodeDragItem } from '@ngflow/system';
+import { XYDrag, type XYDragInstance } from '@ngflow/system';
 import { FlowStore } from '../services/flow-store.service';
-import type { Node } from '../types';
 
 @Directive({
   selector: '[ngFlowDrag]',
@@ -28,10 +26,6 @@ export class DragDirective implements OnInit, OnChanges, OnDestroy {
   readonly isSelectable = input(true, { alias: 'ngFlowDragSelectable' });
   readonly nodeClickDistance = input(0, { alias: 'ngFlowDragClickDistance' });
 
-  readonly dragStart = output<{ event: MouseEvent; node: Node; nodes: Node[] }>();
-  readonly drag = output<{ event: MouseEvent; node: Node; nodes: Node[] }>();
-  readonly dragStop = output<{ event: MouseEvent; node: Node; nodes: Node[] }>();
-
   private dragInstance: XYDragInstance | null = null;
 
   ngOnInit(): void {
@@ -39,21 +33,6 @@ export class DragDirective implements OnInit, OnChanges, OnDestroy {
       getStoreItems: () => this.store.getStoreItems(),
       onNodeMouseDown: (id: string) => {
         this.handleNodeClick(id);
-      },
-      onDragStart: (event: MouseEvent, _dragItems: Map<string, NodeDragItem>, node: NodeBase) => {
-        const selectedNodes = this.store.selectedNodes();
-        const userNode = (node as unknown as { internals?: { userNode?: Node } })?.internals?.userNode ?? node as unknown as Node;
-        this.dragStart.emit({ event, node: userNode, nodes: selectedNodes });
-      },
-      onDrag: (event: MouseEvent, _dragItems: Map<string, NodeDragItem>, node: NodeBase) => {
-        const selectedNodes = this.store.selectedNodes();
-        const userNode = (node as unknown as { internals?: { userNode?: Node } })?.internals?.userNode ?? node as unknown as Node;
-        this.drag.emit({ event, node: userNode, nodes: selectedNodes });
-      },
-      onDragStop: (event: MouseEvent, _dragItems: Map<string, NodeDragItem>, node: NodeBase) => {
-        const selectedNodes = this.store.selectedNodes();
-        const userNode = (node as unknown as { internals?: { userNode?: Node } })?.internals?.userNode ?? node as unknown as Node;
-        this.dragStop.emit({ event, node: userNode, nodes: selectedNodes });
       },
     });
 

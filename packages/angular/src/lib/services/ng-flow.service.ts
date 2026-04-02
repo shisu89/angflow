@@ -4,6 +4,8 @@ import {
   rendererPointToPoint,
   getNodesBounds as getNodesBoundsSystem,
   getConnectedEdges as getConnectedEdgesSystem,
+  getOutgoers as getOutgoersSystem,
+  getIncomers as getIncomersSystem,
   getViewportForBounds,
   type XYPosition,
   type SnapGrid,
@@ -530,6 +532,69 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
         })
         .filter((e): e is NonNullable<typeof e> => e !== null);
     });
+  }
+
+  // ── Computed Graph Signals ─────────────────────────────────────────
+
+  /**
+   * Returns a reactive signal of the outgoing neighbor nodes for a given node ID.
+   */
+  selectOutgoers(nodeId: string): Signal<NodeType[]> {
+    return computed(() => {
+      this.store.version();
+      const nodes = this.store.nodes();
+      const edges = this.store.edges();
+      const node = nodes.find(n => n.id === nodeId);
+      if (!node) return [];
+      return getOutgoersSystem(node, nodes, edges as EdgeBase[]) as unknown as NodeType[];
+    });
+  }
+
+  /**
+   * Returns a reactive signal of the incoming neighbor nodes for a given node ID.
+   */
+  selectIncomers(nodeId: string): Signal<NodeType[]> {
+    return computed(() => {
+      this.store.version();
+      const nodes = this.store.nodes();
+      const edges = this.store.edges();
+      const node = nodes.find(n => n.id === nodeId);
+      if (!node) return [];
+      return getIncomersSystem(node, nodes, edges as EdgeBase[]) as unknown as NodeType[];
+    });
+  }
+
+  /**
+   * Returns a reactive signal of all edges connected to a given node ID (as source or target).
+   */
+  selectConnectedEdges(nodeId: string): Signal<EdgeType[]> {
+    return computed(() => {
+      this.store.version();
+      return getConnectedEdgesSystem(
+        [{ id: nodeId }] as NodeBase[],
+        this.store.edges() as EdgeBase[]
+      ) as unknown as EdgeType[];
+    });
+  }
+
+  // ── Change Middleware ──────────────────────────────────────────────
+
+  /**
+   * Registers middleware that intercepts node changes before they are applied.
+   * Returns an unregister function.
+   */
+  onNodesChangeMiddleware(id: string, fn: (changes: import('@ngflow/system').NodeChange<NodeType>[]) => import('@ngflow/system').NodeChange<NodeType>[]): () => void {
+    this.store.nodesChangeMiddleware.set(id, fn);
+    return () => { this.store.nodesChangeMiddleware.delete(id); };
+  }
+
+  /**
+   * Registers middleware that intercepts edge changes before they are applied.
+   * Returns an unregister function.
+   */
+  onEdgesChangeMiddleware(id: string, fn: (changes: import('@ngflow/system').EdgeChange<EdgeType>[]) => import('@ngflow/system').EdgeChange<EdgeType>[]): () => void {
+    this.store.edgesChangeMiddleware.set(id, fn);
+    return () => { this.store.edgesChangeMiddleware.delete(id); };
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────

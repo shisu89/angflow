@@ -10,9 +10,9 @@ import {
   AfterViewInit,
   OnDestroy,
   ElementRef,
-  viewChild,
+  TemplateRef,
 } from '@angular/core';
-import { CommonModule, NgComponentOutlet } from '@angular/common';
+import { CommonModule, NgComponentOutlet, NgTemplateOutlet } from '@angular/common';
 import { FlowStore } from '../../services/flow-store.service';
 import { NODE_ID } from '../../services/tokens';
 import { DragDirective } from '../../directives/drag.directive';
@@ -32,7 +32,7 @@ const builtInNodeTypes: NodeTypes = {
 @Component({
   selector: 'ng-flow-node-renderer',
   standalone: true,
-  imports: [CommonModule, NgComponentOutlet, DragDirective],
+  imports: [CommonModule, NgComponentOutlet, NgTemplateOutlet, DragDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     'class': 'ng-flow__nodes xy-flow__nodes',
@@ -52,11 +52,9 @@ const builtInNodeTypes: NodeTypes = {
         [ngFlowDragDisabled]="node.draggable === false || !store.nodesDraggable()"
         [ngFlowDragHandleSelector]="node.dragHandle"
         [ngFlowDragNoDragClass]="store.noDragClassName()"
-        (dragStart)="nodeDragStart.emit($event)"
-        (drag)="nodeDrag.emit($event)"
-        (dragStop)="nodeDragStop.emit($event)"
         role="button"
         [attr.aria-label]="getNodeAriaLabel(node)"
+        [attr.aria-describedby]="store.rfId() + '-node-desc'"
         [attr.aria-selected]="node.selected ?? false"
         [attr.data-id]="node.id"
         [attr.tabindex]="store.nodesFocusable() ? 0 : -1"
@@ -70,9 +68,15 @@ const builtInNodeTypes: NodeTypes = {
         (mouseleave)="onNodeEvent($event, node.id, 'mouseleave')"
         (focus)="onNodeFocus(node)"
       >
-        <ng-container
-          *ngComponentOutlet="getNodeComponent(node.type); inputs: getNodeInputs(node); injector: getNodeInjector(node.id)"
-        />
+        @if (getNodeTemplate(node.type); as tmpl) {
+          <ng-container
+            *ngTemplateOutlet="tmpl; context: getNodeTemplateContext(node); injector: getNodeInjector(node.id)"
+          />
+        } @else {
+          <ng-container
+            *ngComponentOutlet="getNodeComponent(node.type); inputs: getNodeInputs(node); injector: getNodeInjector(node.id)"
+          />
+        }
       </div>
     }
   `,
@@ -83,6 +87,7 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
   private el = inject(ElementRef<HTMLElement>);
 
   readonly customNodeTypes = input<NodeTypes>({});
+  readonly nodeTemplateMap = input<Map<string, TemplateRef<any>>>(new Map());
 
   // Node events that bubble up to NgFlowComponent
   readonly nodeClick = output<{ event: MouseEvent; node: Node }>();
@@ -91,9 +96,6 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
   readonly nodeMouseEnter = output<{ event: MouseEvent; node: Node }>();
   readonly nodeMouseMove = output<{ event: MouseEvent; node: Node }>();
   readonly nodeMouseLeave = output<{ event: MouseEvent; node: Node }>();
-  readonly nodeDragStart = output<{ event: MouseEvent; node: Node; nodes: Node[] }>();
-  readonly nodeDrag = output<{ event: MouseEvent; node: Node; nodes: Node[] }>();
-  readonly nodeDragStop = output<{ event: MouseEvent; node: Node; nodes: Node[] }>();
 
   readonly visibleNodes = computed(() => this.store.visibleNodes());
 
@@ -157,8 +159,9 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
 
     switch (eventType) {
       case 'click':
-        // Select the node on click
-        if (this.store.elementsSelectable()) {
+        // Select the node on click, but don't re-select if already selected
+        // (which would deselect other nodes in a multi-selection)
+        if (this.store.elementsSelectable() && !internalNode?.selected) {
           this.store.addSelectedNodes([nodeId]);
         }
         this.nodeClick.emit({ event, node });
@@ -182,8 +185,9 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
   }
 
   onNodeFocus(node: Node): void {
-    // Select the focused node
-    if (this.store.elementsSelectable()) {
+    // Select the focused node, but don't re-select if already selected
+    // (which would deselect other nodes in a multi-selection)
+    if (this.store.elementsSelectable() && !node.selected) {
       this.store.addSelectedNodes([node.id]);
     }
 
@@ -227,6 +231,24 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
     }
 
     this.store.panBy({ x: targetX - currentX, y: targetY - currentY });
+  }
+
+  getNodeTemplate(type?: string): TemplateRef<any> | null {
+    const resolvedType = type || 'default';
+    return this.nodeTemplateMap().get(resolvedType) ?? null;
+  }
+
+  getNodeTemplateContext(node: InternalNode): Record<string, unknown> {
+    const userNode = node.internals?.userNode ?? node;
+    return {
+      $implicit: userNode,
+      node: userNode,
+      data: userNode.data,
+      selected: node.selected ?? false,
+      id: node.id,
+      type: node.type,
+      dragging: node.dragging ?? false,
+    };
   }
 
   getNodeComponent(type?: string): Type<unknown> {

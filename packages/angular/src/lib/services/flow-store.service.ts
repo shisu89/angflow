@@ -134,6 +134,18 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   // ── Delete validation callback ────────────────────────────────────
   onBeforeDelete: ((params: { nodes: NodeType[]; edges: EdgeType[] }) => boolean | Promise<boolean>) | null = null;
 
+  // ── Node drag callbacks (set by NgFlowComponent, consumed by XYDrag) ──
+  onNodeDragStart: ((event: MouseEvent, node: NodeType, nodes: NodeType[]) => void) | null = null;
+  onNodeDrag: ((event: MouseEvent, node: NodeType, nodes: NodeType[]) => void) | null = null;
+  onNodeDragStop: ((event: MouseEvent, node: NodeType, nodes: NodeType[]) => void) | null = null;
+  onSelectionDragStart: ((event: MouseEvent, nodes: NodeType[]) => void) | null = null;
+  onSelectionDrag: ((event: MouseEvent, nodes: NodeType[]) => void) | null = null;
+  onSelectionDragStop: ((event: MouseEvent, nodes: NodeType[]) => void) | null = null;
+
+  // ── Change middleware maps ─────────────────────────────────────────
+  readonly nodesChangeMiddleware = new Map<string, (changes: NodeChange<NodeType>[]) => NodeChange<NodeType>[]>();
+  readonly edgesChangeMiddleware = new Map<string, (changes: EdgeChange<EdgeType>[]) => EdgeChange<EdgeType>[]>();
+
   // ── Mutable lookup maps (not deeply reactive, updated imperatively) ───
 
   readonly nodeLookup: NodeLookup<InternalNodeBase<NodeType>> = new Map();
@@ -326,6 +338,12 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   triggerNodeChanges(changes: NodeChange<NodeType>[]): void {
     if (!changes?.length) return;
 
+    // Apply middleware pipeline
+    for (const middleware of this.nodesChangeMiddleware.values()) {
+      changes = middleware(changes);
+      if (!changes?.length) return;
+    }
+
     // Fast path: if all changes are position-only, update nodeLookup in-place
     // instead of rebuilding everything via setNodes
     const allPosition = changes.every(c => c.type === 'position');
@@ -379,6 +397,12 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
   triggerEdgeChanges(changes: EdgeChange<EdgeType>[]): void {
     if (!changes?.length) return;
+
+    // Apply middleware pipeline
+    for (const middleware of this.edgesChangeMiddleware.values()) {
+      changes = middleware(changes);
+      if (!changes?.length) return;
+    }
 
     // Always apply changes internally for immediate visual feedback
     const updatedEdges = applyEdgeChanges(changes, this.edges());
@@ -657,6 +681,14 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       noDragClassName: this.noDragClassName(),
       noPanClassName: this.noPanClassName(),
       noWheelClassName: this.noWheelClassName(),
+
+      // Node drag callbacks for XYDrag multi-select support
+      onNodeDragStart: this.onNodeDragStart ?? undefined,
+      onNodeDrag: this.onNodeDrag ?? undefined,
+      onNodeDragStop: this.onNodeDragStop ?? undefined,
+      onSelectionDragStart: this.onSelectionDragStart ?? undefined,
+      onSelectionDrag: this.onSelectionDrag ?? undefined,
+      onSelectionDragStop: this.onSelectionDragStop ?? undefined,
 
       // Store-bound callbacks for system subsystems
       panBy: (delta: { x: number; y: number }) => this.panBy(delta),

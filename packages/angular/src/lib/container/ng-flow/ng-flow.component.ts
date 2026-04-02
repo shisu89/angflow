@@ -6,6 +6,7 @@ import {
   model,
   effect,
   viewChild,
+  contentChildren,
   ElementRef,
   OnInit,
   OnDestroy,
@@ -15,6 +16,7 @@ import {
   NgZone,
   signal,
   computed,
+  TemplateRef,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
@@ -61,7 +63,10 @@ import { ViewportComponent } from '../viewport/viewport.component';
 import { PaneComponent } from '../pane/pane.component';
 import { ConnectionLineComponent } from '../../components/connection-line/connection-line.component';
 import { SelectionBoxComponent } from '../../components/selection-box/selection-box.component';
+import { A11yDescriptionsComponent } from '../../components/a11y-descriptions/a11y-descriptions.component';
+import { AttributionComponent } from '../../components/attribution/attribution.component';
 import { KeyHandlerDirective } from '../../directives/key-handler.directive';
+import { NgFlowNodeTypeDirective } from '../../directives/node-type.directive';
 import type {
   Node,
   Edge,
@@ -97,6 +102,8 @@ import type {
     ConnectionLineComponent,
     SelectionBoxComponent,
     KeyHandlerDirective,
+    A11yDescriptionsComponent,
+    AttributionComponent,
   ],
   providers: [FlowStore, NgFlowService],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -153,20 +160,22 @@ import type {
           <ng-flow-connection-line [customComponent]="connectionLineComponent()" [connectionLineType]="connectionLineType()" />
           <ng-flow-node-renderer
             [customNodeTypes]="nodeTypes()"
+            [nodeTemplateMap]="nodeTemplateMap()"
             (nodeClick)="nodeClick.emit($event)"
             (nodeDoubleClick)="nodeDoubleClick.emit($event)"
             (nodeContextMenu)="nodeContextMenu.emit($event)"
             (nodeMouseEnter)="nodeMouseEnter.emit($event)"
             (nodeMouseMove)="nodeMouseMove.emit($event)"
             (nodeMouseLeave)="nodeMouseLeave.emit($event)"
-            (nodeDragStart)="nodeDragStart.emit($event)"
-            (nodeDrag)="nodeDrag.emit($event)"
-            (nodeDragStop)="nodeDragStop.emit($event)"
           />
         </ng-flow-viewport>
         <ng-flow-selection-box (contextMenu)="selectionContextMenu.emit({ event: $event, nodes: store.selectedNodes() })" />
       </ng-flow-pane>
       <ng-content />
+      <ng-flow-a11y-descriptions />
+      @if (!hideAttribution()) {
+        <ng-flow-attribution />
+      }
       <div class="xy-flow__a11y-descriptions" aria-live="assertive" aria-atomic="true"
            style="position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); border: 0;">
         {{ store.ariaLiveMessage() }}
@@ -182,6 +191,18 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   private readonly zone = inject(NgZone);
   private readonly containerRef = viewChild<ElementRef<HTMLDivElement>>('container');
   private readonly paneRef = viewChild(PaneComponent);
+
+  /** Content-projected node type templates */
+  private readonly nodeTypeDirectives = contentChildren(NgFlowNodeTypeDirective);
+
+  /** Map of type name → TemplateRef built from content-projected templates */
+  readonly nodeTemplateMap = computed(() => {
+    const map = new Map<string, TemplateRef<any>>();
+    for (const dir of this.nodeTypeDirectives()) {
+      map.set(dir.type, dir.template);
+    }
+    return map;
+  });
 
   private resizeObserver: ResizeObserver | null = null;
   private panZoomInstance: PanZoomInstance | null = null;
@@ -307,6 +328,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   // ── Pro ────────────────────────────────────────────────────────────────
   readonly proOptions = input<ProOptions>();
   readonly attributionPosition = input<PanelPosition>('bottom-right');
+  readonly hideAttribution = input(false);
 
   // ── ID ────────────────────────────────────────────────────────────────
   readonly flowId = input<string | undefined>(undefined, { alias: 'id' });
@@ -508,6 +530,26 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     this.store.onClickConnectEnd = (event: MouseEvent) => {
       this.clickConnectEnd.emit(event);
     };
+
+    // Wire node drag callbacks so XYDrag can fire them for multi-node dragging
+    this.store.onNodeDragStart = (event: MouseEvent, node: any, nodes: any[]) => {
+      this.nodeDragStart.emit({ event, node, nodes });
+    };
+    this.store.onNodeDrag = (event: MouseEvent, node: any, nodes: any[]) => {
+      this.nodeDrag.emit({ event, node, nodes });
+    };
+    this.store.onNodeDragStop = (event: MouseEvent, node: any, nodes: any[]) => {
+      this.nodeDragStop.emit({ event, node, nodes });
+    };
+    this.store.onSelectionDragStart = (event: MouseEvent, nodes: any[]) => {
+      this.selectionDragStart.emit({ event, nodes });
+    };
+    this.store.onSelectionDrag = (event: MouseEvent, nodes: any[]) => {
+      this.selectionDrag.emit({ event, nodes });
+    };
+    this.store.onSelectionDragStop = (event: MouseEvent, nodes: any[]) => {
+      this.selectionDragStop.emit({ event, nodes });
+    };
   }
 
   ngOnInit(): void {
@@ -622,6 +664,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       if (Math.sqrt(dx * dx + dy * dy) > threshold) return;
     }
     this.panePointerDownPos = null;
+    this.store.resetSelectedElements();
     this.paneClick.emit(event);
   }
 

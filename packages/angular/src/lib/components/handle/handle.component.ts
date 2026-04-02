@@ -35,6 +35,7 @@ import { NODE_ID } from '../../services/tokens';
     '[attr.data-nodeid]': 'nodeId',
     '[attr.data-handlepos]': 'position()',
     '[attr.data-id]': 'dataId()',
+    '[attr.aria-describedby]': 'store.rfId() + "-handle-desc"',
     '(mousedown)': 'onPointerDown($event)',
     '(click)': 'onClick($event)',
   },

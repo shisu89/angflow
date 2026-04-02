@@ -26,6 +26,9 @@ import type { Node, Edge, InternalNode, NodeTypes, EdgeTypes } from '.';
 
 export type OnNodesChange<NodeType extends Node = Node> = (changes: NodeChange<NodeType>[]) => void;
 export type OnEdgesChange<EdgeType extends Edge = Edge> = (changes: EdgeChange<EdgeType>[]) => void;
+
+export type NodesChangeMiddleware<NodeType extends Node = Node> = (changes: NodeChange<NodeType>[]) => NodeChange<NodeType>[];
+export type EdgesChangeMiddleware<EdgeType extends Edge = Edge> = (changes: EdgeChange<EdgeType>[]) => EdgeChange<EdgeType>[];
 export type OnNodesDelete<NodeType extends Node = Node> = (nodes: NodeType[]) => void;
 export type OnEdgesDelete<EdgeType extends Edge = Edge> = (edges: EdgeType[]) => void;
 
