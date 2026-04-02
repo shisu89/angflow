@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, computed, input, Type } from '@angular/core';
 import { CommonModule, NgComponentOutlet } from '@angular/common';
-import { getBezierPath, getSmoothStepPath, getStraightPath, ConnectionLineType, Position, type ConnectionInProgress } from '@ngflow/system';
+import { getBezierPath, getSmoothStepPath, getStraightPath, ConnectionLineType, Position, type ConnectionInProgress } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 
 @Component({

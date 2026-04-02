@@ -1,6 +1,6 @@
 {
-  "name": "@ngflow/system",
-  "version": "0.0.76",
+  "name": "@angflow/system",
+  "version": "0.0.77",
   "description": "xyflow core system that powers React Flow and Svelte Flow.",
   "keywords": [
     "node-based UI",
@@ -19,6 +19,7 @@
   "module": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
   "exports": {
+    "./package.json": "./package.json",
     ".": {
       "node": {
         "types": "./dist/esm/index.d.ts",

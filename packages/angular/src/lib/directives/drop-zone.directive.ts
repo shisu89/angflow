@@ -1,6 +1,6 @@
 import { Directive, inject, output, OnInit, OnDestroy, ElementRef } from '@angular/core';
 import { NgFlowService } from '../services/ng-flow.service';
-import type { XYPosition } from '@ngflow/system';
+import type { XYPosition } from '@angflow/system';
 
 /**
  * Directive that makes the flow canvas a drop zone for external drag-and-drop.

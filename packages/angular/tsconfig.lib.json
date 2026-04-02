@@ -7,7 +7,7 @@
     "declarationMap": true,
     "noImplicitReturns": false,
     "paths": {
-      "@ngflow/system": ["../system/dist/esm/index.d.ts"]
+      "@angflow/system": ["../system/dist/esm/index.d.ts"]
     }
   },
   "include": ["src/**/*.ts"],

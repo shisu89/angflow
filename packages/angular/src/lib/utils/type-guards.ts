@@ -1,4 +1,4 @@
-import { isNodeBase, isEdgeBase } from '@ngflow/system';
+import { isNodeBase, isEdgeBase } from '@angflow/system';
 import type { Node, Edge } from '../types';
 
 /**

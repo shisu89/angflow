@@ -17,7 +17,7 @@ import {
   type NodeBase,
   type EdgeBase,
   type InternalNodeUpdate,
-} from '@ngflow/system';
+} from '@angflow/system';
 
 import { FlowStore } from './flow-store.service';
 import type { Node, Edge, InternalNode, NgFlowInstance, NgFlowJsonObject, DeleteElementsOptions } from '../types';
@@ -583,7 +583,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * Registers middleware that intercepts node changes before they are applied.
    * Returns an unregister function.
    */
-  onNodesChangeMiddleware(id: string, fn: (changes: import('@ngflow/system').NodeChange<NodeType>[]) => import('@ngflow/system').NodeChange<NodeType>[]): () => void {
+  onNodesChangeMiddleware(id: string, fn: (changes: import('@angflow/system').NodeChange<NodeType>[]) => import('@angflow/system').NodeChange<NodeType>[]): () => void {
     this.store.nodesChangeMiddleware.set(id, fn);
     return () => { this.store.nodesChangeMiddleware.delete(id); };
   }
@@ -592,7 +592,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * Registers middleware that intercepts edge changes before they are applied.
    * Returns an unregister function.
    */
-  onEdgesChangeMiddleware(id: string, fn: (changes: import('@ngflow/system').EdgeChange<EdgeType>[]) => import('@ngflow/system').EdgeChange<EdgeType>[]): () => void {
+  onEdgesChangeMiddleware(id: string, fn: (changes: import('@angflow/system').EdgeChange<EdgeType>[]) => import('@angflow/system').EdgeChange<EdgeType>[]): () => void {
     this.store.edgesChangeMiddleware.set(id, fn);
     return () => { this.store.edgesChangeMiddleware.delete(id); };
   }

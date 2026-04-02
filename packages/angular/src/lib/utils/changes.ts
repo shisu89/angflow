@@ -5,7 +5,7 @@ import type {
   EdgeSelectionChange,
   NodeRemoveChange,
   EdgeRemoveChange,
-} from '@ngflow/system';
+} from '@angflow/system';
 import type { Node, Edge } from '../types';
 
 function applyChanges(changes: any[], elements: any[]): any[] {

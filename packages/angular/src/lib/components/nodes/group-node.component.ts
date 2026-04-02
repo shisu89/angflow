@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, input } from '@angular/core';
-import { Position } from '@ngflow/system';
+import { Position } from '@angflow/system';
 
 @Component({
   selector: 'ng-flow-group-node',

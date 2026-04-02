@@ -21,7 +21,7 @@
     "outDir": "./dist/esm",
     "baseUrl": ".",
     "paths": {
-      "@ngflow/system": ["../system/src/index.ts"]
+      "@angflow/system": ["../system/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts"],

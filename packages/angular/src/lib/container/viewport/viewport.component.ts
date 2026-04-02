@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, computed } from '@angular/core';
-import type { Transform } from '@ngflow/system';
+import type { Transform } from '@angflow/system';
 
 @Component({
   selector: 'ng-flow-viewport',

@@ -22,7 +22,7 @@ import {
   type Connection,
   type ConnectionState,
   type FinalConnectionState,
-} from '@ngflow/system';
+} from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 import { BezierEdgeComponent } from '../../components/edges/bezier-edge.component';
 import { StraightEdgeComponent } from '../../components/edges/straight-edge.component';

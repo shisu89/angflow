@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, computed } from '@angular/core';
-import { getBezierPath, Position } from '@ngflow/system';
+import { getBezierPath, Position } from '@angflow/system';
 import { BaseEdgeComponent } from './base-edge.component';
 
 @Component({

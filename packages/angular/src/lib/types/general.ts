@@ -20,7 +20,7 @@ import type {
   NodeConnection,
   FinalConnectionState,
   OnConnectStartParams,
-} from '@ngflow/system';
+} from '@angflow/system';
 
 import type { Node, Edge, InternalNode, NodeTypes, EdgeTypes } from '.';
 

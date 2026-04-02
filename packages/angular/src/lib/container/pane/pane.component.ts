@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, output, inject, NgZone, OnDestroy, ElementRef } from '@angular/core';
-import { getNodesInside, SelectionMode } from '@ngflow/system';
+import { getNodesInside, SelectionMode } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 
 @Component({

@@ -53,7 +53,7 @@ import {
   type NodeChange,
   type EdgeChange,
   type OnConnectStartParams,
-} from '@ngflow/system';
+} from '@angflow/system';
 
 import { FlowStore } from '../../services/flow-store.service';
 import { NgFlowService } from '../../services/ng-flow.service';

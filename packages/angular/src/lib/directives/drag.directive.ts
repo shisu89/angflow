@@ -8,7 +8,7 @@ import {
   OnDestroy,
   SimpleChanges,
 } from '@angular/core';
-import { XYDrag, type XYDragInstance } from '@ngflow/system';
+import { XYDrag, type XYDragInstance } from '@angflow/system';
 import { FlowStore } from '../services/flow-store.service';
 
 @Directive({

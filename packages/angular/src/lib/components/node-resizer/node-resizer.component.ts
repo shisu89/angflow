@@ -22,7 +22,7 @@ import {
   type XYResizerChildChange,
   type ResizeDragEvent,
   type ResizeParams,
-} from '@ngflow/system';
+} from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 import { NODE_ID } from '../../services/tokens';
 

@@ -15,7 +15,7 @@ import {
   XYMinimap,
   getInternalNodesBounds,
   type PanelPosition,
-} from '@ngflow/system';
+} from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 import { PanelComponent } from '../panel/panel.component';
 import type { Node, InternalNode } from '../../types';
