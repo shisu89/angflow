@@ -123,9 +123,10 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
       }
     });
 
-    // Use MutationObserver to detect when new nodes are added to the DOM
-    this.mutationObserver = new MutationObserver(() => {
+    // Use MutationObserver to detect when nodes are added/removed from the DOM
+    this.mutationObserver = new MutationObserver((mutations) => {
       this.observeNewNodes();
+      this.cleanupRemovedNodes(mutations);
     });
     this.mutationObserver.observe(this.el.nativeElement, { childList: true, subtree: false });
 
@@ -150,6 +151,20 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
         this.resizeObserver!.observe(el);
       }
     });
+  }
+
+  private cleanupRemovedNodes(mutations: MutationRecord[]): void {
+    for (const mutation of mutations) {
+      for (const removedNode of Array.from(mutation.removedNodes)) {
+        if (!(removedNode instanceof HTMLElement)) continue;
+        const id = removedNode.getAttribute('data-id');
+        if (id && this.observedNodeIds.has(id)) {
+          this.observedNodeIds.delete(id);
+          this.resizeObserver?.unobserve(removedNode);
+          this.nodeInjectorCache.delete(id);
+        }
+      }
+    }
   }
 
   onNodeEvent(event: MouseEvent, nodeId: string, eventType: string): void {

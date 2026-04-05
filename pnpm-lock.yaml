@@ -29,15 +29,15 @@ importers:
 
   packages/angular:
     dependencies:
+      '@angflow/system':
+        specifier: '>=0.0.76'
+        version: 0.0.77
       '@angular/common':
         specifier: '>=17.0.0'
         version: 21.2.6(@angular/core@21.2.6(@angular/compiler@21.2.6)(rxjs@7.8.1))(rxjs@7.8.1)
       '@angular/core':
         specifier: '>=17.0.0'
         version: 21.2.6(@angular/compiler@21.2.6)(rxjs@7.8.1)
-      '@ngflow/system':
-        specifier: workspace:*
-        version: link:../system
       rxjs:
         specifier: '>=7.0.0'
         version: 7.8.1
@@ -157,6 +157,9 @@ packages:
   '@aashutoshrathi/word-wrap@1.2.6':
     resolution: {integrity: sha512-1Yjs2SvM8TflER/OD3cOjhWWOZb58A2t7wpE2S9XfBYTiIl+XFhQG2bjy4Pu1I+EAlCNUzRDYDdFwFYUKvXcIA==}
     engines: {node: '>=0.10.0'}
+
+  '@angflow/system@0.0.77':
+    resolution: {integrity: sha512-nIw33dnlOeRjBzYtjctYKlWXiVNQ8f6P20EjlmeisHlOOMpN6MqNUIpM+xhPg1i6mnszx6E3cxrlhKOlKz74xQ==}
 
   '@angular/common@21.2.6':
     resolution: {integrity: sha512-2FcpZ1h6AZ4JwCIlnpHCYrbRTGQTOj/RFXkuX/qw7K6cFmJGfWFMmr++xWtHZEvUddfbR9hqDo+v1mkqEKE/Kw==}
@@ -2013,6 +2016,18 @@ packages:
 snapshots:
 
   '@aashutoshrathi/word-wrap@1.2.6': {}
+
+  '@angflow/system@0.0.77':
+    dependencies:
+      '@types/d3-drag': 3.0.7
+      '@types/d3-interpolate': 3.0.4
+      '@types/d3-selection': 3.0.10
+      '@types/d3-transition': 3.0.8
+      '@types/d3-zoom': 3.0.8
+      d3-drag: 3.0.0
+      d3-interpolate: 3.0.1
+      d3-selection: 3.0.0
+      d3-zoom: 3.0.0
 
   '@angular/common@21.2.6(@angular/core@21.2.6(@angular/compiler@21.2.6)(rxjs@7.8.1))(rxjs@7.8.1)':
     dependencies:
