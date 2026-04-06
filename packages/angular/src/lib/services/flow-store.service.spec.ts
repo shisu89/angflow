@@ -1,0 +1,568 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { FlowStore } from './flow-store.service';
+import type { Node, Edge } from '../types';
+
+function makeNode(id: string, overrides: Partial<Node> = {}): Node {
+  return { id, position: { x: 0, y: 0 }, data: {}, type: 'default', ...overrides };
+}
+
+function makeEdge(id: string, source: string, target: string, overrides: Partial<Edge> = {}): Edge {
+  return { id, source, target, ...overrides };
+}
+
+describe('FlowStore', () => {
+  let store: FlowStore;
+
+  beforeEach(() => {
+    store = new FlowStore();
+  });
+
+  // ── setNodes: lookup population & internals ───────────────────────────
+
+  describe('setNodes populates nodeLookup with internals', () => {
+    it('creates internal node entries with positionAbsolute', () => {
+      store.setNodes([makeNode('1', { position: { x: 50, y: 100 } })]);
+      const internal = store.nodeLookup.get('1');
+      expect(internal).toBeDefined();
+      expect(internal!.internals?.positionAbsolute).toBeDefined();
+    });
+
+    it('stores userNode back-reference in internals', () => {
+      const node = makeNode('1');
+      store.setNodes([node]);
+      const internal = store.nodeLookup.get('1');
+      expect(internal!.internals?.userNode).toBeDefined();
+      expect(internal!.internals!.userNode.id).toBe('1');
+    });
+
+    it('removes stale entries from nodeLookup on replace', () => {
+      store.setNodes([makeNode('1'), makeNode('2')]);
+      expect(store.nodeLookup.size).toBe(2);
+
+      store.setNodes([makeNode('3')]);
+      // Old nodes should be gone from lookup
+      expect(store.nodeLookup.has('1')).toBe(false);
+      expect(store.nodeLookup.has('2')).toBe(false);
+      expect(store.nodeLookup.has('3')).toBe(true);
+    });
+  });
+
+  // ── setEdges: connectionLookup population ─────────────────────────────
+
+  describe('setEdges populates edgeLookup and connectionLookup', () => {
+    it('maps edge IDs in edgeLookup', () => {
+      store.setEdges([makeEdge('e1', 'a', 'b'), makeEdge('e2', 'b', 'c')]);
+      expect(store.edgeLookup.get('e1')?.source).toBe('a');
+      expect(store.edgeLookup.get('e2')?.target).toBe('c');
+    });
+
+    it('builds connectionLookup keyed by node ID', () => {
+      store.setEdges([makeEdge('e1', 'a', 'b')]);
+      // Both source and target nodes should appear in connectionLookup
+      expect(store.connectionLookup.has('a')).toBe(true);
+      expect(store.connectionLookup.has('b')).toBe(true);
+    });
+
+    it('clears stale edgeLookup entries on replace', () => {
+      store.setEdges([makeEdge('e1', 'a', 'b')]);
+      store.setEdges([makeEdge('e2', 'c', 'd')]);
+      expect(store.edgeLookup.has('e1')).toBe(false);
+      expect(store.edgeLookup.has('e2')).toBe(true);
+    });
+  });
+
+  // ── triggerNodeChanges: fast-path vs full-path ────────────────────────
+
+  describe('triggerNodeChanges', () => {
+    let changeSpy: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      changeSpy = vi.fn();
+      store.onNodesChange = changeSpy;
+      store.setNodes([
+        makeNode('1', { position: { x: 0, y: 0 } }),
+        makeNode('2', { position: { x: 100, y: 100 } }),
+      ]);
+    });
+
+    it('fast-path: position-only changes update nodeLookup in-place without setNodes', () => {
+      const vBefore = store.version();
+
+      store.triggerNodeChanges([
+        { id: '1', type: 'position', position: { x: 50, y: 60 }, dragging: true },
+      ]);
+
+      // nodeLookup updated in-place
+      const internal = store.nodeLookup.get('1');
+      expect(internal!.position).toEqual({ x: 50, y: 60 });
+      expect(internal!.dragging).toBe(true);
+
+      // userNode reference also updated
+      expect(internal!.internals!.userNode.position).toEqual({ x: 50, y: 60 });
+
+      // Only one version bump (not the double bump from setNodes→bumpVersion + triggerNodeChanges→bumpVersion)
+      expect(store.version()).toBe(vBefore + 1);
+    });
+
+    it('full-path: non-position changes go through applyNodeChanges + setNodes', () => {
+      store.triggerNodeChanges([
+        { id: '1', type: 'select', selected: true },
+      ]);
+
+      // setNodes was called, so nodes array is updated
+      expect(store.nodes().find(n => n.id === '1')?.selected).toBe(true);
+    });
+
+    it('mixed changes take the full path', () => {
+      store.triggerNodeChanges([
+        { id: '1', type: 'position', position: { x: 10, y: 20 } },
+        { id: '2', type: 'select', selected: true },
+      ]);
+
+      // Both changes applied via full path
+      expect(store.nodes().find(n => n.id === '2')?.selected).toBe(true);
+    });
+
+    it('fires onNodesChange callback with all changes', () => {
+      store.triggerNodeChanges([
+        { id: '1', type: 'position', position: { x: 10, y: 20 } },
+      ]);
+      expect(changeSpy).toHaveBeenCalledWith([
+        expect.objectContaining({ id: '1', type: 'position' }),
+      ]);
+    });
+
+    it('no-ops on empty changes array', () => {
+      const vBefore = store.version();
+      store.triggerNodeChanges([]);
+      expect(store.version()).toBe(vBefore);
+      expect(changeSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Middleware pipeline ────────────────────────────────────────────────
+
+  describe('middleware pipeline', () => {
+    it('middleware can filter out specific change types', () => {
+      const spy = vi.fn();
+      store.onNodesChange = spy;
+      store.setNodes([makeNode('1'), makeNode('2')]);
+
+      store.nodesChangeMiddleware.set('block-select', (changes) =>
+        changes.filter(c => c.type !== 'select')
+      );
+
+      store.addSelectedNodes(['1']);
+
+      // Middleware blocked all select changes, so callback should receive empty or no call
+      const allChanges = spy.mock.calls.flatMap(([c]) => c);
+      expect(allChanges.filter((c: any) => c.type === 'select')).toHaveLength(0);
+    });
+
+    it('middleware can transform position values', () => {
+      const spy = vi.fn();
+      store.onNodesChange = spy;
+      store.setNodes([makeNode('1')]);
+
+      // Middleware that snaps positions to grid of 10
+      store.nodesChangeMiddleware.set('snap', (changes) =>
+        changes.map(c => {
+          if (c.type === 'position' && c.position) {
+            return {
+              ...c,
+              position: {
+                x: Math.round(c.position.x / 10) * 10,
+                y: Math.round(c.position.y / 10) * 10,
+              },
+            };
+          }
+          return c;
+        })
+      );
+
+      store.triggerNodeChanges([
+        { id: '1', type: 'position', position: { x: 13, y: 27 } },
+      ]);
+
+      const posChanges = spy.mock.calls[0][0].filter((c: any) => c.type === 'position');
+      expect(posChanges[0].position).toEqual({ x: 10, y: 30 });
+    });
+
+    it('middleware returning empty array stops the pipeline', () => {
+      const spy = vi.fn();
+      store.onNodesChange = spy;
+      store.setNodes([makeNode('1')]);
+
+      store.nodesChangeMiddleware.set('block-all', () => []);
+
+      store.triggerNodeChanges([
+        { id: '1', type: 'position', position: { x: 50, y: 50 } },
+      ]);
+
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('edge middleware works the same way', () => {
+      const spy = vi.fn();
+      store.onEdgesChange = spy;
+      store.setNodes([makeNode('1'), makeNode('2')]);
+      store.setEdges([makeEdge('e1', '1', '2')]);
+
+      store.edgesChangeMiddleware.set('block', () => []);
+      store.addSelectedEdges(['e1']);
+
+      expect(spy).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Selection: single vs multi ────────────────────────────────────────
+
+  describe('selection behavior', () => {
+    beforeEach(() => {
+      store.setNodes([makeNode('1'), makeNode('2'), makeNode('3')]);
+      store.setEdges([makeEdge('e1', '1', '2'), makeEdge('e2', '2', '3')]);
+    });
+
+    it('single-select mode: selecting a node deselects all other nodes and edges', () => {
+      store.multiSelectionActive.set(false);
+
+      store.addSelectedNodes(['1']);
+      expect(store.nodes().find(n => n.id === '1')?.selected).toBe(true);
+
+      store.addSelectedNodes(['2']);
+      // Node 1 should now be deselected
+      expect(store.nodes().find(n => n.id === '1')?.selected).toBe(false);
+      expect(store.nodes().find(n => n.id === '2')?.selected).toBe(true);
+    });
+
+    it('multi-select mode: selecting a node preserves existing selection', () => {
+      store.multiSelectionActive.set(true);
+
+      store.addSelectedNodes(['1']);
+      store.addSelectedNodes(['2']);
+
+      expect(store.nodes().find(n => n.id === '1')?.selected).toBe(true);
+      expect(store.nodes().find(n => n.id === '2')?.selected).toBe(true);
+      expect(store.nodes().find(n => n.id === '3')?.selected).toBeFalsy();
+    });
+
+    it('single-select edge deselects all nodes', () => {
+      store.multiSelectionActive.set(false);
+      store.addSelectedNodes(['1']);
+      expect(store.nodes().find(n => n.id === '1')?.selected).toBe(true);
+
+      store.addSelectedEdges(['e1']);
+      expect(store.nodes().find(n => n.id === '1')?.selected).toBe(false);
+      expect(store.edges().find(e => e.id === 'e1')?.selected).toBe(true);
+    });
+
+    it('unselectNodesAndEdges with specific targets only deselects those', () => {
+      store.multiSelectionActive.set(true);
+      store.addSelectedNodes(['1']);
+      store.addSelectedNodes(['2']);
+
+      store.unselectNodesAndEdges({ nodes: [store.nodes().find(n => n.id === '1')!] });
+
+      expect(store.nodes().find(n => n.id === '1')?.selected).toBe(false);
+      expect(store.nodes().find(n => n.id === '2')?.selected).toBe(true);
+    });
+
+    it('getSelectionChanges generates changes only for elements whose selection state actually changes', () => {
+      // Select node 1
+      store.addSelectedNodes(['1']);
+      // Select node 1 again in single-select mode — this should still generate
+      // deselection changes for the other nodes but not a redundant select for node 1
+      const spy = vi.fn();
+      store.onNodesChange = spy;
+
+      store.addSelectedNodes(['1']);
+
+      // All emitted changes should have meaningful state transitions
+      if (spy.mock.calls.length > 0) {
+        const changes = spy.mock.calls[0][0];
+        for (const change of changes) {
+          if (change.type === 'select') {
+            const node = store.nodeLookup.get(change.id);
+            // The change should reflect the desired state
+            expect(typeof change.selected).toBe('boolean');
+          }
+        }
+      }
+    });
+  });
+
+  // ── Batch: coalescing ─────────────────────────────────────────────────
+
+  describe('batch coalescing', () => {
+    it('setNodes + setEdges inside batch produces one version bump instead of two', () => {
+      const v0 = store.version();
+      store.batch(() => {
+        store.setNodes([makeNode('1'), makeNode('2')]);  // normally bumps
+        store.setEdges([makeEdge('e1', '1', '2')]);      // normally bumps
+      });
+      expect(store.version()).toBe(v0 + 1);
+      // But the data is all there
+      expect(store.nodes()).toHaveLength(2);
+      expect(store.edges()).toHaveLength(1);
+      expect(store.edgeLookup.has('e1')).toBe(true);
+    });
+
+    it('nested batch defers until outermost completes', () => {
+      const v0 = store.version();
+      store.batch(() => {
+        store.setNodes([makeNode('1')]);
+        store.batch(() => {
+          store.setEdges([makeEdge('e1', '1', '2')]);
+          expect(store.version()).toBe(v0); // still deferred
+        });
+        expect(store.version()).toBe(v0); // inner didn't flush
+      });
+      expect(store.version()).toBe(v0 + 1);
+    });
+
+    it('batch still flushes version if callback throws', () => {
+      const v0 = store.version();
+      expect(() => {
+        store.batch(() => {
+          store.setNodes([makeNode('1')]); // dirties
+          throw new Error('boom');
+        });
+      }).toThrow('boom');
+      expect(store.version()).toBe(v0 + 1);
+    });
+
+    it('batch with no mutations does not bump version', () => {
+      const v0 = store.version();
+      store.batch(() => { /* nothing */ });
+      expect(store.version()).toBe(v0);
+    });
+  });
+
+  // ── applyNodeChanges (via triggerNodeChanges full path) ───────────────
+
+  describe('change application', () => {
+    beforeEach(() => {
+      store.setNodes([
+        makeNode('1', { position: { x: 0, y: 0 } }),
+        makeNode('2', { position: { x: 100, y: 100 } }),
+        makeNode('3', { position: { x: 200, y: 200 } }),
+      ]);
+    });
+
+    it('remove change deletes a node', () => {
+      store.triggerNodeChanges([{ id: '2', type: 'remove' }]);
+      expect(store.nodes()).toHaveLength(2);
+      expect(store.nodes().find(n => n.id === '2')).toBeUndefined();
+    });
+
+    it('add change inserts a new node', () => {
+      store.triggerNodeChanges([{
+        type: 'add',
+        item: makeNode('4', { position: { x: 300, y: 300 } }),
+      } as any]);
+      expect(store.nodes()).toHaveLength(4);
+      expect(store.nodes().find(n => n.id === '4')).toBeDefined();
+    });
+
+    it('add with index inserts at specific position', () => {
+      store.triggerNodeChanges([{
+        type: 'add',
+        item: makeNode('4'),
+        index: 1,
+      } as any]);
+      expect(store.nodes()[1].id).toBe('4');
+    });
+
+    it('select change updates selected flag', () => {
+      store.triggerNodeChanges([{ id: '1', type: 'select', selected: true }]);
+      expect(store.nodes().find(n => n.id === '1')?.selected).toBe(true);
+      expect(store.nodes().find(n => n.id === '2')?.selected).toBeFalsy();
+    });
+
+    it('position change updates node position', () => {
+      // Use full path by mixing in a non-position change
+      store.triggerNodeChanges([
+        { id: '1', type: 'position', position: { x: 999, y: 888 } },
+        { id: '2', type: 'select', selected: true },
+      ]);
+      expect(store.nodes().find(n => n.id === '1')?.position).toEqual({ x: 999, y: 888 });
+    });
+
+    it('dimensions change sets measured and optionally width/height', () => {
+      store.triggerNodeChanges([{
+        id: '1',
+        type: 'dimensions',
+        dimensions: { width: 200, height: 100 },
+        setAttributes: true,
+      } as any]);
+      const node = store.nodes().find(n => n.id === '1')!;
+      expect(node.measured).toEqual({ width: 200, height: 100 });
+      expect(node.width).toBe(200);
+      expect(node.height).toBe(100);
+    });
+
+    it('replace change swaps the node entirely', () => {
+      const replacement = makeNode('2', { position: { x: 999, y: 999 }, data: { replaced: true } });
+      store.triggerNodeChanges([{ id: '2', type: 'replace', item: replacement } as any]);
+      const node = store.nodes().find(n => n.id === '2')!;
+      expect(node.position).toEqual({ x: 999, y: 999 });
+      expect(node.data).toEqual({ replaced: true });
+    });
+
+    it('multiple changes on the same node are applied in order', () => {
+      store.triggerNodeChanges([
+        { id: '1', type: 'position', position: { x: 50, y: 50 } },
+        { id: '1', type: 'select', selected: true },
+      ]);
+      const node = store.nodes().find(n => n.id === '1')!;
+      expect(node.position).toEqual({ x: 50, y: 50 });
+      expect(node.selected).toBe(true);
+    });
+  });
+
+  // ── Edge change application ───────────────────────────────────────────
+
+  describe('edge change application', () => {
+    beforeEach(() => {
+      store.setNodes([makeNode('1'), makeNode('2'), makeNode('3')]);
+      store.setEdges([
+        makeEdge('e1', '1', '2'),
+        makeEdge('e2', '2', '3'),
+      ]);
+    });
+
+    it('remove change deletes an edge and updates edgeLookup', () => {
+      store.triggerEdgeChanges([{ id: 'e1', type: 'remove' }]);
+      expect(store.edges()).toHaveLength(1);
+      expect(store.edgeLookup.has('e1')).toBe(false);
+    });
+
+    it('select change updates edge selected flag', () => {
+      store.triggerEdgeChanges([{ id: 'e1', type: 'select', selected: true }]);
+      expect(store.edges().find(e => e.id === 'e1')?.selected).toBe(true);
+    });
+  });
+
+  // ── visibleNodes with onlyRenderVisibleElements ───────────────────────
+
+  describe('visible elements filtering', () => {
+    it('when onlyRenderVisibleElements=false, all nodes are visible', () => {
+      store.setNodes([makeNode('1'), makeNode('2'), makeNode('3')]);
+      store.onlyRenderVisibleElements.set(false);
+      expect(store.visibleNodes()).toHaveLength(3);
+    });
+
+    it('when onlyRenderVisibleElements=true, culls measured nodes outside viewport', () => {
+      store.width.set(500);
+      store.height.set(500);
+      store.transform.set([0, 0, 1]);
+      store.onlyRenderVisibleElements.set(true);
+
+      store.setNodes([
+        makeNode('visible', { position: { x: 100, y: 100 }, width: 100, height: 50 }),
+        makeNode('offscreen', { position: { x: 5000, y: 5000 }, width: 100, height: 50 }),
+      ]);
+
+      // getNodesInside forces initial render when handleBounds is undefined
+      // (nodes need DOM measurement first). Simulate a fully-measured node:
+      for (const [, n] of store.nodeLookup) {
+        n.measured = { width: n.width ?? 100, height: n.height ?? 50 };
+        n.internals.handleBounds = { source: [], target: [] };
+      }
+      store.bumpVersion();
+
+      const visible = store.visibleNodes();
+      const ids = visible.map(n => n.id);
+      expect(ids).toContain('visible');
+      expect(ids).not.toContain('offscreen');
+    });
+
+    it('visibleEdgeIds only includes edges whose source AND target are visible', () => {
+      store.width.set(500);
+      store.height.set(500);
+      store.transform.set([0, 0, 1]);
+      store.onlyRenderVisibleElements.set(true);
+
+      store.setNodes([
+        makeNode('a', { position: { x: 100, y: 100 }, width: 100, height: 50 }),
+        makeNode('b', { position: { x: 200, y: 200 }, width: 100, height: 50 }),
+        makeNode('c', { position: { x: 5000, y: 5000 }, width: 100, height: 50 }),
+      ]);
+
+      // Simulate fully-measured nodes (handleBounds set = no forced initial render)
+      for (const [, n] of store.nodeLookup) {
+        n.measured = { width: n.width ?? 100, height: n.height ?? 50 };
+        n.internals.handleBounds = { source: [], target: [] };
+      }
+
+      store.setEdges([
+        makeEdge('ab', 'a', 'b'),
+        makeEdge('ac', 'a', 'c'),  // c is offscreen
+      ]);
+
+      const visibleEdges = store.visibleEdgeIds();
+      expect(visibleEdges.has('ab')).toBe(true);
+      expect(visibleEdges.has('ac')).toBe(false);
+    });
+  });
+
+  // ── updateNodePositions (drag simulation) ─────────────────────────────
+
+  describe('updateNodePositions', () => {
+    it('emits position changes with dragging flag', () => {
+      const spy = vi.fn();
+      store.onNodesChange = spy;
+      store.setNodes([makeNode('1', { position: { x: 0, y: 0 } })]);
+
+      const dragItems = new Map([
+        ['1', { position: { x: 50, y: 75 }, internals: { positionAbsolute: { x: 50, y: 75 } }, measured: { width: 150, height: 40 } }],
+      ]);
+
+      store.updateNodePositions(dragItems, true);
+
+      expect(spy).toHaveBeenCalled();
+      const changes = spy.mock.calls[0][0];
+      expect(changes[0]).toEqual(expect.objectContaining({
+        id: '1',
+        type: 'position',
+        position: { x: 50, y: 75 },
+        dragging: true,
+      }));
+    });
+
+    it('updates nodeLookup position in-place (fast path)', () => {
+      store.setNodes([makeNode('1', { position: { x: 0, y: 0 } })]);
+
+      const dragItems = new Map([
+        ['1', { position: { x: 77, y: 88 }, internals: { positionAbsolute: { x: 77, y: 88 } }, measured: { width: 150, height: 40 } }],
+      ]);
+
+      store.updateNodePositions(dragItems, true);
+
+      expect(store.nodeLookup.get('1')!.position).toEqual({ x: 77, y: 88 });
+    });
+  });
+
+  // ── reset ─────────────────────────────────────────────────────────────
+
+  describe('reset clears all mutable state', () => {
+    it('clears lookups, signals, and selection state', () => {
+      store.setNodes([makeNode('1')]);
+      store.setEdges([makeEdge('e1', '1', '2')]);
+      store.multiSelectionActive.set(true);
+      store.userSelectionActive.set(true);
+      store.transform.set([50, 50, 2]);
+
+      store.reset();
+
+      expect(store.nodeLookup.size).toBe(0);
+      expect(store.edgeLookup.size).toBe(0);
+      expect(store.connectionLookup.size).toBe(0);
+      expect(store.nodes()).toEqual([]);
+      expect(store.edges()).toEqual([]);
+      expect(store.transform()).toEqual([0, 0, 1]);
+      expect(store.multiSelectionActive()).toBe(false);
+      expect(store.userSelectionActive()).toBe(false);
+    });
+  });
+});

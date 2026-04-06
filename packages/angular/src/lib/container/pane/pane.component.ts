@@ -151,6 +151,10 @@ export class PaneComponent implements OnDestroy {
     this.zone.run(() => {
       this.store.userSelectionActive.set(false);
       this.store.userSelectionRect.set(null);
+      // Mark nodes selection as active if nodes were selected
+      if (this.store.selectedNodes().length > 0) {
+        this.store.nodesSelectionActive.set(true);
+      }
       this.selectionEnd.emit(event);
     });
   }

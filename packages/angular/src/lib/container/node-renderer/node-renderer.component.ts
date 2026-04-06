@@ -12,7 +12,7 @@ import {
   ElementRef,
   TemplateRef,
 } from '@angular/core';
-import { CommonModule, NgComponentOutlet, NgTemplateOutlet } from '@angular/common';
+import { CommonModule, NgComponentOutlet, NgTemplateOutlet, NgStyle } from '@angular/common';
 import { FlowStore } from '../../services/flow-store.service';
 import { NODE_ID } from '../../services/tokens';
 import { DragDirective } from '../../directives/drag.directive';
@@ -32,7 +32,7 @@ const builtInNodeTypes: NodeTypes = {
 @Component({
   selector: 'ng-flow-node-renderer',
   standalone: true,
-  imports: [CommonModule, NgComponentOutlet, NgTemplateOutlet, DragDirective],
+  imports: [CommonModule, NgComponentOutlet, NgTemplateOutlet, NgStyle, DragDirective],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     'class': 'ng-flow__nodes xy-flow__nodes',
@@ -40,9 +40,10 @@ const builtInNodeTypes: NodeTypes = {
   },
   template: `
     @for (node of visibleNodes(); track node.id) {
+      @if (!node.hidden) {
       <div
         class="ng-flow__node xy-flow__node"
-        [class]="'xy-flow__node-' + (node.type || 'default')"
+        [class]="getNodeClasses(node)"
         [class.selected]="node.selected"
         [class.draggable]="node.draggable !== false && store.nodesDraggable()"
         [class.dragging]="node.dragging"
@@ -60,12 +61,14 @@ const builtInNodeTypes: NodeTypes = {
         [attr.tabindex]="store.nodesFocusable() ? 0 : -1"
         [style.z-index]="getNodeZ(node)"
         [style.transform]="getNodeTransform(node)"
+        [ngStyle]="node.style"
         (click)="onNodeEvent($event, node.id, 'click')"
         (dblclick)="onNodeEvent($event, node.id, 'dblclick')"
         (contextmenu)="onNodeEvent($event, node.id, 'contextmenu')"
         (mouseenter)="onNodeEvent($event, node.id, 'mouseenter')"
         (mousemove)="onNodeEvent($event, node.id, 'mousemove')"
         (mouseleave)="onNodeEvent($event, node.id, 'mouseleave')"
+        (keydown)="onNodeKeyDown($event, node)"
         (focus)="onNodeFocus(node)"
       >
         @if (getNodeTemplate(node.type); as tmpl) {
@@ -78,6 +81,7 @@ const builtInNodeTypes: NodeTypes = {
           />
         }
       </div>
+      }
     }
   `,
 })
@@ -100,6 +104,7 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
   readonly visibleNodes = computed(() => this.store.visibleNodes());
 
   private nodeInjectorCache = new Map<string, Injector>();
+  private nodeInputsCache = new Map<string, { version: number; inputs: Record<string, unknown> }>();
   private resizeObserver: ResizeObserver | null = null;
 
   private mutationObserver: MutationObserver | null = null;
@@ -162,6 +167,7 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
           this.observedNodeIds.delete(id);
           this.resizeObserver?.unobserve(removedNode);
           this.nodeInjectorCache.delete(id);
+          this.nodeInputsCache.delete(id);
         }
       }
     }
@@ -174,10 +180,18 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
 
     switch (eventType) {
       case 'click':
-        // Select the node on click, but don't re-select if already selected
-        // (which would deselect other nodes in a multi-selection)
-        if (this.store.elementsSelectable() && !internalNode?.selected) {
-          this.store.addSelectedNodes([nodeId]);
+        if (this.store.elementsSelectable() && internalNode?.selectable !== false) {
+          if (this.store.multiSelectionActive()) {
+            // Multi-selection key held: toggle this node
+            if (internalNode?.selected) {
+              this.store.unselectNodesAndEdges({ nodes: [node] });
+            } else {
+              this.store.addSelectedNodes([nodeId]);
+            }
+          } else if (!internalNode?.selected) {
+            // Normal click on unselected node: replace selection
+            this.store.addSelectedNodes([nodeId]);
+          }
         }
         this.nodeClick.emit({ event, node });
         break;
@@ -199,10 +213,22 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  onNodeKeyDown(event: KeyboardEvent, node: Node): void {
+    if (event.key === 'Escape') {
+      this.store.unselectNodesAndEdges({ nodes: [node] });
+      // Move focus to the container to avoid the node staying focused
+      (event.currentTarget as HTMLElement)?.blur();
+    } else if (event.key === 'Enter') {
+      if (this.store.elementsSelectable() && !node.selected) {
+        this.store.addSelectedNodes([node.id]);
+      }
+    }
+  }
+
   onNodeFocus(node: Node): void {
     // Select the focused node, but don't re-select if already selected
     // (which would deselect other nodes in a multi-selection)
-    if (this.store.elementsSelectable() && !node.selected) {
+    if (this.store.elementsSelectable() && node.selectable !== false && !node.selected) {
       this.store.addSelectedNodes([node.id]);
     }
 
@@ -283,6 +309,11 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
     return injector;
   }
 
+  getNodeClasses(node: InternalNode): string {
+    const typeClass = 'xy-flow__node-' + (node.type || 'default');
+    return node.className ? typeClass + ' ' + node.className : typeClass;
+  }
+
   getNodeZ(node: InternalNode): number {
     return node.internals?.z ?? 0;
   }
@@ -301,7 +332,13 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
   }
 
   getNodeInputs(node: InternalNode): Record<string, unknown> {
-    return {
+    const version = this.store.version();
+    const cached = this.nodeInputsCache.get(node.id);
+    if (cached && cached.version === version) {
+      return cached.inputs;
+    }
+
+    const inputs: Record<string, unknown> = {
       id: node.id,
       data: node.data,
       type: node.type,
@@ -315,5 +352,7 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
       targetPosition: node.targetPosition,
       dragHandle: node.dragHandle,
     };
+    this.nodeInputsCache.set(node.id, { version, inputs });
+    return inputs;
   }
 }

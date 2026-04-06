@@ -1,0 +1,4 @@
+[      43ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:4201/tests/generic/nodes/chunk-VGVVFMME.js:0
+[      47ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:4201/tests/generic/nodes/main.js:0
+[      53ms] [ERROR] Refused to apply style from 'http://localhost:4201/tests/generic/nodes/styles.css' because its MIME type ('text/html') is not a supported stylesheet MIME type, and strict MIME checking is enabled. @ http://localhost:4201/tests/generic/nodes/general:0
+[      67ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:4201/favicon.ico:0

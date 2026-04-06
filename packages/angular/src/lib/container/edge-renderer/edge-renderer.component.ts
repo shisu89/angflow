@@ -81,20 +81,26 @@ const builtInEdgeTypes: EdgeTypes = {
       </defs>
     </svg>
     @for (edge of visibleEdges(); track edge.id) {
+      @if (!edge.hidden) {
       @let ei = getEdgeInputs(edge);
       <svg
         class="ng-flow__edge xy-flow__edge"
-        [class]="'xy-flow__edge-' + (edge.type || 'default')"
+        [class]="getEdgeClasses(edge)"
         [class.selected]="edge.selected"
         [class.animated]="edge.animated"
         [class.selectable]="edge.selectable !== false"
-        [style.z-index]="edge.zIndex ?? 0"
+        [style.z-index]="getEdgeZIndex(edge)"
         [attr.aria-label]="getEdgeAriaLabel(edge)"
+        [attr.tabindex]="store.edgesFocusable() ? 0 : -1"
         role="img"
         style="overflow: visible; position: absolute; width: 100%; height: 100%; pointer-events: none;"
+        (keydown)="onEdgeKeyDown($event, edge)"
+        (focus)="onEdgeFocus(edge)"
       >
         <g
           [attr.data-id]="edge.id"
+          [class]="getEdgeGClasses(edge)"
+          [attr.aria-label]="edge.ariaLabel ? edge.ariaLabel : undefined"
           style="pointer-events: visibleStroke;"
           (click)="onEdgeEvent($event, edge, 'click')"
           (dblclick)="onEdgeEvent($event, edge, 'dblclick')"
@@ -113,13 +119,15 @@ const builtInEdgeTypes: EdgeTypes = {
               [attr.d]="getEdgePath(ei)"
               fill="none"
               stroke="transparent"
-              stroke-width="20"
+              [attr.stroke-width]="edge.interactionWidth ?? 20"
+              style="pointer-events: all;"
             />
             <path
-              class="xy-flow__edge-path"
+              class="ng-flow__edge-path xy-flow__edge-path"
               [attr.d]="getEdgePath(ei)"
               [attr.marker-start]="ei['markerStart']"
               [attr.marker-end]="ei['markerEnd']"
+              [attr.style]="getEdgePathStyle(edge)"
             />
           }
           @if (isEdgeReconnectable(edge)) {
@@ -144,10 +152,11 @@ const builtInEdgeTypes: EdgeTypes = {
           }
         </g>
       </svg>
+      }
     }
     <div class="xy-flow__edgelabel-renderer" style="position: absolute; width: 100%; height: 100%; pointer-events: none; top: 0; left: 0;">
       @for (edge of visibleEdges(); track edge.id) {
-        @if (edge.label) {
+        @if (edge.label && !edge.hidden) {
           @let ei = getEdgeInputs(edge);
           <div
             class="xy-flow__edge-label"
@@ -202,6 +211,32 @@ export class EdgeRendererComponent {
     // OR the user explicitly overrode a built-in name with their own component
     const customTypes = this.customEdgeTypes();
     return resolvedType in customTypes;
+  }
+
+  getEdgeClasses(edge: Edge): string {
+    const typeClass = 'xy-flow__edge-' + (edge.type || 'default');
+    return edge.className ? typeClass + ' ' + edge.className : typeClass;
+  }
+
+  getEdgeGClasses(edge: Edge): string {
+    let cls = 'ng-flow__edge-wrapper';
+    if (edge.selected) cls += ' selected';
+    if (edge.animated) cls += ' animated';
+    if (edge.className) cls += ' ' + edge.className;
+    return cls;
+  }
+
+  getEdgePathStyle(edge: Edge): string | null {
+    const style = edge.style as Record<string, string> | undefined;
+    if (!style) return null;
+    return Object.entries(style).map(([k, v]) => `${k}: ${v}`).join('; ');
+  }
+
+  getEdgeZIndex(edge: Edge): number {
+    if (edge.zIndex !== undefined) return edge.zIndex;
+    const sourceZ = this.store.nodeLookup.get(edge.source)?.internals?.z ?? 0;
+    const targetZ = this.store.nodeLookup.get(edge.target)?.internals?.z ?? 0;
+    return Math.max(sourceZ, targetZ);
   }
 
   getEdgePath(ei: Record<string, unknown>): string {
@@ -326,6 +361,22 @@ export class EdgeRendererComponent {
     }
   }
 
+  onEdgeKeyDown(event: KeyboardEvent, edge: Edge): void {
+    if (event.key === 'Escape') {
+      this.store.unselectNodesAndEdges({ edges: [edge] });
+    } else if (event.key === 'Enter') {
+      if (this.store.elementsSelectable()) {
+        this.store.addSelectedEdges([edge.id]);
+      }
+    }
+  }
+
+  onEdgeFocus(edge: Edge): void {
+    if (this.store.elementsSelectable() && !edge.selected) {
+      this.store.addSelectedEdges([edge.id]);
+    }
+  }
+
   getEdgeCenterX(ei: Record<string, unknown>): number {
     return ((ei['sourceX'] as number) + (ei['targetX'] as number)) / 2;
   }
@@ -419,7 +470,7 @@ export class EdgeRendererComponent {
 
   private addMarker(map: Map<string, Record<string, unknown>>, marker: EdgeMarker | undefined): void {
     if (!marker || typeof marker === 'string') return;
-    const id = getMarkerId(marker, undefined);
+    const id = getMarkerId(marker, this.store.rfId());
     if (!map.has(id)) {
       map.set(id, { ...marker, id });
     }
@@ -428,6 +479,6 @@ export class EdgeRendererComponent {
   private getMarkerUrl(marker: EdgeMarker | string | undefined): string | undefined {
     if (!marker) return undefined;
     if (typeof marker === 'string') return marker;
-    return `url(#${getMarkerId(marker, undefined)})`;
+    return `url('#${getMarkerId(marker, this.store.rfId())}')`;
   }
 }

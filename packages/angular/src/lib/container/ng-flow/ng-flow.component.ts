@@ -268,7 +268,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
   // ── Selection ─────────────────────────────────────────────────────────
   readonly selectionOnDrag = input(false);
-  readonly selectionMode = input<SelectionMode>(SelectionMode.Partial);
+  readonly selectionMode = input<SelectionMode>(SelectionMode.Full);
 
   // ── Viewport constraints ──────────────────────────────────────────────
   readonly minZoom = input(0.5);
@@ -421,18 +421,26 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   readonly autoPanStart = output<void>({ alias: 'autoPanStart' });
   readonly autoPanEnd = output<void>({ alias: 'autoPanEnd' });
 
+  private lastNodesRef: NodeType[] | null = null;
+  private lastEdgesRef: EdgeType[] | null = null;
+
   constructor() {
-    // Sync inputs → store via effects
+    // Sync inputs → store via effects.
+    // Track last reference to avoid re-setting when the store already has the data
+    // (e.g. after triggerNodeChanges internally calls setNodes, then the parent
+    //  re-applies the same changes via onNodesChange → [nodes] → this effect).
     effect(() => {
       const nodes = this.nodesModel();
-      if (nodes !== undefined) {
+      if (nodes !== undefined && nodes !== this.lastNodesRef) {
+        this.lastNodesRef = nodes;
         this.store.setNodes(nodes);
       }
     });
 
     effect(() => {
       const edges = this.edgesModel();
-      if (edges !== undefined) {
+      if (edges !== undefined && edges !== this.lastEdgesRef) {
+        this.lastEdgesRef = edges;
         this.store.setEdges(edges);
       }
     });
@@ -503,6 +511,23 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
     effect(() => {
       this.store.setTranslateExtent(this.translateExtent());
+    });
+
+    // Re-sync pan/zoom options whenever the relevant inputs change
+    effect(() => {
+      // Read all pan/zoom inputs to establish signal dependencies
+      this.panOnDrag();
+      this.panOnScroll();
+      this.panOnScrollMode();
+      this.panOnScrollSpeed();
+      this.zoomOnScroll();
+      this.zoomOnPinch();
+      this.zoomOnDoubleClick();
+      this.preventScrolling();
+      this.noPanClassName();
+      this.noWheelClassName();
+      this.paneClickDistance();
+      this.updatePanZoomOptions();
     });
 
     // Wire store change callbacks to outputs
@@ -664,6 +689,19 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       if (Math.sqrt(dx * dx + dy * dy) > threshold) return;
     }
     this.panePointerDownPos = null;
+
+    // Don't deselect when clicking on nodes, edges, handles, or selection box (event bubbles up)
+    const target = event.target as HTMLElement;
+    if (target.closest('.xy-flow__node') || target.closest('.xy-flow__edge') ||
+        target.closest('.xy-flow__handle') || target.closest('.xy-flow__selection')) {
+      return;
+    }
+
+    // Don't deselect right after a selection drag ended (the click fires from mouseup)
+    if (this.store.nodesSelectionActive()) {
+      return;
+    }
+
     this.store.resetSelectedElements();
     this.paneClick.emit(event);
   }

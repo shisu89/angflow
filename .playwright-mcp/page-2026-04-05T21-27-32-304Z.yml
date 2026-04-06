@@ -1,0 +1,51 @@
+- application [ref=e5]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - generic:
+        - generic:
+          - img
+          - img "Edge from 1 to 2"
+          - img "Edge from 1 to 3"
+          - img "Edge from 3 to 5"
+          - img "Edge from 4 to 6"
+          - img "Edge from 5 to 7"
+          - img "Edge from 6 to 8"
+          - img "aria-label-test"
+          - img "Edge from 8 to 10"
+          - img "Edge from 9 to 11"
+          - generic:
+            - generic [ref=e39]: animated
+            - generic [ref=e40]: not-selectable
+            - generic [ref=e41]: not-deletable
+            - generic [ref=e42]: z-index
+            - generic [ref=e43]: aria-label
+            - generic [ref=e44]: interaction-width
+            - generic [ref=e45]: markers
+        - generic:
+          - 'button "Node: 1, type: input" [ref=e46]':
+            - generic [ref=e48]: "1"
+          - 'button "Node: 2, type: default" [ref=e50]':
+            - generic [ref=e53]: "2"
+          - 'button "Node: 3, type: default" [ref=e55]':
+            - generic [ref=e58]: "3"
+          - 'button "Node: 4, type: default" [ref=e60]':
+            - generic [ref=e63]: "4"
+          - 'button "Node: 5, type: default" [ref=e65]':
+            - generic [ref=e68]: "5"
+          - 'button "Node: 6, type: default" [ref=e70]':
+            - generic [ref=e73]: "6"
+          - 'button "Node: 7, type: default" [ref=e75]':
+            - generic [ref=e78]: "7"
+          - 'button "Node: 8, type: default" [ref=e80]':
+            - generic [ref=e83]: "8"
+          - 'button "Node: 9, type: default" [ref=e85]':
+            - generic [ref=e88]: "9"
+          - 'button "Node: 10, type: default" [ref=e90]':
+            - generic [ref=e93]: "10"
+          - 'button "Node: 11, type: default" [ref=e95]':
+            - generic [ref=e98]: "11"
+    - generic [ref=e100]:
+      - generic [ref=e101]: Press enter or space to select a node. Press delete to remove it and escape to cancel.
+      - generic [ref=e102]: Handle
+      - generic [ref=e103]: Edge connection
+    - generic [ref=e104]: ngflow

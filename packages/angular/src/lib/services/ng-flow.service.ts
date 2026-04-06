@@ -52,19 +52,11 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   /** Reactive signal indicating whether all nodes have been measured and positioned. */
   readonly nodesInitialized: Signal<boolean> = computed(() => this.store.nodesInitialized());
 
-  /**
-   * Returns a reactive signal containing the data property of specified nodes.
-   * Call once and store the reference — do not call repeatedly in templates.
-   */
-  nodesData(nodeIds: string[]): Signal<{ id: string; data: Record<string, unknown>; type?: string }[]> {
-    return computed(() => {
-      this.store.version();
-      const idSet = new Set(nodeIds);
-      return this.store.nodes()
-        .filter(n => idSet.has(n.id))
-        .map(n => ({ id: n.id, data: n.data as Record<string, unknown>, type: n.type }));
-    });
-  }
+  /** Reactive access to currently visible nodes (respects onlyRenderVisibleElements). */
+  readonly visibleNodes: Signal<import('@angflow/system').InternalNodeBase<NodeType>[]> = computed(() => this.store.visibleNodes());
+
+  /** Reactive access to IDs of currently visible edges (respects onlyRenderVisibleElements). */
+  readonly visibleEdgeIds: Signal<Set<string>> = computed(() => this.store.visibleEdgeIds());
 
   // ── Viewport operations ───────────────────────────────────────────────
 
@@ -197,7 +189,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   // ── Edge Operations ───────────────────────────────────────────────────
 
   getEdge(id: string): EdgeType | undefined {
-    return this.store.edges().find((e) => e.id === id);
+    return this.store.edgeLookup.get(id) as EdgeType | undefined;
   }
 
   getEdges(): EdgeType[] {
@@ -235,6 +227,16 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
         return edge;
       })
     );
+  }
+
+  // ── Batch ─────────────────────────────────────────────────────────────
+
+  /**
+   * Coalesce multiple setNodes/setEdges calls into a single reactivity cycle.
+   * Prevents intermediate renders when updating both nodes and edges together.
+   */
+  batch(fn: () => void): void {
+    this.store.batch(fn);
   }
 
   // ── Delete ────────────────────────────────────────────────────────────

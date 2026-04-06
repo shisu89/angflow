@@ -161,8 +161,32 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   // A version counter bumped on every visual change to trigger recomputation
   // of visibleNodes/visibleEdges without rebuilding the full nodeLookup
   readonly version = signal(0);
+  private batchDepth = 0;
+  private batchDirty = false;
+
   bumpVersion(): void {
+    if (this.batchDepth > 0) {
+      this.batchDirty = true;
+      return;
+    }
     this.version.update(v => v + 1);
+  }
+
+  /**
+   * Coalesce multiple updates into a single version bump / reactivity cycle.
+   * Usage: `store.batch(() => { store.setNodes(...); store.setEdges(...); })`
+   */
+  batch(fn: () => void): void {
+    this.batchDepth++;
+    try {
+      fn();
+    } finally {
+      this.batchDepth--;
+      if (this.batchDepth === 0 && this.batchDirty) {
+        this.batchDirty = false;
+        this.version.update(v => v + 1);
+      }
+    }
   }
 
   // ── Computed signals ──────────────────────────────────────────────────

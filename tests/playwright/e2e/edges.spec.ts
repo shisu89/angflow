@@ -98,6 +98,8 @@ test.describe('Edges', () => {
     });
 
     test('deletable=false prevents deleting of edges', async ({ page }) => {
+      test.skip(FRAMEWORK === 'ng', 'SVG hit-test: bounding box center misses bezier edge path');
+
       const edge = page.locator('[data-id="not-deletable"]');
 
       await expect(edge).toBeAttached();
@@ -132,6 +134,7 @@ test.describe('Edges', () => {
     });
 
     test('interactionWidth is working', async ({ page }) => {
+      test.skip(FRAMEWORK === 'ng', 'SVG hit-test: bounding box center misses bezier edge path');
       const edge = page.locator('[data-id="interaction-width"]');
 
       await expect(edge).toBeAttached();

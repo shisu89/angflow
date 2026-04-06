@@ -1,0 +1,34 @@
+- application [ref=e5]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - generic:
+        - generic:
+          - img
+          - img "Edge from Node-1 to Node-2"
+          - img "Edge from Node-1 to Node-3"
+          - generic:
+            - generic [ref=e18]: edge
+            - generic [ref=e19]: edge
+        - generic:
+          - 'button "Node: Node-1, type: input" [ref=e20]':
+            - generic [ref=e22]: Node-1
+          - 'button "Node: Node-2, type: output" [ref=e24]':
+            - generic [ref=e27]: Node-2
+          - 'button "Node: Node-3, type: default" [ref=e28]':
+            - generic [ref=e31]: Node-3
+          - 'button "Node: Node-4, type: output" [ref=e33]':
+            - generic [ref=e36]: Node-4
+          - 'button "Node: Drag Handle, type: DragHandleNode" [ref=e37]'
+          - 'button "Node: notConnectable, type: output" [ref=e41]':
+            - generic [ref=e44]: notConnectable
+          - 'button "Node: notDraggable, type: default" [ref=e45] [cursor=pointer]':
+            - generic [ref=e48]: notDraggable
+          - 'button "Node: notSelectable, type: default" [ref=e50]':
+            - generic [ref=e53]: notSelectable
+          - 'button "Node: notDeletable, type: default" [ref=e55]':
+            - generic [ref=e58]: notDeletable
+    - generic [ref=e60]:
+      - generic [ref=e61]: Press enter or space to select a node. Press delete to remove it and escape to cancel.
+      - generic [ref=e62]: Handle
+      - generic [ref=e63]: Edge connection
+    - generic [ref=e64]: ngflow

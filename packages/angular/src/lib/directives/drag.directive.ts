@@ -69,7 +69,7 @@ export class DragDirective implements OnInit, OnChanges, OnDestroy {
     const node = store.nodeLookup.get(id);
     if (!node) return;
 
-    if (store.selectNodesOnDrag()) {
+    if (store.selectNodesOnDrag() && node.selectable !== false) {
       // If the node is already selected, don't re-select (which would deselect others)
       if (!node.selected) {
         store.addSelectedNodes([id]);

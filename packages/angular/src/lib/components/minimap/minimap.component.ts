@@ -37,6 +37,8 @@ export type GetMiniMapNodeAttribute<NodeType extends Node = Node> = (node: NodeT
         [style.height.px]="mmHeight()"
         style="border-radius: 4px; overflow: hidden; border: 1px solid #ddd; box-shadow: 0 1px 4px rgba(0,0,0,0.1); cursor: pointer;"
         (click)="onMinimapClick($event)"
+        (mousedown)="onMinimapMouseDown($event)"
+        (wheel)="onMinimapWheel($event)"
       >
         <svg
           class="xy-flow__minimap-svg"
@@ -142,6 +144,10 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
   readonly minimapNodeClick = output<{ event: MouseEvent; node: Node }>();
 
   private xyMinimap: ReturnType<typeof XYMinimap> | null = null;
+  private animationFrameId: number | null = null;
+  private isDragging = false;
+  private boundOnMouseMove = this.onMinimapMouseMove.bind(this);
+  private boundOnMouseUp = this.onMinimapMouseUp.bind(this);
 
   readonly minimapNodes = computed(() => {
     this.store.version(); // react to node changes
@@ -234,6 +240,12 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
     const newX = this.store.width() / 2 - flowX * zoom;
     const newY = this.store.height() / 2 - flowY * zoom;
 
+    // Cancel any in-flight animation before starting a new one
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+
     // Animate the viewport pan over ~300ms using requestAnimationFrame
     const startX = this.store.transform()[0];
     const startY = this.store.transform()[1];
@@ -253,8 +265,9 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
       this.store.bumpVersion();
 
       if (t < 1) {
-        requestAnimationFrame(animate);
+        this.animationFrameId = requestAnimationFrame(animate);
       } else {
+        this.animationFrameId = null;
         // Sync d3-zoom internal state without transition
         try {
           this.store.panZoom()?.syncViewport({ x: newX, y: newY, zoom });
@@ -265,7 +278,80 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
       }
     };
 
-    requestAnimationFrame(animate);
+    this.animationFrameId = requestAnimationFrame(animate);
+  }
+
+  onMinimapMouseDown(event: MouseEvent): void {
+    if (!this.pannable()) return;
+    this.isDragging = true;
+    document.addEventListener('mousemove', this.boundOnMouseMove);
+    document.addEventListener('mouseup', this.boundOnMouseUp);
+  }
+
+  private onMinimapMouseMove(event: MouseEvent): void {
+    if (!this.isDragging) return;
+
+    const container = this.minimapContainerRef()?.nativeElement;
+    if (!container) return;
+
+    const svgEl = container.querySelector('svg');
+    if (!svgEl) return;
+
+    const rect = svgEl.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const clickY = event.clientY - rect.top;
+
+    const bounds = this.computeBounds();
+    const padding = 20;
+    const vbX = bounds.x - padding;
+    const vbY = bounds.y - padding;
+    const vbW = bounds.width + padding * 2;
+    const vbH = bounds.height + padding * 2;
+
+    const flowX = vbX + (clickX / this.mmWidth()) * vbW;
+    const flowY = vbY + (clickY / this.mmHeight()) * vbH;
+
+    const zoom = this.store.transform()[2];
+    const newX = this.store.width() / 2 - flowX * zoom;
+    const newY = this.store.height() / 2 - flowY * zoom;
+
+    this.store.transform.set([newX, newY, zoom]);
+    this.store.bumpVersion();
+    try {
+      this.store.panZoom()?.syncViewport({ x: newX, y: newY, zoom });
+    } catch { /* noop */ }
+  }
+
+  private onMinimapMouseUp(): void {
+    this.isDragging = false;
+    document.removeEventListener('mousemove', this.boundOnMouseMove);
+    document.removeEventListener('mouseup', this.boundOnMouseUp);
+  }
+
+  onMinimapWheel(event: WheelEvent): void {
+    if (!this.zoomable()) return;
+    event.preventDefault();
+
+    const currentZoom = this.store.transform()[2];
+    const delta = -event.deltaY * (this.zoomStep() / 1000);
+    const nextZoom = Math.min(
+      this.store.maxZoom(),
+      Math.max(this.store.minZoom(), currentZoom + delta)
+    );
+
+    const [x, y] = this.store.transform();
+    // Zoom toward the center of the viewport
+    const cx = this.store.width() / 2;
+    const cy = this.store.height() / 2;
+    const scale = nextZoom / currentZoom;
+    const newX = cx - (cx - x) * scale;
+    const newY = cy - (cy - y) * scale;
+
+    this.store.transform.set([newX, newY, nextZoom]);
+    this.store.bumpVersion();
+    try {
+      this.store.panZoom()?.syncViewport({ x: newX, y: newY, zoom: nextZoom });
+    } catch { /* noop */ }
   }
 
   onMinimapNodeClick(event: MouseEvent, node: { _userNode?: Node }): void {
@@ -276,6 +362,11 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+    }
+    document.removeEventListener('mousemove', this.boundOnMouseMove);
+    document.removeEventListener('mouseup', this.boundOnMouseUp);
     this.xyMinimap?.destroy();
   }
 

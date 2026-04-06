@@ -4,25 +4,25 @@ Gaps and improvement opportunities identified by comparing the Angular port agai
 
 ## P1 — High Priority
 
-- [ ] **Add PanZoom options re-sync on input changes** — When inputs like `panOnDrag`, `zoomOnScroll`, `panOnScrollMode`, `zoomOnDoubleClick`, `preventScrolling` change after init, the underlying `XYPanZoom` instance isn't updated. React Flow re-syncs these via its store subscription. (`ng-flow.component.ts`)
-- [ ] **Fix multi-select click behavior** — Node click handler calls `addSelectedNodes()` without checking whether the multi-selection key (Ctrl/Cmd) is held. This means clicking a node always replaces the selection instead of toggling. (`node-renderer.component.ts:162-166`)
-- [ ] **Fix MiniMap animation race condition** — Clicking the minimap while a pan animation is running starts a new `requestAnimationFrame` loop without canceling the previous one. Store a `cancelAnimationFrame` handle. (`minimap.component.ts:243-268`)
-- [ ] **Add edge keyboard navigation** — React's EdgeWrapper handles `onKeyDown` (Escape/Enter) for keyboard-based selection/deselection. Angular's edge renderer has no `(keydown)` handler — edges are not keyboard-navigable. (`edge-renderer.component.ts`)
-- [ ] **Add per-node keyboard event handling** — React's NodeWrapper handles `onKeyDown` (Escape, Enter, Arrow keys) per-node. Angular relies entirely on the global `KeyHandlerDirective`. (`node-renderer.component.ts`)
-- [ ] **Cache node inputs to avoid unnecessary re-renders** — `getNodeInputs()` creates a new object on every call. With `NgComponentOutlet`, Angular compares inputs by reference, so every node re-renders on any change, defeating OnPush. Cache input objects by node ID + version. (`node-renderer.component.ts:288-303`)
-- [ ] **Implement MiniMap drag-to-pan and scroll-to-zoom** — `pannable` input only supports click-to-pan, not drag-to-pan on the viewport rectangle. `zoomable` input is declared but never used. (`minimap.component.ts:117-118`)
+- [x] **Add PanZoom options re-sync on input changes** — Added effect that tracks all pan/zoom inputs and calls `updatePanZoomOptions()` on change. (`ng-flow.component.ts`)
+- [x] **Fix multi-select click behavior** — Node click handler now checks `multiSelectionActive()`: Ctrl/Cmd+click toggles selection, normal click replaces. (`node-renderer.component.ts`)
+- [x] **Fix MiniMap animation race condition** — Stores `animationFrameId` and cancels previous animation before starting a new one. (`minimap.component.ts`)
+- [x] **Add edge keyboard navigation** — Added `tabindex`, `(keydown)`, and `(focus)` on edge SVG wrappers. Escape deselects, Enter selects. (`edge-renderer.component.ts`)
+- [x] **Add per-node keyboard event handling** — Added `(keydown)` handler on node wrappers. Escape deselects (and blurs), Enter selects. (`node-renderer.component.ts`)
+- [x] **Cache node inputs to avoid unnecessary re-renders** — `getNodeInputs()` now caches by node ID + store version. Cache entries cleaned up on node removal. (`node-renderer.component.ts`)
+- [x] **Implement MiniMap drag-to-pan and scroll-to-zoom** — `pannable` now supports drag-to-pan (mousedown/mousemove/mouseup). `zoomable` now supports scroll-to-zoom (wheel event). (`minimap.component.ts`)
 
 ## P2 — Medium Priority
 
-- [ ] **Add batch update support** — React uses a `BatchProvider` with `useQueue` to coalesce `setNodes`/`setEdges` calls. Angular applies each immediately, causing multiple renders when updating both in sequence.
-- [ ] **Expose visible node/edge signals via NgFlowService** — `store.visibleNodes` and `store.visibleEdgeIds` exist but aren't exposed through the public API for users to consume reactively.
-- [ ] **Add unit tests for FlowStore and NgFlowService** — Zero `.spec.ts` files exist in the Angular package. The FlowStore alone is 700+ lines with no test coverage.
-- [ ] **Add Playwright e2e tests for Angular** — Existing Playwright tests only cover React and Svelte. No Angular test fixtures or CI config.
-- [ ] **Remove duplicate `nodesData()` method** — `NgFlowService` has both `nodesData()` (reads from `store.nodes()`) and `selectNodesData()` (reads from `store.nodeLookup`). The latter is more correct; remove the former. (`ng-flow.service.ts:59-67`)
-- [ ] **Use `edgeLookup` Map in `getEdge()`** — `getEdge()` does `this.store.edges().find()` (O(n)) when `this.store.edgeLookup` (O(1)) is available. (`ng-flow.service.ts:199-200`)
-- [ ] **Add `onInit` output event** — React Flow fires an `onInit` callback when the flow is ready (viewport initialized, nodes measured). No Angular equivalent exists.
-- [ ] **Add accessibility to Controls** — Lock button missing `aria-pressed`, buttons missing `type="button"`, SVGs missing `aria-hidden="true"`. (`controls.component.ts`)
-- [ ] **Align `selectionMode` default to `Full`** — Angular defaults to `SelectionMode.Partial` while React defaults to `Full`. (`ng-flow.component.ts:271`)
+- [x] **Add batch update support** — Added `batch()` to FlowStore and NgFlowService. Defers version bumps until all updates are applied. (`flow-store.service.ts`, `ng-flow.service.ts`)
+- [x] **Expose visible node/edge signals via NgFlowService** — Added `visibleNodes` and `visibleEdgeIds` computed signals to public API. (`ng-flow.service.ts`)
+- [x] **Add unit tests for FlowStore and NgFlowService** — 93 tests covering state management, node/edge CRUD, selection, batching, middleware, coordinate conversion, serialization. Vitest + zoneless Angular TestBed. (`flow-store.service.spec.ts`, `ng-flow.service.spec.ts`)
+- [~] **Add Playwright e2e tests for Angular** — Angular example app at `examples/angular/` with all test fixture routes. Playwright config at `playwright.angular.config.ts`. **37/43 tests pass** (86%) including: all nodes tests (selection, drag, connect, delete, classes, styles, hidden, selectable=false), all edge tests except 2 (selection, multi-select, delete, classes, styles, aria-label, animated, markers, z-index, sub-flow z-index, selectable=false, hidden), all pane tests except 1 (zoom, minZoom/maxZoom, autoPan, panOnScroll, initialViewport), props (colorMode light+dark). Remaining 6: edge deletable-false/interactionWidth (click coordinate targeting), node-toolbar (2, positioning offset), multi-select-drag (selection key integration), pane-pan (1px rounding).
+- [x] **Remove duplicate `nodesData()` method** — Removed `nodesData()` from NgFlowService; `selectNodesData()` is the canonical replacement. (`ng-flow.service.ts`)
+- [x] **Use `edgeLookup` Map in `getEdge()`** — Changed from O(n) `edges().find()` to O(1) `edgeLookup.get()`. (`ng-flow.service.ts`)
+- [x] **Add `onInit` output event** — Already existed: `init` output emits `NgFlowService` instance in `ngAfterViewInit`. (`ng-flow.component.ts:346,609`)
+- [x] **Add accessibility to Controls** — Added `type="button"`, `aria-label` on all buttons, `aria-pressed` on lock toggle, `aria-hidden="true"` on all SVGs. (`controls.component.ts`)
+- [x] **Align `selectionMode` default to `Full`** — Changed default from `SelectionMode.Partial` to `SelectionMode.Full`. (`ng-flow.component.ts`)
 
 ## P3 — Low Priority
 

@@ -8,8 +8,13 @@ import { NODE_ID } from '../../services/tokens';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    'class': 'ng-flow__node-toolbar',
-    'style': 'position: absolute; pointer-events: all; z-index: 1000;',
+    '[attr.data-id]': 'resolvedNodeIds()[0]',
+    '[class]': 'shouldShow() ? "ng-flow__node-toolbar xy-flow__node-toolbar" : ""',
+    '[style.position]': '"absolute"',
+    '[style.left.px]': '0',
+    '[style.top.px]': '0',
+    '[style.pointer-events]': 'shouldShow() ? "all" : "none"',
+    '[style.z-index]': '1000',
     '[style.display]': 'shouldShow() ? "block" : "none"',
     '[style.transform]': 'toolbarTransform()',
   },
@@ -31,7 +36,7 @@ export class NodeToolbarComponent {
     this.contextNodeId = nodeId ?? '';
   }
 
-  private readonly resolvedNodeIds = computed((): string[] => {
+  readonly resolvedNodeIds = computed((): string[] => {
     const inputId = this.nodeIdInput();
     if (inputId !== undefined) {
       return Array.isArray(inputId) ? inputId : [inputId];
@@ -40,6 +45,7 @@ export class NodeToolbarComponent {
   });
 
   readonly shouldShow = computed(() => {
+    this.store.version(); // react to node changes
     if (this.isVisible() !== undefined) return this.isVisible()!;
     const ids = this.resolvedNodeIds();
     return ids.some(id => {

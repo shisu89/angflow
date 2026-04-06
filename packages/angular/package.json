@@ -1,6 +1,6 @@
 {
   "name": "@angflow/angular",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "description": "Angular Flow - A highly customizable Angular library for building node-based editors and interactive flow charts.",
   "keywords": [
@@ -41,6 +41,8 @@
   },
   "scripts": {
     "build": "ngc -p tsconfig.lib.json && node scripts/bundle-css.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint --ext .ts src",
     "typecheck": "tsc --noEmit"
   },
@@ -48,13 +50,17 @@
     "@angflow/system": ">=0.0.76"
   },
   "peerDependencies": {
-    "@angular/core": ">=17.0.0",
     "@angular/common": ">=17.0.0",
+    "@angular/core": ">=17.0.0",
     "rxjs": ">=7.0.0"
   },
   "devDependencies": {
     "@angular/compiler": ">=17.0.0",
     "@angular/compiler-cli": ">=17.0.0",
-    "typescript": "5.9.3"
+    "@angular/platform-browser": "^21.2.7",
+    "@angular/platform-browser-dynamic": "^21.2.7",
+    "jsdom": "^29.0.1",
+    "typescript": "5.9.3",
+    "vitest": "^4.1.2"
   }
 }
