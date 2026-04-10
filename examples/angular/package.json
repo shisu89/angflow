@@ -4,25 +4,41 @@
   "private": true,
   "scripts": {
     "dev": "ng serve",
+    "start": "ng serve",
     "build": "ng build",
-    "start": "ng serve"
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test"
   },
   "dependencies": {
+    "@angflow/angular": "workspace:*",
+    "@angflow/system": "workspace:*",
     "@angular/common": "^21.2.0",
     "@angular/compiler": "^21.2.0",
     "@angular/core": "^21.2.0",
+    "@angular/forms": "^21.2.0",
     "@angular/platform-browser": "^21.2.0",
     "@angular/router": "^21.2.0",
-    "@angflow/angular": "workspace:*",
-    "@angflow/system": "workspace:*",
-    "rxjs": "^7.8.0",
-    "tslib": "^2.6.0",
-    "zone.js": "^0.15.0"
+    "@types/d3-drag": "^3.0.7",
+    "@types/d3-interpolate": "^3.0.4",
+    "@types/d3-selection": "^3.0.11",
+    "@types/d3-transition": "^3.0.9",
+    "@types/d3-zoom": "^3.0.8",
+    "d3-drag": "^3.0.0",
+    "d3-interpolate": "^3.0.1",
+    "d3-selection": "^3.0.0",
+    "d3-zoom": "^3.0.0",
+    "rxjs": ">=7.0.0",
+    "tslib": "^2.3.0"
   },
   "devDependencies": {
-    "@angular/build": "^21.2.0",
-    "@angular/cli": "^21.2.0",
+    "@angular/build": "^21.2.5",
+    "@angular/cli": "^21.2.5",
     "@angular/compiler-cli": "^21.2.0",
-    "typescript": "~5.9.3"
+    "@types/node": "^25.5.0",
+    "jsdom": "^28.0.0",
+    "prettier": "^3.8.1",
+    "resolve-typescript-plugin": "^2.0.1",
+    "typescript": "~5.9.2",
+    "vitest": "^4.0.8"
   }
 }
