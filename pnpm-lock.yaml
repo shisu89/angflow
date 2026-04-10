@@ -118,8 +118,8 @@ importers:
   packages/angular:
     dependencies:
       '@angflow/system':
-        specifier: '>=0.0.82'
-        version: 0.0.82
+        specifier: '>=0.0.83'
+        version: 0.0.83
       '@angular/common':
         specifier: '>=17.0.0'
         version: 21.2.6(@angular/core@21.2.6(@angular/compiler@21.2.6)(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
@@ -150,7 +150,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.2
-        version: 4.1.2(@types/node@25.6.0)(jsdom@29.0.1)(vite@8.0.3(@types/node@25.6.0)(esbuild@0.27.3)(sass@1.97.3)(terser@5.46.1))
+        version: 4.1.2(@types/node@25.6.0)(jsdom@29.0.1)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@25.6.0)(esbuild@0.27.3)(sass@1.97.3)(terser@5.46.1))
 
   packages/system:
     dependencies:
@@ -321,8 +321,8 @@ packages:
     resolution: {integrity: sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw==}
     engines: {node: '>=6.0.0'}
 
-  '@angflow/system@0.0.82':
-    resolution: {integrity: sha512-SpDvaimloLKo6XHcufjGWTEzQaHf6807OI1MKoLWqeRzMYGE5oZJ7yXydoZxFW4+6X/VelayRIZ4lvhbNoZsNA==}
+  '@angflow/system@0.0.83':
+    resolution: {integrity: sha512-6dkHLixXcFHyNftCu5Y/DAGsMFtXRIPyN4WzV/p/XvUf9TNizfRS09FER4F1xhT5dVk0OSwhoR5J9o4v49QpxA==}
 
   '@angular-devkit/architect@0.2102.6':
     resolution: {integrity: sha512-h4qybKypR7OuwcTHPQI1zRm7abXgmPiV49vI2UeMtVVY/GKzru9gMexcYmWabzEyBY8w6VSfWjV2X+eit2EhDQ==}
@@ -4494,7 +4494,7 @@ snapshots:
       '@jridgewell/gen-mapping': 0.3.13
       '@jridgewell/trace-mapping': 0.3.31
 
-  '@angflow/system@0.0.82':
+  '@angflow/system@0.0.83':
     dependencies:
       '@types/d3-drag': 3.0.7
       '@types/d3-interpolate': 3.0.4
@@ -5501,7 +5501,7 @@ snapshots:
   '@rolldown/binding-openharmony-arm64@1.0.0-rc.4':
     optional: true
 
-  '@rolldown/binding-wasm32-wasi@1.0.0-rc.12':
+  '@rolldown/binding-wasm32-wasi@1.0.0-rc.12(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)':
     dependencies:
       '@napi-rs/wasm-runtime': 1.1.2(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
     transitivePeerDependencies:
@@ -5881,13 +5881,13 @@ snapshots:
     optionalDependencies:
       vite: 7.3.1(@types/node@25.6.0)(lightningcss@1.32.0)(sass@1.97.3)(terser@5.46.1)
 
-  '@vitest/mocker@4.1.2(vite@8.0.3(@types/node@25.6.0)(esbuild@0.27.3)(sass@1.97.3)(terser@5.46.1))':
+  '@vitest/mocker@4.1.2(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@25.6.0)(esbuild@0.27.3)(sass@1.97.3)(terser@5.46.1))':
     dependencies:
       '@vitest/spy': 4.1.2
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 8.0.3(@types/node@25.6.0)(esbuild@0.27.3)(sass@1.97.3)(terser@5.46.1)
+      vite: 8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@25.6.0)(esbuild@0.27.3)(sass@1.97.3)(terser@5.46.1)
 
   '@vitest/pretty-format@4.1.2':
     dependencies:
@@ -8002,7 +8002,7 @@ snapshots:
     dependencies:
       glob: 10.5.0
 
-  rolldown@1.0.0-rc.12:
+  rolldown@1.0.0-rc.12(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2):
     dependencies:
       '@oxc-project/types': 0.122.0
       '@rolldown/pluginutils': 1.0.0-rc.12
@@ -8019,7 +8019,7 @@ snapshots:
       '@rolldown/binding-linux-x64-gnu': 1.0.0-rc.12
       '@rolldown/binding-linux-x64-musl': 1.0.0-rc.12
       '@rolldown/binding-openharmony-arm64': 1.0.0-rc.12
-      '@rolldown/binding-wasm32-wasi': 1.0.0-rc.12
+      '@rolldown/binding-wasm32-wasi': 1.0.0-rc.12(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
       '@rolldown/binding-win32-arm64-msvc': 1.0.0-rc.12
       '@rolldown/binding-win32-x64-msvc': 1.0.0-rc.12
     transitivePeerDependencies:
@@ -8599,12 +8599,12 @@ snapshots:
       sass: 1.97.3
       terser: 5.46.1
 
-  vite@8.0.3(@types/node@25.6.0)(esbuild@0.27.3)(sass@1.97.3)(terser@5.46.1):
+  vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@25.6.0)(esbuild@0.27.3)(sass@1.97.3)(terser@5.46.1):
     dependencies:
       lightningcss: 1.32.0
       picomatch: 4.0.4
       postcss: 8.5.8
-      rolldown: 1.0.0-rc.12
+      rolldown: 1.0.0-rc.12(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
       tinyglobby: 0.2.15
     optionalDependencies:
       '@types/node': 25.6.0
@@ -8644,10 +8644,10 @@ snapshots:
     transitivePeerDependencies:
       - msw
 
-  vitest@4.1.2(@types/node@25.6.0)(jsdom@29.0.1)(vite@8.0.3(@types/node@25.6.0)(esbuild@0.27.3)(sass@1.97.3)(terser@5.46.1)):
+  vitest@4.1.2(@types/node@25.6.0)(jsdom@29.0.1)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@25.6.0)(esbuild@0.27.3)(sass@1.97.3)(terser@5.46.1)):
     dependencies:
       '@vitest/expect': 4.1.2
-      '@vitest/mocker': 4.1.2(vite@8.0.3(@types/node@25.6.0)(esbuild@0.27.3)(sass@1.97.3)(terser@5.46.1))
+      '@vitest/mocker': 4.1.2(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@25.6.0)(esbuild@0.27.3)(sass@1.97.3)(terser@5.46.1))
       '@vitest/pretty-format': 4.1.2
       '@vitest/runner': 4.1.2
       '@vitest/snapshot': 4.1.2
@@ -8664,7 +8664,7 @@ snapshots:
       tinyexec: 1.0.4
       tinyglobby: 0.2.15
       tinyrainbow: 3.1.0
-      vite: 8.0.3(@types/node@25.6.0)(esbuild@0.27.3)(sass@1.97.3)(terser@5.46.1)
+      vite: 8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@25.6.0)(esbuild@0.27.3)(sass@1.97.3)(terser@5.46.1)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 25.6.0
