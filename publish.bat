@@ -86,7 +86,7 @@ for /f "delims=" %%v in ('node -p "require('./package.json').version"') do set A
 echo @angflow/angular is now !ANGULAR_VERSION!
 
 echo.
-echo [6/6] Publishing @angflow/angular@!ANGULAR_VERSION!...
+echo [6/7] Publishing @angflow/angular@!ANGULAR_VERSION!...
 call npm publish --access public
 if errorlevel 1 (
     echo.
@@ -97,8 +97,20 @@ if errorlevel 1 (
 popd
 
 echo.
+echo [7/7] Refreshing pnpm-lock.yaml to match bumped specifiers...
+pushd "%ROOT%"
+call pnpm install --lockfile-only
+if errorlevel 1 (
+    echo.
+    echo ERROR: pnpm lockfile refresh failed. Run 'pnpm install --lockfile-only' manually before committing.
+    popd
+    exit /b 1
+)
+popd
+
+echo.
 echo Done.
-echo   @angflow/system  -> !SYSTEM_VERSION!
-echo   @angflow/angular -> !ANGULAR_VERSION!
-echo Remember to commit the version bumps in packages\system\package.json and packages\angular\package.json.
+echo   @angflow/system  -^> !SYSTEM_VERSION!
+echo   @angflow/angular -^> !ANGULAR_VERSION!
+echo Remember to commit the version bumps in packages\system\package.json, packages\angular\package.json, and pnpm-lock.yaml.
 endlocal
