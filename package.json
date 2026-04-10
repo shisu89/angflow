@@ -1,19 +1,19 @@
 {
-  "name": "@ngflow/monorepo",
+  "name": "@angflow/monorepo",
   "version": "0.0.0",
   "description": "A highly customizable Angular library for building node-based editors and interactive flow charts",
-  "repository": "git@github.com:ngflow/ngflow.git",
+  "repository": "git@github.com:angflow/angflow.git",
   "license": "MIT",
   "private": true,
   "scripts": {
     "preinstall": "npx only-allow pnpm",
-    "build": "pnpm --filter @ngflow/system run build && pnpm --filter @ngflow/angular run build",
-    "build:system": "pnpm --filter @ngflow/system run build",
-    "build:angular": "pnpm --filter @ngflow/angular run build",
-    "lint": "pnpm --filter @ngflow/system run lint && pnpm --filter @ngflow/angular run lint",
-    "typecheck": "pnpm --filter @ngflow/system run typecheck && pnpm --filter @ngflow/angular run typecheck",
+    "build": "pnpm --filter @angflow/system run build && pnpm --filter @angflow/angular run build",
+    "build:system": "pnpm --filter @angflow/system run build",
+    "build:angular": "pnpm --filter @angflow/angular run build",
+    "lint": "pnpm --filter @angflow/system run lint && pnpm --filter @angflow/angular run lint",
+    "typecheck": "pnpm --filter @angflow/system run typecheck && pnpm --filter @angflow/angular run typecheck",
     "clean": "pnpm -r --parallel exec rimraf dist node_modules",
-    "publish:ngflow": "pnpm --filter @ngflow/system publish --access public && pnpm --filter @ngflow/angular publish --access public"
+    "publish:angflow": "pnpm --filter @angflow/system publish --access public && pnpm --filter @angflow/angular publish --access public"
   },
   "devDependencies": {
     "concurrently": "^7.6.0",

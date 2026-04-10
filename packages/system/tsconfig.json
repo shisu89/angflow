@@ -1,6 +1,6 @@
 {
-  "display": "@ngflow/system",
-  "extends": "@ngflow/tsconfig/base.json",
+  "display": "@angflow/system",
+  "extends": "@angflow/tsconfig/base.json",
   "compilerOptions": {
     "lib": ["dom", "esnext"],
     "module": "esnext",

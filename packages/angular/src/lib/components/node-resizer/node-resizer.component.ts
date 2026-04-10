@@ -22,6 +22,10 @@ import {
   type XYResizerChildChange,
   type ResizeDragEvent,
   type ResizeParams,
+  type NodeChange,
+  type NodeDimensionChange,
+  type NodePositionChange,
+  type XYPosition,
 } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 import { NODE_ID } from '../../services/tokens';
@@ -33,65 +37,65 @@ import { NODE_ID } from '../../services/tokens';
   host: {
     'class': 'ng-flow__node-resizer xy-flow__resize-control',
     'style': 'position: absolute; inset: 0; pointer-events: none;',
-    '[style.display]': 'isVisible() === false ? "none" : null',
+    '[style.display]': 'effectivelyVisible() ? null : "none"',
   },
   template: `
     <div
-      class="xy-flow__resize-control handle-top-left"
+      class="xy-flow__resize-control nodrag handle handle-top-left top left"
       [class]="handleClassName()"
       [style.position]="'absolute'" [style.top]="'0'" [style.left]="'0'"
       [style.cursor]="'nw-resize'" [style.pointer-events]="'all'"
       [style.width.px]="10" [style.height.px]="10"
-      [style.border-color]="color() ?? null"
+      [style.background-color]="color() ?? null"
     ></div>
     <div
-      class="xy-flow__resize-control handle-top-right"
+      class="xy-flow__resize-control nodrag handle handle-top-right top right"
       [class]="handleClassName()"
       [style.position]="'absolute'" [style.top]="'0'" [style.right]="'0'"
       [style.cursor]="'ne-resize'" [style.pointer-events]="'all'"
       [style.width.px]="10" [style.height.px]="10"
-      [style.border-color]="color() ?? null"
+      [style.background-color]="color() ?? null"
     ></div>
     <div
-      class="xy-flow__resize-control handle-bottom-left"
+      class="xy-flow__resize-control nodrag handle handle-bottom-left bottom left"
       [class]="handleClassName()"
       [style.position]="'absolute'" [style.bottom]="'0'" [style.left]="'0'"
       [style.cursor]="'sw-resize'" [style.pointer-events]="'all'"
       [style.width.px]="10" [style.height.px]="10"
-      [style.border-color]="color() ?? null"
+      [style.background-color]="color() ?? null"
     ></div>
     <div
-      class="xy-flow__resize-control handle-bottom-right"
+      class="xy-flow__resize-control nodrag handle handle-bottom-right bottom right"
       [class]="handleClassName()"
       [style.position]="'absolute'" [style.bottom]="'0'" [style.right]="'0'"
       [style.cursor]="'se-resize'" [style.pointer-events]="'all'"
       [style.width.px]="10" [style.height.px]="10"
-      [style.border-color]="color() ?? null"
+      [style.background-color]="color() ?? null"
     ></div>
     <!-- Resize lines -->
     <div
-      class="xy-flow__resize-control line-top"
+      class="xy-flow__resize-control nodrag line line-top top"
       [class]="lineClassName()"
       [style.position]="'absolute'" [style.top]="'0'" [style.left]="'0'" [style.right]="'0'"
       [style.height.px]="2" [style.cursor]="'n-resize'" [style.pointer-events]="'all'"
       [style.border-color]="color() ?? null"
     ></div>
     <div
-      class="xy-flow__resize-control line-right"
+      class="xy-flow__resize-control nodrag line line-right right"
       [class]="lineClassName()"
       [style.position]="'absolute'" [style.top]="'0'" [style.right]="'0'" [style.bottom]="'0'"
       [style.width.px]="2" [style.cursor]="'e-resize'" [style.pointer-events]="'all'"
       [style.border-color]="color() ?? null"
     ></div>
     <div
-      class="xy-flow__resize-control line-bottom"
+      class="xy-flow__resize-control nodrag line line-bottom bottom"
       [class]="lineClassName()"
       [style.position]="'absolute'" [style.bottom]="'0'" [style.left]="'0'" [style.right]="'0'"
       [style.height.px]="2" [style.cursor]="'s-resize'" [style.pointer-events]="'all'"
       [style.border-color]="color() ?? null"
     ></div>
     <div
-      class="xy-flow__resize-control line-left"
+      class="xy-flow__resize-control nodrag line line-left left"
       [class]="lineClassName()"
       [style.position]="'absolute'" [style.top]="'0'" [style.left]="'0'" [style.bottom]="'0'"
       [style.width.px]="2" [style.cursor]="'w-resize'" [style.pointer-events]="'all'"
@@ -109,7 +113,13 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
   readonly maxWidth = input(Infinity);
   readonly maxHeight = input(Infinity);
   readonly keepAspectRatio = input(false);
-  readonly isVisible = input<boolean>(true);
+  /**
+   * Controls handle visibility.
+   * - `undefined` (default): auto — handles show only when the host node is selected.
+   * - `true`: always visible, regardless of selection.
+   * - `false`: always hidden.
+   */
+  readonly isVisible = input<boolean | undefined>(undefined);
   readonly color = input<string>();
   readonly handleClassName = input<string>('');
   readonly handleStyle = input<Partial<CSSStyleDeclaration>>();
@@ -128,19 +138,37 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
   private nodeId: string = '';
   private resizerInstances: ReturnType<typeof XYResizer>[] = [];
 
+  /**
+   * Host-level visibility: explicit `isVisible` wins; otherwise follow the
+   * owning node's `selected` state so handles only show on selection.
+   */
+  readonly effectivelyVisible = computed(() => {
+    const explicit = this.isVisible();
+    if (explicit !== undefined) return explicit;
+    // Establish reactive dependency on node state (selection changes setNodes).
+    const nodes = this.store.nodes();
+    const id = this.nodeIdInput() ?? this.nodeId;
+    if (!id) return true;
+    const node = nodes.find((n) => n.id === id);
+    return node?.selected ?? false;
+  });
+
   constructor(@Optional() @Inject(NODE_ID) nodeId: string | null) {
     this.nodeId = nodeId ?? '';
   }
 
   ngAfterViewInit(): void {
     const resolvedNodeId = this.nodeIdInput() ?? this.nodeId;
-    const handles = this.el.nativeElement.querySelectorAll('.xy-flow__resize-control');
-    const positions: ControlPosition[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+    // Template order: 4 corners, then 4 lines. Must match `positions` below.
+    const handles: HTMLDivElement[] = Array.from(
+      (this.el.nativeElement as HTMLElement).querySelectorAll(':scope > .xy-flow__resize-control')
+    ) as HTMLDivElement[];
+    const positions: ControlPosition[] = [
+      'top-left', 'top-right', 'bottom-left', 'bottom-right',
+      'top', 'right', 'bottom', 'left',
+    ];
 
-    // Only set up corner handles (first 4)
-    const cornerHandles = Array.from(handles).slice(0, 4) as Element[];
-
-    cornerHandles.forEach((handle, index) => {
+    handles.forEach((handle, index) => {
       const resizer = XYResizer({
         domNode: handle as HTMLDivElement,
         nodeId: resolvedNodeId,
@@ -152,10 +180,51 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
           nodeOrigin: this.store.nodeOrigin(),
           paneDomNode: this.store.domNode(),
         }),
-        onChange: (changes: XYResizerChange, childChanges: XYResizerChildChange[]) => {
-          this.resize.emit({ changes, childChanges });
+        onChange: (change: XYResizerChange, childChanges: XYResizerChildChange[]) => {
+          const nodeChanges: NodeChange[] = [];
+          const nextPosition: Partial<XYPosition> = { x: change.x, y: change.y };
+
+          if (nextPosition.x !== undefined && nextPosition.y !== undefined) {
+            nodeChanges.push({
+              id: resolvedNodeId,
+              type: 'position',
+              position: { x: nextPosition.x, y: nextPosition.y },
+            } as NodePositionChange);
+          }
+
+          if (change.width !== undefined && change.height !== undefined) {
+            nodeChanges.push({
+              id: resolvedNodeId,
+              type: 'dimensions',
+              resizing: true,
+              setAttributes: true,
+              dimensions: { width: change.width, height: change.height },
+            } as NodeDimensionChange);
+          }
+
+          for (const childChange of childChanges) {
+            nodeChanges.push({
+              id: childChange.id,
+              type: 'position',
+              position: childChange.position,
+            } as NodePositionChange);
+          }
+
+          if (nodeChanges.length > 0) {
+            this.store.triggerNodeChanges(nodeChanges);
+          }
+
+          this.resize.emit({ changes: change, childChanges });
         },
         onEnd: (change: Required<XYResizerChange>) => {
+          this.store.triggerNodeChanges([
+            {
+              id: resolvedNodeId,
+              type: 'dimensions',
+              resizing: false,
+              dimensions: { width: change.width, height: change.height },
+            } as NodeDimensionChange,
+          ]);
           this.resizeEnd.emit({ changes: change });
         },
       });

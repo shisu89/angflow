@@ -1,6 +1,6 @@
 {
   "name": "@angflow/angular",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "type": "module",
   "description": "Angular Flow - A highly customizable Angular library for building node-based editors and interactive flow charts.",
   "keywords": [
@@ -10,11 +10,11 @@
     "diagram",
     "workflow",
     "angular-flow",
-    "ngflow"
+    "angflow"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/ngflow/ngflow.git",
+    "url": "https://github.com/angflow/angflow.git",
     "directory": "packages/angular"
   },
   "files": [

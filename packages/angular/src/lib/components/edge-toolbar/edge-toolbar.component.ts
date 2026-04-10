@@ -51,7 +51,10 @@ export class EdgeToolbarComponent {
   });
 
   readonly toolbarTransform = computed(() => {
-    const zoom = this.store.transform()[2];
-    return getEdgeToolbarTransform(this.x(), this.y(), zoom, this.alignX(), this.alignY());
+    const [tx, ty, zoom] = this.store.transform();
+    // x,y are in flow coordinates; convert to viewport pixel coordinates
+    const vx = this.x() * zoom + tx;
+    const vy = this.y() * zoom + ty;
+    return getEdgeToolbarTransform(vx, vy, zoom, this.alignX(), this.alignY());
   });
 }

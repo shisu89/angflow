@@ -12,7 +12,7 @@ import { PanelComponent } from '../panel/panel.component';
         class="ng-flow__attribution xy-flow__attribution"
         style="font-size: 10px; color: #999; pointer-events: all;"
       >
-        ngflow
+        angflow
       </span>
     </ng-flow-panel>
   `,

@@ -1,4 +1,4 @@
 module.exports = {
   root: true,
-  extends: ['@ngflow/eslint-config'],
+  extends: ['@angflow/eslint-config'],
 };

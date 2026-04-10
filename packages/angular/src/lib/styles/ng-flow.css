@@ -1,11 +1,11 @@
 /*
- * @ngflow/angular — Complete stylesheet
+ * @angflow/angular — Complete stylesheet
  *
  * Import this once in your app's global styles:
- *   @import '@ngflow/angular/styles/ng-flow.css';
+ *   @import '@angflow/angular/styles/ng-flow.css';
  *
  * Or in angular.json:
- *   "styles": ["node_modules/@ngflow/angular/styles/ng-flow.css"]
+ *   "styles": ["node_modules/@angflow/angular/styles/ng-flow.css"]
  */
 
 /* ── CSS Custom Properties (theme defaults) ─────────────────────── */

@@ -12,3 +12,6 @@ stats.html
 .log
 .turbo
 .rollup.cache
+.playwright-mcp
+openspec
+.claude
