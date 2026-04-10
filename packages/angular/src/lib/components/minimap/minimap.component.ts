@@ -14,7 +14,9 @@ import {
 import {
   XYMinimap,
   getInternalNodesBounds,
+  getBoundsOfRects,
   type PanelPosition,
+  type Rect,
 } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 import { PanelComponent } from '../panel/panel.component';
@@ -82,7 +84,7 @@ export type GetMiniMapNodeAttribute<NodeType extends Node = Node> = (node: NodeT
             [attr.height]="maskPosition().height"
             fill="none"
             [attr.stroke]="maskStrokeColor() ?? 'rgba(0,89,220,0.6)'"
-            [attr.stroke-width]="maskStrokeWidth()"
+            [attr.stroke-width]="scaledMaskStrokeWidth()"
             rx="2"
           />
         </svg>
@@ -143,13 +145,7 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
     }));
   });
 
-  readonly viewBox = computed(() => {
-    this.store.version();
-    const bounds = this.computeBounds();
-    const padding = 20;
-    return `${bounds.x - padding} ${bounds.y - padding} ${bounds.width + padding * 2} ${bounds.height + padding * 2}`;
-  });
-
+  // Current viewport rect expressed in flow coordinates.
   readonly maskPosition = computed(() => {
     const t = this.store.transform();
     const w = this.store.width();
@@ -161,6 +157,59 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
       height: h / t[2],
     };
   });
+
+  // Union of nodes bounds + viewport rect, aspect-ratio corrected to the
+  // minimap SVG's own width/height, plus an offsetScale * viewScale padding
+  // on all sides. This mirrors React Flow's approach so the viewBox always
+  // contains both the nodes and the current viewport — without it, the mask
+  // "hole" (viewport rect) can cover the entire visible viewBox and the
+  // dim-outside-viewport contrast disappears.
+  readonly viewBoxData = computed(() => {
+    this.store.version();
+
+    const viewBB: Rect = this.maskPosition();
+    const nodes = this.minimapNodes();
+
+    let boundingRect: Rect;
+    if (nodes.length > 0) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const n of nodes) {
+        if (n.x < minX) minX = n.x;
+        if (n.y < minY) minY = n.y;
+        if (n.x + n.width > maxX) maxX = n.x + n.width;
+        if (n.y + n.height > maxY) maxY = n.y + n.height;
+      }
+      const nodesRect: Rect = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+      boundingRect = getBoundsOfRects(nodesRect, viewBB);
+    } else {
+      boundingRect = viewBB;
+    }
+
+    const elementWidth = this.mmWidth();
+    const elementHeight = this.mmHeight();
+    const scaledWidth = boundingRect.width / elementWidth;
+    const scaledHeight = boundingRect.height / elementHeight;
+    const viewScale = Math.max(scaledWidth, scaledHeight) || 1;
+    const viewWidth = viewScale * elementWidth;
+    const viewHeight = viewScale * elementHeight;
+    const offset = this.offsetScale() * viewScale;
+    const x = boundingRect.x - (viewWidth - boundingRect.width) / 2 - offset;
+    const y = boundingRect.y - (viewHeight - boundingRect.height) / 2 - offset;
+    const width = viewWidth + offset * 2;
+    const height = viewHeight + offset * 2;
+
+    return { x, y, width, height, viewScale };
+  });
+
+  readonly viewBox = computed(() => {
+    const v = this.viewBoxData();
+    return `${v.x} ${v.y} ${v.width} ${v.height}`;
+  });
+
+  // Scale the viewport outline stroke by viewScale so it renders at a
+  // consistent CSS-pixel thickness regardless of how zoomed-out the
+  // minimap's internal coordinate system is.
+  readonly scaledMaskStrokeWidth = computed(() => this.maskStrokeWidth() * this.viewBoxData().viewScale);
 
   // SVG path for the mask: big outer rect + inner viewport rect.
   // Combined with fill-rule="evenodd", the overlap of the two subpaths
@@ -212,16 +261,10 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
     const clickX = event.clientX - rect.left;
     const clickY = event.clientY - rect.top;
 
-    // Convert from SVG pixel coords to viewBox coords
-    const bounds = this.computeBounds();
-    const padding = 20;
-    const vbX = bounds.x - padding;
-    const vbY = bounds.y - padding;
-    const vbW = bounds.width + padding * 2;
-    const vbH = bounds.height + padding * 2;
-
-    const flowX = vbX + (clickX / this.mmWidth()) * vbW;
-    const flowY = vbY + (clickY / this.mmHeight()) * vbH;
+    // Convert from SVG pixel coords to flow coords using the current viewBox.
+    const v = this.viewBoxData();
+    const flowX = v.x + (clickX / this.mmWidth()) * v.width;
+    const flowY = v.y + (clickY / this.mmHeight()) * v.height;
 
     // Emit click event
     this.minimapClick.emit({ event, position: { x: flowX, y: flowY } });
@@ -294,15 +337,9 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
     const clickX = event.clientX - rect.left;
     const clickY = event.clientY - rect.top;
 
-    const bounds = this.computeBounds();
-    const padding = 20;
-    const vbX = bounds.x - padding;
-    const vbY = bounds.y - padding;
-    const vbW = bounds.width + padding * 2;
-    const vbH = bounds.height + padding * 2;
-
-    const flowX = vbX + (clickX / this.mmWidth()) * vbW;
-    const flowY = vbY + (clickY / this.mmHeight()) * vbH;
+    const v = this.viewBoxData();
+    const flowX = v.x + (clickX / this.mmWidth()) * v.width;
+    const flowY = v.y + (clickY / this.mmHeight()) * v.height;
 
     const zoom = this.store.transform()[2];
     const newX = this.store.width() / 2 - flowX * zoom;
@@ -363,17 +400,4 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
     this.xyMinimap?.destroy();
   }
 
-  private computeBounds() {
-    const nodes = this.minimapNodes();
-    if (nodes.length === 0) return { x: 0, y: 0, width: 200, height: 150 };
-
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const n of nodes) {
-      minX = Math.min(minX, n.x);
-      minY = Math.min(minY, n.y);
-      maxX = Math.max(maxX, n.x + n.width);
-      maxY = Math.max(maxY, n.y + n.height);
-    }
-    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-  }
 }
