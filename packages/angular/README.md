@@ -1,6 +1,6 @@
-# @xyflow/angular
+# @angflow/angular
 
-An Angular library for building node-based UIs, interactive flow charts, and diagrams. Built on top of `@xyflow/system` — the same framework-agnostic core that powers [React Flow](https://reactflow.dev/) and [Svelte Flow](https://svelteflow.dev/).
+An Angular library for building node-based UIs, interactive flow charts, and diagrams. Built on top of `@angflow/system` — a republish of `@xyflow/system`, the same framework-agnostic core that powers [React Flow](https://reactflow.dev/) and [Svelte Flow](https://svelteflow.dev/).
 
 ## Features
 
@@ -29,7 +29,7 @@ An Angular library for building node-based UIs, interactive flow charts, and dia
 ## Installation
 
 ```bash
-npm install @xyflow/angular @xyflow/system
+npm install @angflow/angular @angflow/system
 ```
 
 ## Quick Start
@@ -45,9 +45,9 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
   Position,
-} from '@xyflow/angular';
-import type { Node, Edge, Connection } from '@xyflow/angular';
-import { addEdge } from '@xyflow/system';
+} from '@angflow/angular';
+import type { Node, Edge, Connection } from '@angflow/angular';
+import { addEdge } from '@angflow/system';
 
 @Component({
   selector: 'app-root',
@@ -95,6 +95,22 @@ export class App {
   }
 }
 ```
+
+## Example App
+
+A full example app lives at [`example-app/`](../../../example-app) in this repo. It's the best place to see working code for every feature — custom nodes and edges, sub-flows, node/edge toolbars, drag-from-sidebar, save/restore, connection validation, and more.
+
+```bash
+cd example-app
+npm install
+npm start          # opens http://localhost:4200
+```
+
+The app ships three sections:
+
+- **Gallery** ([`src/app/examples/`](../../../example-app/src/app/examples)) — focused, one-feature-per-page demos (overview, custom node/edge, edge types, floating edges, node resizer, connection validation, drag-from-sidebar, sub-flows, node/edge toolbars, custom minimap, background variants, save/restore)
+- **Showcase** ([`src/app/showcase/`](../../../example-app/src/app/showcase)) — an end-to-end demo with a node palette, inspector panel, and simulation service; a good template for a real app
+- **Kitchen Sink** ([`src/app/kitchen-sink/`](../../../example-app/src/app/kitchen-sink)) — exercises nearly every feature together with a live event log
 
 ## Custom Nodes
 
@@ -164,7 +180,7 @@ flowService.toObject(); // { nodes, edges, viewport }
 
 - **Signal-based state** — Angular 17+ signals for fine-grained reactivity (no RxJS in the store)
 - **OnPush everywhere** — all components use `ChangeDetectionStrategy.OnPush`
-- **@xyflow/system core** — shares the same drag, pan/zoom, handle, and resize logic as React Flow and Svelte Flow
+- **@angflow/system core** — shares the same drag, pan/zoom, handle, and resize logic as React Flow and Svelte Flow (republished from `@xyflow/system`)
 - **Standalone components** — no NgModule, tree-shakeable
 
 ## Keyboard Shortcuts
@@ -180,7 +196,7 @@ flowService.toObject(); // { nodes, edges, viewport }
 
 ## Credits
 
-Built on top of [xyflow](https://github.com/xyflow/xyflow) by [webkid GmbH](https://webkid.io/). The Angular port uses `@xyflow/system` for framework-agnostic core logic.
+Built on top of [xyflow](https://github.com/xyflow/xyflow) by [webkid GmbH](https://webkid.io/). The Angular port uses `@angflow/system` (a republish of `@xyflow/system`) for framework-agnostic core logic.
 
 ## License
 

@@ -6011,9 +6011,10 @@ var NodeRendererComponent = class _NodeRendererComponent {
 })();
 
 // ../../packages/angular/dist/esm/lib/components/edges/base-edge.component.js
-function BaseEdgeComponent_Conditional_0_Template(rf, ctx) {
+function BaseEdgeComponent_Conditional_1_Template(rf, ctx) {
   if (rf & 1) {
-    ɵɵdomElement(0, "path", 0);
+    ɵɵnamespaceSVG();
+    ɵɵdomElement(0, "path", 1);
   }
   if (rf & 2) {
     const ctx_r0 = ɵɵnextContext();
@@ -6070,16 +6071,20 @@ var BaseEdgeComponent = class _BaseEdgeComponent {
         style: [1, "style"],
         interactionWidth: [1, "interactionWidth"]
       },
-      decls: 2,
+      decls: 3,
       vars: 5,
-      consts: [["fill", "none", "stroke", "transparent", 1, "xy-flow__edge-interaction"], [1, "xy-flow__edge-path"]],
+      consts: [["xmlns", "http://www.w3.org/2000/svg", 2, "position", "absolute", "top", "0", "left", "0", "width", "100%", "height", "100%", "overflow", "visible", "pointer-events", "none"], ["fill", "none", "stroke", "transparent", 1, "xy-flow__edge-interaction", 2, "pointer-events", "stroke"], [1, "xy-flow__edge-path"]],
       template: function BaseEdgeComponent_Template(rf, ctx) {
         if (rf & 1) {
-          ɵɵconditionalCreate(0, BaseEdgeComponent_Conditional_0_Template, 1, 2, "path", 0);
-          ɵɵdomElement(1, "path", 1);
+          ɵɵnamespaceSVG();
+          ɵɵdomElementStart(0, "svg", 0);
+          ɵɵconditionalCreate(1, BaseEdgeComponent_Conditional_1_Template, 1, 2, ":svg:path", 1);
+          ɵɵdomElement(2, "path", 2);
+          ɵɵdomElementEnd();
         }
         if (rf & 2) {
-          ɵɵconditional(ctx.interactionWidth() ? 0 : -1);
+          ɵɵadvance();
+          ɵɵconditional(ctx.interactionWidth() ? 1 : -1);
           ɵɵadvance();
           ɵɵattribute("d", ctx.path())("marker-start", ctx.markerStart())("marker-end", ctx.markerEnd())("style", ctx.style(), ɵɵsanitizeStyle);
         }
@@ -6100,23 +6105,31 @@ var BaseEdgeComponent = class _BaseEdgeComponent {
       host: {
         "style": "display: contents;"
       },
+      // The inline <svg> wrapper forces the <path> elements into the SVG namespace,
+      // which is required when this component is projected through NgComponentOutlet
+      // (Angular creates the dynamic component's host in the XHTML namespace even
+      // when it sits inside an <svg>, so raw <path> children would render as unknown
+      // HTML elements without this wrapper).
       template: `
-    @if (interactionWidth()) {
+    <svg xmlns="http://www.w3.org/2000/svg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none;">
+      @if (interactionWidth()) {
+        <path
+          class="xy-flow__edge-interaction"
+          [attr.d]="path()"
+          fill="none"
+          stroke="transparent"
+          [attr.stroke-width]="interactionWidth()"
+          style="pointer-events: stroke;"
+        />
+      }
       <path
-        class="xy-flow__edge-interaction"
+        class="xy-flow__edge-path"
         [attr.d]="path()"
-        fill="none"
-        stroke="transparent"
-        [attr.stroke-width]="interactionWidth()"
+        [attr.marker-start]="markerStart()"
+        [attr.marker-end]="markerEnd()"
+        [attr.style]="style()"
       />
-    }
-    <path
-      class="xy-flow__edge-path"
-      [attr.d]="path()"
-      [attr.marker-start]="markerStart()"
-      [attr.marker-end]="markerEnd()"
-      [attr.style]="style()"
-    />
+    </svg>
   `
     }]
   }], null, {
