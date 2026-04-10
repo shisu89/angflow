@@ -48,20 +48,6 @@ export type GetMiniMapNodeAttribute<NodeType extends Node = Node> = (node: NodeT
         >
           <!-- Background -->
           <rect x="-10000" y="-10000" width="20000" height="20000" [attr.fill]="bgColor() ?? '#f0f0f0'" />
-          <!-- Mask: dim area outside viewport -->
-          <defs>
-            <clipPath [attr.id]="'minimap-mask-' + store.rfId()">
-              <rect x="-10000" y="-10000" width="20000" height="20000" />
-            </clipPath>
-          </defs>
-          <!-- Viewport window (bright area) -->
-          <rect
-            [attr.x]="maskPosition().x"
-            [attr.y]="maskPosition().y"
-            [attr.width]="maskPosition().width"
-            [attr.height]="maskPosition().height"
-            fill="#fff"
-          />
           <!-- Nodes -->
           @for (node of minimapNodes(); track node.id) {
             <rect
@@ -78,6 +64,16 @@ export type GetMiniMapNodeAttribute<NodeType extends Node = Node> = (node: NodeT
               (click)="onMinimapNodeClick($event, node)"
             />
           }
+          <!-- Mask overlay: dim area outside viewport via evenodd path -->
+          @if (maskColor()) {
+            <path
+              class="xy-flow__minimap-mask"
+              [attr.d]="maskPath()"
+              [attr.fill]="maskColor()"
+              fill-rule="evenodd"
+              style="pointer-events: none;"
+            />
+          }
           <!-- Viewport outline -->
           <rect
             [attr.x]="maskPosition().x"
@@ -89,21 +85,6 @@ export type GetMiniMapNodeAttribute<NodeType extends Node = Node> = (node: NodeT
             [attr.stroke-width]="maskStrokeWidth()"
             rx="2"
           />
-          <!-- Mask overlay (dim non-viewport area) -->
-          @if (maskColor()) {
-            <rect x="-10000" y="-10000" width="20000" height="20000"
-              [attr.fill]="maskColor()"
-              style="pointer-events: none;"
-            />
-            <rect
-              [attr.x]="maskPosition().x"
-              [attr.y]="maskPosition().y"
-              [attr.width]="maskPosition().width"
-              [attr.height]="maskPosition().height"
-              fill="#fff"
-              style="pointer-events: none;"
-            />
-          }
         </svg>
       </div>
     </ng-flow-panel>
@@ -179,6 +160,18 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
       width: w / t[2],
       height: h / t[2],
     };
+  });
+
+  // SVG path for the mask: big outer rect + inner viewport rect.
+  // Combined with fill-rule="evenodd", the overlap of the two subpaths
+  // becomes a hole — dimming everything outside the viewport while
+  // leaving nodes inside the viewport fully visible.
+  readonly maskPath = computed(() => {
+    const m = this.maskPosition();
+    return (
+      `M-10000,-10000h20000v20000h-20000z ` +
+      `M${m.x},${m.y}h${m.width}v${m.height}h${-m.width}z`
+    );
   });
 
   getNodeColor(node: { _userNode?: Node }): string {
