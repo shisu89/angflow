@@ -20,7 +20,15 @@ export function seedNodes(): Node[] {
       id: 'rich',
       type: 'ksRich',
       position: { x: 280, y: 40 },
-      data: { label: 'Rich node', name: 'user', count: 3 },
+      data: {
+        label: 'Rich node',
+        name: 'user',
+        count: 3,
+        // Kept in sync with settings.showNodeToolbar / showNodeResizer by the
+        // reactive effect in KitchenSinkComponent.
+        _showToolbar: true,
+        _showResizer: true,
+      },
       style: { width: '220px', height: '180px' },
     },
     {

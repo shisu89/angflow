@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { NodeChange } from '@angflow/system';
 import { FlowStore } from './flow-store.service';
 import type { Node, Edge } from '../types';
 
@@ -74,10 +75,10 @@ describe('FlowStore', () => {
   // ── triggerNodeChanges: fast-path vs full-path ────────────────────────
 
   describe('triggerNodeChanges', () => {
-    let changeSpy: ReturnType<typeof vi.fn>;
+    let changeSpy: ReturnType<typeof vi.fn<(changes: NodeChange<Node>[]) => void>>;
 
     beforeEach(() => {
-      changeSpy = vi.fn();
+      changeSpy = vi.fn<(changes: NodeChange<Node>[]) => void>();
       store.onNodesChange = changeSpy;
       store.setNodes([
         makeNode('1', { position: { x: 0, y: 0 } }),
@@ -563,6 +564,49 @@ describe('FlowStore', () => {
       expect(store.transform()).toEqual([0, 0, 1]);
       expect(store.multiSelectionActive()).toBe(false);
       expect(store.userSelectionActive()).toBe(false);
+    });
+  });
+
+  // Mirrors the pattern NgFlowComponent.ngOnInit installs to bridge store
+  // errors to the component's (error) output while preserving the default
+  // devWarn handler.
+  describe('onError wrapping preserves previous handler and forwards to emitter', () => {
+    it('invokes the previous handler and the new emitter in order', () => {
+      const calls: string[] = [];
+      const previousOnError = (id: string, message: string) => {
+        calls.push(`prev:${id}:${message}`);
+      };
+      store.onError.set(previousOnError);
+
+      // Simulate the wrap that NgFlowComponent.ngOnInit does.
+      const captured = store.onError();
+      const emittedEvents: Array<{ id: string; message: string }> = [];
+      store.onError.set((id, message) => {
+        captured?.(id, message);
+        emittedEvents.push({ id, message });
+      });
+
+      store.onError()('001', 'something went wrong');
+
+      expect(calls).toEqual(['prev:001:something went wrong']);
+      expect(emittedEvents).toEqual([{ id: '001', message: 'something went wrong' }]);
+    });
+
+    it('does not throw when wrapping the default devWarn handler', () => {
+      // A freshly constructed store starts with devWarn as its default handler.
+      // Wrapping it using the ngOnInit pattern must not throw, even though
+      // devWarn is a no-op outside NODE_ENV=development.
+      const captured = store.onError();
+      expect(captured).toBeDefined();
+
+      const emittedEvents: Array<{ id: string; message: string }> = [];
+      store.onError.set((id, message) => {
+        captured?.(id, message);
+        emittedEvents.push({ id, message });
+      });
+
+      expect(() => store.onError()('002', 'boom')).not.toThrow();
+      expect(emittedEvents).toEqual([{ id: '002', message: 'boom' }]);
     });
   });
 });

@@ -137,6 +137,8 @@ export function createPanOnScrollHandler({
         zoomPanValues.isPanScrolling = false;
       }, 150);
     }
+
+    return;
   };
 }
 
@@ -159,6 +161,8 @@ export function createZoomOnScrollHandler({ noWheelClassName, preventScrolling, 
     event.preventDefault();
 
     d3ZoomHandler.call(this, event, d);
+
+    return null;
   };
 }
 

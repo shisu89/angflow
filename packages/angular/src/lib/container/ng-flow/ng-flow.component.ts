@@ -585,6 +585,14 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       this.store.setDefaultNodesAndEdges(defaultN, defaultE);
     }
 
+    // Bridge store errors to the (error) output. Preserve the default handler
+    // (devWarn) so unbound consumers still see console warnings.
+    const previousOnError = this.store.onError();
+    this.store.onError.set((id, message) => {
+      previousOnError?.(id, message);
+      this.error.emit({ id, message });
+    });
+
     // Queue fit view if requested
     if (this.fitView()) {
       this.store.fitViewQueued.set(true);

@@ -10,6 +10,7 @@ import {
   isCoordinateExtent,
   getNodeDimensions,
   nodeToBox,
+  isDevEnv,
 } from './general';
 import {
   type Transform,
@@ -196,7 +197,7 @@ export const getNodesBounds = <NodeType extends NodeBase = NodeBase>(
   nodes: (NodeType | InternalNodeBase<NodeType> | string)[],
   params: GetNodesBoundsParams<NodeType> = { nodeOrigin: [0, 0] }
 ): Rect => {
-  if (process.env.NODE_ENV === 'development' && !params.nodeLookup) {
+  if (isDevEnv() && !params.nodeLookup) {
     console.warn(
       'Please use `getNodesBounds` from `useReactFlow`/`useSvelteFlow` hook to ensure correct values for sub flows. If not possible, you have to provide a nodeLookup to support sub flows.'
     );

@@ -3,10 +3,12 @@ import {
   ChangeDetectionStrategy,
   signal,
   computed,
+  effect,
   Type,
 } from '@angular/core';
 import {
   NgFlowComponent,
+  NgFlowService,
   BackgroundComponent,
   ControlsComponent,
   MiniMapComponent,
@@ -322,7 +324,7 @@ function parseKeyCode(raw: string): string | string[] {
           (nodesChange)="onNodesChange($event)"
           (edgesChange)="onEdgesChange($event)"
           (connect)="onConnect($event)"
-          (init)="logEvent('init', 'ready')"
+          (init)="onFlowInit($event)"
           (nodeClick)="logEvent('nodeClick', $event.node.id)"
           (nodeDoubleClick)="logEvent('nodeDoubleClick', $event.node.id)"
           (nodeContextMenu)="logEvent('nodeContextMenu', $event.node.id)"
@@ -1039,6 +1041,34 @@ export class KitchenSinkComponent {
   private lastMoveLoggedAt = 0;
   private lastViewportLoggedAt = 0;
 
+  /** Captured from <ng-flow> (init) — null until the flow mounts. */
+  private flowApi: NgFlowService | null = null;
+
+  constructor() {
+    // Propagate plugin toggles that live on node data: the rich node reads
+    // data._showToolbar / data._showResizer. Patch the nodes signal whenever
+    // the relevant settings change. Runs once on construction with the
+    // defaults (which match seed data), then on every subsequent toggle.
+    effect(() => {
+      const showToolbar = this.settings().showNodeToolbar;
+      const showResizer = this.settings().showNodeResizer;
+      this.nodes.update((nodes) =>
+        nodes.map((n) =>
+          n.id === 'rich'
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  _showToolbar: showToolbar,
+                  _showResizer: showResizer,
+                },
+              }
+            : n
+        )
+      );
+    });
+  }
+
   readonly nodeTypes: Record<string, Type<unknown>> = {
     ksRich: KitchenSinkRichNodeComponent,
   };
@@ -1140,9 +1170,12 @@ export class KitchenSinkComponent {
   }
 
   triggerFitView(): void {
-    // fitView on-load toggle triggers a re-fit each time it's set true
-    this.settings.update((s) => ({ ...s, fitViewOnLoad: false }));
-    setTimeout(() => this.settings.update((s) => ({ ...s, fitViewOnLoad: true })), 50);
+    this.flowApi?.fitView();
+  }
+
+  onFlowInit(service: NgFlowService): void {
+    this.flowApi = service;
+    this.logEvent('init', 'ready');
   }
 
   // ── Graph mutations ─────────────────────────────────────────────────
