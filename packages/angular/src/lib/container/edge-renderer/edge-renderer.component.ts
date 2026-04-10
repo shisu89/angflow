@@ -110,8 +110,21 @@ const builtInEdgeTypes: EdgeTypes = {
           (mouseleave)="onEdgeEvent($event, edge, 'mouseleave')"
         >
           @if (isCustomEdge(edge.type)) {
-            <ng-container
-              *ngComponentOutlet="getEdgeComponent(edge.type); inputs: ei"
+            <!--
+              For custom edges the visual (path + labels) is rendered in the
+              HTML overlay layer below, because NgComponentOutlet creates the
+              dynamic component's host in the XHTML namespace which breaks SVG
+              child rendering. We still emit a transparent interaction path
+              here so that pointer events (click/hover/etc.) fire on the
+              existing SVG <g> event handlers.
+            -->
+            <path
+              class="xy-flow__edge-interaction"
+              [attr.d]="getEdgePath(ei)"
+              fill="none"
+              stroke="transparent"
+              [attr.stroke-width]="edge.interactionWidth ?? 20"
+              style="pointer-events: all;"
             />
           } @else {
             <path
@@ -152,6 +165,34 @@ const builtInEdgeTypes: EdgeTypes = {
           }
         </g>
       </svg>
+      }
+    }
+    <!--
+      HTML overlay for custom edges. Angular's NgComponentOutlet can only
+      create host elements in the XHTML namespace, so rendering a custom
+      edge directly inside an <svg> sub-tree breaks its <path> children.
+      We render the dynamic component here in an HTML context and let
+      BaseEdgeComponent wrap its paths in an inline <svg>. Pointer events
+      are still handled on the SVG <g> layer above via a transparent
+      interaction path, so this overlay is pointer-events: none.
+    -->
+    @for (edge of visibleEdges(); track edge.id) {
+      @if (!edge.hidden && isCustomEdge(edge.type)) {
+        @let ei = getEdgeInputs(edge);
+        <div
+          class="ng-flow__custom-edge"
+          [style.position]="'absolute'"
+          [style.top]="'0'"
+          [style.left]="'0'"
+          [style.width]="'100%'"
+          [style.height]="'100%'"
+          [style.pointer-events]="'none'"
+          [style.z-index]="getEdgeZIndex(edge)"
+        >
+          <ng-container
+            *ngComponentOutlet="getEdgeComponent(edge.type); inputs: ei"
+          />
+        </div>
       }
     }
     <div class="xy-flow__edgelabel-renderer" style="position: absolute; width: 100%; height: 100%; pointer-events: none; top: 0; left: 0;">

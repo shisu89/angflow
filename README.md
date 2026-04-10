@@ -2,16 +2,18 @@
 
 This is a fork of [xyflow](https://github.com/xyflow/xyflow) that adds an **Angular port** of React Flow. It builds on `@angflow/system` (a republish of `@xyflow/system`), the same framework-agnostic core that powers React Flow and Svelte Flow.
 
+Published on npm as [`@angflow/angular`](https://www.npmjs.com/package/@angflow/angular) and [`@angflow/system`](https://www.npmjs.com/package/@angflow/system). The `react/` and `svelte/` packages in this repo are kept intact to make it easier to pull upstream updates from xyflow and are **not** republished under the `@angflow` scope — consume those from `@xyflow/react` / `@xyflow/svelte` as usual.
+
 ---
 
 ## Packages
 
-| Package | Path | Description |
-|---------|------|-------------|
-| **Angular Flow** `@angflow/angular` | [packages/angular](./packages/angular) | Angular 17+ library for node-based UIs |
-| React Flow 12 `@xyflow/react` | [packages/react](./packages/react) | Original React implementation |
-| Svelte Flow `@xyflow/svelte` | [packages/svelte](./packages/svelte) | Svelte implementation |
-| Shared core `@angflow/system` | [packages/system](./packages/system) | Framework-agnostic drag, pan/zoom, handles, resize (republish of `@xyflow/system`) |
+| Package | Path | npm | Description |
+|---------|------|-----|-------------|
+| **Angular Flow** `@angflow/angular` | [packages/angular](./packages/angular) | [`@angflow/angular`](https://www.npmjs.com/package/@angflow/angular) | Angular 17+ signals-based library for node-based UIs |
+| Shared core `@angflow/system` | [packages/system](./packages/system) | [`@angflow/system`](https://www.npmjs.com/package/@angflow/system) | Framework-agnostic drag, pan/zoom, handles, resize (republish of `@xyflow/system`) |
+| React Flow 12 `@xyflow/react` | [packages/react](./packages/react) | — | Original React implementation (kept for upstream merges, not republished) |
+| Svelte Flow `@xyflow/svelte` | [packages/svelte](./packages/svelte) | — | Svelte implementation (kept for upstream merges, not republished) |
 
 ## Angular Flow
 
