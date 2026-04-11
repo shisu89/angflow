@@ -378,10 +378,18 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       // Produce new user-node objects instead of mutating them so that
       // reference-equality checks in adoptUserNodes (checkEquality: true) remain
       // valid, and consumers relying on immutability are not surprised.
+
+      // Build an O(1) lookup map first to avoid O(n²) find() in the map() below.
+      const changeById = new Map(
+        (changes as Array<NodeChange<NodeType>>)
+          .filter(c => c.type === 'position')
+          .map(c => [c.id, c as Extract<NodeChange<NodeType>, { type: 'position' }>])
+      );
+
       let nodesChanged = false;
       const updatedNodes = this.nodes().map((userNode) => {
-        const change = changes.find(c => c.type === 'position' && c.id === userNode.id);
-        if (!change || change.type !== 'position') return userNode;
+        const change = changeById.get(userNode.id);
+        if (!change) return userNode;
 
         const internalNode = this.nodeLookup.get(change.id);
         if (!internalNode) return userNode;
