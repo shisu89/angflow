@@ -399,16 +399,12 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
         // Produce a new user-node object to preserve immutability
         nodesChanged = true;
-        const newUserNode = { ...userNode } as NodeType;
-        if (change.position) {
-          (newUserNode as any).position = change.position;
-        }
-        if (change.dragging !== undefined) {
-          (newUserNode as any).dragging = change.dragging;
-        }
+        const newUserNode: NodeType = change.position
+          ? { ...userNode, position: change.position, dragging: change.dragging }
+          : { ...userNode, dragging: change.dragging };
         // Keep the internal node's userNode reference in sync
         if (internalNode.internals) {
-          (internalNode.internals as any).userNode = newUserNode;
+          (internalNode.internals as { userNode: NodeType }).userNode = newUserNode;
         }
         return newUserNode;
       });

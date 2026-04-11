@@ -29,17 +29,16 @@ export class DragDirective implements OnInit, OnChanges, OnDestroy {
   private dragInstance: XYDragInstance | null = null;
 
   ngOnInit(): void {
-    this.dragInstance = XYDrag({
-      getStoreItems: () => this.store.getStoreItems(),
-      onNodeMouseDown: (id: string) => {
-        this.handleNodeClick(id);
-      },
-    });
-
+    this.ensureDragInstance();
     this.updateDrag();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
+    // Re-create the drag instance if it was previously destroyed due to being
+    // disabled but is now being enabled again.
+    if (!this.disabled()) {
+      this.ensureDragInstance();
+    }
     if (this.dragInstance) {
       this.updateDrag();
     }
@@ -55,9 +54,10 @@ export class DragDirective implements OnInit, OnChanges, OnDestroy {
     }
 
     if (this.disabled()) {
-      // Detach d3-drag listener by clearing the domNode so pointer events are
-      // no longer intercepted while the node is in a disabled state.
-      this.dragInstance.update({ domNode: null as unknown as HTMLDivElement });
+      // Destroy and nullify the drag instance to fully detach the d3-drag
+      // listener while the directive is in a disabled state.
+      this.dragInstance.destroy();
+      this.dragInstance = null;
       return;
     }
 
@@ -69,6 +69,17 @@ export class DragDirective implements OnInit, OnChanges, OnDestroy {
       nodeId: this.nodeId(),
       nodeClickDistance: this.nodeClickDistance(),
     });
+  }
+
+  private ensureDragInstance(): void {
+    if (!this.dragInstance) {
+      this.dragInstance = XYDrag({
+        getStoreItems: () => this.store.getStoreItems(),
+        onNodeMouseDown: (id: string) => {
+          this.handleNodeClick(id);
+        },
+      });
+    }
   }
 
   private handleNodeClick(id: string): void {

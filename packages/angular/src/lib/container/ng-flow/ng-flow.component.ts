@@ -537,6 +537,9 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     // high-cost pan-zoom options update above.
     effect(() => {
       const active = this.store.userSelectionActive();
+      // PanZoomUpdateOptions requires all fields, but XYPanZoom.update()
+      // only uses the provided fields at runtime. A partial update is safe
+      // here because we only need to toggle d3-zoom's filter function.
       this.panZoomInstance?.update({ userSelectionActive: active } as any);
     });
 
