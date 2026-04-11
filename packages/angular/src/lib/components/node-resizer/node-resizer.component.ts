@@ -22,6 +22,7 @@ import {
   type XYResizerChildChange,
   type ResizeDragEvent,
   type ResizeParams,
+  type ResizeParamsWithDirection,
   type NodeChange,
   type NodeDimensionChange,
   type NodePositionChange,
@@ -238,15 +239,32 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
           maxHeight: this.maxHeight(),
         },
         keepAspectRatio: this.keepAspectRatio(),
-        onResizeStart: this.onResizeStartCb() ?? ((event: ResizeDragEvent, params: ResizeParams) => {
-          this.resizeStart.emit({ event, ...params });
-        }),
-        onResize: this.onResizeCb() ?? ((event: ResizeDragEvent, params: ResizeParams) => {
-          this.resize.emit({ event, ...params });
-        }),
-        onResizeEnd: this.onResizeEndCb() ?? ((event: ResizeDragEvent, params: ResizeParams) => {
-          this.resizeEnd.emit({ event, ...params });
-        }),
+        // Use stable closures that always delegate to the current signal values
+        // so that input changes after init are picked up correctly.
+        onResizeStart: (event: ResizeDragEvent, params: ResizeParams) => {
+          const cb = this.onResizeStartCb();
+          if (cb) {
+            cb(event, params);
+          } else {
+            this.resizeStart.emit({ event, ...params });
+          }
+        },
+        onResize: (event: ResizeDragEvent, params: ResizeParamsWithDirection) => {
+          const cb = this.onResizeCb();
+          if (cb) {
+            cb(event, params);
+          } else {
+            this.resize.emit({ event, ...params });
+          }
+        },
+        onResizeEnd: (event: ResizeDragEvent, params: ResizeParams) => {
+          const cb = this.onResizeEndCb();
+          if (cb) {
+            cb(event, params);
+          } else {
+            this.resizeEnd.emit({ event, ...params });
+          }
+        },
         shouldResize: this.shouldResize(),
       });
 

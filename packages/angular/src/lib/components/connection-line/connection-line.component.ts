@@ -39,7 +39,6 @@ export class ConnectionLineComponent {
   readonly connectionLineType = input<ConnectionLineType>(ConnectionLineType.Bezier);
 
   readonly isConnecting = computed(() => {
-    this.store.version();
     const conn = this.store.connection();
     return conn?.inProgress ?? false;
   });
@@ -61,7 +60,6 @@ export class ConnectionLineComponent {
   });
 
   private readonly connectionCoords = computed(() => {
-    this.store.version();
     const conn = this.store.connection();
     if (!conn?.inProgress) return null;
 

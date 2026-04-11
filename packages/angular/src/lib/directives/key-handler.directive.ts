@@ -3,7 +3,6 @@ import {
   inject,
   input,
   output,
-  OnInit,
   OnDestroy,
 } from '@angular/core';
 import { isInputDOMNode, type NodeChange, type EdgeChange } from '@angflow/system';
@@ -17,9 +16,10 @@ import type { Node, Edge } from '../types';
   host: {
     '(document:keydown)': 'onKeyDown($event)',
     '(document:keyup)': 'onKeyUp($event)',
+    '(window:blur)': 'onWindowBlur()',
   },
 })
-export class KeyHandlerDirective implements OnInit, OnDestroy {
+export class KeyHandlerDirective implements OnDestroy {
   private store = inject(FlowStore);
 
   readonly deleteKeyCode = input<string | string[] | null>(['Backspace', 'Delete']);
@@ -34,8 +34,9 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
   private selectionKeyPressed = false;
   private multiSelectionKeyPressed = false;
 
-  ngOnInit(): void {}
-  ngOnDestroy(): void {}
+  ngOnDestroy(): void {
+    this.onWindowBlur();
+  }
 
   onKeyDown(event: KeyboardEvent): void {
     if (isInputDOMNode(event)) return;
@@ -82,6 +83,19 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
     }
 
     if (this.matchesKey(event.key, this.multiSelectionKeyCode())) {
+      this.multiSelectionKeyPressed = false;
+      this.store.multiSelectionActive.set(false);
+    }
+  }
+
+  onWindowBlur(): void {
+    // Reset key states when window loses focus so keys don't get permanently
+    // stuck in the "pressed" state (e.g. after cmd+tab focus switch).
+    if (this.selectionKeyPressed) {
+      this.selectionKeyPressed = false;
+      this.store.selectionKeyActive.set(false);
+    }
+    if (this.multiSelectionKeyPressed) {
       this.multiSelectionKeyPressed = false;
       this.store.multiSelectionActive.set(false);
     }

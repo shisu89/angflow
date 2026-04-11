@@ -487,9 +487,15 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * Returns a signal that tracks whether a specific key (or any key in an array) is currently pressed.
    * Equivalent to React's `useKeyPress()`.
    * Automatically cleaned up when the service is destroyed.
+   * Note: browser-only — returns a signal that is always `false` in SSR environments.
    */
   selectKeyPressed(keyCode: string | string[]): Signal<boolean> {
     const pressed = signal(false);
+
+    if (typeof document === 'undefined') {
+      return pressed.asReadonly();
+    }
+
     const keys = Array.isArray(keyCode) ? keyCode : [keyCode];
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -498,13 +504,16 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     const onKeyUp = (e: KeyboardEvent) => {
       if (keys.includes(e.key)) pressed.set(false);
     };
+    const onBlur = () => pressed.set(false);
 
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
 
     this.destroyRef.onDestroy(() => {
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
     });
 
     return pressed.asReadonly();
@@ -528,7 +537,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
       this.store.version();
       return ids
         .map(id => {
-          const edge = this.store.edges().find(e => e.id === id);
+          const edge = this.store.edgeLookup.get(id) as EdgeType | undefined;
           if (!edge) return null;
           return { id: edge.id, data: edge.data as Record<string, unknown>, type: edge.type };
         })

@@ -177,7 +177,7 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
 
   onNodeEvent(event: MouseEvent, nodeId: string, eventType: string): void {
     const internalNode = this.store.nodeLookup.get(nodeId);
-    const node = internalNode?.internals?.userNode ?? internalNode;
+    const node = internalNode?.internals?.userNode;
     if (!node) return;
 
     switch (eventType) {

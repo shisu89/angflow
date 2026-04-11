@@ -223,8 +223,8 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   });
 
   // ── Data (model = two-way binding) ────────────────────────────────────
-  readonly nodesModel = model<NodeType[]>([] as unknown as NodeType[], { alias: 'nodes' });
-  readonly edgesModel = model<EdgeType[]>([] as unknown as EdgeType[], { alias: 'edges' });
+  readonly nodesModel = model<NodeType[]>([], { alias: 'nodes' });
+  readonly edgesModel = model<EdgeType[]>([], { alias: 'edges' });
   readonly viewportModel = model<Viewport | undefined>(undefined, { alias: 'viewport' });
 
   // ── Data (input-only for uncontrolled mode) ───────────────────────────
@@ -513,7 +513,10 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       this.store.setTranslateExtent(this.translateExtent());
     });
 
-    // Re-sync pan/zoom options whenever the relevant inputs change
+    // Re-sync pan/zoom options whenever the relevant inputs change.
+    // NOTE: Do NOT read store.userSelectionActive() here — it changes on every
+    // selection mousemove and would cause panZoomInstance.update() to be called
+    // at high frequency. That property is synced in a separate effect below.
     effect(() => {
       // Read all pan/zoom inputs to establish signal dependencies
       this.panOnDrag();
@@ -528,6 +531,13 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       this.noWheelClassName();
       this.paneClickDistance();
       this.updatePanZoomOptions();
+    });
+
+    // Sync userSelectionActive separately to avoid coupling it with the
+    // high-cost pan-zoom options update above.
+    effect(() => {
+      const active = this.store.userSelectionActive();
+      this.panZoomInstance?.update({ userSelectionActive: active } as any);
     });
 
     // Wire store change callbacks to outputs
@@ -772,7 +782,6 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       preventScrolling: this.preventScrolling(),
       noPanClassName: this.noPanClassName(),
       noWheelClassName: this.noWheelClassName(),
-      userSelectionActive: this.store.userSelectionActive(),
       lib: 'ng',
       onTransformChange: (transform: Transform) => {
         this.store.transform.set(transform);

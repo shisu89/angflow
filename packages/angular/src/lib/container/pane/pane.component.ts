@@ -33,6 +33,7 @@ export class PaneComponent implements OnDestroy {
   private isSelecting = false;
   private startX = 0;
   private startY = 0;
+  private selectedDuringDrag = false;
   private boundOnMouseMove: ((e: MouseEvent) => void) | null = null;
   private boundOnMouseUp: ((e: MouseEvent) => void) | null = null;
   private nativeMouseDownHandler: ((e: Event) => void) | null = null;
@@ -74,6 +75,7 @@ export class PaneComponent implements OnDestroy {
     this.startX = event.clientX - rect.left;
     this.startY = event.clientY - rect.top;
     this.isSelecting = true;
+    this.selectedDuringDrag = false;
 
     this.store.userSelectionActive.set(true);
     this.store.userSelectionRect.set({
@@ -128,8 +130,9 @@ export class PaneComponent implements OnDestroy {
       );
 
       const nodeIds = nodesInside.map(n => n.id);
+      this.store.addSelectedNodes(nodeIds);
       if (nodeIds.length > 0) {
-        this.store.addSelectedNodes(nodeIds);
+        this.selectedDuringDrag = true;
       }
     });
   }
@@ -151,10 +154,13 @@ export class PaneComponent implements OnDestroy {
     this.zone.run(() => {
       this.store.userSelectionActive.set(false);
       this.store.userSelectionRect.set(null);
-      // Mark nodes selection as active if nodes were selected
-      if (this.store.selectedNodes().length > 0) {
+      // Mark nodes selection as active only if this drag actually selected nodes.
+      // Using pre-existing selection state would falsely set the flag when the
+      // drag box was empty but nodes happened to be selected from before.
+      if (this.selectedDuringDrag) {
         this.store.nodesSelectionActive.set(true);
       }
+      this.selectedDuringDrag = false;
       this.selectionEnd.emit(event);
     });
   }

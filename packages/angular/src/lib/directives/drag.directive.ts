@@ -50,7 +50,14 @@ export class DragDirective implements OnInit, OnChanges, OnDestroy {
   }
 
   private updateDrag(): void {
-    if (this.disabled() || !this.el.nativeElement || !this.dragInstance) {
+    if (!this.el.nativeElement || !this.dragInstance) {
+      return;
+    }
+
+    if (this.disabled()) {
+      // Detach d3-drag listener by clearing the domNode so pointer events are
+      // no longer intercepted while the node is in a disabled state.
+      this.dragInstance.update({ domNode: null as unknown as HTMLDivElement });
       return;
     }
 

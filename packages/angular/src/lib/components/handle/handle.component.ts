@@ -6,8 +6,6 @@ import {
   inject,
   computed,
   ElementRef,
-  OnInit,
-  OnDestroy,
   Optional,
   Inject,
 } from '@angular/core';
@@ -41,7 +39,7 @@ import { NODE_ID } from '../../services/tokens';
   },
   template: `<ng-content />`,
 })
-export class HandleComponent implements OnInit, OnDestroy {
+export class HandleComponent {
   readonly Position = Position;
 
   readonly type = input.required<HandleType>();
@@ -67,10 +65,6 @@ export class HandleComponent implements OnInit, OnDestroy {
   constructor(@Optional() @Inject(NODE_ID) nodeId: string | null) {
     this.nodeId = nodeId ?? '';
   }
-
-  ngOnInit(): void {}
-
-  ngOnDestroy(): void {}
 
   onPointerDown(event: MouseEvent | PointerEvent): void {
     if (!this.isConnectableStart()) return;

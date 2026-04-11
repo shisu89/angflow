@@ -80,9 +80,10 @@ const builtInEdgeTypes: EdgeTypes = {
         }
       </defs>
     </svg>
-    @for (edge of visibleEdges(); track edge.id) {
+    @for (item of visibleEdgesWithInputs(); track item.edge.id) {
+      @let edge = item.edge;
+      @let ei = item.ei;
       @if (!edge.hidden) {
-      @let ei = getEdgeInputs(edge);
       <svg
         class="ng-flow__edge xy-flow__edge"
         [class]="getEdgeClasses(edge)"
@@ -176,9 +177,10 @@ const builtInEdgeTypes: EdgeTypes = {
       are still handled on the SVG <g> layer above via a transparent
       interaction path, so this overlay is pointer-events: none.
     -->
-    @for (edge of visibleEdges(); track edge.id) {
+    @for (item of visibleEdgesWithInputs(); track item.edge.id) {
+      @let edge = item.edge;
+      @let ei = item.ei;
       @if (!edge.hidden && isCustomEdge(edge.type)) {
-        @let ei = getEdgeInputs(edge);
         <div
           class="ng-flow__custom-edge"
           [style.position]="'absolute'"
@@ -196,9 +198,10 @@ const builtInEdgeTypes: EdgeTypes = {
       }
     }
     <div class="xy-flow__edgelabel-renderer" style="position: absolute; width: 100%; height: 100%; pointer-events: none; top: 0; left: 0;">
-      @for (edge of visibleEdges(); track edge.id) {
+      @for (item of visibleEdgesWithInputs(); track item.edge.id) {
+        @let edge = item.edge;
+        @let ei = item.ei;
         @if (edge.label && !edge.hidden) {
-          @let ei = getEdgeInputs(edge);
           <div
             class="xy-flow__edge-label"
             [style.position]="'absolute'"
@@ -233,6 +236,14 @@ export class EdgeRendererComponent {
     const visibleIds = this.store.visibleEdgeIds();
     return this.store.edges().filter((e) => visibleIds.has(e.id));
   });
+
+  /**
+   * Pre-computes edge inputs once per render cycle so getEdgeInputs() is not
+   * called redundantly in the three @for loops in the template.
+   */
+  readonly visibleEdgesWithInputs = computed(() =>
+    this.visibleEdges().map((edge) => ({ edge, ei: this.getEdgeInputs(edge) }))
+  );
 
   readonly markers = computed(() => {
     const edges = this.store.edges();
@@ -350,6 +361,49 @@ export class EdgeRendererComponent {
       targetY = targetPos.y;
     }
 
+    // Compute the geometrically correct label position using the path functions.
+    // All path functions return [path, labelX, labelY, ...] so labelX/Y is the
+    // actual midpoint along the curve, not the arithmetic midpoint of endpoints.
+    const pathParams = {
+      sourceX,
+      sourceY,
+      targetX,
+      targetY,
+      sourcePosition: srcPos,
+      targetPosition: tgtPos,
+    };
+    const edgeType = edge.type || 'default';
+    let labelX: number;
+    let labelY: number;
+    switch (edgeType) {
+      case 'straight': {
+        const [, lx, ly] = getStraightPath(pathParams);
+        labelX = lx;
+        labelY = ly;
+        break;
+      }
+      case 'step': {
+        const [, lx, ly] = getSmoothStepPath({ ...pathParams, borderRadius: 0 });
+        labelX = lx;
+        labelY = ly;
+        break;
+      }
+      case 'smoothstep': {
+        const [, lx, ly] = getSmoothStepPath(pathParams);
+        labelX = lx;
+        labelY = ly;
+        break;
+      }
+      case 'default':
+      case 'bezier':
+      default: {
+        const [, lx, ly] = getBezierPath(pathParams);
+        labelX = lx;
+        labelY = ly;
+        break;
+      }
+    }
+
     return {
       id: edge.id,
       source: edge.source,
@@ -367,6 +421,8 @@ export class EdgeRendererComponent {
       targetY,
       sourcePosition: srcPos,
       targetPosition: tgtPos,
+      labelX,
+      labelY,
       markerStart: this.getMarkerUrl(edge.markerStart as EdgeMarker | undefined),
       markerEnd: this.getMarkerUrl(edge.markerEnd as EdgeMarker | undefined),
       interactionWidth: edge.interactionWidth,
@@ -419,11 +475,11 @@ export class EdgeRendererComponent {
   }
 
   getEdgeCenterX(ei: Record<string, unknown>): number {
-    return ((ei['sourceX'] as number) + (ei['targetX'] as number)) / 2;
+    return ei['labelX'] as number;
   }
 
   getEdgeCenterY(ei: Record<string, unknown>): number {
-    return ((ei['sourceY'] as number) + (ei['targetY'] as number)) / 2;
+    return ei['labelY'] as number;
   }
 
   getEdgeAriaLabel(edge: Edge): string {

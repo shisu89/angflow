@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, output, inject, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, inject, computed } from '@angular/core';
 import type { PanelPosition, FitViewOptionsBase } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 import { NgFlowService } from '../../services/ng-flow.service';
@@ -86,7 +86,11 @@ export class ControlsComponent {
   readonly fitViewClick = output<void>();
   readonly interactiveChange = output<boolean>();
 
-  readonly isLocked = signal(false);
+  // Derived from store so it stays in sync even when the parent re-applies
+  // configuration inputs (which would otherwise silently revert a manual lock).
+  readonly isLocked = computed(
+    () => !this.store.nodesDraggable() || !this.store.nodesConnectable() || !this.store.elementsSelectable()
+  );
 
   onZoomIn() {
     this.ngFlowService.zoomIn();
@@ -105,7 +109,6 @@ export class ControlsComponent {
 
   onToggleLock() {
     const locked = !this.isLocked();
-    this.isLocked.set(locked);
     this.store.nodesDraggable.set(!locked);
     this.store.nodesConnectable.set(!locked);
     this.store.elementsSelectable.set(!locked);

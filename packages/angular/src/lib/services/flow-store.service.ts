@@ -38,6 +38,7 @@ import {
   type ZIndexMode,
   type AriaLabelConfig,
   type FitViewOptionsBase,
+  type InternalNodeUpdate,
 } from '@angflow/system';
 
 import type { Node, Edge, InternalNode } from '../types';
@@ -273,7 +274,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     }
   }
 
-  updateNodeInternals(updates: Map<string, any>): void {
+  updateNodeInternals(updates: Map<string, InternalNodeUpdate>): void {
     const { changes, updatedInternals } = updateNodeInternalsSystem(
       updates,
       this.nodeLookup,
@@ -373,16 +374,19 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     const allPosition = changes.every(c => c.type === 'position');
 
     if (allPosition) {
-      // Update user nodes array with new positions (cheap shallow copy)
-      const currentNodes = this.nodes();
+      // Update user nodes array with new positions (cheap shallow copy).
+      // Produce new user-node objects instead of mutating them so that
+      // reference-equality checks in adoptUserNodes (checkEquality: true) remain
+      // valid, and consumers relying on immutability are not surprised.
       let nodesChanged = false;
+      const updatedNodes = this.nodes().map((userNode) => {
+        const change = changes.find(c => c.type === 'position' && c.id === userNode.id);
+        if (!change || change.type !== 'position') return userNode;
 
-      for (const change of changes) {
-        if (change.type !== 'position') continue;
         const internalNode = this.nodeLookup.get(change.id);
-        if (!internalNode) continue;
+        if (!internalNode) return userNode;
 
-        // Update internal node position in-place (fast)
+        // Update internal node data in-place (not user-visible)
         if (change.position) {
           internalNode.position = change.position;
           if (internalNode.internals) {
@@ -393,16 +397,24 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
           internalNode.dragging = change.dragging;
         }
 
-        // Update the user node reference too
-        const userNode = internalNode.internals?.userNode;
-        if (userNode && change.position) {
-          (userNode as any).position = change.position;
-          (userNode as any).dragging = change.dragging;
-          nodesChanged = true;
+        // Produce a new user-node object to preserve immutability
+        nodesChanged = true;
+        const newUserNode = { ...userNode } as NodeType;
+        if (change.position) {
+          (newUserNode as any).position = change.position;
         }
-      }
+        if (change.dragging !== undefined) {
+          (newUserNode as any).dragging = change.dragging;
+        }
+        // Keep the internal node's userNode reference in sync
+        if (internalNode.internals) {
+          (internalNode.internals as any).userNode = newUserNode;
+        }
+        return newUserNode;
+      });
 
       if (nodesChanged) {
+        this.nodes.set(updatedNodes);
         // Bump version to trigger template re-render without full rebuild
         this.bumpVersion();
       }
@@ -626,6 +638,8 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     this.parentLookup.clear();
     this.edgeLookup.clear();
     this.connectionLookup.clear();
+    this.nodesChangeMiddleware.clear();
+    this.edgesChangeMiddleware.clear();
 
     this.nodes.set([]);
     this.edges.set([]);
