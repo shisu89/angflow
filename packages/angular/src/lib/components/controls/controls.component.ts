@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, output, inject, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, inject, computed } from '@angular/core';
 import type { PanelPosition, FitViewOptionsBase } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 import { NgFlowService } from '../../services/ng-flow.service';
@@ -22,6 +22,7 @@ import { PanelComponent } from '../panel/panel.component';
             class="ng-flow__controls-button xy-flow__controls-button"
             title="zoom in"
             aria-label="zoom in"
+            [disabled]="maxZoomReached()"
             (click)="onZoomIn()"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true"><path d="M32 18.133H18.133V32h-4.266V18.133H0v-4.266h13.867V0h4.266v13.867H32z"/></svg>
@@ -31,6 +32,7 @@ import { PanelComponent } from '../panel/panel.component';
             class="ng-flow__controls-button xy-flow__controls-button"
             title="zoom out"
             aria-label="zoom out"
+            [disabled]="minZoomReached()"
             (click)="onZoomOut()"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true"><path d="M0 13.867h32v4.266H0z"/></svg>
@@ -86,7 +88,20 @@ export class ControlsComponent {
   readonly fitViewClick = output<void>();
   readonly interactiveChange = output<boolean>();
 
-  readonly isLocked = signal(false);
+  // Derive interactive/locked state directly from the store so external
+  // mutations of nodesDraggable/nodesConnectable/elementsSelectable stay
+  // in sync with the lock icon. Mirrors React Flow's Controls selector.
+  readonly isInteractive = computed(
+    () =>
+      this.store.nodesDraggable() ||
+      this.store.nodesConnectable() ||
+      this.store.elementsSelectable()
+  );
+  readonly isLocked = computed(() => !this.isInteractive());
+
+  // Disable zoom buttons at min/max extent, matching React Flow's behaviour.
+  readonly maxZoomReached = computed(() => this.store.transform()[2] >= this.store.maxZoom());
+  readonly minZoomReached = computed(() => this.store.transform()[2] <= this.store.minZoom());
 
   onZoomIn() {
     this.ngFlowService.zoomIn();
@@ -104,11 +119,10 @@ export class ControlsComponent {
   }
 
   onToggleLock() {
-    const locked = !this.isLocked();
-    this.isLocked.set(locked);
-    this.store.nodesDraggable.set(!locked);
-    this.store.nodesConnectable.set(!locked);
-    this.store.elementsSelectable.set(!locked);
-    this.interactiveChange.emit(!locked);
+    const nextInteractive = !this.isInteractive();
+    this.store.nodesDraggable.set(nextInteractive);
+    this.store.nodesConnectable.set(nextInteractive);
+    this.store.elementsSelectable.set(nextInteractive);
+    this.interactiveChange.emit(nextInteractive);
   }
 }

@@ -382,22 +382,34 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
         const internalNode = this.nodeLookup.get(change.id);
         if (!internalNode) continue;
 
+        let mutated = false;
+
         // Update internal node position in-place (fast)
         if (change.position) {
           internalNode.position = change.position;
           if (internalNode.internals) {
             internalNode.internals.positionAbsolute = change.position;
           }
+          mutated = true;
         }
         if (change.dragging !== undefined) {
           internalNode.dragging = change.dragging;
+          mutated = true;
         }
 
-        // Update the user node reference too
-        const userNode = internalNode.internals?.userNode;
-        if (userNode && change.position) {
-          (userNode as any).position = change.position;
-          (userNode as any).dragging = change.dragging;
+        // Mirror the mutation onto the user-facing node reference so that
+        // external consumers observing `nodes()` see consistent state.
+        const userNode = internalNode.internals?.userNode as any;
+        if (userNode) {
+          if (change.position) {
+            userNode.position = change.position;
+          }
+          if (change.dragging !== undefined) {
+            userNode.dragging = change.dragging;
+          }
+        }
+
+        if (mutated) {
           nodesChanged = true;
         }
       }

@@ -705,8 +705,11 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       return;
     }
 
-    // Don't deselect right after a selection drag ended (the click fires from mouseup)
+    // Don't deselect right after a selection drag ended (the click fires from mouseup).
+    // Clear the flag so the NEXT pane click can deselect normally — otherwise every
+    // subsequent click would also be swallowed.
     if (this.store.nodesSelectionActive()) {
+      this.store.nodesSelectionActive.set(false);
       return;
     }
 

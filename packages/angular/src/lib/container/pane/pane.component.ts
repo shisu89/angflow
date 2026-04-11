@@ -127,10 +127,10 @@ export class PaneComponent implements OnDestroy {
         partially
       );
 
+      // Always dispatch — passing an empty list through addSelectedNodes is how
+      // we deselect nodes that fell outside the shrinking box.
       const nodeIds = nodesInside.map(n => n.id);
-      if (nodeIds.length > 0) {
-        this.store.addSelectedNodes(nodeIds);
-      }
+      this.store.addSelectedNodes(nodeIds);
     });
   }
 

@@ -98,19 +98,21 @@ export class App {
 
 ## Example App
 
-A full example app lives at [`example-app/`](../../../example-app) in this repo. It's the best place to see working code for every feature — custom nodes and edges, sub-flows, node/edge toolbars, drag-from-sidebar, save/restore, connection validation, and more.
+A full example app lives at [`examples/angular/`](../../examples/angular) in this repo. It's the best place to see working code for every feature — custom nodes and edges, sub-flows, node/edge toolbars, drag-from-sidebar, save/restore, connection validation, and more.
 
 ```bash
-cd example-app
-npm install
-npm start          # opens http://localhost:4200
+pnpm install          # from the repo root (first time only)
+cd examples/angular
+npm run dev           # opens http://localhost:4200
 ```
+
+The example consumes `@angflow/angular` and `@angflow/system` via pnpm `workspace:*`, so local edits in `packages/angular/` are picked up immediately — no rebuild or reinstall step needed.
 
 The app ships three sections:
 
-- **Gallery** ([`src/app/examples/`](../../../example-app/src/app/examples)) — focused, one-feature-per-page demos (overview, custom node/edge, edge types, floating edges, node resizer, connection validation, drag-from-sidebar, sub-flows, node/edge toolbars, custom minimap, background variants, save/restore)
-- **Showcase** ([`src/app/showcase/`](../../../example-app/src/app/showcase)) — an end-to-end demo with a node palette, inspector panel, and simulation service; a good template for a real app
-- **Kitchen Sink** ([`src/app/kitchen-sink/`](../../../example-app/src/app/kitchen-sink)) — exercises nearly every feature together with a live event log
+- **Gallery** ([`src/app/examples/`](../../examples/angular/src/app/examples)) — focused, one-feature-per-page demos (overview, custom node/edge, edge types, floating edges, node resizer, connection validation, drag-from-sidebar, sub-flows, node/edge toolbars, custom minimap, background variants, save/restore)
+- **Showcase** ([`src/app/showcase/`](../../examples/angular/src/app/showcase)) — an end-to-end demo with a node palette, inspector panel, and simulation service; a good template for a real app
+- **Kitchen Sink** ([`src/app/kitchen-sink/`](../../examples/angular/src/app/kitchen-sink)) — exercises nearly every feature together with a live event log
 
 ## Custom Nodes
 

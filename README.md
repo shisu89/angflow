@@ -36,14 +36,14 @@ See the [Angular Flow README](./packages/angular/README.md) for API documentatio
 
 ## Example App
 
-A standalone demo app lives at [`example-app/`](../example-app/) (sibling to this directory). It's the best place to see Angular Flow in action and browse real, working source code for every feature.
+A demo app lives in this repo at [`examples/angular/`](./examples/angular). It's the best place to see Angular Flow in action and browse real, working source code for every feature.
 
 ### Running it
 
 ```bash
-cd example-app
-npm install
-npm start          # or: npx ng serve
+pnpm install       # from the repo root (first time only)
+cd examples/angular
+npm run dev        # or: npm start / npx ng serve
 ```
 
 Then open http://localhost:4200. The app redirects to `/gallery/overview` by default.
@@ -52,40 +52,32 @@ Then open http://localhost:4200. The app redirects to `/gallery/overview` by def
 
 The app is organized into three sections, reachable from the sidebar:
 
-**Gallery** — focused examples, one feature per page. Each lives in its own directory under [`example-app/src/app/examples/`](../example-app/src/app/examples):
+**Gallery** — focused examples, one feature per page. Each lives in its own directory under [`examples/angular/src/app/examples/`](./examples/angular/src/app/examples):
 
 | Route | Source | Demonstrates |
 |-------|--------|--------------|
-| `/gallery/overview` | [overview/](../example-app/src/app/examples/overview) | Basic nodes, edges, plugins, `applyNodeChanges` / `applyEdgeChanges` |
-| `/gallery/custom-node` | [custom-node/](../example-app/src/app/examples/custom-node) | Registering a custom Angular component as a node type |
-| `/gallery/custom-edge` | [custom-edge/](../example-app/src/app/examples/custom-edge) | Custom edge components with path generators |
-| `/gallery/edge-types` | [edge-types/](../example-app/src/app/examples/edge-types) | Built-in bezier, straight, step, and smooth-step edges |
-| `/gallery/floating-edges` | [floating-edges/](../example-app/src/app/examples/floating-edges) | Edges that attach to the closest point on a node |
-| `/gallery/connection-validation` | [connection-validation/](../example-app/src/app/examples/connection-validation) | `isValidConnection` gating drag-to-connect |
-| `/gallery/drag-from-sidebar` | [drag-from-sidebar/](../example-app/src/app/examples/drag-from-sidebar) | HTML5 drag-and-drop from a palette, `screenToFlowPosition` |
-| `/gallery/sub-flows` | [sub-flows/](../example-app/src/app/examples/sub-flows) | Parent/child nodes with `extent: 'parent'` |
-| `/gallery/node-resizer` | [node-resizer/](../example-app/src/app/examples/node-resizer) | `NodeResizerComponent` with min/max constraints |
-| `/gallery/node-toolbar` | [node-toolbar/](../example-app/src/app/examples/node-toolbar) | Contextual toolbars attached to nodes |
-| `/gallery/edge-toolbar` | [edge-toolbar/](../example-app/src/app/examples/edge-toolbar) | Contextual toolbars attached to edges |
-| `/gallery/minimap-custom` | [minimap-custom/](../example-app/src/app/examples/minimap-custom) | Styling the minimap and per-node colors |
-| `/gallery/backgrounds-variants` | [backgrounds-variants/](../example-app/src/app/examples/backgrounds-variants) | Dots, lines, and cross background patterns |
-| `/gallery/save-restore` | [save-restore/](../example-app/src/app/examples/save-restore) | `toObject()` / restore via `NgFlowService` |
+| `/gallery/overview` | [overview/](./examples/angular/src/app/examples/overview) | Basic nodes, edges, plugins, `applyNodeChanges` / `applyEdgeChanges` |
+| `/gallery/custom-node` | [custom-node/](./examples/angular/src/app/examples/custom-node) | Registering a custom Angular component as a node type |
+| `/gallery/custom-edge` | [custom-edge/](./examples/angular/src/app/examples/custom-edge) | Custom edge components with path generators |
+| `/gallery/edge-types` | [edge-types/](./examples/angular/src/app/examples/edge-types) | Built-in bezier, straight, step, and smooth-step edges |
+| `/gallery/floating-edges` | [floating-edges/](./examples/angular/src/app/examples/floating-edges) | Edges that attach to the closest point on a node |
+| `/gallery/connection-validation` | [connection-validation/](./examples/angular/src/app/examples/connection-validation) | `isValidConnection` gating drag-to-connect |
+| `/gallery/drag-from-sidebar` | [drag-from-sidebar/](./examples/angular/src/app/examples/drag-from-sidebar) | HTML5 drag-and-drop from a palette, `screenToFlowPosition` |
+| `/gallery/sub-flows` | [sub-flows/](./examples/angular/src/app/examples/sub-flows) | Parent/child nodes with `extent: 'parent'` |
+| `/gallery/node-resizer` | [node-resizer/](./examples/angular/src/app/examples/node-resizer) | `NodeResizerComponent` with min/max constraints |
+| `/gallery/node-toolbar` | [node-toolbar/](./examples/angular/src/app/examples/node-toolbar) | Contextual toolbars attached to nodes |
+| `/gallery/edge-toolbar` | [edge-toolbar/](./examples/angular/src/app/examples/edge-toolbar) | Contextual toolbars attached to edges |
+| `/gallery/minimap-custom` | [minimap-custom/](./examples/angular/src/app/examples/minimap-custom) | Styling the minimap and per-node colors |
+| `/gallery/backgrounds-variants` | [backgrounds-variants/](./examples/angular/src/app/examples/backgrounds-variants) | Dots, lines, and cross background patterns |
+| `/gallery/save-restore` | [save-restore/](./examples/angular/src/app/examples/save-restore) | `toObject()` / restore via `NgFlowService` |
 
-**Showcase** — `/showcase` ([`src/app/showcase/`](../example-app/src/app/showcase)) — a richer end-to-end demo featuring custom color nodes, a form-input node, a result node, a node palette, an inspector panel, and a simulation service. Useful as a template for a real app.
+**Showcase** — `/showcase` ([`src/app/showcase/`](./examples/angular/src/app/showcase)) — a richer end-to-end demo featuring custom color nodes, a form-input node, a result node, a node palette, an inspector panel, and a simulation service. Useful as a template for a real app.
 
-**Kitchen Sink** — `/kitchen-sink` ([`src/app/kitchen-sink/`](../example-app/src/app/kitchen-sink)) — exercises nearly every feature together: seeded graphs, layout switching, and a live event log. Handy when verifying a change didn't regress anything.
+**Kitchen Sink** — `/kitchen-sink` ([`src/app/kitchen-sink/`](./examples/angular/src/app/kitchen-sink)) — exercises nearly every feature together: seeded graphs, layout switching, and a live event log. Handy when verifying a change didn't regress anything.
 
 ### How it consumes the library
 
-The example app depends on `@angflow/angular` as a packed tarball (see [`example-app/package.json`](../example-app/package.json)), so rebuilding and repacking the library is the fastest path to test local changes:
-
-```bash
-cd angflow/packages/angular
-npm run build && npm pack
-cd ../../../example-app
-npm install ../angflow/packages/angular/angflow-angular-*.tgz
-npm start
-```
+The example app depends on `@angflow/angular` and `@angflow/system` as pnpm `workspace:*` dependencies (see [`examples/angular/package.json`](./examples/angular/package.json)), so edits in `packages/angular/` and `packages/system/` are picked up immediately — no build, pack, or reinstall step needed. Just restart the dev server if the change doesn't hot-reload.
 
 ## Getting Started
 
@@ -288,7 +280,7 @@ git fetch upstream
 git merge upstream/main
 ```
 
-The Angular port lives in `packages/angular/` and `../example-app/`, which don't exist upstream, so merges are typically conflict-free. Updates to `@xyflow/system` from upstream are picked up automatically.
+The Angular port lives in `packages/angular/` and `examples/angular/`, which don't exist upstream, so merges are typically conflict-free. Updates to `@xyflow/system` from upstream are picked up automatically.
 
 ## Credits
 

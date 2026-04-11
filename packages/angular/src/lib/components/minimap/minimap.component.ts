@@ -129,6 +129,10 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
   private xyMinimap: ReturnType<typeof XYMinimap> | null = null;
   private animationFrameId: number | null = null;
   private isDragging = false;
+  // Tracks whether the mouse actually moved between mousedown and mouseup.
+  // Used to suppress the synthetic click event that fires after a drag, which
+  // would otherwise trigger a second pan animation on top of the drag.
+  private dragMoved = false;
   private boundOnMouseMove = this.onMinimapMouseMove.bind(this);
   private boundOnMouseUp = this.onMinimapMouseUp.bind(this);
 
@@ -250,6 +254,14 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
   ngAfterViewInit(): void {}
 
   onMinimapClick(event: MouseEvent): void {
+    // Browsers fire `click` after `mouseup` when both land on the same element,
+    // regardless of drag distance. If the user was panning the minimap, swallow
+    // this trailing click so we don't start a second pan animation on top.
+    if (this.dragMoved) {
+      this.dragMoved = false;
+      return;
+    }
+
     const container = this.minimapContainerRef()?.nativeElement;
     if (!container) return;
 
@@ -320,12 +332,14 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
   onMinimapMouseDown(event: MouseEvent): void {
     if (!this.pannable()) return;
     this.isDragging = true;
+    this.dragMoved = false;
     document.addEventListener('mousemove', this.boundOnMouseMove);
     document.addEventListener('mouseup', this.boundOnMouseUp);
   }
 
   private onMinimapMouseMove(event: MouseEvent): void {
     if (!this.isDragging) return;
+    this.dragMoved = true;
 
     const container = this.minimapContainerRef()?.nativeElement;
     if (!container) return;
