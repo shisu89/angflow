@@ -66,7 +66,7 @@ function applyChanges(changes: any[], elements: any[]): any[] {
   return updatedElements;
 }
 
-function applyChange(change: any, element: any): void {
+function applyChange(change: any, element: Record<string, unknown>): void {
   switch (change.type) {
     case 'select': {
       element.selected = change.selected;

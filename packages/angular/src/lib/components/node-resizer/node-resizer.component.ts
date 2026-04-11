@@ -148,7 +148,7 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
     // Establish reactive dependency on node state (selection changes setNodes).
     const nodes = this.store.nodes();
     const id = this.nodeIdInput() ?? this.nodeId;
-    if (!id) return true;
+    if (!id) return false;
     const node = nodes.find((n) => n.id === id);
     return node?.selected ?? false;
   });

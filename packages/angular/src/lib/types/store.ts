@@ -24,6 +24,10 @@ import type {
   ColorMode,
   NodeChange,
   EdgeChange,
+  HandleType,
+  Connection,
+  HandleConnection,
+  FitViewOptionsBase,
 } from '@angflow/system';
 
 import type { Node, Edge, NodeTypes, EdgeTypes, DefaultEdgeOptions } from '.';
@@ -44,7 +48,7 @@ export interface FlowStoreState<NodeType extends Node = Node, EdgeType extends E
   nodeLookup: NodeLookup<InternalNodeBase<NodeType>>;
   parentLookup: ParentLookup<InternalNodeBase<NodeType>>;
   edgeLookup: EdgeLookup<EdgeType>;
-  connectionLookup: Map<string, Map<string, any>>;
+  connectionLookup: Map<string, Map<string, HandleConnection>>;
 
   onNodesChange: ((changes: NodeChange<NodeType>[]) => void) | null;
   onEdgesChange: ((changes: EdgeChange<EdgeType>[]) => void) | null;
@@ -89,19 +93,19 @@ export interface FlowStoreState<NodeType extends Node = Node, EdgeType extends E
 
   connectionMode: ConnectionMode;
   connection: ConnectionState;
-  connectionClickStartHandle: any | null;
+  connectionClickStartHandle: { nodeId: string; handleId: string | null; type: HandleType } | null;
   connectOnClick: boolean;
   connectionRadius: number;
 
   fitViewQueued: boolean;
-  fitViewOptions: any | undefined;
+  fitViewOptions: FitViewOptionsBase<NodeType> | undefined;
 
   autoPanOnConnect: boolean;
   autoPanOnNodeDrag: boolean;
   autoPanOnNodeFocus: boolean;
   autoPanSpeed: number;
 
-  isValidConnection: ((connection: any) => boolean) | undefined;
+  isValidConnection: ((connection: Connection) => boolean) | undefined;
   onError: OnError;
 
   lib: string;
