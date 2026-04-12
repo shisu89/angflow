@@ -28,7 +28,8 @@
     "d3-selection": "^3.0.0",
     "d3-zoom": "^3.0.0",
     "rxjs": ">=7.0.0",
-    "tslib": "^2.3.0"
+    "tslib": "^2.3.0",
+    "uplot": "^1.6.31"
   },
   "devDependencies": {
     "@angular/build": "^21.2.5",
