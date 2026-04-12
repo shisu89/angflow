@@ -1,5 +1,6 @@
 /* Import the complete ng-flow stylesheet from the library */
 @import '@angflow/angular/dist/style.css';
+@import 'uplot/dist/uPlot.min.css';
 
 /* App-specific reset */
 * {
