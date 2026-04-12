@@ -193,6 +193,7 @@ export class TimeseriesPageComponent {
         type: 'tsUpload',
         position: { x: 60 + Math.random() * 80, y: 60 + Math.random() * 80 },
         data: emptyUploadNodeData() as unknown as Node['data'],
+        style: { width: '300px', height: '320px' },
       },
     ]);
   }
@@ -205,6 +206,7 @@ export class TimeseriesPageComponent {
         type: 'tsQuery',
         position: { x: 60 + Math.random() * 80, y: 260 + Math.random() * 80 },
         data: emptyQueryNodeData() as unknown as Node['data'],
+        style: { width: '300px', height: '200px' },
       },
     ]);
   }
@@ -217,6 +219,7 @@ export class TimeseriesPageComponent {
         type: 'tsChart',
         position: { x: 420 + Math.random() * 80, y: 120 + Math.random() * 80 },
         data: emptyChartNodeData() as unknown as Node['data'],
+        style: { width: '520px', height: '360px' },
       },
     ]);
   }
@@ -240,18 +243,21 @@ export class TimeseriesPageComponent {
         type: 'tsUpload',
         position: { x: 60, y: 60 },
         data: emptyUploadNodeData('Data A') as unknown as Node['data'],
+        style: { width: '300px', height: '320px' },
       },
       {
         id: this.nextId('query'),
         type: 'tsQuery',
-        position: { x: 60, y: 320 },
+        position: { x: 60, y: 420 },
         data: emptyQueryNodeData('Query') as unknown as Node['data'],
+        style: { width: '300px', height: '200px' },
       },
       {
         id: this.nextId('chart'),
         type: 'tsChart',
         position: { x: 460, y: 120 },
         data: emptyChartNodeData('Chart') as unknown as Node['data'],
+        style: { width: '520px', height: '360px' },
       },
     ];
   }

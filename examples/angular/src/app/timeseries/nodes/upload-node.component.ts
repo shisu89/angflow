@@ -9,7 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { HandleComponent, NgFlowService, Position } from '@angflow/angular';
+import { HandleComponent, NodeResizerComponent, NgFlowService, Position } from '@angflow/angular';
 import type { TimeseriesDescriptor } from '../data/descriptors';
 import type {
   DatasetMetadata,
@@ -41,11 +41,14 @@ export function emptyUploadNodeData(label = 'Upload'): UploadNodeData {
   selector: 'app-ts-upload-node',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HandleComponent],
+  imports: [HandleComponent, NodeResizerComponent],
   styleUrls: ['./nodes.css'],
+  styles: [`:host { display: block; width: 100%; height: 100%; } .ts-node { width: 100%; height: 100%; box-sizing: border-box; overflow: auto; }`],
   template: `
+    <ng-flow-node-resizer [minWidth]="260" [minHeight]="200" color="#6366f1" />
     <div class="ts-node" [class.selected]="selected()">
       <div class="ts-node__header">
+        <span class="ts-node__drag-grip">&#x2630;</span>
         <input
           class="ts-node__header-input nodrag"
           [value]="label()"

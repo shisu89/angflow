@@ -13,7 +13,7 @@ import {
   runInInjectionContext,
   type Type,
 } from '@angular/core';
-import { HandleComponent, NgFlowService, Position } from '@angflow/angular';
+import { HandleComponent, NodeResizerComponent, NgFlowService, Position } from '@angflow/angular';
 import { TimeseriesDataService } from '../data/timeseries-data.service';
 import type { TimeseriesDescriptor, QueryResult } from '../data/descriptors';
 import { descriptorKey } from '../data/descriptors';
@@ -45,12 +45,15 @@ interface UpstreamEntry {
   selector: 'app-ts-chart-node',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HandleComponent],
+  imports: [HandleComponent, NodeResizerComponent],
   styleUrls: ['./nodes.css'],
+  styles: [`:host { display: block; width: 100%; height: 100%; } .ts-node--chart { width: 100%; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; } .ts-node--chart .ts-node__body { flex: 1; min-height: 0; } .ts-node__chart-host { width: 100%; height: 100%; }`],
   template: `
+    <ng-flow-node-resizer [minWidth]="420" [minHeight]="280" color="#6366f1" />
     <ng-flow-handle type="target" [position]="Position.Left" />
     <div class="ts-node ts-node--chart" [class.selected]="selected()">
       <div class="ts-node__header">
+        <span class="ts-node__drag-grip">&#x2630;</span>
         <input
           class="ts-node__header-input nodrag"
           [value]="title()"
