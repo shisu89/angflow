@@ -138,7 +138,7 @@ export class UploadNodeComponent {
 
   readonly statusClass = computed(() => {
     const s = this.uploadState();
-    return `${s}`;
+    return s === 'uploading' ? 'loading' : s;
   });
 
   readonly canUpload = computed(() => {

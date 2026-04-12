@@ -222,25 +222,10 @@ export class TimeseriesPageComponent {
   }
 
   clearBackend(): void {
-    // Clear the in-memory store. Also null out any `source` references in
-    // upload/query nodes so the UI isn't holding stale ids.
+    // Clear the in-memory store. Node sources are NOT nulled out — the chart
+    // node will surface "dataset not found" error chips, demonstrating what
+    // happens when backend data disappears while connected (per spec).
     this.backend.clear();
-    this.nodes.set(
-      this.nodes().map((n) => {
-        if (n.type === 'tsUpload' || n.type === 'tsQuery') {
-          return {
-            ...n,
-            data: {
-              ...(n.data as any),
-              source: null,
-              availableColumns: [],
-              selectedColumns: [],
-            },
-          };
-        }
-        return n;
-      }),
-    );
   }
 
   private nextId(prefix: string): string {
