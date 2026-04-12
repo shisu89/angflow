@@ -18,6 +18,14 @@ import { EdgeToolbarExampleComponent } from './examples/edge-toolbar/edge-toolba
 import { FloatingEdgesExampleComponent } from './examples/floating-edges/floating-edges.component';
 import { ShowcaseComponent } from './showcase/showcase.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { TimeseriesPageComponent } from './timeseries/timeseries-page.component';
+import { timeseriesHttpInterceptor } from './timeseries/backend/timeseries-http.interceptor';
+import { TimeseriesDataService } from './timeseries/data/timeseries-data.service';
+import { TIMESERIES_DATA_PROVIDERS } from './timeseries/data/timeseries-data-provider';
+import { BackendTimeseriesProvider } from './timeseries/data/backend-timeseries-provider';
+import { CHART_RENDERER } from './timeseries/chart/chart-renderer';
+import { UplotChartRenderer } from './timeseries/chart/uplot-chart-renderer';
 
 export const routes: Routes = [
   {
@@ -48,6 +56,21 @@ export const routes: Routes = [
       },
       { path: 'showcase', component: ShowcaseComponent },
       { path: 'kitchen-sink', component: KitchenSinkComponent },
+      {
+        path: 'timeseries',
+        component: TimeseriesPageComponent,
+        providers: [
+          provideHttpClient(withInterceptors([timeseriesHttpInterceptor])),
+          BackendTimeseriesProvider,
+          {
+            provide: TIMESERIES_DATA_PROVIDERS,
+            useExisting: BackendTimeseriesProvider,
+            multi: true,
+          },
+          TimeseriesDataService,
+          { provide: CHART_RENDERER, useValue: UplotChartRenderer },
+        ],
+      },
       { path: '**', component: ComingSoonComponent },
     ],
   },

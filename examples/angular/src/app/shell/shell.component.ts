@@ -13,6 +13,7 @@ import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
         <a routerLink="/gallery" routerLinkActive="is-active">Gallery</a>
         <a routerLink="/showcase" routerLinkActive="is-active">Showcase</a>
         <a routerLink="/kitchen-sink" routerLinkActive="is-active">Kitchen Sink</a>
+        <a routerLink="/timeseries" routerLinkActive="is-active">Timeseries</a>
       </nav>
     </header>
     <main class="shell__main">
