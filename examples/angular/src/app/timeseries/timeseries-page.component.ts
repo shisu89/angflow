@@ -159,15 +159,21 @@ export class TimeseriesPageComponent {
   }
 
   onNodesChange(changes: any[]): void {
-    this.nodes.set(applyNodeChanges(changes, this.nodes()));
+    // Use the flow service's current nodes as base (not this.nodes()) so that
+    // updateNodeData changes from inside child components aren't overwritten
+    // when a position/selection change fires.
+    const base = this.flow ? this.flow.nodes() : this.nodes();
+    this.nodes.set(applyNodeChanges(changes, base));
   }
 
   onEdgesChange(changes: any[]): void {
-    this.edges.set(applyEdgeChanges(changes, this.edges()));
+    const base = this.flow ? this.flow.edges() : this.edges();
+    this.edges.set(applyEdgeChanges(changes, base));
   }
 
   onConnect(connection: Connection): void {
-    this.edges.set(addEdge(connection, this.edges()) as Edge[]);
+    const base = this.flow ? this.flow.edges() : this.edges();
+    this.edges.set(addEdge(connection, base) as Edge[]);
   }
 
   onNodesDelete(deletedNodes: Node[]): void {
