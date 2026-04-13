@@ -1,6 +1,6 @@
 {
   "name": "@angflow/angular",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "type": "module",
   "description": "Angular Flow - A highly customizable Angular library for building node-based editors and interactive flow charts.",
   "keywords": [
@@ -47,7 +47,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@angflow/system": ">=0.0.83"
+    "@angflow/system": ">=0.0.84"
   },
   "peerDependencies": {
     "@angular/common": ">=17.0.0",

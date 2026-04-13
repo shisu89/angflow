@@ -78,7 +78,12 @@ export function updateAbsolutePositions<NodeType extends NodeBase>(
 
 function parseHandles(userNode: NodeBase, internalNode?: InternalNodeBase): NodeHandleBounds | undefined {
   if (!userNode.handles) {
-    return !userNode.measured ? undefined : internalNode?.internals.handleBounds;
+    // Always preserve existing handleBounds from the previous internalNode.
+    // Handle positions are relative to the node and only change when the DOM
+    // structure changes, which is handled by ResizeObserver → updateNodeInternals.
+    // Wiping them when `measured` is absent caused permanent loss because
+    // ResizeObserver only fires on size changes, not position changes.
+    return internalNode?.internals.handleBounds;
   }
 
   const source: Handle[] = [];
@@ -162,7 +167,6 @@ export function adoptUserNodes<NodeType extends NodeBase>(
         },
         internals: {
           positionAbsolute: clampedPosition,
-          // if user re-initializes the node or removes `measured` for whatever reason, we reset the handleBounds so that the node gets re-measured
           handleBounds: parseHandles(userNode, internalNode),
           z: calculateZ(userNode, selectedNodeZ, _options.zIndexMode),
           userNode,
