@@ -38,6 +38,7 @@ import {
   type ZIndexMode,
   type AriaLabelConfig,
   type FitViewOptionsBase,
+  type HandleType,
 } from '@angflow/system';
 
 import type { Node, Edge, InternalNode } from '../types';
@@ -51,6 +52,50 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   readonly width = signal(0);
   readonly height = signal(0);
   readonly transform: WritableSignal<Transform> = signal<Transform>([0, 0, 1]);
+
+  // ── Handle data registry ──────────────────────────────────────────────
+  // Keyed by `${nodeId}:${handleId ?? ''}:${type}`. Populated by
+  // HandleComponent.
+  private readonly _handleData = signal<Map<string, unknown>>(new Map());
+
+  /** Internal read-only accessor for reactive consumers (edge renderer, connection line). */
+  readonly handleDataRegistry: Signal<Map<string, unknown>> = this._handleData.asReadonly();
+
+  private handleKey(nodeId: string, handleId: string | null, type: HandleType): string {
+    return `${nodeId}:${handleId ?? ''}:${type}`;
+  }
+
+  /** Register or update a handle's user-supplied data. Pass `undefined` to clear. */
+  registerHandleData(nodeId: string, handleId: string | null, type: HandleType, data: unknown): void {
+    const key = this.handleKey(nodeId, handleId, type);
+    const current = this._handleData();
+    if (data === undefined) {
+      if (!current.has(key)) return;
+      const next = new Map(current);
+      next.delete(key);
+      this._handleData.set(next);
+      return;
+    }
+    if (current.get(key) === data) return;
+    const next = new Map(current);
+    next.set(key, data);
+    this._handleData.set(next);
+  }
+
+  /** Remove a handle's registration. Safe to call for unknown keys. */
+  unregisterHandleData(nodeId: string, handleId: string | null, type: HandleType): void {
+    const key = this.handleKey(nodeId, handleId, type);
+    const current = this._handleData();
+    if (!current.has(key)) return;
+    const next = new Map(current);
+    next.delete(key);
+    this._handleData.set(next);
+  }
+
+  /** Public lookup helper. Returns undefined if no data is registered. */
+  getHandleData(nodeId: string, handleId: string | null, type: HandleType): unknown {
+    return this._handleData().get(this.handleKey(nodeId, handleId, type));
+  }
 
   readonly nodes: WritableSignal<NodeType[]> = signal<NodeType[]>([]);
   readonly edges: WritableSignal<EdgeType[]> = signal<EdgeType[]>([]);

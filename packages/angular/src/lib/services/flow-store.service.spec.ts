@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { computed } from '@angular/core';
 import type { NodeChange } from '@angflow/system';
 import { FlowStore } from './flow-store.service';
 import type { Node, Edge } from '../types';
@@ -607,6 +608,66 @@ describe('FlowStore', () => {
 
       expect(() => store.onError()('002', 'boom')).not.toThrow();
       expect(emittedEvents).toEqual([{ id: '002', message: 'boom' }]);
+    });
+  });
+
+  // ── handle data registry ──────────────────────────────────────────────
+
+  describe('handle data registry', () => {
+    it('registerHandleData stores a value retrievable by getHandleData', () => {
+      store.registerHandleData('n1', 'h1', 'source', 'string');
+      expect(store.getHandleData('n1', 'h1', 'source')).toBe('string');
+    });
+
+    it('getHandleData returns undefined for unknown keys', () => {
+      expect(store.getHandleData('n1', 'h1', 'source')).toBeUndefined();
+    });
+
+    it('registerHandleData replaces the existing value for the same key', () => {
+      store.registerHandleData('n1', 'h1', 'source', 'string');
+      store.registerHandleData('n1', 'h1', 'source', 'number');
+      expect(store.getHandleData('n1', 'h1', 'source')).toBe('number');
+    });
+
+    it('null handleId is treated as empty-string segment in the key', () => {
+      store.registerHandleData('n1', null, 'target', { tag: 'x' });
+      expect(store.getHandleData('n1', null, 'target')).toEqual({ tag: 'x' });
+    });
+
+    it('differentiates by handle type', () => {
+      store.registerHandleData('n1', 'h1', 'source', 'src');
+      store.registerHandleData('n1', 'h1', 'target', 'tgt');
+      expect(store.getHandleData('n1', 'h1', 'source')).toBe('src');
+      expect(store.getHandleData('n1', 'h1', 'target')).toBe('tgt');
+    });
+
+    it('unregisterHandleData removes the entry', () => {
+      store.registerHandleData('n1', 'h1', 'source', 'string');
+      store.unregisterHandleData('n1', 'h1', 'source');
+      expect(store.getHandleData('n1', 'h1', 'source')).toBeUndefined();
+    });
+
+    it('registerHandleData with undefined value removes the entry', () => {
+      store.registerHandleData('n1', 'h1', 'source', 'string');
+      store.registerHandleData('n1', 'h1', 'source', undefined);
+      expect(store.getHandleData('n1', 'h1', 'source')).toBeUndefined();
+    });
+
+    it('handleDataRegistry signal notifies dependents on write', () => {
+      const spy = vi.fn<(map: Map<string, unknown>) => void>();
+      // subscribe via computed so it re-evaluates on registry writes
+      const c = computed(() => {
+        const map = store.handleDataRegistry();
+        spy(map);
+        return map.size;
+      });
+      expect(c()).toBe(0);
+      store.registerHandleData('n1', 'h1', 'source', 'x');
+      expect(c()).toBe(1);
+      store.registerHandleData('n1', 'h2', 'source', 'y');
+      expect(c()).toBe(2);
+      store.unregisterHandleData('n1', 'h1', 'source');
+      expect(c()).toBe(1);
     });
   });
 });
