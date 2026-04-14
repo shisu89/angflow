@@ -629,7 +629,7 @@ describe('FlowStore', () => {
       expect(store.getHandleData('n1', 'h1', 'source')).toBe('number');
     });
 
-    it('null handleId is treated as empty-string segment in the key', () => {
+    it('stores and retrieves a value with null handleId', () => {
       store.registerHandleData('n1', null, 'target', { tag: 'x' });
       expect(store.getHandleData('n1', null, 'target')).toEqual({ tag: 'x' });
     });
