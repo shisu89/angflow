@@ -17,6 +17,7 @@ import {
   type NodeBase,
   type EdgeBase,
   type InternalNodeUpdate,
+  type HandleType,
 } from '@angflow/system';
 
 import { FlowStore } from './flow-store.service';
@@ -597,6 +598,23 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   onEdgesChangeMiddleware(id: string, fn: (changes: import('@angflow/system').EdgeChange<EdgeType>[]) => import('@angflow/system').EdgeChange<EdgeType>[]): () => void {
     this.store.edgesChangeMiddleware.set(id, fn);
     return () => { this.store.edgesChangeMiddleware.delete(id); };
+  }
+
+  // ── Handle Data ───────────────────────────────────────────────────────
+
+  /**
+   * Look up the user-supplied data attached to a handle via `<ng-flow-handle [data]="...">`.
+   *
+   * @remarks
+   * Returns `undefined` if no data is registered. Typically used from
+   * `isValidConnection` callbacks to compare source / target handle types.
+   *
+   * @param nodeId - The node id hosting the handle.
+   * @param handleId - The handle id (or `null` if the handle has no id).
+   * @param type - `'source'` or `'target'`.
+   */
+  getHandleData(nodeId: string, handleId: string | null, type: HandleType): unknown {
+    return this.store.getHandleData(nodeId, handleId, type);
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────

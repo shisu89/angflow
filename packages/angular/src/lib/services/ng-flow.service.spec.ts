@@ -258,6 +258,24 @@ describe('NgFlowService', () => {
     });
   });
 
+  // ── getHandleData: pass-through to FlowStore ─────────────────────────
+
+  describe('getHandleData', () => {
+    it('returns data registered via FlowStore', () => {
+      store.registerHandleData('n1', 'h1', 'source', 'string');
+      expect(service.getHandleData('n1', 'h1', 'source')).toBe('string');
+    });
+
+    it('returns undefined for unknown keys', () => {
+      expect(service.getHandleData('n1', 'nope', 'source')).toBeUndefined();
+    });
+
+    it('propagates null handleId', () => {
+      store.registerHandleData('n1', null, 'target', { tag: 42 });
+      expect(service.getHandleData('n1', null, 'target')).toEqual({ tag: 42 });
+    });
+  });
+
   // ── selectKeyPressed: key tracking ────────────────────────────────────
 
   describe('selectKeyPressed', () => {
