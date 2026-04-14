@@ -655,19 +655,44 @@ describe('FlowStore', () => {
 
     it('handleDataRegistry signal notifies dependents on write', () => {
       const spy = vi.fn<(map: Map<string, unknown>) => void>();
-      // subscribe via computed so it re-evaluates on registry writes
       const c = computed(() => {
         const map = store.handleDataRegistry();
         spy(map);
         return map.size;
       });
+
       expect(c()).toBe(0);
+      const initialCalls = spy.mock.calls.length;
+      expect(initialCalls).toBeGreaterThanOrEqual(1);
+
       store.registerHandleData('n1', 'h1', 'source', 'x');
       expect(c()).toBe(1);
+      expect(spy.mock.calls.length).toBeGreaterThan(initialCalls);
+
+      const afterFirst = spy.mock.calls.length;
       store.registerHandleData('n1', 'h2', 'source', 'y');
       expect(c()).toBe(2);
+      expect(spy.mock.calls.length).toBeGreaterThan(afterFirst);
+
+      const afterSecond = spy.mock.calls.length;
       store.unregisterHandleData('n1', 'h1', 'source');
       expect(c()).toBe(1);
+      expect(spy.mock.calls.length).toBeGreaterThan(afterSecond);
+    });
+
+    it('distinguishes null handleId from empty-string handleId', () => {
+      store.registerHandleData('n1', null, 'source', 'null-data');
+      store.registerHandleData('n1', '', 'source', 'empty-data');
+      expect(store.getHandleData('n1', null, 'source')).toBe('null-data');
+      expect(store.getHandleData('n1', '', 'source')).toBe('empty-data');
+    });
+
+    it('reset() clears all registered handle data', () => {
+      store.registerHandleData('n1', 'h1', 'source', 'x');
+      store.registerHandleData('n2', 'h2', 'target', 'y');
+      expect(store.handleDataRegistry().size).toBe(2);
+      store.reset();
+      expect(store.handleDataRegistry().size).toBe(0);
     });
   });
 });

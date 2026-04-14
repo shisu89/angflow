@@ -54,7 +54,8 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   readonly transform: WritableSignal<Transform> = signal<Transform>([0, 0, 1]);
 
   // ── Handle data registry ──────────────────────────────────────────────
-  // Keyed by `${nodeId}:${handleId ?? ''}:${type}`. Populated by
+  // Keyed by `${nodeId}:${handleId === null ? '\u0000' : handleId}:${type}`.
+  // The null-character sentinel distinguishes null from "". Populated by
   // HandleComponent.
   private readonly _handleData = signal<Map<string, unknown>>(new Map());
 
@@ -62,7 +63,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   readonly handleDataRegistry: Signal<Map<string, unknown>> = this._handleData.asReadonly();
 
   private handleKey(nodeId: string, handleId: string | null, type: HandleType): string {
-    return `${nodeId}:${handleId ?? ''}:${type}`;
+    return `${nodeId}:${handleId === null ? '\u0000' : handleId}:${type}`;
   }
 
   /** Register or update a handle's user-supplied data. Pass `undefined` to clear. */
@@ -696,6 +697,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     this.multiSelectionActive.set(false);
     this.selectionKeyActive.set(false);
     this.fitViewQueued.set(false);
+    this._handleData.set(new Map());
   }
 
   // ── Internal helpers ──────────────────────────────────────────────────
