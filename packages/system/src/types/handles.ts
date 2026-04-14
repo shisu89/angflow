@@ -14,6 +14,8 @@ export type Handle = {
   type: HandleType;
   width: number;
   height: number;
+  /** User-attached metadata (e.g. data type tag). Populated by the framework wrapper. */
+  data?: unknown;
 };
 
 export type HandleProps = {
@@ -57,4 +59,6 @@ export type HandleProps = {
    * @remarks optional if there is only one handle of this type
    */
   id?: string | null;
+  /** User-attached metadata. */
+  data?: unknown;
 };
