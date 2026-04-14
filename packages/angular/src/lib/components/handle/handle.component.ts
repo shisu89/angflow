@@ -66,23 +66,26 @@ export class HandleComponent implements OnInit, OnDestroy {
   // data-id attribute used by XYHandle to find handles in the DOM
   readonly dataId = computed(() => `${this.store.rfId()}-${this.nodeId}-${this.handleId()}-${this.type()}`);
 
+  private isRegistered = false;
+
   constructor(@Optional() @Inject(NODE_ID) nodeId: string | null) {
     this.nodeId = nodeId ?? '';
 
     effect(() => {
       const d = this.data();
       this.store.registerHandleData(this.nodeId, this.handleId(), this.type(), d);
+      this.isRegistered = true;
     });
   }
 
   ngOnInit(): void {}
 
   ngOnDestroy(): void {
-    try {
-      this.store.unregisterHandleData(this.nodeId, this.handleId(), this.type());
-    } catch {
-      // required input `type` may be unavailable if component was never fully initialized
-    }
+    // Guard: the effect may never have run if inputs were not resolved before
+    // destroy (happens in some test lifecycles). In production, Angular's
+    // required-input check would error before reaching this path.
+    if (!this.isRegistered) return;
+    this.store.unregisterHandleData(this.nodeId, this.handleId(), this.type());
   }
 
   onPointerDown(event: MouseEvent | PointerEvent): void {
