@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, computed } from '@angular/core';
-import { getBezierPath, Position, type BezierPathOptions } from '@angflow/system';
+import { getBezierPath, Position, type BezierPathOptions, type Handle } from '@angflow/system';
 import { BaseEdgeComponent } from './base-edge.component';
 
 @Component({
@@ -40,6 +40,8 @@ export class BezierEdgeComponent {
   readonly targetHandleId = input<string | null>();
   readonly selectable = input<boolean>();
   readonly deletable = input<boolean>();
+  readonly sourceHandle = input<Handle | null>(null);
+  readonly targetHandle = input<Handle | null>(null);
 
   readonly edgePath = computed(() => {
     const [path] = getBezierPath({

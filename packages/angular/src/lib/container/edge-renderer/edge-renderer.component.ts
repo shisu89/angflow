@@ -322,6 +322,13 @@ export class EdgeRendererComponent {
       (h) => h.id === edge.targetHandle || (!edge.targetHandle && h.id === null)
     ) ?? targetNode?.internals?.handleBounds?.target?.[0];
 
+    const enrichedSourceHandle = sourceHandle
+      ? { ...sourceHandle, data: this.store.getHandleData(edge.source, sourceHandle.id ?? null, 'source') }
+      : null;
+    const enrichedTargetHandle = targetHandle
+      ? { ...targetHandle, data: this.store.getHandleData(edge.target, targetHandle.id ?? null, 'target') }
+      : null;
+
     const sourcePos = sourceNode?.internals?.positionAbsolute ?? sourceNode?.position ?? { x: 0, y: 0 };
     const targetPos = targetNode?.internals?.positionAbsolute ?? targetNode?.position ?? { x: 0, y: 0 };
 
@@ -373,6 +380,8 @@ export class EdgeRendererComponent {
       pathOptions: (edge as Record<string, unknown>).pathOptions,
       sourceHandleId: edge.sourceHandle,
       targetHandleId: edge.targetHandle,
+      sourceHandle: enrichedSourceHandle,
+      targetHandle: enrichedTargetHandle,
     };
   }
 

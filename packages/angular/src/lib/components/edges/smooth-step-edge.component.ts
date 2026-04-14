@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, computed } from '@angular/core';
-import { getSmoothStepPath, Position, type SmoothStepPathOptions } from '@angflow/system';
+import { getSmoothStepPath, Position, type SmoothStepPathOptions, type Handle } from '@angflow/system';
 import { BaseEdgeComponent } from './base-edge.component';
 
 @Component({
@@ -31,6 +31,8 @@ export class SmoothStepEdgeComponent {
   readonly interactionWidth = input<number>();
   readonly pathOptions = input<SmoothStepPathOptions>();
   readonly label = input<string>();
+  readonly sourceHandle = input<Handle | null>(null);
+  readonly targetHandle = input<Handle | null>(null);
 
   readonly edgePath = computed(() => {
     const [path] = getSmoothStepPath({

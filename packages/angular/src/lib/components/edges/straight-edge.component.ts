@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, computed } from '@angular/core';
-import { getStraightPath, Position } from '@angflow/system';
+import { getStraightPath, Position, type Handle } from '@angflow/system';
 import { BaseEdgeComponent } from './base-edge.component';
 
 @Component({
@@ -28,6 +28,8 @@ export class StraightEdgeComponent {
   readonly markerEnd = input<string>();
   readonly interactionWidth = input<number>();
   readonly label = input<string>();
+  readonly sourceHandle = input<Handle | null>(null);
+  readonly targetHandle = input<Handle | null>(null);
 
   readonly edgePath = computed(() => {
     const [path] = getStraightPath({
