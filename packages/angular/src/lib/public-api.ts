@@ -35,6 +35,10 @@ export { NodeResizerComponent } from './components/node-resizer/node-resizer.com
 export { A11yDescriptionsComponent } from './components/a11y-descriptions/a11y-descriptions.component';
 export { AttributionComponent } from './components/attribution/attribution.component';
 
+// Handle layout helpers
+export { AfHandleGroupComponent } from './components/handle-group/handle-group.component';
+export { AfHandleRowComponent } from './components/handle-group/handle-row.component';
+
 // Directives
 export { DragDirective } from './directives/drag.directive';
 export { KeyHandlerDirective } from './directives/key-handler.directive';
