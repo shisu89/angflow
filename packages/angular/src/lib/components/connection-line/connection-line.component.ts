@@ -78,11 +78,20 @@ export class ConnectionLineComponent {
 
     const toPosition = activeConn.toPosition ?? Position.Top;
 
+    // Enrich fromHandle with data from the registry (if present).
+    let fromHandle = activeConn.fromHandle ?? null;
+    if (fromHandle) {
+      const data = this.store.getHandleData(fromHandle.nodeId, fromHandle.id ?? null, fromHandle.type);
+      if (data !== undefined) {
+        fromHandle = { ...fromHandle, data };
+      }
+    }
+
     return {
       fromX, fromY, fromPosition,
       toX, toY, toPosition,
       fromNode: activeConn.fromNode ?? null,
-      fromHandle: activeConn.fromHandle ?? null,
+      fromHandle,
     };
   });
 
