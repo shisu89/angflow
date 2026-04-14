@@ -5,6 +5,7 @@ import {
   output,
   inject,
   computed,
+  effect,
   ElementRef,
   OnInit,
   OnDestroy,
@@ -51,6 +52,7 @@ export class HandleComponent implements OnInit, OnDestroy {
   readonly isConnectableStart = input(true);
   readonly isConnectableEnd = input(true);
   readonly isValidConnection = input<((connection: Connection) => boolean) | undefined>(undefined);
+  readonly data = input<unknown>(undefined);
 
   /** Emitted when a connection is completed on this handle. */
   readonly handleConnect = output<Connection>({ alias: 'onConnect' });
@@ -66,11 +68,22 @@ export class HandleComponent implements OnInit, OnDestroy {
 
   constructor(@Optional() @Inject(NODE_ID) nodeId: string | null) {
     this.nodeId = nodeId ?? '';
+
+    effect(() => {
+      const d = this.data();
+      this.store.registerHandleData(this.nodeId, this.handleId(), this.type(), d);
+    });
   }
 
   ngOnInit(): void {}
 
-  ngOnDestroy(): void {}
+  ngOnDestroy(): void {
+    try {
+      this.store.unregisterHandleData(this.nodeId, this.handleId(), this.type());
+    } catch {
+      // required input `type` may be unavailable if component was never fully initialized
+    }
+  }
 
   onPointerDown(event: MouseEvent | PointerEvent): void {
     if (!this.isConnectableStart()) return;
