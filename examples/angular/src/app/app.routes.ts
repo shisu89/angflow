@@ -16,6 +16,7 @@ import { EdgeTypesExampleComponent } from './examples/edge-types/edge-types.comp
 import { NodeToolbarExampleComponent } from './examples/node-toolbar/node-toolbar.component';
 import { EdgeToolbarExampleComponent } from './examples/edge-toolbar/edge-toolbar.component';
 import { FloatingEdgesExampleComponent } from './examples/floating-edges/floating-edges.component';
+import { TypedHandlesExampleComponent } from './examples/typed-handles/typed-handles.component';
 import { ShowcaseComponent } from './showcase/showcase.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
 
@@ -44,6 +45,7 @@ export const routes: Routes = [
           { path: 'node-toolbar', component: NodeToolbarExampleComponent },
           { path: 'edge-toolbar', component: EdgeToolbarExampleComponent },
           { path: 'floating-edges', component: FloatingEdgesExampleComponent },
+          { path: 'typed-handles', component: TypedHandlesExampleComponent },
         ],
       },
       { path: 'showcase', component: ShowcaseComponent },
