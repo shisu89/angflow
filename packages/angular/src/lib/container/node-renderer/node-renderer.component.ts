@@ -71,7 +71,7 @@ const builtInNodeTypes: NodeTypes = {
         (mousemove)="onNodeEvent($event, node.id, 'mousemove')"
         (mouseleave)="onNodeEvent($event, node.id, 'mouseleave')"
         (keydown)="onNodeKeyDown($event, node)"
-        (focus)="onNodeFocus(node)"
+        (focus)="onNodeFocus(node, $event)"
       >
         @if (getNodeTemplate(node.type); as tmpl) {
           <ng-container
@@ -227,10 +227,14 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  onNodeFocus(node: Node): void {
-    // Select the focused node, but don't re-select if already selected
-    // (which would deselect other nodes in a multi-selection)
-    if (this.store.elementsSelectable() && node.selectable !== false && !node.selected) {
+  onNodeFocus(node: Node, event?: FocusEvent): void {
+    // Only select on keyboard-driven focus (:focus-visible). Mouse-driven
+    // focus fires before the native click, so selecting here would race the
+    // click handler — on Ctrl+Click it adds the node, then click sees it as
+    // selected and toggles it back off.
+    const el = event?.currentTarget as HTMLElement | null;
+    const focusVisible = el?.matches?.(':focus-visible') ?? false;
+    if (focusVisible && this.store.elementsSelectable() && node.selectable !== false && !node.selected) {
       this.store.addSelectedNodes([node.id]);
     }
 

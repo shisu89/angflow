@@ -351,6 +351,7 @@ svg.xy-flow__connectionline {
   height: 100%;
   left: 0;
   top: 0;
+  transform-origin: 0 0;
   user-select: none;
 }
 

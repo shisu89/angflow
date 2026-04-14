@@ -118,8 +118,8 @@ importers:
   packages/angular:
     dependencies:
       '@angflow/system':
-        specifier: '>=0.0.86'
-        version: 0.0.86
+        specifier: '>=0.0.87'
+        version: 0.0.87
       '@angular/common':
         specifier: '>=17.0.0'
         version: 21.2.6(@angular/core@21.2.6(@angular/compiler@21.2.6)(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
@@ -321,8 +321,8 @@ packages:
     resolution: {integrity: sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw==}
     engines: {node: '>=6.0.0'}
 
-  '@angflow/system@0.0.86':
-    resolution: {integrity: sha512-Yx9LJ/cT4gIE0/Wo6i7dgAV+s0k82fm/j7KX1w4rosEvY8dGtBXMznGoKHkUE79X8KtYv0WYdCViXu0U2xfCRg==}
+  '@angflow/system@0.0.87':
+    resolution: {integrity: sha512-dsVtt8XLe/H4mF60Daqd3/FalGCkqdz8PMmUM7PinRJG1GNgPL42ddIgufrNNxtgi3zgH/3OX9g9t9wBPD4Mlg==}
 
   '@angular-devkit/architect@0.2102.6':
     resolution: {integrity: sha512-h4qybKypR7OuwcTHPQI1zRm7abXgmPiV49vI2UeMtVVY/GKzru9gMexcYmWabzEyBY8w6VSfWjV2X+eit2EhDQ==}
@@ -4494,7 +4494,7 @@ snapshots:
       '@jridgewell/gen-mapping': 0.3.13
       '@jridgewell/trace-mapping': 0.3.31
 
-  '@angflow/system@0.0.86':
+  '@angflow/system@0.0.87':
     dependencies:
       '@types/d3-drag': 3.0.7
       '@types/d3-interpolate': 3.0.4
