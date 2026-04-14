@@ -94,4 +94,17 @@ describe('HandleComponent data registration', () => {
     fixture.detectChanges();
     expect(s.getHandleData('node-B', 'h2', 'source')).toBeUndefined();
   });
+
+  it('registers and unregisters correctly when handleId is null', () => {
+    const fixture = TestBed.createComponent(HandleComponent);
+    const inst = fixture.componentInstance;
+    setSignalInput(inst, 'type', 'target' as HandleType);
+    // handleId defaults to null — do not override
+    setSignalInput(inst, 'data', 'null-key-data');
+    fixture.detectChanges();
+    expect(store.getHandleData('node-A', null, 'target')).toBe('null-key-data');
+
+    fixture.destroy();
+    expect(store.getHandleData('node-A', null, 'target')).toBeUndefined();
+  });
 });
