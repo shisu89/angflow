@@ -79,6 +79,7 @@ export class ControlsComponent {
   readonly showFitView = input(true);
   readonly showInteractive = input(true);
   readonly fitViewOptions = input<FitViewOptionsBase<any>>();
+  readonly fitViewFn = input<(() => void) | undefined>(undefined);
   readonly orientation = input<'horizontal' | 'vertical'>('vertical');
   readonly ariaLabel = input<string>('Angular Flow controls');
 
@@ -114,7 +115,12 @@ export class ControlsComponent {
   }
 
   onFitView() {
-    this.ngFlowService.fitView(this.fitViewOptions());
+    const fn = this.fitViewFn();
+    if (fn) {
+      fn();
+    } else {
+      this.ngFlowService.fitView(this.fitViewOptions());
+    }
     this.fitViewClick.emit();
   }
 

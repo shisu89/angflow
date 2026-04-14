@@ -342,7 +342,9 @@ function getFitViewNodes<
   const optionNodeIds = options?.nodes ? new Set(options.nodes.map((node) => node.id)) : null;
 
   nodeLookup.forEach((n) => {
-    const isVisible = n.measured.width && n.measured.height && (options?.includeHiddenNodes || !n.hidden);
+    const width = n.measured?.width ?? n.width ?? n.initialWidth;
+    const height = n.measured?.height ?? n.height ?? n.initialHeight;
+    const isVisible = width && height && (options?.includeHiddenNodes || !n.hidden);
 
     if (isVisible && (!optionNodeIds || optionNodeIds.has(n.id))) {
       fitViewNodes.set(n.id, n);
