@@ -11,7 +11,7 @@ import {
 } from '@angflow/angular';
 import type { Node, Edge, Connection } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
-import { ExampleCardComponent } from '../_shared/example-card.component';
+import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
 // Custom edge: inline SVG with a gradient stroke + a blurred glow underlay,
 // plus a gradient-pill label rendered via EdgeLabelRenderer. We drop
