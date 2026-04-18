@@ -13,7 +13,6 @@ import {
   AfterViewInit,
   Type,
   inject,
-  NgZone,
   signal,
   computed,
   TemplateRef,
@@ -188,7 +187,6 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 {
   readonly store = inject(FlowStore) as unknown as FlowStore<NodeType, EdgeType>;
   private readonly ngFlowService = inject(NgFlowService) as unknown as NgFlowService<NodeType, EdgeType>;
-  private readonly zone = inject(NgZone);
   private readonly containerRef = viewChild<ElementRef<HTMLDivElement>>('container');
   private readonly paneRef = viewChild(PaneComponent);
 
@@ -739,13 +737,11 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
         this.moveStart.emit({ event, viewport });
       },
       onPanZoom: (event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
-        this.zone.run(() => {
-          const transform: Transform = [viewport.x, viewport.y, viewport.zoom];
-          this.store.transform.set(transform);
-          this.store.bumpVersion();
-          this.move.emit({ event, viewport });
-          this.viewportChange.emit(viewport);
-        });
+        const transform: Transform = [viewport.x, viewport.y, viewport.zoom];
+        this.store.transform.set(transform);
+        this.store.bumpVersion();
+        this.move.emit({ event, viewport });
+        this.viewportChange.emit(viewport);
       },
       onPanZoomEnd: (event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
         this.moveEnd.emit({ event, viewport });

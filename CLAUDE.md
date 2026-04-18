@@ -94,3 +94,13 @@ npm publish --access public
 - **@angflow/system**: Framework-agnostic core. XYDrag, XYHandle, XYPanZoom, XYResizer, XYMinimap classes. Graph utils, path generators, types.
 - **@angflow/angular**: Angular signals-based wrapper. FlowStore (state), NgFlowService (API), NgFlowComponent (main), node/edge renderers, plugin components (Background, Controls, MiniMap, etc.).
 - System package should rarely need changes — most work happens in the Angular package.
+
+## Zoneless-first contributor rules
+
+The Angular package assumes no Zone.js. These rules preserve that invariant:
+
+1. **Never inject `NgZone`.** If you think you need it, you're mixing Zone.js assumptions into zoneless-native code. Drive view updates via signal writes instead.
+2. **Event handlers from outside Angular (D3 bindings, native listeners, `requestAnimationFrame` callbacks) must drive view updates via signal writes.** Never rely on Zone to tick change detection. Writing to a signal the template reads is sufficient.
+3. **Timers are fine.** `setTimeout` / `setInterval` / `requestAnimationFrame` used to schedule logic are framework-agnostic and work in both zoneless and zonal modes. Only the *purpose* matters — using them to force CD is forbidden (rule 2); using them to delay work is allowed.
+
+Library builds and examples must keep the zonal example suite passing (`examples/angular/`) and meet the zoneless example validation bar documented in `docs/superpowers/specs/2026-04-18-angular-19-zoneless-upgrade-design.md`.

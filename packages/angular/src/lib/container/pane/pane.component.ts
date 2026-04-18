@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, output, inject, NgZone, OnDestroy, ElementRef } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, inject, OnDestroy, ElementRef } from '@angular/core';
 import { getNodesInside, SelectionMode } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 
@@ -18,7 +18,6 @@ import { FlowStore } from '../../services/flow-store.service';
 })
 export class PaneComponent implements OnDestroy {
   readonly store = inject(FlowStore);
-  private zone = inject(NgZone);
   private el = inject(ElementRef<HTMLElement>);
 
   readonly panOnDrag = input<boolean | number[]>(true);
@@ -90,10 +89,8 @@ export class PaneComponent implements OnDestroy {
     this.boundOnMouseMove = (e: MouseEvent) => this.onMouseMove(e);
     this.boundOnMouseUp = (e: MouseEvent) => this.onMouseUp(e);
 
-    this.zone.runOutsideAngular(() => {
-      document.addEventListener('mousemove', this.boundOnMouseMove!);
-      document.addEventListener('mouseup', this.boundOnMouseUp!);
-    });
+    document.addEventListener('mousemove', this.boundOnMouseMove!);
+    document.addEventListener('mouseup', this.boundOnMouseUp!);
   }
 
   private onMouseMove(event: MouseEvent): void {
@@ -115,23 +112,21 @@ export class PaneComponent implements OnDestroy {
       startY: this.startY,
     };
 
-    this.zone.run(() => {
-      this.store.userSelectionRect.set(selectionRect);
+    this.store.userSelectionRect.set(selectionRect);
 
-      const transform = this.store.transform();
-      const partially = this.selectionMode() === SelectionMode.Partial;
-      const nodesInside = getNodesInside(
-        this.store.nodeLookup,
-        selectionRect,
-        transform,
-        partially
-      );
+    const transform = this.store.transform();
+    const partially = this.selectionMode() === SelectionMode.Partial;
+    const nodesInside = getNodesInside(
+      this.store.nodeLookup,
+      selectionRect,
+      transform,
+      partially
+    );
 
-      // Always dispatch — passing an empty list through addSelectedNodes is how
-      // we deselect nodes that fell outside the shrinking box.
-      const nodeIds = nodesInside.map(n => n.id);
-      this.store.addSelectedNodes(nodeIds);
-    });
+    // Always dispatch — passing an empty list through addSelectedNodes is how
+    // we deselect nodes that fell outside the shrinking box.
+    const nodeIds = nodesInside.map(n => n.id);
+    this.store.addSelectedNodes(nodeIds);
   }
 
   private onMouseUp(event: MouseEvent): void {
@@ -148,15 +143,13 @@ export class PaneComponent implements OnDestroy {
       this.boundOnMouseUp = null;
     }
 
-    this.zone.run(() => {
-      this.store.userSelectionActive.set(false);
-      this.store.userSelectionRect.set(null);
-      // Mark nodes selection as active if nodes were selected
-      if (this.store.selectedNodes().length > 0) {
-        this.store.nodesSelectionActive.set(true);
-      }
-      this.selectionEnd.emit(event);
-    });
+    this.store.userSelectionActive.set(false);
+    this.store.userSelectionRect.set(null);
+    // Mark nodes selection as active if nodes were selected
+    if (this.store.selectedNodes().length > 0) {
+      this.store.nodesSelectionActive.set(true);
+    }
+    this.selectionEnd.emit(event);
   }
 
   ngOnDestroy(): void {
