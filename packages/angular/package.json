@@ -50,13 +50,13 @@
     "@angflow/system": ">=0.0.87"
   },
   "peerDependencies": {
-    "@angular/common": ">=17.0.0",
-    "@angular/core": ">=17.0.0",
+    "@angular/common": ">=19.0.0",
+    "@angular/core": ">=19.0.0",
     "rxjs": ">=7.0.0"
   },
   "devDependencies": {
-    "@angular/compiler": ">=17.0.0",
-    "@angular/compiler-cli": ">=17.0.0",
+    "@angular/compiler": ">=19.0.0",
+    "@angular/compiler-cli": ">=19.0.0",
     "@angular/platform-browser": "^21.2.7",
     "@angular/platform-browser-dynamic": "^21.2.7",
     "jsdom": "^29.0.1",
