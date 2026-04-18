@@ -46,6 +46,8 @@ cd examples/angular
 npm run dev        # or: npm start / npx ng serve
 ```
 
+> **Note:** Use `pnpm install` (not `npm install`), and run it from the repo root — not from `examples/angular/` or any other subdirectory. npm doesn't understand the `workspace:*` protocol, and running an install inside a subdirectory bypasses the workspace, so either will fail with `EUNSUPPORTEDPROTOCOL`. Once installed, `npm run` and `pnpm run` are interchangeable for the scripts.
+
 Then open http://localhost:4200. The app redirects to `/gallery/overview` by default.
 
 ### What's inside
