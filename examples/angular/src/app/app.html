@@ -1,1 +1,9 @@
+<header class="harness-header">
+  <strong>angflow dev harness</strong>
+  <select [value]="currentPath()" (change)="onChange($event)" aria-label="Select an example">
+    @for (route of routes; track route.path) {
+      <option [value]="route.path">{{ route.name }}</option>
+    }
+  </select>
+</header>
 <router-outlet />

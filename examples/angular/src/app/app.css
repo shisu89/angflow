@@ -1,4 +1,13 @@
-:host {
-  display: block;
-  height: 100vh;
+:host { display: flex; flex-direction: column; height: 100vh; }
+.harness-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fafc;
+  font-family: system-ui, sans-serif;
 }
+.harness-header strong { font-size: 0.875rem; }
+.harness-header select { padding: 0.25rem 0.5rem; font-size: 0.875rem; }
+router-outlet + * { flex: 1; min-height: 0; }

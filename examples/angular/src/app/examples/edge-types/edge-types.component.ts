@@ -8,7 +8,7 @@ import {
   applyEdgeChanges,
 } from '@angflow/angular';
 import type { Node, Edge } from '@angflow/angular';
-import { ExampleCardComponent } from '../../shell/example-card.component';
+import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
 const EDGE_TYPES = ['default', 'straight', 'step', 'smoothstep', 'simplebezier'] as const;
 

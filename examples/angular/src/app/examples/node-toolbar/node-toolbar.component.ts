@@ -11,7 +11,7 @@ import {
 } from '@angflow/angular';
 import type { Node, Edge, Connection } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
-import { ExampleCardComponent } from '../../shell/example-card.component';
+import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
 @Component({
   selector: 'app-toolbar-node',
