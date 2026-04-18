@@ -29,6 +29,17 @@ If the example should also appear in the public showcase website, add a correspo
 
 `src/app/kitchen-sink/` is an everything-bagel scratchpad used for cross-feature regression checks. It is intentionally large and messy.
 
+## Zoneless harness
+
+`src/zoneless/` is a separate Angular app bootstrapped with `provideZonelessChangeDetection()`. It loads a 200-node graph and exercises the interaction surfaces audited in the `0.1.0` Angular 19 + zoneless upgrade: node drag, pan/zoom, box-select, edge connection drag, keyboard delete, minimap interaction.
+
+```bash
+pnpm --filter angular-examples dev:zoneless    # dev server
+pnpm --filter angular-examples build:zoneless  # production build → dist/zoneless
+```
+
+This is the release gate referenced in `docs/superpowers/specs/2026-04-18-angular-19-zoneless-upgrade-design.md` — `@angflow/angular@0.1.0` tags only after this harness passes the FPS bar in Chrome DevTools Performance.
+
 ---
 
 *Angflow is an independent open-source project. Angular is a trademark of Google LLC and is used for identification purposes only. This project is not affiliated with or endorsed by Google or the Angular team.*

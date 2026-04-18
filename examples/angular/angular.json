@@ -67,6 +67,54 @@
         },
         "test": {
           "builder": "@angular/build:unit-test"
+        },
+        "build-zoneless": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "src/zoneless/main.ts",
+            "index": "src/zoneless/index.html",
+            "tsConfig": "tsconfig.app.json",
+            "outputPath": "dist/zoneless",
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "public"
+              }
+            ],
+            "styles": [
+              "src/styles.css"
+            ]
+          },
+          "configurations": {
+            "production": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "800kB",
+                  "maximumError": "1.5MB"
+                }
+              ],
+              "outputHashing": "all"
+            },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve-zoneless": {
+          "builder": "@angular/build:dev-server",
+          "configurations": {
+            "production": {
+              "buildTarget": "angular-examples:build-zoneless:production"
+            },
+            "development": {
+              "buildTarget": "angular-examples:build-zoneless:development"
+            }
+          },
+          "defaultConfiguration": "development"
         }
       }
     }
