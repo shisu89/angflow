@@ -10,7 +10,7 @@ import {
 } from '@angflow/angular';
 import type { Node, Edge, Connection, Viewport } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
-import { ExampleCardComponent } from '../../shell/example-card.component';
+import { ExampleCardComponent } from '../_shared/example-card.component';
 
 const STORAGE_KEY = 'angflow:gallery:save-restore';
 
