@@ -15,7 +15,7 @@ import {
   type Connection,
 } from '../types';
 
-import { getClosestHandle, isConnectionValid, getHandleType, getHandle } from './utils';
+import { getClosestHandle, getFloatingDropTarget, isConnectionValid, getHandleType, getHandle } from './utils';
 import { IsValidParams, OnPointerDownParams, Result, XYHandleInstance } from './types';
 
 const alwaysValid = () => true;
@@ -143,12 +143,16 @@ function onPointerDown(
 
     const transform = getTransform();
     position = getEventPosition(event, containerBounds);
+    const pointerInRenderer = pointToRendererPoint(position, transform, false, [1, 1]);
     closestHandle = getClosestHandle(
-      pointToRendererPoint(position, transform, false, [1, 1]),
+      pointerInRenderer,
       connectionRadius,
       nodeLookup,
       fromHandle
     );
+    if (!closestHandle) {
+      closestHandle = getFloatingDropTarget(pointerInRenderer, nodeLookup, fromHandle);
+    }
 
     if (!autoPanStarted) {
       autoPan();
