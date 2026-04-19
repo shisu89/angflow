@@ -192,6 +192,10 @@ svg.xy-flow__connectionline {
   cursor: default;
 }
 .xy-flow__node.selectable { cursor: pointer; }
+.xy-flow__node.connection-target {
+  outline: 2px dashed var(--xy-connection-target-outline-color, #3b82f6);
+  outline-offset: 4px;
+}
 .xy-flow__node.selectable:hover {
   box-shadow: var(--xy-node-boxshadow-hover, var(--xy-node-boxshadow-hover-default));
 }

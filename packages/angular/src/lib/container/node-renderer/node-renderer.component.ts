@@ -49,6 +49,7 @@ const builtInNodeTypes: NodeTypes = {
         [class.dragging]="node.dragging"
         [class.selectable]="node.selectable !== false"
         [class.connectable]="true"
+        [class.connection-target]="store.connectionTargetNodeId() === node.id"
         [ngFlowDrag]="node.id"
         [ngFlowDragDisabled]="node.draggable === false || !store.nodesDraggable()"
         [ngFlowDragHandleSelector]="node.dragHandle"

@@ -109,6 +109,10 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   readonly paneDragging = signal(false);
   readonly nodesSelectionActive = signal(false);
   readonly userSelectionActive = signal(false);
+
+  /** Id of the node currently showing Stage 2 floating-drop feedback during a connection drag.
+   *  Null when no candidate is active or when Stage 1 owns the drop target. */
+  readonly connectionTargetNodeId = signal<string | null>(null);
   readonly userSelectionRect = signal<SelectionRect | null>(null);
   readonly multiSelectionActive = signal(false);
   readonly selectionKeyActive = signal(false);

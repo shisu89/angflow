@@ -41,6 +41,7 @@ function onPointerDown(
     onConnectEnd,
     isValidConnection = alwaysValid,
     onReconnectEnd,
+    onConnectionTargetChange,
     updateConnection,
     getTransform,
     getFromHandle,
@@ -154,6 +155,10 @@ function onPointerDown(
       closestHandle = getFloatingDropTarget(pointerInRenderer, nodeLookup, fromHandle);
     }
 
+    // Notify consumer which node is the Stage 2 floating drop candidate (null if Stage 1 handles it)
+    const targetNodeId = (closestHandle as any)?.floating === true ? (closestHandle as any).nodeId : null;
+    onConnectionTargetChange?.(targetNodeId);
+
     if (!autoPanStarted) {
       autoPan();
       autoPanStarted = true;
@@ -228,6 +233,7 @@ function onPointerDown(
       }
     }
 
+    onConnectionTargetChange?.(null);
     cancelConnection();
     cancelAnimationFrame(autoPanId);
     autoPanStarted = false;

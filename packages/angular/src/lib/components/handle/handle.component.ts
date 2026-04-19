@@ -124,6 +124,9 @@ export class HandleComponent implements OnInit, OnDestroy {
       },
       onConnectStart: (event: MouseEvent | TouchEvent, params: { nodeId: string | null; handleId: string | null; handleType: HandleType | null }) => store.onConnectStart?.(event, params),
       onConnectEnd: (event: MouseEvent | TouchEvent) => store.onConnectEnd?.(event),
+      onConnectionTargetChange: (nodeId: string | null) => {
+        store.connectionTargetNodeId.set(nodeId);
+      },
       getTransform: () => store.transform(),
       getFromHandle: () => {
         const conn = store.connection();

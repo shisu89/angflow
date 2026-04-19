@@ -34,6 +34,7 @@ export type OnPointerDownParams = {
   onConnectEnd?: OnConnectEnd;
   isValidConnection?: IsValidConnection;
   onReconnectEnd?: (evt: MouseEvent | TouchEvent, connectionState: FinalConnectionState) => void;
+  onConnectionTargetChange?: (nodeId: string | null) => void;
   getTransform: () => Transform;
   getFromHandle: () => Handle | null;
   autoPanSpeed?: number;
