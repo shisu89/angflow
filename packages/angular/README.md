@@ -204,7 +204,11 @@ The public API is modeled on React Flow deliberately. `<ng-flow>` mirrors `<Reac
 
 ## Credits
 
-Built on top of [xyflow](https://github.com/xyflow/xyflow) by [webkid GmbH](https://webkid.io/). The framework-agnostic core (`@angflow/system`) is a republish of `@xyflow/system`; upstream fixes and features flow through. If you use angflow in production, please consider [sponsoring xyflow](https://github.com/sponsors/xyflow).
+Built on top of [xyflow](https://github.com/xyflow/xyflow) by [webkid GmbH](https://webkid.io/). The framework-agnostic core (`@angflow/system`) is a republish of `@xyflow/system`; upstream fixes and features flow through.
+
+**Why xyflow as the base?** Pan/zoom, drag, handle routing, and resizer math are hard to get right — xyflow has years of production use shaking those edge cases out, and it deliberately splits that interaction layer from the framework-specific view layer. That split is what makes a faithful Angular port possible. Mirroring the React Flow API on top means the thousands of React Flow examples, Stack Overflow answers, and blog posts also work as documentation for angflow. See the [root README](../../README.md#why-build-on-xyflow) for the full rationale.
+
+If you use angflow in production, please consider [sponsoring xyflow](https://github.com/sponsors/xyflow).
 
 ## License
 

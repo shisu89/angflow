@@ -172,6 +172,14 @@ Use `applyNodeChanges` / `applyEdgeChanges` to mutate the arrays in your compone
 
 angflow stands on the shoulders of [xyflow](https://github.com/xyflow/xyflow) by [webkid GmbH](https://webkid.io/) — the open-source project that powers React Flow and Svelte Flow. The Angular package reimplements the rendering, state, and event layers on top of Angular 17+ signals, but the framework-agnostic core (`@angflow/system`) is published straight from upstream so the two stay in lockstep.
 
+### Why build on xyflow?
+
+- **Solved problems stay solved.** Pan/zoom, drag, handle routing, connection validation, resizer math — these are deceptively hard to get right across trackpads, touch, and d3-zoom edge cases. xyflow has years of production use shaking them out. Rewriting from scratch would mean rediscovering every one of those bugs in Angular.
+- **A framework-agnostic core exists.** xyflow deliberately separates the interaction math (`@xyflow/system`) from the rendering layer. That split is what makes a faithful Angular port possible at all — we get to reuse the hard part verbatim and focus on idiomatic Angular for the view and state.
+- **Upstream fixes flow through.** Because `@angflow/system` is a republish of `@xyflow/system`, improvements landing in xyflow reach angflow users without us forking and diverging.
+- **A familiar API lowers the cost of picking it up.** Teams evaluating flow libraries have usually seen React Flow. Mirroring its shape (`<ng-flow>`, `<ng-flow-handle>`, `NgFlowService`, `applyNodeChanges`) means prior experience transfers — and so do the thousands of React Flow Q&As, blog posts, and Stack Overflow answers.
+- **MIT-licensed and community-built.** The license explicitly allows this kind of derivative work. Being public about the lineage is the honest way to honor that.
+
 Huge thanks to the xyflow maintainers and contributors for building and MIT-licensing the foundation this project is built on. If you end up using angflow in production, consider [sponsoring xyflow](https://github.com/sponsors/xyflow) — their work benefits this project directly.
 
 ## License
