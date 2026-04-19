@@ -16,6 +16,9 @@ export type Handle = {
   height: number;
   /** User-attached metadata (e.g. data type tag). Populated by the framework wrapper. */
   data?: unknown;
+  /** If true, edges connected to this handle render endpoints as ray-rect intersections on the node border
+   *  and the handle acts as a whole-node drop fallback during connection drag. */
+  floating?: boolean;
 };
 
 export type HandleProps = {
