@@ -4,6 +4,15 @@ import { FlowStore } from '../../services/flow-store.service';
 import { NgFlowService } from '../../services/ng-flow.service';
 import { PanelComponent } from '../panel/panel.component';
 
+/**
+ * Floating panel with zoom-in, zoom-out, fit-view, and lock-interactivity
+ * buttons. Project additional `<button>`s as children to extend the toolbar.
+ *
+ * @example
+ * ```html
+ * <ng-flow-controls position="bottom-left" />
+ * ```
+ */
 @Component({
   selector: 'ng-flow-controls',
   standalone: true,
@@ -74,19 +83,30 @@ export class ControlsComponent {
   private store = inject(FlowStore);
   private ngFlowService = inject(NgFlowService);
 
+  /** Where the panel is anchored. */
   readonly position = input<PanelPosition>('bottom-left');
+  /** Render the zoom-in and zoom-out buttons. */
   readonly showZoom = input(true);
+  /** Render the fit-view button. */
   readonly showFitView = input(true);
+  /** Render the lock-interactivity button. */
   readonly showInteractive = input(true);
+  /** Options passed to `fitView` when the button is pressed. */
   readonly fitViewOptions = input<FitViewOptionsBase<any>>();
+  /** Custom handler invoked instead of `fitView` when the fit button is pressed. */
   readonly fitViewFn = input<(() => void) | undefined>(undefined);
+  /** Lay buttons out horizontally or vertically. */
   readonly orientation = input<'horizontal' | 'vertical'>('vertical');
+  /** ARIA label for the toolbar container. */
   readonly ariaLabel = input<string>('Angular Flow controls');
 
-  // Callback outputs
+  /** Fires when the zoom-in button is clicked. */
   readonly zoomInClick = output<void>();
+  /** Fires when the zoom-out button is clicked. */
   readonly zoomOutClick = output<void>();
+  /** Fires when the fit-view button is clicked. */
   readonly fitViewClick = output<void>();
+  /** Fires with the new interactive state after the lock button is toggled. */
   readonly interactiveChange = output<boolean>();
 
   // Derive interactive/locked state directly from the store so external

@@ -2,6 +2,10 @@ import { Component, ChangeDetectionStrategy, input, computed } from '@angular/co
 import { getBezierPath, Position, type Handle } from '@angflow/system';
 import { BaseEdgeComponent } from './base-edge.component';
 
+/**
+ * Cubic-bezier edge with a simpler curve approximation than `BezierEdgeComponent`.
+ * Cheaper to compute; useful when rendering many edges.
+ */
 @Component({
   selector: 'ng-flow-simple-bezier-edge',
   standalone: true,

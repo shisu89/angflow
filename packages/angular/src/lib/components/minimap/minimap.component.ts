@@ -22,8 +22,21 @@ import { FlowStore } from '../../services/flow-store.service';
 import { PanelComponent } from '../panel/panel.component';
 import type { Node, InternalNode } from '../../types';
 
+/**
+ * Function form of a per-node minimap attribute (color, class, stroke color);
+ * receives the node and returns a string applied to its rect.
+ */
 export type GetMiniMapNodeAttribute<NodeType extends Node = Node> = (node: NodeType) => string;
 
+/**
+ * Miniature overview of the whole graph with a viewport indicator.
+ * Optionally pannable and zoomable to let the user navigate from the overview.
+ *
+ * @example
+ * ```html
+ * <ng-flow-minimap pannable zoomable [nodeColor]="colorByType" />
+ * ```
+ */
 @Component({
   selector: 'ng-flow-minimap',
   standalone: true,
@@ -96,34 +109,51 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
   readonly store = inject(FlowStore);
   private minimapContainerRef = viewChild<ElementRef>('minimapContainer');
 
+  /** Where the minimap panel is anchored. */
   readonly position = input<PanelPosition>('bottom-right');
+  /** Minimap width in pixels. Aliased as `width`. */
   readonly mmWidth = input(200, { alias: 'width' });
+  /** Minimap height in pixels. Aliased as `height`. */
   readonly mmHeight = input(150, { alias: 'height' });
+  /** Allow dragging on the minimap to pan the main viewport. */
   readonly pannable = input(false);
+  /** Allow scroll-wheel on the minimap to zoom the main viewport. */
   readonly zoomable = input(false);
+  /** Zoom step applied per wheel tick when `zoomable`. */
   readonly zoomStep = input(10);
+  /** Invert the pan direction when dragging on the minimap. */
   readonly inversePan = input(false);
 
-  // Node styling
+  /** Node fill color, or function mapping node → color. */
   readonly nodeColor = input<string | GetMiniMapNodeAttribute>('#e2e2e2');
+  /** Node stroke color, or function mapping node → color. */
   readonly nodeStrokeColor = input<string | GetMiniMapNodeAttribute>('transparent');
+  /** Node CSS class, or function mapping node → class. */
   readonly nodeClassName = input<string | GetMiniMapNodeAttribute>('');
+  /** Corner radius (rx) for node rects. */
   readonly nodeBorderRadius = input(5);
+  /** Stroke width for node rects. */
   readonly nodeStrokeWidth = input(2);
+  /** Reserved — custom Angular component to render each minimap node. Not yet wired. */
   readonly nodeComponent = input<Type<unknown> | null>(null);
 
-  // Appearance
+  /** Background fill behind the nodes. Defaults to `#f0f0f0`. */
   readonly bgColor = input<string>();
+  /** Overlay fill for the area outside the current viewport. */
   readonly maskColor = input<string>('rgba(240, 240, 240, 0.6)');
+  /** Stroke color of the viewport rectangle. */
   readonly maskStrokeColor = input<string>();
+  /** Stroke width of the viewport rectangle (scaled by view scale). */
   readonly maskStrokeWidth = input(6);
+  /** Padding around the graph bounds, scaled with the view. */
   readonly offsetScale = input(5);
 
-  // Accessibility
+  /** ARIA label for the minimap. */
   readonly ariaLabel = input<string | null>('Mini Map');
 
-  // Events
+  /** Fires when the minimap is clicked, with the flow-space position under the click. */
   readonly minimapClick = output<{ event: MouseEvent; position: { x: number; y: number } }>();
+  /** Fires when a node rendered in the minimap is clicked. */
   readonly minimapNodeClick = output<{ event: MouseEvent; node: Node }>();
 
   private xyMinimap: ReturnType<typeof XYMinimap> | null = null;

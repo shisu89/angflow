@@ -2,6 +2,10 @@ import { Component, ChangeDetectionStrategy, input } from '@angular/core';
 import { HandleComponent } from '../handle/handle.component';
 import { Position } from '@angflow/system';
 
+/**
+ * Built-in node renderer with a target handle on top and a source handle on
+ * bottom. Used when a node has no `type` or `type: 'default'`.
+ */
 @Component({
   selector: 'ng-flow-default-node',
   standalone: true,

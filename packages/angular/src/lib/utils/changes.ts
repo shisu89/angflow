@@ -101,6 +101,21 @@ function applyChange(change: any, element: any): void {
   }
 }
 
+/**
+ * Apply an array of `NodeChange` to the current `nodes` array and return a
+ * new array reflecting them. Typical usage is to call this inside
+ * `(nodesChange)` to keep your bound `nodes` in sync with user interaction.
+ *
+ * Handles `add`, `remove`, `replace`, `select`, `position`, and `dimensions`
+ * changes; unknown change types pass through unchanged.
+ *
+ * @example
+ * ```typescript
+ * onNodesChange(changes: NodeChange[]) {
+ *   this.nodes = applyNodeChanges(changes, this.nodes);
+ * }
+ * ```
+ */
 export function applyNodeChanges<NodeType extends Node = Node>(
   changes: NodeChange<NodeType>[],
   nodes: NodeType[]
@@ -108,6 +123,11 @@ export function applyNodeChanges<NodeType extends Node = Node>(
   return applyChanges(changes, nodes) as NodeType[];
 }
 
+/**
+ * Apply an array of `EdgeChange` to the current `edges` array and return a
+ * new array reflecting them. Mirror of {@link applyNodeChanges} for edges;
+ * wire to `(edgesChange)`.
+ */
 export function applyEdgeChanges<EdgeType extends Edge = Edge>(
   changes: EdgeChange<EdgeType>[],
   edges: EdgeType[]

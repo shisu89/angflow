@@ -11,6 +11,17 @@ import {
 import { XYDrag, type XYDragInstance } from '@angflow/system';
 import { FlowStore } from '../services/flow-store.service';
 
+/**
+ * Attach to a custom element to make it drag-draggable inside the flow.
+ * Internally wraps the `@angflow/system` `XYDrag` helper and updates the
+ * store with position changes. Used by the node renderer; expose for custom
+ * node wrappers that need to opt into dragging manually.
+ *
+ * @example
+ * ```html
+ * <div [ngFlowDrag]="node.id" [ngFlowDragSelectable]="true">…</div>
+ * ```
+ */
 @Directive({
   selector: '[ngFlowDrag]',
   standalone: true,
@@ -19,11 +30,17 @@ export class DragDirective implements OnInit, OnChanges, OnDestroy {
   private store = inject(FlowStore);
   private el = inject(ElementRef<HTMLDivElement>);
 
+  /** Id of the node being dragged. Required; used as the directive's primary input. */
   readonly nodeId = input.required<string>({ alias: 'ngFlowDrag' });
+  /** Disable the drag behavior without detaching the directive. */
   readonly disabled = input(false, { alias: 'ngFlowDragDisabled' });
+  /** CSS class that, when present on a descendant, prevents that descendant from starting a drag. */
   readonly noDragClassName = input<string>('nodrag', { alias: 'ngFlowDragNoDragClass' });
+  /** Optional CSS selector — only descendants matching it will start a drag. */
   readonly handleSelector = input<string | undefined>(undefined, { alias: 'ngFlowDragHandleSelector' });
+  /** Whether mousedown on the element should also select the node. */
   readonly isSelectable = input(true, { alias: 'ngFlowDragSelectable' });
+  /** Pixel threshold below which the gesture is treated as a click, not a drag. */
   readonly nodeClickDistance = input(0, { alias: 'ngFlowDragClickDistance' });
 
   private dragInstance: XYDragInstance | null = null;

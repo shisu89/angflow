@@ -1,5 +1,9 @@
 import { Component, ChangeDetectionStrategy, input } from '@angular/core';
 
+/**
+ * Helper that renders a text label centered at `(x, y)` in flow coordinates,
+ * with a small background for readability. Place inside an SVG edge template.
+ */
 @Component({
   selector: 'ng-flow-edge-text',
   standalone: true,
