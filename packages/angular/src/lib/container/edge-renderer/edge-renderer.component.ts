@@ -17,6 +17,8 @@ import {
   getBezierPath,
   getSmoothStepPath,
   getStraightPath,
+  getFloatingEndpoint,
+  inferSide,
   type EdgeMarker,
   type HandleType,
   type Connection,
@@ -341,7 +343,32 @@ export class EdgeRendererComponent {
     let srcPos = sourceHandle?.position ?? (edge as Record<string, unknown>).sourcePosition as Position ?? Position.Bottom;
     let tgtPos = targetHandle?.position ?? (edge as Record<string, unknown>).targetPosition as Position ?? Position.Top;
 
-    if (sourceHandle) {
+    // Self-loops ignore floating and fall back to fixed-handle positions (geometric degeneracy).
+    const isSelfLoop = edge.source === edge.target;
+    const sourceFloating = !isSelfLoop && sourceHandle?.floating === true;
+    const targetFloating = !isSelfLoop && targetHandle?.floating === true;
+
+    const sourceRect = { x: sourcePos.x, y: sourcePos.y, width: sourceW, height: sourceH };
+    const targetRect = { x: targetPos.x, y: targetPos.y, width: targetW, height: targetH };
+
+    // Reference points: see spec section "Reference-point resolution".
+    const sourceRef = targetFloating
+      ? { x: targetRect.x + targetRect.width / 2, y: targetRect.y + targetRect.height / 2 }
+      : targetHandle
+        ? { x: targetPos.x + targetHandle.x + (targetHandle.width ?? 0) / 2, y: targetPos.y + targetHandle.y + (targetHandle.height ?? 0) / 2 }
+        : { x: targetRect.x + targetRect.width / 2, y: targetRect.y };
+    const targetRef = sourceFloating
+      ? { x: sourceRect.x + sourceRect.width / 2, y: sourceRect.y + sourceRect.height / 2 }
+      : sourceHandle
+        ? { x: sourcePos.x + sourceHandle.x + (sourceHandle.width ?? 0) / 2, y: sourcePos.y + sourceHandle.y + (sourceHandle.height ?? 0) / 2 }
+        : { x: sourceRect.x + sourceRect.width / 2, y: sourceRect.y + sourceRect.height };
+
+    if (sourceFloating) {
+      const p = getFloatingEndpoint(sourceRect, sourceRef);
+      sourceX = p.x;
+      sourceY = p.y;
+      srcPos = inferSide(p, sourceRect);
+    } else if (sourceHandle) {
       sourceX = sourcePos.x + sourceHandle.x + (sourceHandle.width ?? 0) / 2;
       sourceY = sourcePos.y + sourceHandle.y + (sourceHandle.height ?? 0) / 2;
     } else {
@@ -349,7 +376,12 @@ export class EdgeRendererComponent {
       sourceY = sourcePos.y + sourceH;
     }
 
-    if (targetHandle) {
+    if (targetFloating) {
+      const p = getFloatingEndpoint(targetRect, targetRef);
+      targetX = p.x;
+      targetY = p.y;
+      tgtPos = inferSide(p, targetRect);
+    } else if (targetHandle) {
       targetX = targetPos.x + targetHandle.x + (targetHandle.width ?? 0) / 2;
       targetY = targetPos.y + targetHandle.y + (targetHandle.height ?? 0) / 2;
     } else {
