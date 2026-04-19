@@ -35,6 +35,7 @@ import { NODE_ID } from '../../services/tokens';
     '[attr.data-handleid]': 'handleId()',
     '[attr.data-nodeid]': 'nodeId',
     '[attr.data-handlepos]': 'position()',
+    '[attr.data-floating]': 'floating() ? "" : null',
     '[attr.data-id]': 'dataId()',
     '[attr.aria-describedby]': 'store.rfId() + "-handle-desc"',
     '(mousedown)': 'onPointerDown($event)',
@@ -53,6 +54,7 @@ export class HandleComponent implements OnInit, OnDestroy {
   readonly isConnectableEnd = input(true);
   readonly isValidConnection = input<((connection: Connection) => boolean) | undefined>(undefined);
   readonly data = input<unknown>(undefined);
+  readonly floating = input(false);
 
   /** Emitted when a connection is completed on this handle. */
   readonly handleConnect = output<Connection>({ alias: 'onConnect' });

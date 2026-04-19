@@ -107,4 +107,22 @@ describe('HandleComponent data registration', () => {
     fixture.destroy();
     expect(store.getHandleData('node-A', null, 'target')).toBeUndefined();
   });
+
+  it('sets the data-floating attribute when the floating input is true', () => {
+    // Case 1: floating=true
+    const fixture1 = TestBed.createComponent(HandleComponent);
+    const inst1 = fixture1.componentInstance;
+    setSignalInput(inst1, 'type', 'source' as HandleType);
+    setSignalInput(inst1, 'floating', true);
+    fixture1.detectChanges();
+    expect(fixture1.nativeElement.hasAttribute('data-floating')).toBe(true);
+
+    // Case 2: floating=false (default)
+    const fixture2 = TestBed.createComponent(HandleComponent);
+    const inst2 = fixture2.componentInstance;
+    setSignalInput(inst2, 'type', 'source' as HandleType);
+    setSignalInput(inst2, 'floating', false);
+    fixture2.detectChanges();
+    expect(fixture2.nativeElement.hasAttribute('data-floating')).toBe(false);
+  });
 });
