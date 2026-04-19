@@ -547,6 +547,9 @@ export class EdgeRendererComponent {
       onReconnectEnd: (evt: MouseEvent | TouchEvent, connectionState: FinalConnectionState) => {
         this.reconnectEnd.emit({ event: evt, edge, handleType: oppositeHandle.type, connectionState });
       },
+      onConnectionTargetChange: (nodeId: string | null) => {
+        store.connectionTargetNodeId.set(nodeId);
+      },
     } as any);
   }
 
