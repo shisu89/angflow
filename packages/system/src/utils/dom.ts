@@ -89,6 +89,7 @@ export const getHandleBounds = (
       x: (handleBounds.left - nodeBounds.left) / zoom,
       y: (handleBounds.top - nodeBounds.top) / zoom,
       ...getDimensions(handle as HTMLDivElement),
+      floating: handle.hasAttribute('data-floating') ? true : undefined,
     };
   });
 };
