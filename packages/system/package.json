@@ -48,7 +48,9 @@
     "dev": "concurrently \"rollup --config node:@angflow/rollup-config --watch\"",
     "build": "rollup --config node:@angflow/rollup-config --environment NODE_ENV:production",
     "lint": "eslint --ext .js,.ts src",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@types/d3-drag": "^3.0.7",
@@ -66,7 +68,8 @@
     "@angflow/eslint-config": "workspace:*",
     "@angflow/rollup-config": "workspace:*",
     "@angflow/tsconfig": "workspace:*",
-    "typescript": "5.4.5"
+    "typescript": "5.4.5",
+    "vitest": "^4.1.2"
   },
   "rollup": {
     "globals": {
