@@ -11,6 +11,12 @@ import { FlowStore } from '../services/flow-store.service';
 import { elementToRemoveChange } from '../utils/changes';
 import type { Node, Edge } from '../types';
 
+/**
+ * Listens for document-level key events and dispatches Delete/Select-All/
+ * Escape/arrow-key behavior plus selection and multi-select key tracking.
+ * Attached internally by `<ng-flow>`; emits `(nodesDelete)`, `(edgesDelete)`,
+ * and `(deleteElements)` when the user presses the configured delete key.
+ */
 @Directive({
   selector: '[ngFlowKeyHandler]',
   standalone: true,
@@ -22,13 +28,20 @@ import type { Node, Edge } from '../types';
 export class KeyHandlerDirective implements OnInit, OnDestroy {
   private store = inject(FlowStore);
 
+  /** Key(s) that delete selected elements. `null` disables the shortcut. */
   readonly deleteKeyCode = input<string | string[] | null>(['Backspace', 'Delete']);
+  /** Key held to start box-selection. */
   readonly selectionKeyCode = input<string | string[] | null>('Shift');
+  /** Key held to extend the current selection. */
   readonly multiSelectionKeyCode = input<string | string[] | null>('Meta');
+  /** Disable arrow-key node movement. */
   readonly disableKeyboardA11y = input(false);
 
+  /** Fires with the set of nodes deleted by the delete key. */
   readonly nodesDelete = output<Node[]>();
+  /** Fires with the set of edges deleted by the delete key. */
   readonly edgesDelete = output<Edge[]>();
+  /** Fires once with both deleted `nodes` and `edges`. */
   readonly deleteElements = output<{ nodes: Node[]; edges: Edge[] }>();
 
   private selectionKeyPressed = false;

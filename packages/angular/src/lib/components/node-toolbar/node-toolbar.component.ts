@@ -3,6 +3,18 @@ import { Position } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 import { NODE_ID } from '../../services/tokens';
 
+/**
+ * Floating toolbar anchored to a node. By default it appears only while the
+ * owning node is selected. Use inside a node template, or pass `[nodeId]` to
+ * render it anywhere in the flow.
+ *
+ * @example
+ * ```html
+ * <ng-flow-node-toolbar [position]="Position.Top">
+ *   <button (click)="delete()">Delete</button>
+ * </ng-flow-node-toolbar>
+ * ```
+ */
 @Component({
   selector: 'ng-flow-node-toolbar',
   standalone: true,
@@ -23,11 +35,19 @@ import { NODE_ID } from '../../services/tokens';
 export class NodeToolbarComponent {
   private store = inject(FlowStore);
 
-  /** Node ID(s) this toolbar belongs to. Can be a single ID or array of IDs. */
+  /**
+   * Node id(s) this toolbar is anchored to. If omitted and the toolbar is
+   * rendered inside a node template, the host node is used automatically.
+   * Aliased as `nodeId`.
+   */
   readonly nodeIdInput = input<string | string[] | undefined>(undefined, { alias: 'nodeId' });
+  /** Which side of the node the toolbar appears on. */
   readonly position = input<Position>(Position.Top);
+  /** Override visibility. When unset, the toolbar shows only while the node is selected. */
   readonly isVisible = input<boolean>();
+  /** Gap in pixels between the toolbar and the node edge. */
   readonly offset = input(10);
+  /** Alignment of the toolbar along the node edge. */
   readonly align = input<'start' | 'center' | 'end'>('center');
 
   private contextNodeId: string = '';

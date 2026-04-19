@@ -30,6 +30,16 @@ import {
 import { FlowStore } from '../../services/flow-store.service';
 import { NODE_ID } from '../../services/tokens';
 
+/**
+ * Adds draggable resize handles and edges to a node. Place inside a node
+ * template — the resizer auto-discovers the host node id — or pass `[nodeId]`
+ * explicitly to target a different node.
+ *
+ * @example
+ * ```html
+ * <ng-flow-node-resizer [minWidth]="80" [minHeight]="40" [keepAspectRatio]="true" />
+ * ```
+ */
 @Component({
   selector: 'ng-flow-node-resizer',
   standalone: true,
@@ -107,11 +117,17 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
   private store = inject(FlowStore);
   private el = inject(ElementRef<HTMLElement>);
 
+  /** Node to resize. Defaults to the host node when placed inside a node template. Aliased as `nodeId`. */
   readonly nodeIdInput = input<string | undefined>(undefined, { alias: 'nodeId' });
+  /** Minimum allowed width in pixels. */
   readonly minWidth = input(10);
+  /** Minimum allowed height in pixels. */
   readonly minHeight = input(10);
+  /** Maximum allowed width in pixels. */
   readonly maxWidth = input(Infinity);
+  /** Maximum allowed height in pixels. */
   readonly maxHeight = input(Infinity);
+  /** Constrain resize so width/height stay proportional. */
   readonly keepAspectRatio = input(false);
   /**
    * Controls handle visibility.
@@ -120,19 +136,32 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
    * - `false`: always hidden.
    */
   readonly isVisible = input<boolean | undefined>(undefined);
+  /** Fill color for corner handles and edge border color for lines. */
   readonly color = input<string>();
+  /** Extra CSS class applied to each corner handle. */
   readonly handleClassName = input<string>('');
+  /** Inline styles applied to each corner handle. */
   readonly handleStyle = input<Partial<CSSStyleDeclaration>>();
+  /** Extra CSS class applied to each edge line. */
   readonly lineClassName = input<string>('');
+  /** Inline styles applied to each edge line. */
   readonly lineStyle = input<Partial<CSSStyleDeclaration>>();
+  /** Scale handle size inversely with zoom so they stay visually constant. */
   readonly autoScale = input(true);
+  /** Callback that returns `false` to veto a proposed resize step. */
   readonly shouldResize = input<ShouldResize>();
+  /** Alternative to `(resizeStart)` — function form. Aliased as `onResizeStart`. */
   readonly onResizeStartCb = input<OnResizeStart | undefined>(undefined, { alias: 'onResizeStart' });
+  /** Alternative to `(resize)` — function form. Aliased as `onResize`. */
   readonly onResizeCb = input<OnResize | undefined>(undefined, { alias: 'onResize' });
+  /** Alternative to `(resizeEnd)` — function form. Aliased as `onResizeEnd`. */
   readonly onResizeEndCb = input<OnResizeEnd | undefined>(undefined, { alias: 'onResizeEnd' });
 
+  /** Fires when a resize gesture starts. */
   readonly resizeStart = output<{ event: ResizeDragEvent } & ResizeParams>();
+  /** Fires per frame while resizing, with the current dimension/position change. */
   readonly resize = output<{ event?: ResizeDragEvent; changes?: XYResizerChange; childChanges?: XYResizerChildChange[] } & Partial<ResizeParams>>();
+  /** Fires when the resize gesture ends, with the final dimensions. */
   readonly resizeEnd = output<{ event?: ResizeDragEvent; changes?: Required<XYResizerChange> } & Partial<ResizeParams>>();
 
   private nodeId: string = '';

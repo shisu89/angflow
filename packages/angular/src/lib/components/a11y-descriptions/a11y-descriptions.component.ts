@@ -1,6 +1,10 @@
 import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
 import { FlowStore } from '../../services/flow-store.service';
 
+/**
+ * Screen-reader-only descriptions referenced by node, edge, and handle
+ * `aria-describedby` attributes. Rendered internally by `<ng-flow>`.
+ */
 @Component({
   selector: 'ng-flow-a11y-descriptions',
   standalone: true,

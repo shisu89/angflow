@@ -1,8 +1,19 @@
 import { Component, ChangeDetectionStrategy, input, inject, computed } from '@angular/core';
 import { FlowStore } from '../../services/flow-store.service';
 
+/** Visual pattern rendered behind the canvas. */
 export type BackgroundVariant = 'dots' | 'lines' | 'cross';
 
+/**
+ * Tiled SVG background rendered behind nodes and edges. Pattern tracks the
+ * viewport so it stays aligned while panning and zooming.
+ *
+ * @example
+ * ```html
+ * <ng-flow-background variant="dots" [gap]="20" />
+ * <ng-flow-background variant="lines" color="#ddd" />
+ * ```
+ */
 @Component({
   selector: 'ng-flow-background',
   standalone: true,
@@ -86,14 +97,23 @@ export type BackgroundVariant = 'dots' | 'lines' | 'cross';
 export class BackgroundComponent {
   private store = inject(FlowStore);
 
+  /** Pattern shape. */
   readonly variant = input<BackgroundVariant>('dots');
+  /** Distance between pattern elements. Accepts a single number or `[x, y]`. */
   readonly gap = input<number | [number, number]>(20);
+  /** Dot radius (for `dots`) or cross arm length (for `cross`). */
   readonly size = input(1);
+  /** Stroke width for `lines` and `cross` variants. Defaults match `size` for dots. */
   readonly lineWidth = input<number>();
+  /** Offset of the pattern origin from the viewport origin. */
   readonly offset = input<number | [number, number]>(0);
+  /** Pattern stroke/fill color. */
   readonly color = input<string>();
+  /** Solid fill drawn behind the pattern. Leave unset for transparent. */
   readonly bgColor = input<string>();
+  /** Extra CSS class applied to each generated pattern shape. */
   readonly patternClassName = input<string>();
+  /** Override the generated SVG pattern id. Aliased as `id`. */
   readonly bgId = input<string | undefined>(undefined, { alias: 'id' });
 
   readonly patternId = computed(() => {

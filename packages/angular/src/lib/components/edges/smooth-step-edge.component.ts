@@ -2,6 +2,7 @@ import { Component, ChangeDetectionStrategy, input, computed } from '@angular/co
 import { getSmoothStepPath, Position, type SmoothStepPathOptions, type Handle } from '@angflow/system';
 import { BaseEdgeComponent } from './base-edge.component';
 
+/** Edge rendered as orthogonal step segments with rounded corners. */
 @Component({
   selector: 'ng-flow-smooth-step-edge',
   standalone: true,

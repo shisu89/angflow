@@ -2,6 +2,10 @@ import { Component, ChangeDetectionStrategy, input } from '@angular/core';
 import { HandleComponent } from '../handle/handle.component';
 import { Position } from '@angflow/system';
 
+/**
+ * Built-in node renderer with only a target handle on the top.
+ * Used when a node has `type: 'output'`.
+ */
 @Component({
   selector: 'ng-flow-output-node',
   standalone: true,

@@ -1,6 +1,11 @@
 import { Component, ChangeDetectionStrategy, input } from '@angular/core';
 import { Position } from '@angflow/system';
 
+/**
+ * Built-in container node used for sub-flows. No handles and no label —
+ * other nodes parent to it via `parentId` and optionally constrain movement
+ * with `extent: 'parent'`.
+ */
 @Component({
   selector: 'ng-flow-group-node',
   standalone: true,

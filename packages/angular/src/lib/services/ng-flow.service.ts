@@ -23,6 +23,20 @@ import {
 import { FlowStore } from './flow-store.service';
 import type { Node, Edge, InternalNode, NgFlowInstance, NgFlowJsonObject, DeleteElementsOptions } from '../types';
 
+/**
+ * Imperative API for controlling a flow instance: zoom, pan, fit-view,
+ * coordinate conversion, node/edge CRUD, spatial queries, and signal-based
+ * state access. Provided by `<ng-flow>` and `<ng-flow-provider>`; inject into
+ * any descendant with `inject(NgFlowService)`.
+ *
+ * @example
+ * ```typescript
+ * private flow = inject(NgFlowService);
+ *
+ * zoomToFit() { this.flow.fitView({ padding: 0.2 }); }
+ * addNode(n: Node) { this.flow.addNodes(n); }
+ * ```
+ */
 @Injectable()
 export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge = Edge> {
   private store = inject(FlowStore) as unknown as FlowStore<NodeType, EdgeType>;
@@ -61,38 +75,50 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
   // ── Viewport operations ───────────────────────────────────────────────
 
+  /** Zoom the viewport in by one step. Optionally animate over `duration` ms. */
   zoomIn(options?: { duration?: number }) {
     return this.store.zoomIn(options);
   }
 
+  /** Zoom the viewport out by one step. Optionally animate over `duration` ms. */
   zoomOut(options?: { duration?: number }) {
     return this.store.zoomOut(options);
   }
 
+  /** Set the viewport zoom to an absolute level (clamped to `minZoom`/`maxZoom`). */
   zoomTo(zoomLevel: number, options?: { duration?: number }) {
     return this.store.zoomTo(zoomLevel, options);
   }
 
+  /**
+   * Zoom and pan so all nodes (or `options.nodes`) fit in the canvas.
+   * Respects `minZoom`, `maxZoom`, and `padding`.
+   */
   fitView(options?: FitViewOptionsBase<NodeType>) {
     return this.store.fitView(options);
   }
 
+  /** Set the viewport to an absolute `{ x, y, zoom }`. */
   setViewport(viewport: Viewport, options?: { duration?: number }) {
     return this.store.setViewport(viewport, options);
   }
 
+  /** Get the current viewport `{ x, y, zoom }`. Non-reactive — prefer the `viewport` signal in templates. */
   getViewport(): Viewport {
     return this.store.viewport();
   }
 
+  /** Get the current zoom level. Non-reactive. */
   getZoom(): number {
     return this.store.transform()[2];
   }
 
+  /** Center the viewport on a flow-space coordinate. */
   setCenter(x: number, y: number, options?: { zoom?: number; duration?: number }) {
     return this.store.setCenter(x, y, options);
   }
 
+  /** Fit the viewport to a specific `Rect` in flow coordinates. Resolves `false` if pan/zoom isn't yet initialized. */
   async fitBounds(bounds: Rect, options?: { padding?: number; duration?: number }): Promise<boolean> {
     const pz = this.store.panZoom();
     if (!pz) return false;
@@ -104,6 +130,11 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
   // ── Coordinate Conversion ─────────────────────────────────────────────
 
+  /**
+   * Convert a viewport/client coordinate (e.g. a `MouseEvent`'s `clientX`/`clientY`)
+   * into a position in flow coordinates. Useful when dropping from a palette.
+   * Honors `snapToGrid` unless explicitly overridden via `options`.
+   */
   screenToFlowPosition(clientPosition: XYPosition, options?: { snapToGrid?: boolean; snapGrid?: SnapGrid }): XYPosition {
     const domNode = this.store.domNode();
     if (!domNode) return clientPosition;
@@ -122,6 +153,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     );
   }
 
+  /** Inverse of {@link screenToFlowPosition}: convert a flow-space point to viewport/client coordinates. */
   flowToScreenPosition(flowPosition: XYPosition): XYPosition {
     const domNode = this.store.domNode();
     if (!domNode) return flowPosition;
@@ -137,10 +169,12 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
   // ── Node Operations ───────────────────────────────────────────────────
 
+  /** Look up the user-facing `Node` object by id. Returns `undefined` if it doesn't exist. */
   getNode(id: string): NodeType | undefined {
     return this.store.nodeLookup.get(id)?.internals?.userNode as NodeType | undefined;
   }
 
+  /** Return all nodes, or just those with matching ids when `ids` is provided. */
   getNodes(ids?: string[]): NodeType[] {
     if (ids) {
       return ids
@@ -150,19 +184,30 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     return this.store.nodes();
   }
 
+  /**
+   * Look up the internal node record, which includes computed fields like
+   * `positionAbsolute`, `measured`, and handle bounds. Prefer {@link getNode}
+   * for user-facing data.
+   */
   getInternalNode(id: string): InternalNode<NodeType> | undefined {
     return this.store.nodeLookup.get(id) as InternalNode<NodeType> | undefined;
   }
 
+  /** Replace the full `nodes` array. Triggers `(nodesChange)` through the store. */
   setNodes(nodes: NodeType[]): void {
     this.store.setNodes(nodes);
   }
 
+  /** Append one or more nodes to the current array. */
   addNodes(nodes: NodeType | NodeType[]): void {
     const toAdd = Array.isArray(nodes) ? nodes : [nodes];
     this.store.setNodes([...this.store.nodes(), ...toAdd]);
   }
 
+  /**
+   * Apply a shallow merge (or updater function result) to a single node.
+   * Other nodes are left untouched.
+   */
   updateNode(id: string, nodeUpdate: Partial<NodeType> | ((node: NodeType) => Partial<NodeType>)): void {
     this.store.setNodes(
       this.store.nodes().map((node) => {
@@ -175,6 +220,10 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     );
   }
 
+  /**
+   * Merge `dataUpdate` into a node's `data` object. Equivalent to
+   * `updateNode(id, n => ({ data: { ...n.data, ...dataUpdate } }))`.
+   */
   updateNodeData(id: string, dataUpdate: Record<string, unknown> | ((data: NodeType['data']) => Record<string, unknown>)): void {
     this.store.setNodes(
       this.store.nodes().map((node) => {
@@ -189,23 +238,28 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
   // ── Edge Operations ───────────────────────────────────────────────────
 
+  /** Look up an edge by id. */
   getEdge(id: string): EdgeType | undefined {
     return this.store.edgeLookup.get(id) as EdgeType | undefined;
   }
 
+  /** Return the current edges array. */
   getEdges(): EdgeType[] {
     return this.store.edges();
   }
 
+  /** Replace the full `edges` array. */
   setEdges(edges: EdgeType[]): void {
     this.store.setEdges(edges);
   }
 
+  /** Append one or more edges to the current array. */
   addEdges(edges: EdgeType | EdgeType[]): void {
     const toAdd = Array.isArray(edges) ? edges : [edges];
     this.store.setEdges([...this.store.edges(), ...toAdd]);
   }
 
+  /** Apply a shallow merge (or updater function) to a single edge. */
   updateEdge(id: string, edgeUpdate: Partial<EdgeType> | ((edge: EdgeType) => Partial<EdgeType>)): void {
     this.store.setEdges(
       this.store.edges().map((edge) => {
@@ -218,6 +272,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     );
   }
 
+  /** Merge `dataUpdate` into a single edge's `data` object. */
   updateEdgeData(id: string, dataUpdate: Record<string, unknown> | ((data: EdgeType['data']) => Record<string, unknown>)): void {
     this.store.setEdges(
       this.store.edges().map((edge) => {
@@ -242,6 +297,14 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
   // ── Delete ────────────────────────────────────────────────────────────
 
+  /**
+   * Delete the specified nodes and/or edges. Edges connected to deleted nodes
+   * are also removed. If an `onBeforeDelete` hook is set, it runs first and
+   * can veto the deletion.
+   *
+   * @returns The nodes and edges that were actually deleted (empty arrays if
+   *          `onBeforeDelete` returned `false`).
+   */
   async deleteElements(params: DeleteElementsOptions): Promise<{ deletedNodes: NodeType[]; deletedEdges: EdgeType[] }> {
     const nodeIdsToDelete = new Set((params.nodes ?? []).map((n) => n.id));
     const edgeIdsToDelete = new Set((params.edges ?? []).map((e) => e.id));
@@ -276,6 +339,12 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
   // ── Spatial Queries ───────────────────────────────────────────────────
 
+  /**
+   * Return all nodes whose bounding box overlaps `node`'s bounding box.
+   *
+   * @param partially When `true` (default), nodes that merely overlap count;
+   *   when `false`, only nodes fully contained within `node` are returned.
+   */
   getIntersectingNodes(node: NodeType, partially = true): NodeType[] {
     const internalNode = this.store.nodeLookup.get(node.id);
     if (!internalNode) return [];
@@ -312,6 +381,10 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     });
   }
 
+  /**
+   * Whether `node`'s bounding box intersects `area`. `partially` has the
+   * same semantics as {@link getIntersectingNodes}.
+   */
   isNodeIntersecting(node: NodeType, area: Rect, partially = true): boolean {
     const internalNode = this.store.nodeLookup.get(node.id);
     if (!internalNode) return false;
@@ -335,12 +408,14 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
            area.y + area.height >= nodeRect.y + nodeRect.height;
   }
 
+  /** Compute the axis-aligned bounding `Rect` that contains all given nodes. */
   getNodesBounds(nodes: NodeType[]): Rect {
     return getNodesBoundsSystem(nodes, { nodeOrigin: this.store.nodeOrigin() });
   }
 
   // ── Connection Queries ────────────────────────────────────────────────
 
+  /** Return all edges that are incident to any of the given node ids (either end). */
   getConnectedEdges(nodeIds: string | string[]): EdgeType[] {
     const ids = Array.isArray(nodeIds) ? nodeIds : [nodeIds];
     // getConnectedEdges expects node objects, but we pass IDs and edges
@@ -348,6 +423,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     return getConnectedEdgesSystem(nodeObjects, this.store.edges() as EdgeBase[]) as unknown as EdgeType[];
   }
 
+  /** Return all `HandleConnection`s currently attached to a specific handle. */
   getHandleConnections(params: { nodeId: string; type: 'source' | 'target'; id?: string }): HandleConnection[] {
     // The connectionLookup is keyed by composite keys: nodeId, nodeId-type, nodeId-type-handleId
     const lookupKey = params.id
@@ -358,6 +434,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     return Array.from(connections.values());
   }
 
+  /** Return all `HandleConnection`s for every handle on a node. */
   getNodeConnections(nodeId: string): HandleConnection[] {
     const nodeConnections = this.store.connectionLookup.get(nodeId);
     if (!nodeConnections) return [];
@@ -366,6 +443,11 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
   // ── Serialization ─────────────────────────────────────────────────────
 
+  /**
+   * Snapshot of `{ nodes, edges, viewport }` suitable for persistence.
+   * Feed the result back into `[nodes]` / `[edges]` / `[viewport]` bindings
+   * (or `setNodes` / `setEdges` / `setViewport`) to restore.
+   */
   toObject() {
     return {
       nodes: this.store.nodes(),

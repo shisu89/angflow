@@ -16,6 +16,16 @@ import { Position, XYHandle, type HandleType, type Connection, type ConnectionSt
 import { FlowStore } from '../../services/flow-store.service';
 import { NODE_ID } from '../../services/tokens';
 
+/**
+ * Connection point rendered inside a node. A node can have any number of
+ * handles; edges are drawn from a `source` handle to a `target` handle.
+ *
+ * @example
+ * ```html
+ * <ng-flow-handle type="source" [position]="Position.Right" />
+ * <ng-flow-handle type="target" id="in" [position]="Position.Left" />
+ * ```
+ */
 @Component({
   selector: 'ng-flow-handle',
   standalone: true,
@@ -45,13 +55,21 @@ import { NODE_ID } from '../../services/tokens';
 export class HandleComponent implements OnInit, OnDestroy {
   readonly Position = Position;
 
+  /** `'source'` or `'target'` — determines which side of an edge this handle connects. */
   readonly type = input.required<HandleType>();
+  /** Which edge of the host node the handle sits on (`Top`, `Right`, `Bottom`, `Left`). */
   readonly position = input<Position>(Position.Top);
+  /** Optional handle id; required only when a node has multiple handles of the same type. Aliased as `id`. */
   readonly handleId = input<string | null>(null, { alias: 'id' });
+  /** Whether this handle can participate in connections at all. */
   readonly isConnectable = input(true);
+  /** Whether the user may start a new connection from this handle. */
   readonly isConnectableStart = input(true);
+  /** Whether the user may finish a new connection on this handle. */
   readonly isConnectableEnd = input(true);
+  /** Per-handle validator called with the proposed `Connection`. Overrides the flow-level `isValidConnection`. */
   readonly isValidConnection = input<((connection: Connection) => boolean) | undefined>(undefined);
+  /** Arbitrary data attached to this handle (look up with `NgFlowService.getHandleData`). */
   readonly data = input<unknown>(undefined);
 
   /** Emitted when a connection is completed on this handle. */

@@ -1,6 +1,10 @@
 import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { PanelComponent } from '../panel/panel.component';
 
+/**
+ * Small library-attribution badge rendered in the bottom-right corner.
+ * Rendered internally by `<ng-flow>`; hide via `[hideAttribution]="true"`.
+ */
 @Component({
   selector: 'ng-flow-attribution',
   standalone: true,
