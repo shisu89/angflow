@@ -2,6 +2,8 @@
 
 An **Angular library for node-based UIs** — interactive flow charts, diagram editors, workflow canvases, and anything else that needs draggable nodes connected by edges.
 
+angflow is an Angular port of [xyflow](https://github.com/xyflow/xyflow), the open-source library behind [React Flow](https://reactflow.dev) and [Svelte Flow](https://svelteflow.dev). The shared core (`@angflow/system`) is a republish of `@xyflow/system`, which means you get the same battle-tested drag, pan/zoom, handle, and resize logic that powers thousands of production React Flow apps — and upstream bug fixes flow through.
+
 Published on npm as [`@angflow/angular`](https://www.npmjs.com/package/@angflow/angular) and [`@angflow/system`](https://www.npmjs.com/package/@angflow/system).
 
 ---
@@ -166,6 +168,12 @@ If you already know React Flow, you know angflow. The public API is modeled on i
 
 Use `applyNodeChanges` / `applyEdgeChanges` to mutate the arrays in your component in response to `(nodesChange)` / `(edgesChange)` — the same pattern as React Flow's `useNodesState`, without the hook.
 
+## Credits
+
+angflow stands on the shoulders of [xyflow](https://github.com/xyflow/xyflow) by [webkid GmbH](https://webkid.io/) — the open-source project that powers React Flow and Svelte Flow. The Angular package reimplements the rendering, state, and event layers on top of Angular 17+ signals, but the framework-agnostic core (`@angflow/system`) is published straight from upstream so the two stay in lockstep.
+
+Huge thanks to the xyflow maintainers and contributors for building and MIT-licensing the foundation this project is built on. If you end up using angflow in production, consider [sponsoring xyflow](https://github.com/sponsors/xyflow) — their work benefits this project directly.
+
 ## License
 
-[MIT](./LICENSE)
+[MIT](./LICENSE) — inherited from xyflow.
