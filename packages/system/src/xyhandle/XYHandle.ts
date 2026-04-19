@@ -156,7 +156,7 @@ function onPointerDown(
     }
 
     // Notify consumer which node is the Stage 2 floating drop candidate (null if Stage 1 handles it)
-    const targetNodeId = (closestHandle as any)?.floating === true ? (closestHandle as any).nodeId : null;
+    const targetNodeId = closestHandle?.floating === true ? closestHandle.nodeId : null;
     onConnectionTargetChange?.(targetNodeId);
 
     if (!autoPanStarted) {
