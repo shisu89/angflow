@@ -13,6 +13,7 @@ import { EdgeTypesExampleComponent } from './examples/edge-types/edge-types.comp
 import { NodeToolbarExampleComponent } from './examples/node-toolbar/node-toolbar.component';
 import { EdgeToolbarExampleComponent } from './examples/edge-toolbar/edge-toolbar.component';
 import { FloatingEdgesExampleComponent } from './examples/floating-edges/floating-edges.component';
+import { CardinalEdgesExampleComponent } from './examples/cardinal-edges/cardinal-edges.component';
 import { TypedHandlesExampleComponent } from './examples/typed-handles/typed-handles.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
 
@@ -37,6 +38,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Node toolbar',          path: 'node-toolbar',          component: NodeToolbarExampleComponent },
   { name: 'Edge toolbar',          path: 'edge-toolbar',          component: EdgeToolbarExampleComponent },
   { name: 'Floating edges',        path: 'floating-edges',        component: FloatingEdgesExampleComponent },
+  { name: 'Cardinal edges',        path: 'cardinal-edges',        component: CardinalEdgesExampleComponent },
   { name: 'Typed handles',         path: 'typed-handles',         component: TypedHandlesExampleComponent },
   { name: 'Kitchen sink',          path: 'kitchen-sink',          component: KitchenSinkComponent },
 ];
