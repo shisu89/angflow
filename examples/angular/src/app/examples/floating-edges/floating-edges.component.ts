@@ -99,17 +99,19 @@ export class FloatingNodeComponent {
       border: 2px solid #f59e0b;
       border-radius: 8px;
       min-width: 140px;
-      overflow: hidden;
       color: #78350f;
       font-size: 12px;
       font-weight: 600;
+      /* No overflow: hidden — handles are allowed to protrude past the node border. */
     }
     .mixed-node__row {
       padding: 10px 14px;
       position: relative;
     }
     .mixed-node__row + .mixed-node__row {
+      /* Row divider inset from the rounded corners so it doesn't visually clash. */
       border-top: 1px solid #fcd34d;
+      margin: 0 6px;
     }
     /* Fixed handles (row targets): solid orange dot — "this endpoint is pinned". */
     :host ::ng-deep .xy-flow__handle:not([data-floating]) {
