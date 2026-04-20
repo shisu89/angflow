@@ -38,7 +38,14 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
       min-width: 80px;
       text-align: center;
     }
-    :host ::ng-deep .xy-flow__handle { opacity: 0; width: 1px; height: 1px; }
+    /* Floating handles: dashed outline circle signals "this endpoint slides". */
+    :host ::ng-deep .xy-flow__handle[data-floating] {
+      width: 10px;
+      height: 10px;
+      background: transparent;
+      border: 2px dashed #6366f1;
+      opacity: 0.9;
+    }
   `],
 })
 export class FloatingNodeComponent {
@@ -104,16 +111,22 @@ export class FloatingNodeComponent {
     .mixed-node__row + .mixed-node__row {
       border-top: 1px solid #fcd34d;
     }
-    /* Row-anchored source handles: visible so the demo shows where edges originate. */
-    .mixed-node__row ::ng-deep .xy-flow__handle {
-      opacity: 1;
-      width: 8px;
-      height: 8px;
+    /* Fixed handles (row targets): solid orange dot — "this endpoint is pinned". */
+    :host ::ng-deep .xy-flow__handle:not([data-floating]) {
+      width: 10px;
+      height: 10px;
       background: #f59e0b;
       border: 2px solid #78350f;
+      opacity: 1;
     }
-    /* The host-level floating target anchor stays invisible. */
-    :host > ::ng-deep .xy-flow__handle { opacity: 0; width: 1px; height: 1px; }
+    /* Floating handle (common output): dashed orange circle — "this endpoint slides". */
+    :host ::ng-deep .xy-flow__handle[data-floating] {
+      width: 10px;
+      height: 10px;
+      background: transparent;
+      border: 2px dashed #f59e0b;
+      opacity: 0.9;
+    }
   `],
 })
 export class MixedNodeComponent {
