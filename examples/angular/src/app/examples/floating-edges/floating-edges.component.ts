@@ -66,15 +66,20 @@ export class FloatingNodeComponent {
   imports: [HandleComponent],
   host: { style: 'display: contents;' },
   template: `
-    <!-- Two fixed source handles, one per row -->
-    <ng-flow-handle type="source" id="row-a" [position]="Position.Right" />
-    <ng-flow-handle type="source" id="row-b" [position]="Position.Right" />
-    <!-- One floating target anchor; any drop inside the node lands here -->
+    <!-- Floating target anchor at host level: any drop inside the node lands here -->
     <ng-flow-handle type="target" id="any" [position]="Position.Left" [floating]="true" />
 
     <div class="mixed-node">
-      <div class="mixed-node__row">Row A →</div>
-      <div class="mixed-node__row">Row B →</div>
+      <!-- Each row contains its own source handle so the handle's position
+           is computed against the row's bounding rect, not the whole node. -->
+      <div class="mixed-node__row">
+        Row A →
+        <ng-flow-handle type="source" id="row-a" [position]="Position.Right" />
+      </div>
+      <div class="mixed-node__row">
+        Row B →
+        <ng-flow-handle type="source" id="row-b" [position]="Position.Right" />
+      </div>
     </div>
   `,
   styles: [`
@@ -95,7 +100,16 @@ export class FloatingNodeComponent {
     .mixed-node__row + .mixed-node__row {
       border-top: 1px solid #fcd34d;
     }
-    :host ::ng-deep .xy-flow__handle { opacity: 0; width: 1px; height: 1px; }
+    /* Row-anchored source handles: visible so the demo shows where edges originate. */
+    .mixed-node__row ::ng-deep .xy-flow__handle {
+      opacity: 1;
+      width: 8px;
+      height: 8px;
+      background: #f59e0b;
+      border: 2px solid #78350f;
+    }
+    /* The host-level floating target anchor stays invisible. */
+    :host > ::ng-deep .xy-flow__handle { opacity: 0; width: 1px; height: 1px; }
   `],
 })
 export class MixedNodeComponent {
