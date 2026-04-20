@@ -57,7 +57,9 @@ export class FloatingNodeComponent {
   readonly dragHandle = input<string>();
 }
 
-// ── Mixed node: two fixed row-handles + one floating target anchor ──────
+// ── Mixed node: two fixed row-target handles + one floating source anchor ──
+// Each row takes input from a separate upstream node; the node's output is
+// a single floating source that can land anywhere on the node perimeter.
 
 @Component({
   selector: 'app-mixed-node',
@@ -66,19 +68,21 @@ export class FloatingNodeComponent {
   imports: [HandleComponent],
   host: { style: 'display: contents;' },
   template: `
-    <!-- Floating target anchor at host level: any drop inside the node lands here -->
-    <ng-flow-handle type="target" id="any" [position]="Position.Left" [floating]="true" />
+    <!-- Floating source anchor at host level: the common output slides around
+         the node perimeter as downstream targets move. -->
+    <ng-flow-handle type="source" id="out" [position]="Position.Right" [floating]="true" />
 
     <div class="mixed-node">
-      <!-- Each row contains its own source handle so the handle's position
-           is computed against the row's bounding rect, not the whole node. -->
+      <!-- Each row has its own fixed target handle anchored to the row's
+           left edge (row div has position: relative; library CSS absolutely
+           positions xy-flow__handle-left against it). -->
       <div class="mixed-node__row">
-        Row A →
-        <ng-flow-handle type="source" id="row-a" [position]="Position.Right" />
+        <ng-flow-handle type="target" id="row-a" [position]="Position.Left" />
+        Row A ←
       </div>
       <div class="mixed-node__row">
-        Row B →
-        <ng-flow-handle type="source" id="row-b" [position]="Position.Right" />
+        <ng-flow-handle type="target" id="row-b" [position]="Position.Left" />
+        Row B ←
       </div>
     </div>
   `,
@@ -172,14 +176,17 @@ export class FloatingEdgesExampleComponent {
   ];
 
   edges: Edge[] = [
-    // Pure floating-to-floating
-    { id: 'e1-2', source: '1', sourceHandle: 'auto',  target: '2', targetHandle: 'auto' },
-    { id: 'e1-3', source: '1', sourceHandle: 'auto',  target: '3', targetHandle: 'auto' },
-    { id: 'e2-4', source: '2', sourceHandle: 'auto',  target: '4', targetHandle: 'any' },
-    { id: 'e3-4', source: '3', sourceHandle: 'auto',  target: '4', targetHandle: 'any' },
-    // Mixed: fixed row-handle source → floating target
-    { id: 'e4a-5', source: '4', sourceHandle: 'row-a', target: '5', targetHandle: 'auto' },
-    { id: 'e4b-6', source: '4', sourceHandle: 'row-b', target: '6', targetHandle: 'auto' },
+    // Pure floating-to-floating: Origin feeds Service A and Service B
+    { id: 'e1-2', source: '1', sourceHandle: 'auto', target: '2', targetHandle: 'auto' },
+    { id: 'e1-3', source: '1', sourceHandle: 'auto', target: '3', targetHandle: 'auto' },
+    // Mixed: floating source → fixed row-target on Router.
+    // Service A lands on Row A; Service B lands on Row B. Both endpoints on the
+    // upstream side slide floatingly; the Router side stays pinned to its row.
+    { id: 'e2-4a', source: '2', sourceHandle: 'auto', target: '4', targetHandle: 'row-a' },
+    { id: 'e3-4b', source: '3', sourceHandle: 'auto', target: '4', targetHandle: 'row-b' },
+    // Router's common output (floating source) feeds both downstream nodes.
+    { id: 'e4-5', source: '4', sourceHandle: 'out', target: '5', targetHandle: 'auto' },
+    { id: 'e4-6', source: '4', sourceHandle: 'out', target: '6', targetHandle: 'auto' },
   ];
 
   onNodesChange(changes: any[]): void {
