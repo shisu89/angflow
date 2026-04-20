@@ -109,9 +109,7 @@ export class FloatingNodeComponent {
       position: relative;
     }
     .mixed-node__row + .mixed-node__row {
-      /* Row divider inset from the rounded corners so it doesn't visually clash. */
       border-top: 1px solid #fcd34d;
-      margin: 0 6px;
     }
     /* Fixed handles (row targets): solid orange dot — "this endpoint is pinned". */
     :host ::ng-deep .xy-flow__handle:not([data-floating]) {
