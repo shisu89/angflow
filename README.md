@@ -1,8 +1,10 @@
-# xyflow + Angular
+# angflow
 
-This is a fork of [xyflow](https://github.com/xyflow/xyflow) that adds an **Angular port** of React Flow. It builds on `@angflow/system` (a republish of `@xyflow/system`), the same framework-agnostic core that powers React Flow and Svelte Flow.
+An **Angular library for node-based UIs** — interactive flow charts, diagram editors, workflow canvases, and anything else that needs draggable nodes connected by edges.
 
-Published on npm as [`@angflow/angular`](https://www.npmjs.com/package/@angflow/angular) and [`@angflow/system`](https://www.npmjs.com/package/@angflow/system). The `react/` and `svelte/` packages in this repo are kept intact to make it easier to pull upstream updates from xyflow and are **not** republished under the `@angflow` scope — consume those from `@xyflow/react` / `@xyflow/svelte` as usual.
+angflow is an Angular port of [xyflow](https://github.com/xyflow/xyflow), the open-source library behind [React Flow](https://reactflow.dev) and [Svelte Flow](https://svelteflow.dev). The shared core (`@angflow/system`) is a republish of `@xyflow/system`, which means you get the same battle-tested drag, pan/zoom, handle, and resize logic that powers thousands of production React Flow apps — and upstream bug fixes flow through.
+
+Published on npm as [`@angflow/angular`](https://www.npmjs.com/package/@angflow/angular) and [`@angflow/system`](https://www.npmjs.com/package/@angflow/system).
 
 ---
 
@@ -11,13 +13,9 @@ Published on npm as [`@angflow/angular`](https://www.npmjs.com/package/@angflow/
 | Package | Path | npm | Description |
 |---------|------|-----|-------------|
 | **Angular Flow** `@angflow/angular` | [packages/angular](./packages/angular) | [`@angflow/angular`](https://www.npmjs.com/package/@angflow/angular) | Angular 17+ signals-based library for node-based UIs |
-| Shared core `@angflow/system` | [packages/system](./packages/system) | [`@angflow/system`](https://www.npmjs.com/package/@angflow/system) | Framework-agnostic drag, pan/zoom, handles, resize (republish of `@xyflow/system`) |
-| React Flow 12 `@xyflow/react` | [packages/react](./packages/react) | — | Original React implementation (kept for upstream merges, not republished) |
-| Svelte Flow `@xyflow/svelte` | [packages/svelte](./packages/svelte) | — | Svelte implementation (kept for upstream merges, not republished) |
+| Shared core `@angflow/system` | [packages/system](./packages/system) | [`@angflow/system`](https://www.npmjs.com/package/@angflow/system) | Framework-agnostic drag, pan/zoom, handles, resize |
 
-## Angular Flow
-
-The Angular port provides full feature parity with React Flow:
+## Features
 
 - Drag & drop nodes with snap-to-grid
 - Multiple edge types (bezier, straight, step, smooth-step)
@@ -32,7 +30,77 @@ The Angular port provides full feature parity with React Flow:
 - OnPush change detection throughout
 - Dark mode support
 
-See the [Angular Flow README](./packages/angular/README.md) for API documentation and usage examples.
+See the [Angular Flow README](./packages/angular/README.md) for detailed API documentation and usage examples.
+
+## Getting Started
+
+### Installation
+
+```sh
+npm install @angflow/angular @angflow/system
+```
+
+### Basic usage
+
+```typescript
+import { Component } from '@angular/core';
+import {
+  NgFlowComponent,
+  BackgroundComponent,
+  ControlsComponent,
+  MiniMapComponent,
+  applyNodeChanges,
+  applyEdgeChanges,
+} from '@angflow/angular';
+import type { Node, Edge, Connection } from '@angflow/angular';
+import { addEdge } from '@angflow/system';
+
+@Component({
+  selector: 'app-root',
+  standalone: true,
+  imports: [NgFlowComponent, BackgroundComponent, ControlsComponent, MiniMapComponent],
+  template: `
+    <div style="width: 100vw; height: 100vh;">
+      <ng-flow
+        [nodes]="nodes"
+        [edges]="edges"
+        [fitView]="true"
+        (nodesChange)="onNodesChange($event)"
+        (edgesChange)="onEdgesChange($event)"
+        (connect)="onConnect($event)"
+      >
+        <ng-flow-background variant="dots" />
+        <ng-flow-controls />
+        <ng-flow-minimap />
+      </ng-flow>
+    </div>
+  `,
+})
+export class App {
+  nodes: Node[] = [
+    { id: '1', type: 'input', position: { x: 250, y: 0 }, data: { label: 'Start' } },
+    { id: '2', position: { x: 250, y: 150 }, data: { label: 'Process' } },
+    { id: '3', type: 'output', position: { x: 250, y: 300 }, data: { label: 'End' } },
+  ];
+
+  edges: Edge[] = [
+    { id: 'e1-2', source: '1', target: '2' },
+    { id: 'e2-3', source: '2', target: '3' },
+  ];
+
+  onNodesChange(changes: any[]) {
+    this.nodes = applyNodeChanges(changes, this.nodes);
+  }
+
+  onEdgesChange(changes: any[]) {
+    this.edges = applyEdgeChanges(changes, this.edges);
+  }
+
+  onConnect(connection: Connection) {
+    this.edges = addEdge(connection, this.edges) as Edge[];
+  }
+}
+```
 
 ## Example App
 
@@ -81,213 +149,39 @@ The app is organized into three sections, reachable from the sidebar:
 
 The example app depends on `@angflow/angular` and `@angflow/system` as pnpm `workspace:*` dependencies (see [`examples/angular/package.json`](./examples/angular/package.json)), so edits in `packages/angular/` and `packages/system/` are picked up immediately — no build, pack, or reinstall step needed. Just restart the dev server if the change doesn't hot-reload.
 
-## Getting Started
+## Coming from React Flow?
 
-<details>
-  <summary><strong>Angular Flow</strong> basic usage</summary>
+If you already know React Flow, you know angflow. The public API is modeled on it deliberately, so most of your experience carries over:
 
-  ### Installation
+| React Flow | Angular Flow | Notes |
+|------------|--------------|-------|
+| `<ReactFlow>` | `<ng-flow>` | Same props, same events |
+| `<Handle>` | `<ng-flow-handle>` | Same `type` / `position` |
+| `<Background>` / `<Controls>` / `<MiniMap>` | `<ng-flow-background>` / `<ng-flow-controls>` / `<ng-flow-minimap>` | Drop-in |
+| `<NodeToolbar>` / `<NodeResizer>` / `<EdgeToolbar>` | `<ng-flow-node-toolbar>` / `<ng-flow-node-resizer>` / `<ng-flow-edge-toolbar>` | Drop-in |
+| `useReactFlow()` | `inject(NgFlowService)` | `fitView()`, `zoomIn/Out()`, `setViewport()`, `addNodes/Edges()`, `screenToFlowPosition()`, `toObject()`, etc. |
+| `useNodes()` / `useEdges()` / `useViewport()` | `flowService.nodes` / `.edges` / `.viewport` | Signals instead of hooks |
+| `useNodesState()` / `useEdgesState()` | `applyNodeChanges()` / `applyEdgeChanges()` | Same change pipeline; wire via `(nodesChange)` / `(edgesChange)` |
+| `useNodeConnections()` / `useHandleConnections()` | `flowService.selectNodeConnections()` / `.selectHandleConnections()` | Returns a `Signal<…>` |
+| `onConnect`, `onNodeClick`, … (props) | `(connect)`, `(nodeClick)`, … (outputs) | Same payloads |
+| `nodeTypes={...}` | `[nodeTypes]="{ custom: MyComponent }"` | Angular standalone components |
 
-  ```sh
-  npm install @angflow/angular @angflow/system
-  ```
-
-  ### Basic usage
-
-  ```typescript
-  import { Component } from '@angular/core';
-  import {
-    NgFlowComponent,
-    BackgroundComponent,
-    ControlsComponent,
-    MiniMapComponent,
-    applyNodeChanges,
-    applyEdgeChanges,
-  } from '@angflow/angular';
-  import type { Node, Edge, Connection } from '@angflow/angular';
-  import { addEdge } from '@angflow/system';
-
-  @Component({
-    selector: 'app-root',
-    standalone: true,
-    imports: [NgFlowComponent, BackgroundComponent, ControlsComponent, MiniMapComponent],
-    template: `
-      <div style="width: 100vw; height: 100vh;">
-        <ng-flow
-          [nodes]="nodes"
-          [edges]="edges"
-          [fitView]="true"
-          (nodesChange)="onNodesChange($event)"
-          (edgesChange)="onEdgesChange($event)"
-          (connect)="onConnect($event)"
-        >
-          <ng-flow-background variant="dots" />
-          <ng-flow-controls />
-          <ng-flow-minimap />
-        </ng-flow>
-      </div>
-    `,
-  })
-  export class App {
-    nodes: Node[] = [
-      { id: '1', type: 'input', position: { x: 250, y: 0 }, data: { label: 'Start' } },
-      { id: '2', position: { x: 250, y: 150 }, data: { label: 'Process' } },
-      { id: '3', type: 'output', position: { x: 250, y: 300 }, data: { label: 'End' } },
-    ];
-
-    edges: Edge[] = [
-      { id: 'e1-2', source: '1', target: '2' },
-      { id: 'e2-3', source: '2', target: '3' },
-    ];
-
-    onNodesChange(changes: any[]) {
-      this.nodes = applyNodeChanges(changes, this.nodes);
-    }
-
-    onEdgesChange(changes: any[]) {
-      this.edges = applyEdgeChanges(changes, this.edges);
-    }
-
-    onConnect(connection: Connection) {
-      this.edges = addEdge(connection, this.edges) as Edge[];
-    }
-  }
-  ```
-</details>
-
-<details>
-  <summary><strong>React Flow</strong> basic usage</summary>
-
-  ### Installation
-  
-  ```sh
-npm install @xyflow/react
-  ```
-
-  ### Basic usage
-  ```jsx
-import { useCallback } from 'react';
-import {
-  ReactFlow,
-  MiniMap,
-  Controls,
-  Background,
-  useNodesState,
-  useEdgesState,
-  addEdge,
-} from '@xyflow/react';
-
-import '@xyflow/react/dist/style.css';
-
-const initialNodes = [
-  { id: '1', position: { x: 0, y: 0 }, data: { label: '1' } },
-  { id: '2', position: { x: 0, y: 100 }, data: { label: '2' } },
-];
-
-const initialEdges = [{ id: 'e1-2', source: '1', target: '2' }];
-
-function Flow() {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-
-  const onConnect = useCallback((params) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
-
-  return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onConnect={onConnect}
-    >
-      <MiniMap />
-      <Controls />
-      <Background />
-    </ReactFlow>
-  );
-}
-
-export default Flow;
-```
-</details>
-
-<details>
-  <summary><strong>Svelte Flow</strong> basic usage</summary>
-
-  ### Installation
-  
-  ```sh
-npm install @xyflow/svelte
-  ```
-
-  ### Basic usage
-  ```svelte
-<script lang="ts">
-  import { writable } from 'svelte/store';
-  import {
-    SvelteFlow,
-    Controls,
-    Background,
-    BackgroundVariant,
-    MiniMap,
-  } from '@xyflow/svelte';
-
-  import '@xyflow/svelte/dist/style.css'
-  
-  const nodes = writable([
-    {
-      id: '1',
-      type: 'input',
-      data: { label: 'Input Node' },
-      position: { x: 0, y: 0 }
-    },
-    {
-      id: '2',
-      type: 'custom',
-      data: { label: 'Node' },
-      position: { x: 0, y: 150 }
-    }
-  ]);
-
-  const edges = writable([
-    {
-      id: '1-2',
-      type: 'default',
-      source: '1',
-      target: '2',
-      label: 'Edge Text'
-    }
-  ]);
-</script>
-
-<SvelteFlow
-  {nodes}
-  {edges}
-  fitView
-  on:nodeclick={(event) => console.log('on node click', event)}
->
-  <Controls />
-  <Background variant={BackgroundVariant.Dots} />
-  <MiniMap />
-</SvelteFlow>
-```
-</details>
-
-## Syncing with upstream
-
-This repo tracks the original xyflow as `upstream`:
-
-```bash
-git fetch upstream
-git merge upstream/main
-```
-
-The Angular port lives in `packages/angular/` and `examples/angular/`, which don't exist upstream, so merges are typically conflict-free. Updates to `@xyflow/system` from upstream are picked up automatically.
+Use `applyNodeChanges` / `applyEdgeChanges` to mutate the arrays in your component in response to `(nodesChange)` / `(edgesChange)` — the same pattern as React Flow's `useNodesState`, without the hook.
 
 ## Credits
 
-Originally built by [xyflow / webkid GmbH](https://xyflow.com). Angular port built on top of `@xyflow/system`.
+angflow stands on the shoulders of [xyflow](https://github.com/xyflow/xyflow) by [webkid GmbH](https://webkid.io/) — the open-source project that powers React Flow and Svelte Flow. The Angular package reimplements the rendering, state, and event layers on top of Angular 17+ signals, but the framework-agnostic core (`@angflow/system`) is published straight from upstream so the two stay in lockstep.
+
+### Why build on xyflow?
+
+- **Solved problems stay solved.** Pan/zoom, drag, handle routing, connection validation, resizer math — these are deceptively hard to get right across trackpads, touch, and d3-zoom edge cases. xyflow has years of production use shaking them out. Rewriting from scratch would mean rediscovering every one of those bugs in Angular.
+- **A framework-agnostic core exists.** xyflow deliberately separates the interaction math (`@xyflow/system`) from the rendering layer. That split is what makes a faithful Angular port possible at all — we get to reuse the hard part verbatim and focus on idiomatic Angular for the view and state.
+- **Upstream fixes flow through.** Because `@angflow/system` is a republish of `@xyflow/system`, improvements landing in xyflow reach angflow users without us forking and diverging.
+- **A familiar API lowers the cost of picking it up.** Teams evaluating flow libraries have usually seen React Flow. Mirroring its shape (`<ng-flow>`, `<ng-flow-handle>`, `NgFlowService`, `applyNodeChanges`) means prior experience transfers — and so do the thousands of React Flow Q&As, blog posts, and Stack Overflow answers.
+- **MIT-licensed and community-built.** The license explicitly allows this kind of derivative work. Being public about the lineage is the honest way to honor that.
+
+Huge thanks to the xyflow maintainers and contributors for building and MIT-licensing the foundation this project is built on. If you end up using angflow in production, consider [sponsoring xyflow](https://github.com/sponsors/xyflow) — their work benefits this project directly.
 
 ## License
 
-[MIT](./LICENSE)
+[MIT](./LICENSE) — inherited from xyflow.

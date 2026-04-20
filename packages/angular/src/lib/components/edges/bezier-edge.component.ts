@@ -2,6 +2,10 @@ import { Component, ChangeDetectionStrategy, input, computed } from '@angular/co
 import { getBezierPath, Position, type BezierPathOptions, type Handle } from '@angflow/system';
 import { BaseEdgeComponent } from './base-edge.component';
 
+/**
+ * Default cubic-bezier edge. Registered as the `'default'` edge type in
+ * `<ng-flow>`; pass a `pathOptions` input to tweak the curvature.
+ */
 @Component({
   selector: 'ng-flow-bezier-edge',
   standalone: true,

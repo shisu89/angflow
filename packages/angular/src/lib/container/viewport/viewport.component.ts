@@ -1,6 +1,10 @@
 import { Component, ChangeDetectionStrategy, input, computed } from '@angular/core';
 import type { Transform } from '@angflow/system';
 
+/**
+ * Layer that applies the current pan/zoom transform to its projected content.
+ * Rendered internally by `<ng-flow>`; exposed for advanced composition.
+ */
 @Component({
   selector: 'ng-flow-viewport',
   standalone: true,

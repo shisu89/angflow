@@ -3,6 +3,11 @@ import { CommonModule, NgComponentOutlet } from '@angular/common';
 import { getBezierPath, getSmoothStepPath, getStraightPath, ConnectionLineType, Position, type ConnectionInProgress } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 
+/**
+ * Renders the in-progress connection line while the user drags from a handle.
+ * Rendered internally by `<ng-flow>`; you don't normally place this yourself —
+ * configure via `[connectionLineType]` and `[connectionLineComponent]`.
+ */
 @Component({
   selector: 'ng-flow-connection-line',
   standalone: true,
@@ -35,7 +40,9 @@ import { FlowStore } from '../../services/flow-store.service';
 export class ConnectionLineComponent {
   readonly store = inject(FlowStore);
 
+  /** Optional Angular component used instead of the default SVG path. */
   readonly customComponent = input<Type<unknown> | null>(null);
+  /** Path shape when the default renderer is used. */
   readonly connectionLineType = input<ConnectionLineType>(ConnectionLineType.Bezier);
 
   readonly isConnecting = computed(() => {

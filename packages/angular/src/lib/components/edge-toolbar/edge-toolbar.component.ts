@@ -2,6 +2,18 @@ import { Component, ChangeDetectionStrategy, input, inject, computed } from '@an
 import { getEdgeToolbarTransform } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 
+/**
+ * Floating toolbar anchored to a fixed `(x, y)` in flow coordinates — typically
+ * placed near an edge's midpoint. By default it shows only while the owning
+ * edge is selected.
+ *
+ * @example
+ * ```html
+ * <ng-flow-edge-toolbar [edgeId]="edge.id" [x]="labelX" [y]="labelY">
+ *   <button (click)="remove(edge.id)">Delete</button>
+ * </ng-flow-edge-toolbar>
+ * ```
+ */
 @Component({
   selector: 'ng-flow-edge-toolbar',
   standalone: true,

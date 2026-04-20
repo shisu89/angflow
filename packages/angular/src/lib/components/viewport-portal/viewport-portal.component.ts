@@ -1,6 +1,11 @@
 import { Component, ChangeDetectionStrategy, inject, computed } from '@angular/core';
 import { FlowStore } from '../../services/flow-store.service';
 
+/**
+ * Layer that shares the viewport transform with nodes and edges. Content
+ * projected here pans and zooms with the canvas — useful for decorative
+ * overlays drawn in flow coordinates.
+ */
 @Component({
   selector: 'ng-flow-viewport-portal',
   standalone: true,

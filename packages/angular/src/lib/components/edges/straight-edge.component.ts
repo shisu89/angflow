@@ -2,6 +2,7 @@ import { Component, ChangeDetectionStrategy, input, computed } from '@angular/co
 import { getStraightPath, Position, type Handle } from '@angflow/system';
 import { BaseEdgeComponent } from './base-edge.component';
 
+/** Edge rendered as a straight line between source and target. */
 @Component({
   selector: 'ng-flow-straight-edge',
   standalone: true,

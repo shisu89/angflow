@@ -1,6 +1,8 @@
 # @angflow/angular
 
-An Angular library for building node-based UIs, interactive flow charts, and diagrams. Built on top of `@angflow/system` — a republish of `@xyflow/system`, the same framework-agnostic core that powers [React Flow](https://reactflow.dev/) and [Svelte Flow](https://svelteflow.dev/).
+An Angular library for building node-based UIs, interactive flow charts, and diagrams. Angular 17+, signals-based, OnPush everywhere, no RxJS in the store.
+
+Angular port of [xyflow](https://github.com/xyflow/xyflow) — the library behind [React Flow](https://reactflow.dev) and [Svelte Flow](https://svelteflow.dev). The framework-agnostic core (`@angflow/system`) is a republish of `@xyflow/system`, so drag, pan/zoom, handle routing, and resize logic are identical to what React Flow ships.
 
 ## Features
 
@@ -182,7 +184,7 @@ flowService.toObject(); // { nodes, edges, viewport }
 
 - **Signal-based state** — Angular 17+ signals for fine-grained reactivity (no RxJS in the store)
 - **OnPush everywhere** — all components use `ChangeDetectionStrategy.OnPush`
-- **@angflow/system core** — shares the same drag, pan/zoom, handle, and resize logic as React Flow and Svelte Flow (republished from `@xyflow/system`)
+- **`@angflow/system` core** — framework-agnostic drag, pan/zoom, handle, and resize logic
 - **Standalone components** — no NgModule, tree-shakeable
 
 ## Keyboard Shortcuts
@@ -196,10 +198,18 @@ flowService.toObject(); // { nodes, edges, viewport }
 | Shift + drag | Box select |
 | Ctrl/Cmd + click | Multi-select |
 
+## Coming from React Flow?
+
+The public API is modeled on React Flow deliberately. `<ng-flow>` mirrors `<ReactFlow>`, `<ng-flow-handle>` mirrors `<Handle>`, `inject(NgFlowService)` replaces `useReactFlow()`, and state hooks (`useNodes`, `useEdges`, `useViewport`) become signals on the service (`flowService.nodes`, `.edges`, `.viewport`). Use `applyNodeChanges` / `applyEdgeChanges` with `(nodesChange)` / `(edgesChange)` outputs the same way you'd use `useNodesState` / `useEdgesState`. See the [root README](../../README.md#coming-from-react-flow) for a full mapping table.
+
 ## Credits
 
-Built on top of [xyflow](https://github.com/xyflow/xyflow) by [webkid GmbH](https://webkid.io/). The Angular port uses `@angflow/system` (a republish of `@xyflow/system`) for framework-agnostic core logic.
+Built on top of [xyflow](https://github.com/xyflow/xyflow) by [webkid GmbH](https://webkid.io/). The framework-agnostic core (`@angflow/system`) is a republish of `@xyflow/system`; upstream fixes and features flow through.
+
+**Why xyflow as the base?** Pan/zoom, drag, handle routing, and resizer math are hard to get right — xyflow has years of production use shaking those edge cases out, and it deliberately splits that interaction layer from the framework-specific view layer. That split is what makes a faithful Angular port possible. Mirroring the React Flow API on top means the thousands of React Flow examples, Stack Overflow answers, and blog posts also work as documentation for angflow. See the [root README](../../README.md#why-build-on-xyflow) for the full rationale.
+
+If you use angflow in production, please consider [sponsoring xyflow](https://github.com/sponsors/xyflow).
 
 ## License
 
-MIT
+MIT — inherited from xyflow.
