@@ -94,7 +94,7 @@ export class EmojiNodeComponent {
   template: `
     <app-example-card
       title="Custom Node"
-      description="Build a node from scratch with your own template and styling. Wire up source/target handles with HandleComponent."
+      description="Build a node from scratch with your own template and styling. Wire up source/target handles with HandleComponent. This example uses signal inputs per node property; for the newer injection-based API, see Custom node (inject)."
     >
       <ng-flow
         [nodes]="nodes"
