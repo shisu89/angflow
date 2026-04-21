@@ -14,13 +14,13 @@ import {
 } from '@angular/core';
 import { CommonModule, NgComponentOutlet, NgTemplateOutlet, NgStyle } from '@angular/common';
 import { FlowStore } from '../../services/flow-store.service';
-import { NODE_ID } from '../../services/tokens';
+import { NODE_ID, NG_FLOW_NODE_CONTEXT } from '../../services/tokens';
 import { DragDirective } from '../../directives/drag.directive';
 import { DefaultNodeComponent } from '../../components/nodes/default-node.component';
 import { InputNodeComponent } from '../../components/nodes/input-node.component';
 import { OutputNodeComponent } from '../../components/nodes/output-node.component';
 import { GroupNodeComponent } from '../../components/nodes/group-node.component';
-import type { Node, InternalNode, NodeTypes } from '../../types';
+import type { Node, InternalNode, NodeTypes, NgFlowNodeContext } from '../../types';
 
 const builtInNodeTypes: NodeTypes = {
   default: DefaultNodeComponent,
@@ -107,6 +107,7 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
   readonly visibleNodes = computed(() => this.store.visibleNodes());
 
   private nodeInjectorCache = new Map<string, Injector>();
+  private nodeContextCache = new Map<string, NgFlowNodeContext<unknown>>();
   private nodeInputsCache = new Map<string, { version: number; inputs: Record<string, unknown> }>();
   private resizeObserver: ResizeObserver | null = null;
 
@@ -170,6 +171,7 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
           this.observedNodeIds.delete(id);
           this.resizeObserver?.unobserve(removedNode);
           this.nodeInjectorCache.delete(id);
+          this.nodeContextCache.delete(id);
           this.nodeInputsCache.delete(id);
         }
       }
@@ -307,8 +309,17 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
   getNodeInjector(nodeId: string): Injector {
     let injector = this.nodeInjectorCache.get(nodeId);
     if (!injector) {
+      let context = this.nodeContextCache.get(nodeId);
+      if (!context) {
+        context = this.buildNodeContext(nodeId);
+        this.nodeContextCache.set(nodeId, context);
+      }
+
       injector = Injector.create({
-        providers: [{ provide: NODE_ID, useValue: nodeId }],
+        providers: [
+          { provide: NODE_ID, useValue: nodeId },
+          { provide: NG_FLOW_NODE_CONTEXT, useValue: context },
+        ],
         parent: this.parentInjector,
       });
       this.nodeInjectorCache.set(nodeId, injector);
@@ -361,5 +372,33 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
     };
     this.nodeInputsCache.set(node.id, { version, inputs });
     return inputs;
+  }
+
+  private buildNodeContext(nodeId: string): NgFlowNodeContext<unknown> {
+    const store = this.store;
+    const getNode = () => {
+      store.version();
+      return store.nodeLookup.get(nodeId);
+    };
+
+    return {
+      id: computed(() => nodeId),
+      data: computed(() => getNode()?.data),
+      type: computed(() => getNode()?.type),
+      selected: computed(() => getNode()?.selected ?? false),
+      dragging: computed(() => getNode()?.dragging ?? false),
+      zIndex: computed(() => getNode()?.internals?.z ?? 0),
+      isConnectable: computed(() => true),
+      position: computed(() => {
+        const n = getNode();
+        return {
+          x: n?.internals?.positionAbsolute?.x ?? n?.position.x ?? 0,
+          y: n?.internals?.positionAbsolute?.y ?? n?.position.y ?? 0,
+        };
+      }),
+      sourcePosition: computed(() => getNode()?.sourcePosition),
+      targetPosition: computed(() => getNode()?.targetPosition),
+      dragHandle: computed(() => getNode()?.dragHandle),
+    };
   }
 }
