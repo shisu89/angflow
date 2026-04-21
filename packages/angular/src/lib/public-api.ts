@@ -61,6 +61,9 @@ export { applyNodeChanges, applyEdgeChanges } from './utils/changes';
 // Wrapper utility functions for Angular-specific typing
 export { isNode, isEdge } from './utils/type-guards';
 
+// Node injection helper
+export { injectNgFlowNode } from './utils/inject-ng-flow-node';
+
 // Re-export everything from @angflow/system
 export {
   // Enums / Constants
