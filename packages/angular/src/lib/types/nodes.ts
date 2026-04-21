@@ -1,5 +1,5 @@
-import type { Type } from '@angular/core';
-import type { NodeBase, InternalNodeBase, NodeProps as NodePropsBase, CoordinateExtent, OnError } from '@angflow/system';
+import type { Type, Signal } from '@angular/core';
+import type { NodeBase, InternalNodeBase, NodeProps as NodePropsBase, CoordinateExtent, OnError, Position } from '@angflow/system';
 
 /**
  * The Node type represents everything Angular Flow needs to know about a given node.
@@ -65,4 +65,46 @@ export interface NodeComponentInputs<NodeType extends Node = Node> {
   sourcePosition: import('@angflow/system').Position;
   targetPosition: import('@angflow/system').Position;
   dragHandle?: string;
+}
+
+/**
+ * Reactive context passed to a custom node component registered via `nodeTypes`.
+ * Retrieved by `injectNgFlowNode<TData>()` inside the component class.
+ *
+ * All properties are read-only signals. Writes to node state must go through
+ * `NgFlowService` or `FlowStore` — this context is a view-only projection.
+ */
+export interface NgFlowNodeContext<TData = unknown> {
+  /** Node id. */
+  readonly id: Signal<string>;
+
+  /** Consumer-provided data payload. Typed via `TData`. */
+  readonly data: Signal<TData | undefined>;
+
+  /** The node's registered type string (or 'default'). */
+  readonly type: Signal<string | undefined>;
+
+  /** True while this node is part of the current selection. */
+  readonly selected: Signal<boolean>;
+
+  /** True while this node is being dragged. */
+  readonly dragging: Signal<boolean>;
+
+  /** Stacking order computed by the library (selection elevation, etc.). */
+  readonly zIndex: Signal<number>;
+
+  /** Whether connection drag is allowed from this node's handles. */
+  readonly isConnectable: Signal<boolean>;
+
+  /** Absolute position in flow coordinates. */
+  readonly position: Signal<{ x: number; y: number }>;
+
+  /** sourcePosition for default edges (Position enum, optional). */
+  readonly sourcePosition: Signal<Position | undefined>;
+
+  /** targetPosition for default edges. */
+  readonly targetPosition: Signal<Position | undefined>;
+
+  /** CSS selector for the drag-handle sub-element, if any. */
+  readonly dragHandle: Signal<string | undefined>;
 }
