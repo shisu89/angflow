@@ -15,6 +15,7 @@ import { EdgeToolbarExampleComponent } from './examples/edge-toolbar/edge-toolba
 import { FloatingEdgesExampleComponent } from './examples/floating-edges/floating-edges.component';
 import { CardinalEdgesExampleComponent } from './examples/cardinal-edges/cardinal-edges.component';
 import { TypedHandlesExampleComponent } from './examples/typed-handles/typed-handles.component';
+import { CustomNodeInjectExampleComponent } from './examples/custom-node-inject/custom-node-inject.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
 
 export interface HarnessRoute {
@@ -26,6 +27,7 @@ export interface HarnessRoute {
 export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Overview',              path: 'overview',              component: OverviewExampleComponent },
   { name: 'Custom node',           path: 'custom-node',           component: CustomNodeExampleComponent },
+  { name: 'Custom node (inject)',  path: 'custom-node-inject',    component: CustomNodeInjectExampleComponent },
   { name: 'Custom edge',           path: 'custom-edge',           component: CustomEdgeExampleComponent },
   { name: 'Subflows',              path: 'sub-flows',             component: SubFlowsExampleComponent },
   { name: 'Node resizer',          path: 'node-resizer',          component: NodeResizerExampleComponent },
