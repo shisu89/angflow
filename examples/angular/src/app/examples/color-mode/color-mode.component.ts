@@ -8,9 +8,9 @@ import {
   Position,
   applyNodeChanges,
   applyEdgeChanges,
-  addEdge,
 } from '@angflow/angular';
 import type { Node, Edge, Connection, ColorMode } from '@angflow/angular';
+import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
 @Component({
@@ -66,8 +66,6 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
     .cm-select {
       padding: 4px 8px;
       border-radius: 4px;
-      border: 1px solid #cbd5e1;
-      background: #ffffff;
       font-size: 13px;
     }
   `],
