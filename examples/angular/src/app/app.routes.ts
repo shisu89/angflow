@@ -15,6 +15,7 @@ import { EdgeToolbarExampleComponent } from './examples/edge-toolbar/edge-toolba
 import { FloatingEdgesExampleComponent } from './examples/floating-edges/floating-edges.component';
 import { CardinalEdgesExampleComponent } from './examples/cardinal-edges/cardinal-edges.component';
 import { ClickDistanceExampleComponent } from './examples/click-distance/click-distance.component';
+import { ZIndexModeExampleComponent } from './examples/z-index-mode/z-index-mode.component';
 import { CancelConnectionExampleComponent } from './examples/cancel-connection/cancel-connection.component';
 import { ColorModeExampleComponent } from './examples/color-mode/color-mode.component';
 import { InteractionExampleComponent } from './examples/interaction/interaction.component';
@@ -54,6 +55,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Typed handles',         path: 'typed-handles',         component: TypedHandlesExampleComponent },
   { name: 'Accessibility',         path: 'a11y',                  component: A11yExampleComponent },
   { name: 'Hidden',                path: 'hidden',                component: HiddenExampleComponent },
+  { name: 'Z-index mode',          path: 'z-index-mode',          component: ZIndexModeExampleComponent },
   { name: 'Kitchen sink',          path: 'kitchen-sink',          component: KitchenSinkComponent },
 ];
 
