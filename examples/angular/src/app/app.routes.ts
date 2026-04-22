@@ -21,6 +21,7 @@ import { InteractionExampleComponent } from './examples/interaction/interaction.
 import { TypedHandlesExampleComponent } from './examples/typed-handles/typed-handles.component';
 import { CustomNodeInjectExampleComponent } from './examples/custom-node-inject/custom-node-inject.component';
 import { A11yExampleComponent } from './examples/a11y/a11y.component';
+import { HiddenExampleComponent } from './examples/hidden/hidden.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
 
 export interface HarnessRoute {
@@ -52,6 +53,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Interaction',           path: 'interaction',           component: InteractionExampleComponent },
   { name: 'Typed handles',         path: 'typed-handles',         component: TypedHandlesExampleComponent },
   { name: 'Accessibility',         path: 'a11y',                  component: A11yExampleComponent },
+  { name: 'Hidden',                path: 'hidden',                component: HiddenExampleComponent },
   { name: 'Kitchen sink',          path: 'kitchen-sink',          component: KitchenSinkComponent },
 ];
 
