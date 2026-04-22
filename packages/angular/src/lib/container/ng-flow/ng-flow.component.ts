@@ -141,7 +141,7 @@ import type {
     '[class.light]': 'resolvedColorMode() === "light"',
     '[style.width.px]': 'widthInput()',
     '[style.height.px]': 'heightInput()',
-    'style': 'display: block; position: relative; overflow: hidden; width: 100%; height: 100%;',
+    'style': 'display: block; position: relative; overflow: hidden; width: 100%; height: 100%; isolation: isolate;',
   },
   template: `
     <div
