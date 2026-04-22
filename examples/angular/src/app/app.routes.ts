@@ -18,6 +18,7 @@ import { ColorModeExampleComponent } from './examples/color-mode/color-mode.comp
 import { InteractionExampleComponent } from './examples/interaction/interaction.component';
 import { TypedHandlesExampleComponent } from './examples/typed-handles/typed-handles.component';
 import { CustomNodeInjectExampleComponent } from './examples/custom-node-inject/custom-node-inject.component';
+import { A11yExampleComponent } from './examples/a11y/a11y.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
 
 export interface HarnessRoute {
@@ -46,6 +47,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Color mode',            path: 'color-mode',            component: ColorModeExampleComponent },
   { name: 'Interaction',           path: 'interaction',           component: InteractionExampleComponent },
   { name: 'Typed handles',         path: 'typed-handles',         component: TypedHandlesExampleComponent },
+  { name: 'Accessibility',         path: 'a11y',                  component: A11yExampleComponent },
   { name: 'Kitchen sink',          path: 'kitchen-sink',          component: KitchenSinkComponent },
 ];
 
