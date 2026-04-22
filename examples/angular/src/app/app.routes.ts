@@ -24,6 +24,7 @@ import { CustomNodeInjectExampleComponent } from './examples/custom-node-inject/
 import { A11yExampleComponent } from './examples/a11y/a11y.component';
 import { HiddenExampleComponent } from './examples/hidden/hidden.component';
 import { TouchDeviceExampleComponent } from './examples/touch-device/touch-device.component';
+import { UndirectionalExampleComponent } from './examples/undirectional/undirectional.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
 
 export interface HarnessRoute {
@@ -58,6 +59,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Hidden',                path: 'hidden',                component: HiddenExampleComponent },
   { name: 'Z-index mode',          path: 'z-index-mode',          component: ZIndexModeExampleComponent },
   { name: 'Touch device',          path: 'touch-device',          component: TouchDeviceExampleComponent },
+  { name: 'Undirectional',         path: 'undirectional',         component: UndirectionalExampleComponent },
   { name: 'Kitchen sink',          path: 'kitchen-sink',          component: KitchenSinkComponent },
 ];
 
