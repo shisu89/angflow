@@ -14,6 +14,7 @@ import { NodeToolbarExampleComponent } from './examples/node-toolbar/node-toolba
 import { EdgeToolbarExampleComponent } from './examples/edge-toolbar/edge-toolbar.component';
 import { FloatingEdgesExampleComponent } from './examples/floating-edges/floating-edges.component';
 import { CardinalEdgesExampleComponent } from './examples/cardinal-edges/cardinal-edges.component';
+import { ColorModeExampleComponent } from './examples/color-mode/color-mode.component';
 import { TypedHandlesExampleComponent } from './examples/typed-handles/typed-handles.component';
 import { CustomNodeInjectExampleComponent } from './examples/custom-node-inject/custom-node-inject.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
@@ -41,6 +42,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Edge toolbar',          path: 'edge-toolbar',          component: EdgeToolbarExampleComponent },
   { name: 'Floating edges',        path: 'floating-edges',        component: FloatingEdgesExampleComponent },
   { name: 'Cardinal edges',        path: 'cardinal-edges',        component: CardinalEdgesExampleComponent },
+  { name: 'Color mode',            path: 'color-mode',            component: ColorModeExampleComponent },
   { name: 'Typed handles',         path: 'typed-handles',         component: TypedHandlesExampleComponent },
   { name: 'Kitchen sink',          path: 'kitchen-sink',          component: KitchenSinkComponent },
 ];
