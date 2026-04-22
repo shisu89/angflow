@@ -16,23 +16,23 @@ Some mappings are inferred from name similarity; a few may need verification aga
 |---|---|
 | React | 63 |
 | Svelte | 27 |
-| **Angular** | **17** |
+| **Angular** | **26** |
 
-Angular is missing ~46 examples that exist in React, and ~13 that exist in Svelte.
+Angular is missing ~37 examples that exist in React, and ~1 that exists in Svelte.
 
 ## Full table
 
 | Concept | Angular | React | Svelte |
 |---|---|---|---|
-| A11y / Accessibility | ➖ | ✅ `A11y` | ✅ `a11y` |
+| A11y / Accessibility | ✅ `a11y` | ✅ `A11y` | ✅ `a11y` |
 | Add node on edge drop | ➖ | ✅ `AddNodeOnEdgeDrop` | ✅ `add-node-on-drop` |
 | Backgrounds | ✅ `backgrounds-variants` | ✅ `Backgrounds` | ➖ |
 | Basic (minimal example) | ➖ | ✅ `Basic` | ➖ |
 | Broken nodes (error handling) | ➖ | ✅ `BrokenNodes` | ➖ |
-| Cancel connection | ➖ | ✅ `CancelConnection` | ➖ |
+| Cancel connection | ✅ `cancel-connection` | ✅ `CancelConnection` | ➖ |
 | Cardinal edges (four-side snapping) | ✅ `cardinal-edges` | ➖ | ➖ |
-| Click distance | ➖ | ✅ `ClickDistance` | ➖ |
-| Color mode (light/dark) | ➖ | ✅ `ColorMode` | ✅ `color-mode` |
+| Click distance | ✅ `click-distance` | ✅ `ClickDistance` | ➖ |
+| Color mode (light/dark) | ✅ `color-mode` | ✅ `ColorMode` | ✅ `color-mode` |
 | Connection validation | ✅ `connection-validation` | ✅ `Validation` | ✅ `validation` |
 | Controlled / uncontrolled | ➖ | ✅ `ControlledUncontrolled` | ➖ |
 | Controlled viewport | ➖ | ✅ `ControlledViewport` | ✅ `two-way-viewport` |
@@ -55,8 +55,8 @@ Angular is missing ~46 examples that exist in React, and ~13 that exist in Svelt
 | Empty flow | ➖ | ✅ `Empty` | ➖ |
 | Figma-style | ➖ | ✅ `Figma` | ✅ `figma` |
 | Floating edges | ✅ `floating-edges` | ✅ `FloatingEdges` | ➖ |
-| Hidden nodes/edges | ➖ | ✅ `Hidden` | ➖ |
-| Interaction (pan/zoom toggles) | ➖ | ✅ `Interaction` | ✅ `interaction` |
+| Hidden nodes/edges | ✅ `hidden` | ✅ `Hidden` | ➖ |
+| Interaction (pan/zoom toggles) | ✅ `interaction` | ✅ `Interaction` | ✅ `interaction` |
 | Interactive minimap | ➖ | ✅ `InteractiveMinimap` | ➖ |
 | Intersection (`getIntersectingNodes`) | ➖ | ✅ `Intersection` | ✅ `intersections` |
 | Layouting (dagre) | ➖ | ✅ `Layouting` | ✅ `dagre` |
@@ -79,9 +79,9 @@ Angular is missing ~46 examples that exist in React, and ~13 that exist in Svelt
 | Stress (perf) | ➖ | ✅ `Stress` | ✅ `stress` |
 | Sub flows | ✅ `sub-flows` | ✅ `Subflow` | ✅ `subflows` |
 | Switch (conditional rendering) | ➖ | ✅ `Switch` | ➖ |
-| Touch device | ➖ | ✅ `TouchDevice` | ➖ |
+| Touch device | ✅ `touch-device` | ✅ `TouchDevice` | ➖ |
 | Typed handles | ✅ `typed-handles` | ➖ | ➖ |
-| Undirectional (source/target only) | ➖ | ✅ `Undirectional` | ➖ |
+| Undirectional (source/target only) | ✅ `undirectional` | ✅ `Undirectional` | ➖ |
 | Update node | ➖ | ✅ `UpdateNode` | ➖ |
 | `useConnection` hook | ➖ | ✅ `UseConnection` | ➖ |
 | `useKeyPress` hook | ➖ | ✅ `UseKeyPress` | ➖ |
@@ -91,7 +91,7 @@ Angular is missing ~46 examples that exist in React, and ~13 that exist in Svelt
 | `useOnSelectionChange` hook | ➖ | ✅ `UseOnSelectionChange` | ➖ |
 | `useReactFlow` / `useSvelteFlow` hook | ➖ | ✅ `UseReactFlow` | ✅ `usesvelteflow` |
 | `useUpdateNodeInternals` hook | ➖ | ✅ `UseUpdateNodeInternals` | ✅ `useupdatenodeinternals` |
-| Z-index mode | ➖ | ✅ `ZIndexMode` | ➖ |
+| Z-index mode | ✅ `z-index-mode` | ✅ `ZIndexMode` | ➖ |
 
 ¹ `EdgeRenderer` is the React name for the custom-edge-component demo. Likely maps to Angular's `custom-edge`, but worth confirming against the code.
 ² `handle-connect` in Svelte plausibly corresponds to both `EasyConnect` and `UseConnection` in React — verify on port.
@@ -125,3 +125,7 @@ Tier 3 (showcase):
 Tier 4 (API hooks — require equivalent Angular APIs to exist first):
 
 - `use-connection`, `use-on-selection-change`, `use-update-node-internals`, `use-nodes-data`, etc. — port once the Angular service equivalents are confirmed stable.
+
+## API gaps surfaced during Tier 1
+
+- `NgFlowComponent` input **`autoPanOnNodeFocus`** — expected by the React A11y example but not yet implemented on `NgFlowComponent`. Dropped from the Angular `a11y` example; when added, wire a signal-driven `[autoPanOnNodeFocus]` binding and a checkbox toggle per the plan's scaffold.
