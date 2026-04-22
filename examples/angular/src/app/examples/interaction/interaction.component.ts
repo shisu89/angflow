@@ -8,7 +8,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
 } from '@angflow/angular';
-import type { Node, Edge, Connection, Viewport } from '@angflow/angular';
+import type { Node, Edge, Connection, Viewport, NodeChange, EdgeChange } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -46,9 +46,9 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
         (connect)="onConnect($event)"
         (nodeDragStart)="log('drag start', $event.node)"
         (nodeDragStop)="log('drag stop', $event.node)"
-        (nodeClick)="captureElementClick() && log('click', $event.node)"
-        (edgeClick)="captureElementClick() && log('click', $event.edge)"
-        (paneClick)="captureZoomClick() && log('onPaneClick', $event)"
+        (nodeClick)="onNodeClick($event)"
+        (edgeClick)="onEdgeClick($event)"
+        (paneClick)="onPaneClick($event)"
         (moveEnd)="onMoveEnd($event.viewport)"
       >
         <ng-flow-minimap />
@@ -72,7 +72,7 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
             <label><input type="checkbox" [checked]="zoomOnDoubleClick()" (change)="setFlag('zoomOnDoubleClick', $event)" /> zoomOnDoubleClick</label>
             <label><input type="checkbox" [checked]="panOnDrag()" (change)="setFlag('panOnDrag', $event)" /> panOnDrag</label>
             <label><input type="checkbox" [checked]="captureZoomClick()" (change)="setFlag('captureZoomClick', $event)" /> capture onPaneClick</label>
-            <label><input type="checkbox" [checked]="captureZoomScroll()" (change)="setFlag('captureZoomScroll', $event)" /> capture onPaneScroll</label>
+            <label title="pane scroll output not yet exposed by ng-flow"><input type="checkbox" disabled /> capture onPaneScroll</label>
             <label><input type="checkbox" [checked]="captureElementClick()" (change)="setFlag('captureElementClick', $event)" /> capture onElementClick</label>
           </div>
         </ng-flow-panel>
@@ -107,7 +107,6 @@ export class InteractionExampleComponent {
   readonly zoomOnDoubleClick = signal(false);
   readonly panOnDrag = signal<boolean | number[]>(true);
   readonly captureZoomClick = signal(false);
-  readonly captureZoomScroll = signal(false);
   readonly captureElementClick = signal(false);
 
   nodes: Node[] = [
@@ -131,16 +130,16 @@ export class InteractionExampleComponent {
     panOnScroll: this.panOnScroll,
     zoomOnDoubleClick: this.zoomOnDoubleClick,
     captureZoomClick: this.captureZoomClick,
-    captureZoomScroll: this.captureZoomScroll,
     captureElementClick: this.captureElementClick,
   } as Record<string, ReturnType<typeof signal<boolean>>>;
 
-  onNodesChange(changes: any[]): void { this.nodes = applyNodeChanges(changes, this.nodes); }
-  onEdgesChange(changes: any[]): void { this.edges = applyEdgeChanges(changes, this.edges); }
+  onNodesChange(changes: NodeChange[]): void { this.nodes = applyNodeChanges(changes, this.nodes); }
+  onEdgesChange(changes: EdgeChange[]): void { this.edges = applyEdgeChanges(changes, this.edges); }
   onConnect(connection: Connection): void { this.edges = addEdge(connection, this.edges) as Edge[]; }
 
   setFlag(key: string, event: Event): void {
     const checked = (event.target as HTMLInputElement).checked;
+    // panOnDrag is boolean | number[] — cannot use the generic boolean flags map.
     if (key === 'panOnDrag') {
       this.panOnDrag.set(checked);
       return;
@@ -151,6 +150,16 @@ export class InteractionExampleComponent {
 
   setScrollMode(event: Event): void {
     this.panOnScrollMode.set((event.target as HTMLSelectElement).value as PanOnScrollMode);
+  }
+
+  onNodeClick(event: { event: MouseEvent; node: Node }): void {
+    if (this.captureElementClick()) this.log('click', event.node);
+  }
+  onEdgeClick(event: { event: MouseEvent; edge: Edge }): void {
+    if (this.captureElementClick()) this.log('click', event.edge);
+  }
+  onPaneClick(event: MouseEvent): void {
+    if (this.captureZoomClick()) this.log('onPaneClick', event);
   }
 
   onMoveEnd(viewport: Viewport): void { console.log('onMoveEnd', viewport); }
