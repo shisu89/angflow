@@ -14,6 +14,7 @@ import { NodeToolbarExampleComponent } from './examples/node-toolbar/node-toolba
 import { EdgeToolbarExampleComponent } from './examples/edge-toolbar/edge-toolbar.component';
 import { FloatingEdgesExampleComponent } from './examples/floating-edges/floating-edges.component';
 import { CardinalEdgesExampleComponent } from './examples/cardinal-edges/cardinal-edges.component';
+import { CancelConnectionExampleComponent } from './examples/cancel-connection/cancel-connection.component';
 import { ColorModeExampleComponent } from './examples/color-mode/color-mode.component';
 import { InteractionExampleComponent } from './examples/interaction/interaction.component';
 import { TypedHandlesExampleComponent } from './examples/typed-handles/typed-handles.component';
@@ -44,6 +45,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Edge toolbar',          path: 'edge-toolbar',          component: EdgeToolbarExampleComponent },
   { name: 'Floating edges',        path: 'floating-edges',        component: FloatingEdgesExampleComponent },
   { name: 'Cardinal edges',        path: 'cardinal-edges',        component: CardinalEdgesExampleComponent },
+  { name: 'Cancel connection',     path: 'cancel-connection',     component: CancelConnectionExampleComponent },
   { name: 'Color mode',            path: 'color-mode',            component: ColorModeExampleComponent },
   { name: 'Interaction',           path: 'interaction',           component: InteractionExampleComponent },
   { name: 'Typed handles',         path: 'typed-handles',         component: TypedHandlesExampleComponent },
