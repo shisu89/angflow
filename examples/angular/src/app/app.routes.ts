@@ -26,6 +26,7 @@ import { HiddenExampleComponent } from './examples/hidden/hidden.component';
 import { TouchDeviceExampleComponent } from './examples/touch-device/touch-device.component';
 import { UndirectionalExampleComponent } from './examples/undirectional/undirectional.component';
 import { ControlledViewportExampleComponent } from './examples/controlled-viewport/controlled-viewport.component';
+import { DragHandleExampleComponent } from './examples/drag-handle/drag-handle.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
 
 export interface HarnessRoute {
@@ -62,6 +63,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Touch device',          path: 'touch-device',          component: TouchDeviceExampleComponent },
   { name: 'Undirectional',         path: 'undirectional',         component: UndirectionalExampleComponent },
   { name: 'Controlled viewport',   path: 'controlled-viewport',   component: ControlledViewportExampleComponent },
+  { name: 'Drag handle',           path: 'drag-handle',           component: DragHandleExampleComponent },
   { name: 'Kitchen sink',          path: 'kitchen-sink',          component: KitchenSinkComponent },
 ];
 
