@@ -31,6 +31,7 @@ import { InteractiveMinimapExampleComponent } from './examples/interactive-minim
 import { MultiFlowsExampleComponent } from './examples/multi-flows/multi-flows.component';
 import { UpdateNodeExampleComponent } from './examples/update-node/update-node.component';
 import { NodeTypeChangeExampleComponent } from './examples/node-type-change/node-type-change.component';
+import { DefaultOverwritesExampleComponent } from './examples/default-overwrites/default-overwrites.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
 
 export interface HarnessRoute {
@@ -72,6 +73,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Multi flows',           path: 'multi-flows',           component: MultiFlowsExampleComponent },
   { name: 'Update node',           path: 'update-node',           component: UpdateNodeExampleComponent },
   { name: 'Node type change',      path: 'node-type-change',      component: NodeTypeChangeExampleComponent },
+  { name: 'Default overwrites',    path: 'default-overwrites',    component: DefaultOverwritesExampleComponent },
   { name: 'Kitchen sink',          path: 'kitchen-sink',          component: KitchenSinkComponent },
 ];
 
