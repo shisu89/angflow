@@ -36,6 +36,7 @@ import { SetNodesBatchingExampleComponent } from './examples/set-nodes-batching/
 import { AddNodeOnEdgeDropExampleComponent } from './examples/add-node-on-edge-drop/add-node-on-edge-drop.component';
 import { CustomConnectionLineExampleComponent } from './examples/custom-connection-line/custom-connection-line.component';
 import { DetachedHandleExampleComponent } from './examples/detached-handle/detached-handle.component';
+import { EasyConnectExampleComponent } from './examples/easy-connect/easy-connect.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
 
 export interface HarnessRoute {
@@ -82,6 +83,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Add node on edge drop',   path: 'add-node-on-edge-drop',   component: AddNodeOnEdgeDropExampleComponent },
   { name: 'Custom connection line',  path: 'custom-connection-line',  component: CustomConnectionLineExampleComponent },
   { name: 'Detached handle',         path: 'detached-handle',         component: DetachedHandleExampleComponent },
+  { name: 'Easy connect',           path: 'easy-connect',            component: EasyConnectExampleComponent },
   { name: 'Kitchen sink',           path: 'kitchen-sink',            component: KitchenSinkComponent },
 ];
 
