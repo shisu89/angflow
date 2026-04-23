@@ -35,6 +35,7 @@ import { DefaultOverwritesExampleComponent } from './examples/default-overwrites
 import { SetNodesBatchingExampleComponent } from './examples/set-nodes-batching/set-nodes-batching.component';
 import { AddNodeOnEdgeDropExampleComponent } from './examples/add-node-on-edge-drop/add-node-on-edge-drop.component';
 import { CustomConnectionLineExampleComponent } from './examples/custom-connection-line/custom-connection-line.component';
+import { DetachedHandleExampleComponent } from './examples/detached-handle/detached-handle.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
 
 export interface HarnessRoute {
@@ -80,6 +81,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Set nodes batching',    path: 'set-nodes-batching',    component: SetNodesBatchingExampleComponent },
   { name: 'Add node on edge drop',   path: 'add-node-on-edge-drop',   component: AddNodeOnEdgeDropExampleComponent },
   { name: 'Custom connection line',  path: 'custom-connection-line',  component: CustomConnectionLineExampleComponent },
+  { name: 'Detached handle',         path: 'detached-handle',         component: DetachedHandleExampleComponent },
   { name: 'Kitchen sink',           path: 'kitchen-sink',            component: KitchenSinkComponent },
 ];
 
