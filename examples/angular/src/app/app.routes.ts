@@ -34,6 +34,7 @@ import { NodeTypeChangeExampleComponent } from './examples/node-type-change/node
 import { DefaultOverwritesExampleComponent } from './examples/default-overwrites/default-overwrites.component';
 import { SetNodesBatchingExampleComponent } from './examples/set-nodes-batching/set-nodes-batching.component';
 import { AddNodeOnEdgeDropExampleComponent } from './examples/add-node-on-edge-drop/add-node-on-edge-drop.component';
+import { CustomConnectionLineExampleComponent } from './examples/custom-connection-line/custom-connection-line.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
 
 export interface HarnessRoute {
@@ -77,8 +78,9 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Node type change',      path: 'node-type-change',      component: NodeTypeChangeExampleComponent },
   { name: 'Default overwrites',    path: 'default-overwrites',    component: DefaultOverwritesExampleComponent },
   { name: 'Set nodes batching',    path: 'set-nodes-batching',    component: SetNodesBatchingExampleComponent },
-  { name: 'Add node on edge drop', path: 'add-node-on-edge-drop', component: AddNodeOnEdgeDropExampleComponent },
-  { name: 'Kitchen sink',          path: 'kitchen-sink',          component: KitchenSinkComponent },
+  { name: 'Add node on edge drop',   path: 'add-node-on-edge-drop',   component: AddNodeOnEdgeDropExampleComponent },
+  { name: 'Custom connection line',  path: 'custom-connection-line',  component: CustomConnectionLineExampleComponent },
+  { name: 'Kitchen sink',           path: 'kitchen-sink',            component: KitchenSinkComponent },
 ];
 
 export const routes: Routes = [
