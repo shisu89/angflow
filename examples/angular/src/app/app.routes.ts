@@ -40,6 +40,7 @@ import { EasyConnectExampleComponent } from './examples/easy-connect/easy-connec
 import { EdgeRoutingExampleComponent } from './examples/edge-routing/edge-routing.component';
 import { IntersectionExampleComponent } from './examples/intersection/intersection.component';
 import { MovingHandlesExampleComponent } from './examples/moving-handles/moving-handles.component';
+import { ReconnectEdgeExampleComponent } from './examples/reconnect-edge/reconnect-edge.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
 
 export interface HarnessRoute {
@@ -90,6 +91,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Edge routing',            path: 'edge-routing',            component: EdgeRoutingExampleComponent },
   { name: 'Intersection',            path: 'intersection',            component: IntersectionExampleComponent },
   { name: 'Moving handles',          path: 'moving-handles',          component: MovingHandlesExampleComponent },
+  { name: 'Reconnect edge',          path: 'reconnect-edge',          component: ReconnectEdgeExampleComponent },
   { name: 'Kitchen sink',            path: 'kitchen-sink',            component: KitchenSinkComponent },
 ];
 
