@@ -29,6 +29,7 @@ import { ControlledViewportExampleComponent } from './examples/controlled-viewpo
 import { DragHandleExampleComponent } from './examples/drag-handle/drag-handle.component';
 import { InteractiveMinimapExampleComponent } from './examples/interactive-minimap/interactive-minimap.component';
 import { MultiFlowsExampleComponent } from './examples/multi-flows/multi-flows.component';
+import { UpdateNodeExampleComponent } from './examples/update-node/update-node.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
 
 export interface HarnessRoute {
@@ -68,6 +69,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Drag handle',           path: 'drag-handle',           component: DragHandleExampleComponent },
   { name: 'Interactive minimap',   path: 'interactive-minimap',   component: InteractiveMinimapExampleComponent },
   { name: 'Multi flows',           path: 'multi-flows',           component: MultiFlowsExampleComponent },
+  { name: 'Update node',           path: 'update-node',           component: UpdateNodeExampleComponent },
   { name: 'Kitchen sink',          path: 'kitchen-sink',          component: KitchenSinkComponent },
 ];
 
