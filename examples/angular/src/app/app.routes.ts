@@ -32,6 +32,7 @@ import { MultiFlowsExampleComponent } from './examples/multi-flows/multi-flows.c
 import { UpdateNodeExampleComponent } from './examples/update-node/update-node.component';
 import { NodeTypeChangeExampleComponent } from './examples/node-type-change/node-type-change.component';
 import { DefaultOverwritesExampleComponent } from './examples/default-overwrites/default-overwrites.component';
+import { SetNodesBatchingExampleComponent } from './examples/set-nodes-batching/set-nodes-batching.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
 
 export interface HarnessRoute {
@@ -74,6 +75,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Update node',           path: 'update-node',           component: UpdateNodeExampleComponent },
   { name: 'Node type change',      path: 'node-type-change',      component: NodeTypeChangeExampleComponent },
   { name: 'Default overwrites',    path: 'default-overwrites',    component: DefaultOverwritesExampleComponent },
+  { name: 'Set nodes batching',    path: 'set-nodes-batching',    component: SetNodesBatchingExampleComponent },
   { name: 'Kitchen sink',          path: 'kitchen-sink',          component: KitchenSinkComponent },
 ];
 
