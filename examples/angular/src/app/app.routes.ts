@@ -37,6 +37,7 @@ import { AddNodeOnEdgeDropExampleComponent } from './examples/add-node-on-edge-d
 import { CustomConnectionLineExampleComponent } from './examples/custom-connection-line/custom-connection-line.component';
 import { DetachedHandleExampleComponent } from './examples/detached-handle/detached-handle.component';
 import { EasyConnectExampleComponent } from './examples/easy-connect/easy-connect.component';
+import { EdgeRoutingExampleComponent } from './examples/edge-routing/edge-routing.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
 
 export interface HarnessRoute {
@@ -83,8 +84,9 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Add node on edge drop',   path: 'add-node-on-edge-drop',   component: AddNodeOnEdgeDropExampleComponent },
   { name: 'Custom connection line',  path: 'custom-connection-line',  component: CustomConnectionLineExampleComponent },
   { name: 'Detached handle',         path: 'detached-handle',         component: DetachedHandleExampleComponent },
-  { name: 'Easy connect',           path: 'easy-connect',            component: EasyConnectExampleComponent },
-  { name: 'Kitchen sink',           path: 'kitchen-sink',            component: KitchenSinkComponent },
+  { name: 'Easy connect',            path: 'easy-connect',            component: EasyConnectExampleComponent },
+  { name: 'Edge routing',            path: 'edge-routing',            component: EdgeRoutingExampleComponent },
+  { name: 'Kitchen sink',            path: 'kitchen-sink',            component: KitchenSinkComponent },
 ];
 
 export const routes: Routes = [
