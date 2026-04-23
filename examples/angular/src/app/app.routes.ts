@@ -38,6 +38,7 @@ import { CustomConnectionLineExampleComponent } from './examples/custom-connecti
 import { DetachedHandleExampleComponent } from './examples/detached-handle/detached-handle.component';
 import { EasyConnectExampleComponent } from './examples/easy-connect/easy-connect.component';
 import { EdgeRoutingExampleComponent } from './examples/edge-routing/edge-routing.component';
+import { IntersectionExampleComponent } from './examples/intersection/intersection.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
 
 export interface HarnessRoute {
@@ -86,6 +87,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Detached handle',         path: 'detached-handle',         component: DetachedHandleExampleComponent },
   { name: 'Easy connect',            path: 'easy-connect',            component: EasyConnectExampleComponent },
   { name: 'Edge routing',            path: 'edge-routing',            component: EdgeRoutingExampleComponent },
+  { name: 'Intersection',            path: 'intersection',            component: IntersectionExampleComponent },
   { name: 'Kitchen sink',            path: 'kitchen-sink',            component: KitchenSinkComponent },
 ];
 
