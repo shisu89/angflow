@@ -124,8 +124,8 @@ importers:
   packages/angular:
     dependencies:
       '@angflow/system':
-        specifier: workspace:*
-        version: link:../system
+        specifier: '>=0.0.88'
+        version: 0.0.88
       '@angular/common':
         specifier: '>=19.0.0'
         version: 21.2.6(@angular/core@21.2.6(@angular/compiler@21.2.6)(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2)
@@ -329,6 +329,9 @@ packages:
   '@ampproject/remapping@2.3.0':
     resolution: {integrity: sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw==}
     engines: {node: '>=6.0.0'}
+
+  '@angflow/system@0.0.88':
+    resolution: {integrity: sha512-UBk5Kyk1M83Smy13k9LphWXeuyNZ6xtrPVDj2R55jobDtzwkQ3xxO7Kpfq/6tbkMIatEph8qol7qe7svUb8pnw==}
 
   '@angular-devkit/architect@0.2102.6':
     resolution: {integrity: sha512-h4qybKypR7OuwcTHPQI1zRm7abXgmPiV49vI2UeMtVVY/GKzru9gMexcYmWabzEyBY8w6VSfWjV2X+eit2EhDQ==}
@@ -4548,6 +4551,18 @@ snapshots:
     dependencies:
       '@jridgewell/gen-mapping': 0.3.13
       '@jridgewell/trace-mapping': 0.3.31
+
+  '@angflow/system@0.0.88':
+    dependencies:
+      '@types/d3-drag': 3.0.7
+      '@types/d3-interpolate': 3.0.4
+      '@types/d3-selection': 3.0.11
+      '@types/d3-transition': 3.0.9
+      '@types/d3-zoom': 3.0.8
+      d3-drag: 3.0.0
+      d3-interpolate: 3.0.1
+      d3-selection: 3.0.0
+      d3-zoom: 3.0.0
 
   '@angular-devkit/architect@0.2102.6(chokidar@5.0.0)':
     dependencies:
