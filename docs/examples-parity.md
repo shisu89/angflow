@@ -16,9 +16,9 @@ Some mappings are inferred from name similarity; a few may need verification aga
 |---|---|
 | React | 63 |
 | Svelte | 27 |
-| **Angular** | **42** |
+| **Angular** | **45** |
 
-Angular is missing ~21 examples that exist in React, and ~1 that exists in Svelte.
+Angular is missing ~18 examples that exist in React, and ~1 that exists in Svelte.
 
 ## Full table
 
@@ -53,13 +53,13 @@ Angular is missing ~21 examples that exist in React, and ~1 that exists in Svelt
 | Edge types | ✅ `edge-types` | ✅ `EdgeTypes` | ✅ `edges` |
 | Edges (generic) | ➖ | ✅ `Edges` | ➖ |
 | Empty flow | ➖ | ✅ `Empty` | ➖ |
-| Figma-style | ➖ | ✅ `Figma` | ✅ `figma` |
+| Figma-style | ✅ `figma` | ✅ `Figma` | ✅ `figma` |
 | Floating edges | ✅ `floating-edges` | ✅ `FloatingEdges` | ➖ |
 | Hidden nodes/edges | ✅ `hidden` | ✅ `Hidden` | ➖ |
 | Interaction (pan/zoom toggles) | ✅ `interaction` | ✅ `Interaction` | ✅ `interaction` |
 | Interactive minimap | ✅ `interactive-minimap` | ✅ `InteractiveMinimap` | ➖ |
 | Intersection (`getIntersectingNodes`) | ✅ `intersection` | ✅ `Intersection` | ✅ `intersections` |
-| Layouting (dagre) | ➖ | ✅ `Layouting` | ✅ `dagre` |
+| Layouting (dagre) | ✅ `layouting` | ✅ `Layouting` | ✅ `dagre` |
 | Middlewares | ➖ | ✅ `Middlewares` | ➖ |
 | Moving handles | ✅ `moving-handles` | ✅ `MovingHandles` | ➖ |
 | Multi flows on one page | ✅ `multi-flows` | ✅ `MultiFlows` | ➖ |
@@ -76,7 +76,7 @@ Angular is missing ~21 examples that exist in React, and ~1 that exists in Svelt
 | Reset flow | ➖ | ➖ | ✅ `reset` |
 | Save & restore | ✅ `save-restore` | ✅ `SaveRestore` | ➖ |
 | Set nodes batching | ✅ `set-nodes-batching` | ✅ `SetNodesBatching` | ➖ |
-| Stress (perf) | ➖ | ✅ `Stress` | ✅ `stress` |
+| Stress (perf) | ✅ `stress` | ✅ `Stress` | ✅ `stress` |
 | Sub flows | ✅ `sub-flows` | ✅ `Subflow` | ✅ `subflows` |
 | Switch (conditional rendering) | ➖ | ✅ `Switch` | ➖ |
 | Touch device | ✅ `touch-device` | ✅ `TouchDevice` | ➖ |
@@ -126,9 +126,10 @@ Tier 4 (API hooks — require equivalent Angular APIs to exist first):
 
 - `use-connection`, `use-on-selection-change`, `use-update-node-internals`, `use-nodes-data`, etc. — port once the Angular service equivalents are confirmed stable.
 
-## API gaps surfaced during Tier 1–2b
+## API gaps surfaced during Tier 1–3
 
 - `NgFlowComponent` input **`autoPanOnNodeFocus`** — expected by the React A11y example but not yet implemented on `NgFlowComponent`. Dropped from the Angular `a11y` example; when added, wire a signal-driven `[autoPanOnNodeFocus]` binding and a checkbox toggle per the plan's scaffold.
 - `NgFlowComponent` input **`[viewport]`** — declared as a two-way `model<Viewport>` but its value is never read by the pan/zoom instance (it's initialized from `defaultViewport()` and mutated by user gestures). Writing to the parent-side signal bound via `[viewport]` has no visual effect. `(viewportChange)` works as expected, and imperative `NgFlowService.setViewport()` / `fitView()` work by bypassing the input. Surfaced by the `controlled-viewport` example — the "update viewport" and "toggle viewport" buttons update the stored signal but don't move the canvas until the library wires the input into the pan/zoom initializer.
 - **Unknown-type fallback for `nodeTypes` / `edgeTypes`** — the renderer's lookup is `customTypes[resolvedType] ?? builtInTypes[resolvedType] ?? HardcodedDefault`. xyflow/React's behavior is that unknown types fall through to `customTypes.default` (so registering `nodeTypes: { default: X }` applies X both to explicit `type: 'default'` and to unknown types). In angflow, unknown types hit the hardcoded default instead. Surfaced by the `default-overwrites` example — the prescribed React-port code used `type: 'unregistered'` on a node and edge to demonstrate unknown-fallback, but those would have rendered as built-ins; we adjusted the example to drop the `'unregistered'` markers so only the `'default'` override is demonstrated.
 - **Tier 2b surfaced no new library gaps.** All 8 examples ported cleanly after verify-on-port steps. Notable confirmed APIs: `NgFlowService.connection` signal (inProgress discriminated union), `NgFlowService.updateNodeInternals(string | string[])`, `Edge.reconnectable: boolean | HandleType`, `(reconnect)`/`(reconnectStart)`/`(reconnectEnd)` outputs with `FinalConnectionState` payload on end, `(nodeDrag)` mid-drag event with `{event, node, nodes}` payload, custom connection-line contract (9 inputs, rendered outside SVG parent so components must provide their own `<svg>` wrapper).
+- **Tier 3 surfaced no new library gaps.** All 3 examples (`figma`, `layouting`, `stress`) ported using existing inputs/outputs/services. Confirmed during port: `[selectionOnDrag]`/`[selectionMode]`/`[panOnDrag: number[]]`/`[panOnScroll]`/`[paneClickDistance]`/`[zoomActivationKeyCode]`/`[multiSelectionKeyCode]`/`[nodeExtent]`, `(paneContextMenu)`/`(selectionContextMenu)`/`(moveStart)`/`(move)`/`(moveEnd)`/`(paneClick)`/`(selectionStart)`/`(selectionEnd)` outputs, `(init)` output emits live `NgFlowService` instance, `BackgroundVariant` includes `'cross'`. Stress example confirms the `data-id` attribute on `.xy-flow__node` host elements (used for synthesized DOM-event tests). External dep added: `dagre@^0.8.5` + `@types/dagre@^0.7.52` in `examples/angular/package.json`.
