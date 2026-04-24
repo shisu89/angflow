@@ -43,6 +43,7 @@ import { MovingHandlesExampleComponent } from './examples/moving-handles/moving-
 import { ReconnectEdgeExampleComponent } from './examples/reconnect-edge/reconnect-edge.component';
 import { FigmaExampleComponent } from './examples/figma/figma.component';
 import { LayoutingExampleComponent } from './examples/layouting/layouting.component';
+import { StressExampleComponent } from './examples/stress/stress.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
 
 export interface HarnessRoute {
@@ -96,6 +97,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Reconnect edge',          path: 'reconnect-edge',          component: ReconnectEdgeExampleComponent },
   { name: 'Figma',                   path: 'figma',                   component: FigmaExampleComponent },
   { name: 'Layouting',               path: 'layouting',               component: LayoutingExampleComponent },
+  { name: 'Stress',                  path: 'stress',                  component: StressExampleComponent },
   { name: 'Kitchen sink',            path: 'kitchen-sink',            component: KitchenSinkComponent },
 ];
 
