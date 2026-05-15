@@ -1,0 +1,16 @@
+export { AngflowAgentBridge } from './agent-bridge.service';
+export { provideAgentBridge, type AgentBridgeConfig } from './provide-agent-bridge';
+export { AGENT_TOOL_SCHEMAS } from './tool-schemas';
+export { WindowTransport, type WindowTransportOptions } from './transports/window';
+export { WebSocketTransport, type WebSocketTransportOptions } from './transports/websocket';
+export type {
+  AgentRequest,
+  AgentResponse,
+  AgentSuccessResponse,
+  AgentErrorResponse,
+  AgentEvent,
+  AgentInbound,
+  AgentOutbound,
+  AgentTransport,
+  AgentToolSchema,
+} from './types';
