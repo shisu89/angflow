@@ -24,6 +24,17 @@ import type {
 
 import type { Node, Edge, InternalNode, NodeTypes, EdgeTypes } from '.';
 
+/**
+ * Permissive CSS style record used by `Node.style`, `Edge.style`, `labelStyle`,
+ * and `labelBgStyle`. Accepts numbers in addition to strings — mirrors how
+ * React Flow's `CSSProperties` works (numbers are coerced at render time, useful
+ * for SVG attribute-style values like `strokeWidth: 2` or unitless CSS like
+ * `opacity: 0.5`).
+ */
+export type CSSProperties = {
+  [key: string]: string | number | null | undefined;
+};
+
 export type OnNodesChange<NodeType extends Node = Node> = (changes: NodeChange<NodeType>[]) => void;
 export type OnEdgesChange<EdgeType extends Edge = Edge> = (changes: EdgeChange<EdgeType>[]) => void;
 

@@ -4,7 +4,6 @@ import {
   BackgroundComponent,
   ControlsComponent,
   MiniMapComponent,
-  PanelComponent,
   applyNodeChanges,
   applyEdgeChanges,
 } from '@angflow/angular';
@@ -35,7 +34,6 @@ const ariaLabelConfig: Partial<AriaLabelConfig> = {
     BackgroundComponent,
     ControlsComponent,
     MiniMapComponent,
-    PanelComponent,
     ExampleCardComponent,
   ],
   template: `

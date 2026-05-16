@@ -15,15 +15,16 @@ import type {
 } from '@angflow/system';
 
 import type { InternalNode, Node } from './nodes';
+import type { CSSProperties } from './general';
 
 /**
  * Options for edge label rendering.
  */
 export type EdgeLabelOptions = {
   label?: string;
-  labelStyle?: Partial<CSSStyleDeclaration>;
+  labelStyle?: CSSProperties;
   labelShowBg?: boolean;
-  labelBgStyle?: Partial<CSSStyleDeclaration>;
+  labelBgStyle?: CSSProperties;
   labelBgPadding?: [number, number];
   labelBgBorderRadius?: number;
 };
@@ -36,7 +37,7 @@ export type Edge<
   EdgeType extends string | undefined = string | undefined
 > = EdgeBase<EdgeData, EdgeType> &
   EdgeLabelOptions & {
-    style?: Partial<CSSStyleDeclaration>;
+    style?: CSSProperties;
     className?: string;
     reconnectable?: boolean | HandleType;
     focusable?: boolean;
@@ -44,11 +45,19 @@ export type Edge<
     domAttributes?: Record<string, string>;
   };
 
-export type BuiltInEdge =
-  | Edge<Record<string, unknown>, 'smoothstep'>
-  | Edge<Record<string, unknown>, 'default'>
-  | Edge<Record<string, unknown>, 'step'>
-  | Edge<Record<string, unknown>, 'straight'>;
+type SmoothStepEdge<EdgeData extends Record<string, unknown> = Record<string, unknown>> =
+  Edge<EdgeData, 'smoothstep'> & { pathOptions?: SmoothStepPathOptions };
+
+type BezierEdge<EdgeData extends Record<string, unknown> = Record<string, unknown>> =
+  Edge<EdgeData, 'default'> & { pathOptions?: BezierPathOptions };
+
+type StepEdge<EdgeData extends Record<string, unknown> = Record<string, unknown>> =
+  Edge<EdgeData, 'step'> & { pathOptions?: StepPathOptions };
+
+type StraightEdge<EdgeData extends Record<string, unknown> = Record<string, unknown>> =
+  Edge<EdgeData, 'straight'>;
+
+export type BuiltInEdge = SmoothStepEdge | BezierEdge | StepEdge | StraightEdge;
 
 export type EdgeMouseHandler<EdgeType extends Edge = Edge> = (event: MouseEvent, edge: EdgeType) => void;
 

@@ -1,5 +1,6 @@
 import type { Type, Signal } from '@angular/core';
 import type { NodeBase, InternalNodeBase, NodeProps as NodePropsBase, CoordinateExtent, OnError, Position } from '@angflow/system';
+import type { CSSProperties } from './general';
 
 /**
  * The Node type represents everything Angular Flow needs to know about a given node.
@@ -8,7 +9,7 @@ export type Node<
   NodeData extends Record<string, unknown> = Record<string, unknown>,
   NodeType extends string | undefined = string | undefined
 > = NodeBase<NodeData, NodeType> & {
-  style?: Partial<CSSStyleDeclaration>;
+  style?: CSSProperties;
   className?: string;
   resizing?: boolean;
   focusable?: boolean;
