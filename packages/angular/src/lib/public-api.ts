@@ -64,6 +64,27 @@ export { isNode, isEdge } from './utils/type-guards';
 // Node injection helper
 export { injectNgFlowNode } from './utils/inject-ng-flow-node';
 
+// Agent bridge
+export {
+  AngflowAgentBridge,
+  provideAgentBridge,
+  AGENT_TOOL_SCHEMAS,
+  WindowTransport,
+  WebSocketTransport,
+  type AgentBridgeConfig,
+  type WindowTransportOptions,
+  type WebSocketTransportOptions,
+  type AgentRequest,
+  type AgentResponse,
+  type AgentSuccessResponse,
+  type AgentErrorResponse,
+  type AgentEvent,
+  type AgentInbound,
+  type AgentOutbound,
+  type AgentTransport,
+  type AgentToolSchema,
+} from './agent';
+
 // Re-export everything from @angflow/system
 export {
   // Enums / Constants

@@ -95,10 +95,10 @@ import type {
  * plugin components like `<ng-flow-background>`, `<ng-flow-controls>`, and
  * `<ng-flow-minimap>`.
  *
- * `nodes`, `edges`, and `viewport` are controlled inputs — drive them by
- * pushing new arrays back in response to `(nodesChange)` / `(edgesChange)`
- * (paired with `applyNodeChanges` / `applyEdgeChanges`), or hand them off
- * via `defaultNodes` / `defaultEdges` (uncontrolled).
+ * `nodes`, `edges`, and `viewport` are input-bound — for controlled mode, bind
+ * `[nodes]` / `[edges]` and re-assign them from `(nodesChange)` / `(edgesChange)`
+ * after running the deltas through `applyNodeChanges` / `applyEdgeChanges`. For
+ * uncontrolled mode hand off initial state via `defaultNodes` / `defaultEdges`.
  *
  * @example
  * ```html
@@ -247,12 +247,12 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     return mode;
   });
 
-  // ── Data (controlled inputs paired with explicit change outputs) ──────
+  // ── Data (controlled-mode inputs; pair with the *Change outputs) ──────
 
-  /** Nodes to render. Pair with `(nodesChange)` and `applyNodeChanges` to keep in sync. */
+  /** Nodes to render. Re-bind from `(nodesChange)` after running deltas through `applyNodeChanges` to stay in sync. */
   readonly nodesModel = input<NodeType[]>([] as unknown as NodeType[], { alias: 'nodes' });
 
-  /** Edges to render. Pair with `(edgesChange)` and `applyEdgeChanges` to keep in sync. */
+  /** Edges to render. Re-bind from `(edgesChange)` after running deltas through `applyEdgeChanges` to stay in sync. */
   readonly edgesModel = input<EdgeType[]>([] as unknown as EdgeType[], { alias: 'edges' });
 
   /** Current viewport (`{ x, y, zoom }`). Fires `(viewportChange)` on pan/zoom. */

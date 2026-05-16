@@ -43,6 +43,7 @@ export type Edge<
     focusable?: boolean;
     ariaRole?: string;
     domAttributes?: Record<string, string>;
+    pathOptions?: BezierPathOptions | SmoothStepPathOptions | StepPathOptions;
   };
 
 type SmoothStepEdge<EdgeData extends Record<string, unknown> = Record<string, unknown>> =

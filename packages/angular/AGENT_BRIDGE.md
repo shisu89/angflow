@@ -1,0 +1,294 @@
+# Agent Bridge
+
+`AngflowAgentBridge` exposes a flow to AI agents (or any external caller) over a small JSON-RPC protocol. Source lives in `packages/angular/src/lib/agent/`.
+
+## Architecture
+
+```
+┌──────────────┐   tool call   ┌────────────────┐   handler   ┌──────────────┐
+│ External     │ ────────────▶ │   Transport    │ ──────────▶ │ AngflowAgent │
+│ caller       │               │ (Window / WS / │             │ Bridge       │
+│ (LLM, REPL,  │ ◀──────────── │  custom)       │ ◀────────── │              │
+│  Playwright) │   event/result└────────────────┘    invoke   └──────┬───────┘
+└──────────────┘                                                     │
+                                                                     ▼ (via flowId)
+                                                              ┌──────────────┐
+                                                              │ NgFlowService│
+                                                              │   instance   │
+                                                              └──────────────┘
+```
+
+- **Bridge** — root-scoped service. Holds a registry of `flowId → NgFlowService`, routes inbound tool calls to the right service, and emits `flow.state` events when any registered flow's signals change (coalesced via microtask).
+- **Transport** — anything implementing `AgentTransport`. Bundled: `WindowTransport` (exposes `window.angflow`), `WebSocketTransport`. Add custom ones for postMessage, CDP, MCP servers, etc.
+- **Tool schemas** — `AGENT_TOOL_SCHEMAS` is a JSON-Schema array suitable for direct use as Anthropic/OpenAI `tools`.
+
+## Wiring
+
+```ts
+// app.config.ts
+import { provideAgentBridge, WindowTransport } from '@angflow/angular';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideAgentBridge({
+      transports: [new WindowTransport()],
+      history: { maxDepth: 100 },  // default; pass `false` to disable
+    }),
+  ],
+};
+
+// some.component.ts
+import { AngflowAgentBridge, NgFlowService } from '@angflow/angular';
+
+private readonly bridge = inject(AngflowAgentBridge);
+private unregister?: () => void;
+
+onInit(svc: NgFlowService) {
+  this.unregister = this.bridge.register('main', svc);
+}
+ngOnDestroy() { this.unregister?.(); }
+```
+
+After this, the browser devtools console can do `await angflow.callTool('add_node', { node: {…} })`.
+
+## Tool catalog
+
+Every tool takes an optional `flowId` (omit when only one flow is registered; required otherwise). All payloads use the `Node` / `Edge` types from `@angflow/angular`.
+
+### Discovery / read
+
+| Tool | Params | Returns |
+|---|---|---|
+| `list_flows` | — | `string[]` of registered flow ids |
+| `get_state` | — | `{ nodes, edges, viewport }` |
+| `get_nodes` | — | `Node[]` |
+| `get_edges` | — | `Edge[]` |
+| `get_node` | `id: string` | `Node \| null` |
+| `get_edge` | `id: string` | `Edge \| null` |
+| `get_viewport` | — | `{ x, y, zoom }` |
+
+### Read — geometry / graph queries
+
+| Tool | Params | Returns |
+|---|---|---|
+| `get_internal_node` | `id: string` | `{ id, positionAbsolute, measured, handleBounds } \| null` — layout-resolved node with absolute position and measured dimensions |
+| `get_nodes_bounds` | `nodeIds?: string[]` | `{ x, y, width, height }` — bounding rect of the given nodes (all nodes if omitted) |
+| `get_intersecting_nodes` | `id: string`, `partially?: boolean` (default `true`) | `Node[]` — nodes that overlap the given node's bounding box |
+| `is_node_in_area` | `id: string`, `area: { x, y, width, height }`, `partially?: boolean` (default `true`) | `boolean` — whether the node overlaps the given area |
+| `get_outgoers` | `id: string` | `Node[]` — direct downstream neighbours of the node |
+| `get_incomers` | `id: string` | `Node[]` — direct upstream neighbours of the node |
+| `get_connected_edges` | `nodeIds: string[]` | `Edge[]` — all edges touching any of the given nodes |
+| `get_node_connections` | `nodeId: string` | `Connection[]` — all connections (source+target pairs) for the node |
+| `get_handle_connections` | `nodeId: string`, `type: 'source' \| 'target'`, `handleId?: string` | `Connection[]` — connections for a specific handle |
+| `get_handle_data` | `nodeId: string`, `type: 'source' \| 'target'`, `handleId: string \| null` | `HandleElement \| null` — raw handle element data |
+
+### Read — coordinates
+
+| Tool | Params | Returns |
+|---|---|---|
+| `screen_to_flow_position` | `position: { x, y }`, `snapToGrid?: boolean` | `{ x, y }` — converts a screen pixel coordinate to a flow canvas coordinate |
+| `flow_to_screen_position` | `position: { x, y }` | `{ x, y }` — converts a flow canvas coordinate to a screen pixel coordinate |
+
+### Mutate — incremental (preferred)
+
+| Tool | Params | Notes |
+|---|---|---|
+| `add_node` | `node: { id, position:{x,y}, data, type?, … }` | Returns the created `Node` |
+| `add_nodes` | `nodes: Node[]` | Bulk version of `add_node`; returns `Node[]` |
+| `add_edge` | `edge: { id, source, target, sourceHandle?, targetHandle?, type?, animated?, label?, data? }` | Use this to **link nodes**; returns the created `Edge` |
+| `add_edges` | `edges: Edge[]` | Bulk version of `add_edge`; returns `Edge[]` |
+| `update_node` | `id: string`, `patch: Partial<Node>` | Shallow merge. Move with `patch.position`; returns updated `Node` |
+| `update_node_data` | `id: string`, `dataPatch: Record<string, unknown>` | Shallow-merges only the `data` property; returns updated `Node` |
+| `update_edge` | `id: string`, `patch: Partial<Edge>` | Shallow merge; returns updated `Edge` |
+| `update_edge_data` | `id: string`, `dataPatch: Record<string, unknown>` | Shallow-merges only the `data` property; returns updated `Edge` |
+| `delete_elements` | `nodeIds?: string[]`, `edgeIds?: string[]` | Edges to deleted nodes auto-removed. Returns `{ deletedNodeIds, deletedEdgeIds }` |
+
+### Mutate — bulk (prefer incremental ops above)
+
+| Tool | Params |
+|---|---|
+| `set_nodes` | `nodes: Node[]` — full replacement |
+| `set_edges` | `edges: Edge[]` — full replacement |
+
+### Selection
+
+| Tool | Params | Returns |
+|---|---|---|
+| `select_nodes` | `nodeIds: string[]`, `additive?: boolean` (default `false`) | `{ selectedNodeIds: string[] }` |
+| `select_edges` | `edgeIds: string[]`, `additive?: boolean` (default `false`) | `{ selectedEdgeIds: string[] }` |
+| `deselect_all` | — | `null` |
+
+### Viewport / camera
+
+| Tool | Params | Notes |
+|---|---|---|
+| `fit_view` | `nodeIds?`, `padding?`, `duration?` | Animates to fit the given nodes (all nodes if omitted) |
+| `set_viewport` | `viewport: { x, y, zoom }`, `duration?` | Animate to an explicit viewport |
+| `zoom_in` | `duration?: number` | Incremental zoom in |
+| `zoom_out` | `duration?: number` | Incremental zoom out |
+| `zoom_to` | `level: number`, `duration?: number` | Set zoom to an absolute level |
+| `set_center` | `x: number`, `y: number`, `zoom?: number`, `duration?: number` | Center the viewport on a flow coordinate |
+| `fit_bounds` | `bounds: { x, y, width, height }`, `padding?: number`, `duration?: number` | Fit the viewport to an explicit bounding rect |
+
+### Transactional batch
+
+| Tool | Params | Returns |
+|---|---|---|
+| `apply_changes` | `ops: Op[]` | `{ results: Array<{ ok: true; value: unknown }> }` |
+
+See the **Transactional batch** section below for semantics and the full op-kind list.
+
+### History
+
+| Tool | Params | Returns |
+|---|---|---|
+| `undo` | `steps?: number` (default `1`) | `{ undone: number, canUndo: boolean, canRedo: boolean }` |
+| `redo` | `steps?: number` (default `1`) | `{ redone: number, canUndo: boolean, canRedo: boolean }` |
+| `history_status` | — | `{ canUndo: boolean, canRedo: boolean, pastDepth: number, futureDepth: number }` |
+| `clear_history` | — | `null` |
+
+## Events (push)
+
+Subscribers (`angflow.subscribe(h)`) receive:
+
+- `flow.registered` — `{ flowId }`
+- `flow.unregistered` — `{ flowId }`
+- `flow.history` — `{ flowId, canUndo, canRedo, pastDepth, futureDepth }`. Emitted **synchronously inside `dispatch`** immediately after a history-capturing mutation completes (or after `undo`/`redo`/`clear_history`).
+- `flow.state` — `{ flowId, nodes, edges, viewport, selection: { nodeIds, edgeIds } }`. Coalesced per microtask; duplicates suppressed via a cheap signature. Emitted in the **next microtask** via the `watchFlow` effect.
+
+**Ordering note:** When a mutating tool fires, consumers receive `flow.history` first (synchronously), then `flow.state` (next microtask). This ordering is reliable — useful when a consumer wants to update UI affordances before rendering the new graph state.
+
+## Transactional batch
+
+`apply_changes` runs a sequence of ops atomically:
+
+```ts
+await angflow.callTool('apply_changes', {
+  ops: [
+    { op: 'add_node', node: { id: 'a1', position: { x: 0, y: 0 }, data: { label: 'A' } } },
+    { op: 'add_edge', edge: { id: 'e1', source: 'a1', target: 'existing' } },
+    { op: 'update_node_data', id: 'existing', dataPatch: { label: 'Updated' } },
+  ],
+})
+```
+
+**Supported op kinds** (mirrors the individual tool names):
+
+| Op kind | Required fields |
+|---|---|
+| `add_node` | `node: Node` |
+| `add_nodes` | `nodes: Node[]` |
+| `add_edge` | `edge: Edge` |
+| `add_edges` | `edges: Edge[]` |
+| `update_node` | `id: string`, `patch: Partial<Node>` |
+| `update_node_data` | `id: string`, `dataPatch: Record<string, unknown>` |
+| `update_edge` | `id: string`, `patch: Partial<Edge>` |
+| `update_edge_data` | `id: string`, `dataPatch: Record<string, unknown>` |
+| `delete_elements` | `nodeIds?: string[]`, `edgeIds?: string[]` |
+| `select_nodes` | `nodeIds: string[]`, `additive?: boolean` |
+| `select_edges` | `edgeIds: string[]`, `additive?: boolean` |
+| `deselect_all` | — |
+
+**`set_nodes` and `set_edges` are NOT valid ops inside `apply_changes`.** Use the incremental ops instead.
+
+**`delete_elements` inside `apply_changes` skips the `onBeforeDelete` hook.** The standalone `delete_elements` tool awaits `onBeforeDelete` if the host has registered one. Inside `apply_changes`, deletions go through synchronous `setNodes`/`setEdges` filters so the whole batch can roll back on failure — there is no opportunity to await an async veto. If your app relies on `onBeforeDelete` to gate deletions, call the standalone `delete_elements` tool instead.
+
+**Snapshot-rollback semantics:**
+
+1. Before any op executes, `apply_changes` captures a snapshot of `{ nodes, edges }` (viewport is intentionally excluded).
+2. All ops run inside `service.batch()`.
+3. If any op throws, the snapshot is restored via `setNodes`/`setEdges` inside another `batch()` call. A single coalesced `flow.state` event is emitted after the rollback.
+4. On success, a single coalesced `flow.state` event is emitted after all ops complete.
+
+**History:** A successful `apply_changes` that includes at least one non-selection op (i.e., at least one op that is not `select_nodes`, `select_edges`, or `deselect_all`) creates exactly one undo entry. A batch that is entirely selection ops creates no undo entry. A rolled-back `apply_changes` creates no undo entry.
+
+**Error shape on failure:**
+
+```json
+{
+  "code": -32603,
+  "message": "...",
+  "data": { "failedIndex": 2 }
+}
+```
+
+`failedIndex` is the zero-based index of the first op that threw.
+
+## History
+
+The bridge maintains per-flow snapshot stacks of `{ nodes, edges }` (viewport is intentionally excluded so post-mutation zoom/pan survives undo).
+
+### Capture rule
+
+Tools that **do** capture a history entry (mutating tools):
+`add_node`, `add_nodes`, `add_edge`, `add_edges`, `update_node`, `update_node_data`, `update_edge`, `update_edge_data`, `delete_elements`, `set_nodes`, `set_edges`, and `apply_changes` (when it includes at least one non-selection op).
+
+Tools that **do not** capture a history entry:
+- Selection tools (`select_nodes`, `select_edges`, `deselect_all`)
+- Viewport tools (`fit_view`, `set_viewport`, `zoom_in`, `zoom_out`, `zoom_to`, `set_center`, `fit_bounds`)
+- Read / geometry / coordinate tools (all read-only by definition)
+- `apply_changes` when all ops are selection-only
+- A rolled-back `apply_changes`
+
+### Bridge-only scope — known limitation
+
+History tracks only **bridge-initiated mutations**. User-driven changes — drag, connect, resize via the UI; `(nodesChange)` / `(edgesChange)` outputs applied by the parent component — are **not** tracked. Calling `undo` after a user-driven change will restore to the last bridge snapshot and may overwrite those changes. If you need full undo/redo across UI interactions, implement it in the host application.
+
+### Configuration
+
+```ts
+provideAgentBridge({
+  transports: [new WindowTransport()],
+  history: { maxDepth: 100 },  // default maxDepth is 100
+})
+
+// Disable history entirely:
+provideAgentBridge({
+  transports: [new WindowTransport()],
+  history: false,
+})
+```
+
+When history is disabled, `undo` and `redo` return `{ undone/redone: 0, canUndo: false, canRedo: false }` and `history_status` returns `{ canUndo: false, canRedo: false, pastDepth: 0, futureDepth: 0 }`.
+
+### `flow.history` push event
+
+Shape: `{ flowId: string, canUndo: boolean, canRedo: boolean, pastDepth: number, futureDepth: number }`
+
+Emitted synchronously after every mutating tool call (before `flow.state`), and after `undo`, `redo`, and `clear_history`. Useful for updating UI affordances in real time.
+
+## Error codes (JSON-RPC)
+
+| Code | Meaning |
+|---|---|
+| `-32601` | Unknown tool name |
+| `-32602` | Invalid params (wrong type, missing required key) |
+| `-32000` | Flow not found (bad/missing `flowId`) |
+| `-32603` | Internal error from the underlying `NgFlowService` call |
+
+**Note:** `apply_changes` rollback errors use code `-32603` and carry `data: { failedIndex }` in the error object indicating which op caused the failure.
+
+## Two ways to call
+
+1. **In-process** — `bridge.callTool(method, params)` from Angular code (tests, devtools, other components).
+2. **Via transport** — external callers send `{ id, method, params }` frames; transport returns `{ id, result }` or `{ id, error }`.
+
+`WindowTransport` is a thin shim over option 2 that lets you do `await window.angflow.callTool(...)` from the devtools console.
+
+## Adding a new tool
+
+1. Add a schema entry in `src/lib/agent/tool-schemas.ts`.
+2. Register a handler in `installHandlers()` inside `src/lib/agent/agent-bridge.service.ts`.
+3. The handler receives `(flow: NgFlowService, params)` — call into the existing service API; do not reach into the store directly.
+4. If the new behavior should appear in `flow.state` events, make sure the underlying mutation writes to one of the signals already watched (`nodes`, `edges`, `viewport`, `selectedNodes`, `selectedEdges`); if not, extend the watcher in `watchFlow()`.
+5. If the tool mutates `nodes` or `edges`, add it to the `MUTATING_TOOLS` set at the top of `agent-bridge.service.ts` so history capture fires automatically.
+6. Update this doc — at minimum, add the tool to the catalog table.
+
+## Known gaps
+
+Not yet exposed (but planned or noted):
+- **Undo/redo for user-driven changes** — bridge history only tracks bridge-initiated mutations (see History section).
+- **Copy/paste** — no clipboard API in the bridge yet.
+- **Auto-layout** — no automatic layout (dagre, elk, etc.) built in; callers can compute positions and use `apply_changes`.
+- **Runtime node/edge type registration** — cannot register new Angular component types at runtime via the bridge.
+- **Pane/read-only toggles** — cannot toggle `panOnDrag`, `nodesDraggable`, `nodesConnectable`, etc. via the bridge yet.
