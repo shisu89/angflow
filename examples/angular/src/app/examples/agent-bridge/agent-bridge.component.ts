@@ -53,6 +53,21 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
             <pre class="agent-panel__code">// keep the returned function so you can stop listening
 const off = angflow.subscribe(e => console.log(e))
 // off()  // call when done</pre>
+            <pre class="agent-panel__code">await angflow.callTool('apply_changes', {{ '{' }}
+  ops: [
+    {{ '{' }} op: 'add_node', node: {{ '{' }} id: 'x' + Date.now(), position: {{ '{' }} x: 200, y: 200 {{ '}' }}, data: {{ '{' }} label: 'X' {{ '}' }} {{ '}' }} {{ '}' }},
+    {{ '{' }} op: 'add_node', node: {{ '{' }} id: 'y' + Date.now(), position: {{ '{' }} x: 400, y: 200 {{ '}' }}, data: {{ '{' }} label: 'Y' {{ '}' }} {{ '}' }} {{ '}' }},
+  ],
+{{ '}' }})</pre>
+            <pre class="agent-panel__code">await angflow.callTool('undo')</pre>
+            <div class="agent-panel__title">History</div>
+            <div class="agent-panel__history">
+              @if (historyStatus(); as h) {
+                <span>past: {{ h.pastDepth }} | future: {{ h.futureDepth }}</span>
+              } @else {
+                <span>past: 0 | future: 0</span>
+              }
+            </div>
             <div class="agent-panel__title">Activity</div>
             <div class="agent-panel__log">
               @for (line of log(); track line.id) {
@@ -101,6 +116,14 @@ const off = angflow.subscribe(e => console.log(e))
       white-space: pre-wrap;
       overflow-wrap: anywhere;
     }
+    .agent-panel__history {
+      background: #f1f5f9;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      color: #334155;
+    }
     .agent-panel__log {
       max-height: 120px;
       overflow-y: auto;
@@ -137,6 +160,7 @@ export class AgentBridgeExampleComponent implements OnDestroy {
   ];
 
   readonly log = signal<{ id: number; text: string }[]>([]);
+  readonly historyStatus = signal<{ canUndo: boolean; canRedo: boolean; pastDepth: number; futureDepth: number } | null>(null);
 
   onInit(service: NgFlowService<Node, Edge>): void {
     this.unregister = this.bridge.register('demo', service);
@@ -146,7 +170,16 @@ export class AgentBridgeExampleComponent implements OnDestroy {
       const api = (window as unknown as { angflow?: { subscribe: (h: (e: unknown) => void) => () => void } }).angflow;
       if (api) {
         this.unsubscribeFromBridge = api.subscribe((evt) => {
-          const e = evt as { event?: string; params?: { flowId?: string } };
+          const e = evt as { event?: string; params?: { flowId?: string; canUndo?: boolean; canRedo?: boolean; pastDepth?: number; futureDepth?: number } };
+          if (e.event === 'flow.history' && e.params?.flowId === 'demo') {
+            this.historyStatus.set({
+              canUndo: e.params.canUndo ?? false,
+              canRedo: e.params.canRedo ?? false,
+              pastDepth: e.params.pastDepth ?? 0,
+              futureDepth: e.params.futureDepth ?? 0,
+            });
+            return;
+          }
           if (e.event === 'flow.state' && e.params?.flowId === 'demo') return;
           this.appendLog(`${e.event ?? 'event'}` + (e.params?.flowId ? ` (${e.params.flowId})` : ''));
         });
