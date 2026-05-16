@@ -431,6 +431,41 @@ export class AngflowAgentBridge {
       const position = requireObject(params, 'position') as { x: number; y: number };
       return flow.flowToScreenPosition(position);
     });
+
+    this.handlers.set('zoom_in', (flow, params) => {
+      const duration = typeof params['duration'] === 'number' ? (params['duration'] as number) : undefined;
+      return flow.zoomIn({ duration });
+    });
+
+    this.handlers.set('zoom_out', (flow, params) => {
+      const duration = typeof params['duration'] === 'number' ? (params['duration'] as number) : undefined;
+      return flow.zoomOut({ duration });
+    });
+
+    this.handlers.set('zoom_to', (flow, params) => {
+      const level = params['level'];
+      if (typeof level !== 'number') throw new InvalidParamsError('Param "level" must be a number.');
+      const duration = typeof params['duration'] === 'number' ? (params['duration'] as number) : undefined;
+      return flow.zoomTo(level, { duration });
+    });
+
+    this.handlers.set('set_center', (flow, params) => {
+      const x = params['x'];
+      const y = params['y'];
+      if (typeof x !== 'number' || typeof y !== 'number') {
+        throw new InvalidParamsError('Params "x" and "y" must be numbers.');
+      }
+      const zoom = typeof params['zoom'] === 'number' ? (params['zoom'] as number) : undefined;
+      const duration = typeof params['duration'] === 'number' ? (params['duration'] as number) : undefined;
+      return flow.setCenter(x, y, { zoom, duration });
+    });
+
+    this.handlers.set('fit_bounds', (flow, params) => {
+      const bounds = requireObject(params, 'bounds') as { x: number; y: number; width: number; height: number };
+      const padding = typeof params['padding'] === 'number' ? (params['padding'] as number) : undefined;
+      const duration = typeof params['duration'] === 'number' ? (params['duration'] as number) : undefined;
+      return flow.fitBounds(bounds, { padding, duration });
+    });
   }
 }
 

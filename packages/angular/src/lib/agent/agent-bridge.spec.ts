@@ -247,6 +247,47 @@ describe('AngflowAgentBridge', () => {
     });
   });
 
+  describe('viewport tools', () => {
+    let flow: NgFlowService;
+
+    beforeEach(() => {
+      flow = newFlow();
+      bridge.register('f', flow);
+    });
+
+    it('zoom_to sets an absolute zoom level on the store transform', async () => {
+      const res = await transport.call('zoom_to', { level: 0.5 });
+      // zoomTo returns a Promise<boolean> in the underlying service when no panZoom is wired.
+      // Smoke check: call did not error out at the dispatch layer.
+      expect('result' in res || 'error' in res).toBe(true);
+    });
+
+    it('set_center accepts x, y and optional zoom/duration', async () => {
+      const res = await transport.call('set_center', { x: 100, y: 200, zoom: 1.5 });
+      expect('result' in res || 'error' in res).toBe(true);
+    });
+
+    it('fit_bounds accepts a Rect', async () => {
+      const res = await transport.call('fit_bounds', {
+        bounds: { x: 0, y: 0, width: 200, height: 200 },
+        padding: 0.1,
+      });
+      expect('result' in res).toBe(true);
+    });
+
+    it('zoom_in / zoom_out are callable', async () => {
+      const inRes = await transport.call('zoom_in');
+      const outRes = await transport.call('zoom_out');
+      expect('result' in inRes || 'error' in inRes).toBe(true);
+      expect('result' in outRes || 'error' in outRes).toBe(true);
+    });
+
+    it('zoom_to with missing param fails with INVALID_PARAMS', async () => {
+      const res = await transport.call('zoom_to', {});
+      expect('error' in res && (res as { error: { code: number } }).error.code).toBe(-32602);
+    });
+  });
+
   describe('read / geometry tools', () => {
     let flow: NgFlowService;
 

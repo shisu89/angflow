@@ -419,4 +419,76 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'zoom_in',
+    description: 'Zoom the viewport in by one step. Optionally animate over duration ms.',
+    inputSchema: {
+      type: 'object',
+      properties: { flowId: { type: 'string' }, duration: { type: 'number' } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'zoom_out',
+    description: 'Zoom the viewport out by one step. Optionally animate over duration ms.',
+    inputSchema: {
+      type: 'object',
+      properties: { flowId: { type: 'string' }, duration: { type: 'number' } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'zoom_to',
+    description: 'Set the viewport zoom to an absolute level (clamped to minZoom/maxZoom).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        level: { type: 'number' },
+        duration: { type: 'number' },
+      },
+      required: ['level'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'set_center',
+    description: 'Center the viewport on a flow-space coordinate. Optional zoom and animation duration.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        x: { type: 'number' },
+        y: { type: 'number' },
+        zoom: { type: 'number' },
+        duration: { type: 'number' },
+      },
+      required: ['x', 'y'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'fit_bounds',
+    description: 'Fit the viewport to a specific Rect in flow coordinates.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        bounds: {
+          type: 'object',
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+            width: { type: 'number' },
+            height: { type: 'number' },
+          },
+          required: ['x', 'y', 'width', 'height'],
+        },
+        padding: { type: 'number' },
+        duration: { type: 'number' },
+      },
+      required: ['bounds'],
+      additionalProperties: false,
+    },
+  },
 ];
