@@ -18,6 +18,8 @@ import {
   type EdgeBase,
   type InternalNodeUpdate,
   type HandleType,
+  type NodeChange,
+  type EdgeChange,
 } from '@angflow/system';
 
 import { FlowStore } from './flow-store.service';
@@ -201,7 +203,9 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   /** Append one or more nodes to the current array. */
   addNodes(nodes: NodeType | NodeType[]): void {
     const toAdd = Array.isArray(nodes) ? nodes : [nodes];
-    this.store.setNodes([...this.store.nodes(), ...toAdd]);
+    if (!toAdd.length) return;
+    const changes: NodeChange<NodeType>[] = toAdd.map((item) => ({ type: 'add', item }));
+    this.store.triggerNodeChanges(changes);
   }
 
   /**
@@ -209,15 +213,11 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * Other nodes are left untouched.
    */
   updateNode(id: string, nodeUpdate: Partial<NodeType> | ((node: NodeType) => Partial<NodeType>)): void {
-    this.store.setNodes(
-      this.store.nodes().map((node) => {
-        if (node.id === id) {
-          const update = typeof nodeUpdate === 'function' ? nodeUpdate(node) : nodeUpdate;
-          return { ...node, ...update };
-        }
-        return node;
-      })
-    );
+    const current = this.store.nodes().find((n) => n.id === id);
+    if (!current) return;
+    const update = typeof nodeUpdate === 'function' ? nodeUpdate(current) : nodeUpdate;
+    const next = { ...current, ...update } as NodeType;
+    this.store.triggerNodeChanges([{ id, type: 'replace', item: next }]);
   }
 
   /**
@@ -225,15 +225,11 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * `updateNode(id, n => ({ data: { ...n.data, ...dataUpdate } }))`.
    */
   updateNodeData(id: string, dataUpdate: Record<string, unknown> | ((data: NodeType['data']) => Record<string, unknown>)): void {
-    this.store.setNodes(
-      this.store.nodes().map((node) => {
-        if (node.id === id) {
-          const update = typeof dataUpdate === 'function' ? dataUpdate(node.data) : dataUpdate;
-          return { ...node, data: { ...node.data, ...update } };
-        }
-        return node;
-      })
-    );
+    const current = this.store.nodes().find((n) => n.id === id);
+    if (!current) return;
+    const update = typeof dataUpdate === 'function' ? dataUpdate(current.data) : dataUpdate;
+    const next = { ...current, data: { ...current.data, ...update } } as NodeType;
+    this.store.triggerNodeChanges([{ id, type: 'replace', item: next }]);
   }
 
   // ── Edge Operations ───────────────────────────────────────────────────
@@ -256,33 +252,27 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   /** Append one or more edges to the current array. */
   addEdges(edges: EdgeType | EdgeType[]): void {
     const toAdd = Array.isArray(edges) ? edges : [edges];
-    this.store.setEdges([...this.store.edges(), ...toAdd]);
+    if (!toAdd.length) return;
+    const changes: EdgeChange<EdgeType>[] = toAdd.map((item) => ({ type: 'add', item }));
+    this.store.triggerEdgeChanges(changes);
   }
 
   /** Apply a shallow merge (or updater function) to a single edge. */
   updateEdge(id: string, edgeUpdate: Partial<EdgeType> | ((edge: EdgeType) => Partial<EdgeType>)): void {
-    this.store.setEdges(
-      this.store.edges().map((edge) => {
-        if (edge.id === id) {
-          const update = typeof edgeUpdate === 'function' ? edgeUpdate(edge) : edgeUpdate;
-          return { ...edge, ...update };
-        }
-        return edge;
-      })
-    );
+    const current = this.store.edges().find((e) => e.id === id);
+    if (!current) return;
+    const update = typeof edgeUpdate === 'function' ? edgeUpdate(current) : edgeUpdate;
+    const next = { ...current, ...update } as EdgeType;
+    this.store.triggerEdgeChanges([{ id, type: 'replace', item: next }]);
   }
 
   /** Merge `dataUpdate` into a single edge's `data` object. */
   updateEdgeData(id: string, dataUpdate: Record<string, unknown> | ((data: EdgeType['data']) => Record<string, unknown>)): void {
-    this.store.setEdges(
-      this.store.edges().map((edge) => {
-        if (edge.id === id) {
-          const update = typeof dataUpdate === 'function' ? dataUpdate(edge.data) : dataUpdate;
-          return { ...edge, data: { ...edge.data, ...update } };
-        }
-        return edge;
-      })
-    );
+    const current = this.store.edges().find((e) => e.id === id);
+    if (!current) return;
+    const update = typeof dataUpdate === 'function' ? dataUpdate(current.data) : dataUpdate;
+    const next = { ...current, data: { ...current.data, ...update } } as EdgeType;
+    this.store.triggerEdgeChanges([{ id, type: 'replace', item: next }]);
   }
 
   // ── Batch ─────────────────────────────────────────────────────────────

@@ -2,13 +2,21 @@ import type { Type, Signal } from '@angular/core';
 import type { NodeBase, InternalNodeBase, NodeProps as NodePropsBase, CoordinateExtent, OnError, Position } from '@angflow/system';
 
 /**
+ * CSS-in-JS style object. Like React's `CSSProperties`, accepts numbers for
+ * numeric CSS/SVG properties (e.g. `strokeWidth: 1`, `opacity: 0.5`).
+ */
+export type CSSProperties = { [K in keyof CSSStyleDeclaration]?: string | number | null } & {
+  [key: string]: string | number | null | undefined;
+};
+
+/**
  * The Node type represents everything Angular Flow needs to know about a given node.
  */
 export type Node<
   NodeData extends Record<string, unknown> = Record<string, unknown>,
   NodeType extends string | undefined = string | undefined
 > = NodeBase<NodeData, NodeType> & {
-  style?: Partial<CSSStyleDeclaration>;
+  style?: CSSProperties;
   className?: string;
   resizing?: boolean;
   focusable?: boolean;

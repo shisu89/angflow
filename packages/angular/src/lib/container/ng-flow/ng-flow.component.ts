@@ -3,7 +3,6 @@ import {
   ChangeDetectionStrategy,
   input,
   output,
-  model,
   effect,
   viewChild,
   contentChildren,
@@ -96,10 +95,10 @@ import type {
  * plugin components like `<ng-flow-background>`, `<ng-flow-controls>`, and
  * `<ng-flow-minimap>`.
  *
- * `nodes`, `edges`, and `viewport` are two-way bindable (`model`) — you can
- * either drive them by pushing new arrays back in response to `(nodesChange)`
- * / `(edgesChange)` (controlled) or hand them off via `defaultNodes` /
- * `defaultEdges` (uncontrolled).
+ * `nodes`, `edges`, and `viewport` are input-bound — for controlled mode, bind
+ * `[nodes]` / `[edges]` and re-assign them from `(nodesChange)` / `(edgesChange)`
+ * after running the deltas through `applyNodeChanges` / `applyEdgeChanges`. For
+ * uncontrolled mode hand off initial state via `defaultNodes` / `defaultEdges`.
  *
  * @example
  * ```html
@@ -248,16 +247,16 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     return mode;
   });
 
-  // ── Data (model = two-way binding) ────────────────────────────────────
+  // ── Data (controlled-mode inputs; pair with the *Change outputs) ──────
 
-  /** Nodes to render. Two-way bindable; pair with `(nodesChange)` and `applyNodeChanges` to keep in sync. */
-  readonly nodesModel = model<NodeType[]>([] as unknown as NodeType[], { alias: 'nodes' });
+  /** Nodes to render. Re-bind from `(nodesChange)` after running deltas through `applyNodeChanges` to stay in sync. */
+  readonly nodesModel = input<NodeType[]>([] as unknown as NodeType[], { alias: 'nodes' });
 
-  /** Edges to render. Two-way bindable; pair with `(edgesChange)` and `applyEdgeChanges` to keep in sync. */
-  readonly edgesModel = model<EdgeType[]>([] as unknown as EdgeType[], { alias: 'edges' });
+  /** Edges to render. Re-bind from `(edgesChange)` after running deltas through `applyEdgeChanges` to stay in sync. */
+  readonly edgesModel = input<EdgeType[]>([] as unknown as EdgeType[], { alias: 'edges' });
 
-  /** Current viewport (`{ x, y, zoom }`). Two-way bindable. Fires `(viewportChange)` on pan/zoom. */
-  readonly viewportModel = model<Viewport | undefined>(undefined, { alias: 'viewport' });
+  /** Current viewport (`{ x, y, zoom }`). Fires `(viewportChange)` on pan/zoom. */
+  readonly viewportModel = input<Viewport | undefined>(undefined, { alias: 'viewport' });
 
   // ── Data (input-only for uncontrolled mode) ───────────────────────────
 

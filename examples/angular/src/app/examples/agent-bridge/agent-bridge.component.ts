@@ -50,7 +50,9 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
             <pre class="agent-panel__code">await angflow.callTool('add_node', {{ '{' }}
   node: {{ '{' }} id: 'a' + Date.now(), position: {{ '{' }} x: 200, y: 200 {{ '}' }}, data: {{ '{' }} label: 'agent' {{ '}' }} {{ '}' }}
 {{ '}' }})</pre>
-            <pre class="agent-panel__code">angflow.subscribe(e => console.log(e))</pre>
+            <pre class="agent-panel__code">// keep the returned function so you can stop listening
+const off = angflow.subscribe(e => console.log(e))
+// off()  // call when done</pre>
             <div class="agent-panel__title">Activity</div>
             <div class="agent-panel__log">
               @for (line of log(); track line.id) {
@@ -120,6 +122,7 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
 export class AgentBridgeExampleComponent implements OnDestroy {
   private readonly bridge = inject(AngflowAgentBridge);
   private unregister?: () => void;
+  private unsubscribeFromBridge?: () => void;
   private nextLogId = 1;
 
   nodes: Node[] = [
@@ -142,7 +145,7 @@ export class AgentBridgeExampleComponent implements OnDestroy {
     if (typeof window !== 'undefined') {
       const api = (window as unknown as { angflow?: { subscribe: (h: (e: unknown) => void) => () => void } }).angflow;
       if (api) {
-        api.subscribe((evt) => {
+        this.unsubscribeFromBridge = api.subscribe((evt) => {
           const e = evt as { event?: string; params?: { flowId?: string } };
           if (e.event === 'flow.state' && e.params?.flowId === 'demo') return;
           this.appendLog(`${e.event ?? 'event'}` + (e.params?.flowId ? ` (${e.params.flowId})` : ''));
@@ -152,6 +155,7 @@ export class AgentBridgeExampleComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.unsubscribeFromBridge?.();
     this.unregister?.();
   }
 

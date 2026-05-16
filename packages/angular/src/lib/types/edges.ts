@@ -14,16 +14,16 @@ import type {
   XYPosition,
 } from '@angflow/system';
 
-import type { InternalNode, Node } from './nodes';
+import type { InternalNode, Node, CSSProperties } from './nodes';
 
 /**
  * Options for edge label rendering.
  */
 export type EdgeLabelOptions = {
   label?: string;
-  labelStyle?: Partial<CSSStyleDeclaration>;
+  labelStyle?: CSSProperties;
   labelShowBg?: boolean;
-  labelBgStyle?: Partial<CSSStyleDeclaration>;
+  labelBgStyle?: CSSProperties;
   labelBgPadding?: [number, number];
   labelBgBorderRadius?: number;
 };
@@ -36,12 +36,13 @@ export type Edge<
   EdgeType extends string | undefined = string | undefined
 > = EdgeBase<EdgeData, EdgeType> &
   EdgeLabelOptions & {
-    style?: Partial<CSSStyleDeclaration>;
+    style?: CSSProperties;
     className?: string;
     reconnectable?: boolean | HandleType;
     focusable?: boolean;
     ariaRole?: string;
     domAttributes?: Record<string, string>;
+    pathOptions?: BezierPathOptions | SmoothStepPathOptions | StepPathOptions;
   };
 
 export type BuiltInEdge =

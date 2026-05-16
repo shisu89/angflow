@@ -211,6 +211,7 @@ export class AngflowAgentBridge {
 
   private watchFlow(id: string, flow: NgFlowService): EffectRef {
     let pending = false;
+    let lastSignature = '';
     return runInInjectionContext(this.injector, () =>
       effect(() => {
         // Touch every signal we want to broadcast so the effect re-runs on change.
@@ -225,19 +226,22 @@ export class AngflowAgentBridge {
         queueMicrotask(() => {
           pending = false;
           // Re-read on flush so coalesced bursts see the latest state.
-          this.emit({
-            event: 'flow.state',
-            params: {
-              flowId: id,
-              nodes: flow.getNodes(),
-              edges: flow.getEdges(),
-              viewport: flow.getViewport(),
-              selection: {
-                nodeIds: flow.selectedNodes().map((n: Node) => n.id),
-                edgeIds: flow.selectedEdges().map((e: Edge) => e.id),
-              },
+          const params = {
+            flowId: id,
+            nodes: flow.getNodes(),
+            edges: flow.getEdges(),
+            viewport: flow.getViewport(),
+            selection: {
+              nodeIds: flow.selectedNodes().map((n: Node) => n.id),
+              edgeIds: flow.selectedEdges().map((e: Edge) => e.id),
             },
-          });
+          };
+          // Suppress duplicate emissions when controlled-mode round-trips bounce
+          // the same state through the store twice. Cheap signature: ids + counts.
+          const sig = signatureOf(params);
+          if (sig === lastSignature) return;
+          lastSignature = sig;
+          this.emit({ event: 'flow.state', params });
         });
       }),
     );
@@ -339,6 +343,22 @@ export class AngflowAgentBridge {
 
 class FlowNotFoundError extends Error {}
 class InvalidParamsError extends Error {}
+
+function signatureOf(params: {
+  flowId: string;
+  nodes: readonly { id: string; position: { x: number; y: number }; measured?: { width?: number; height?: number } }[];
+  edges: readonly { id: string; source: string; target: string }[];
+  viewport: { x: number; y: number; zoom: number };
+  selection: { nodeIds: string[]; edgeIds: string[] };
+}): string {
+  const n = params.nodes
+    .map((n) => `${n.id}:${n.position.x},${n.position.y}:${n.measured?.width ?? '-'}x${n.measured?.height ?? '-'}`)
+    .join('|');
+  const e = params.edges.map((e) => `${e.id}:${e.source}>${e.target}`).join('|');
+  const v = `${params.viewport.x},${params.viewport.y},${params.viewport.zoom}`;
+  const s = `${params.selection.nodeIds.join(',')}/${params.selection.edgeIds.join(',')}`;
+  return `${n}#${e}#${v}#${s}`;
+}
 
 function requireString(params: Record<string, unknown>, key: string): string {
   const value = params[key];

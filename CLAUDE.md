@@ -104,3 +104,14 @@ The Angular package assumes no Zone.js. These rules preserve that invariant:
 3. **Timers are fine.** `setTimeout` / `setInterval` / `requestAnimationFrame` used to schedule logic are framework-agnostic and work in both zoneless and zonal modes. Only the *purpose* matters — using them to force CD is forbidden (rule 2); using them to delay work is allowed.
 
 Library builds and examples must keep the zonal example suite passing (`examples/angular/`) and meet the zoneless example validation bar documented in `docs/superpowers/specs/2026-04-18-angular-19-zoneless-upgrade-design.md`.
+
+## Agent Bridge
+
+The `AngflowAgentBridge` (in `packages/angular/src/lib/agent/`) exposes flows to AI agents over JSON-RPC. **Reference doc: [`packages/angular/AGENT_BRIDGE.md`](packages/angular/AGENT_BRIDGE.md)** — covers wiring, the full tool catalog, events, error codes, and how to add a new tool.
+
+**When making changes in this area, update `AGENT_BRIDGE.md` in the same commit.** That includes:
+- Adding, removing, or renaming a tool in `tool-schemas.ts` / `installHandlers()`
+- Changing a tool's params, return shape, or error behavior
+- Adding or modifying a transport (`transports/*.ts`)
+- Adding or changing a push event in `watchFlow()`
+- Changing the `register` / `unregister` / `callTool` public surface on `AngflowAgentBridge`
