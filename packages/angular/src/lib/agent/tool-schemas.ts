@@ -491,4 +491,97 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'add_nodes',
+    description: 'Append multiple nodes in a single call. Each node must include id, position, and data.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        nodes: { type: 'array', items: { type: 'object' } },
+      },
+      required: ['nodes'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'add_edges',
+    description: 'Append multiple edges in a single call. Each edge must include id, source, and target.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        edges: { type: 'array', items: { type: 'object' } },
+      },
+      required: ['edges'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'update_node_data',
+    description: 'Merge dataPatch into the named node\'s data object. Leaves other node fields untouched.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        id: { type: 'string' },
+        dataPatch: { type: 'object' },
+      },
+      required: ['id', 'dataPatch'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'update_edge_data',
+    description: 'Merge dataPatch into the named edge\'s data object.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        id: { type: 'string' },
+        dataPatch: { type: 'object' },
+      },
+      required: ['id', 'dataPatch'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'select_nodes',
+    description:
+      'Select the given node ids. additive=false (default) replaces the current selection; ' +
+      'additive=true adds to it.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        nodeIds: { type: 'array', items: { type: 'string' } },
+        additive: { type: 'boolean' },
+      },
+      required: ['nodeIds'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'select_edges',
+    description: 'Select the given edge ids. additive replaces (default) or adds to current selection.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        edgeIds: { type: 'array', items: { type: 'string' } },
+        additive: { type: 'boolean' },
+      },
+      required: ['edgeIds'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'deselect_all',
+    description: 'Clear node and edge selection.',
+    inputSchema: {
+      type: 'object',
+      properties: { flowId: { type: 'string' } },
+      additionalProperties: false,
+    },
+  },
 ];

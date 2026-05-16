@@ -288,6 +288,89 @@ describe('AngflowAgentBridge', () => {
     });
   });
 
+  describe('mutation tools (bulk add and data patches)', () => {
+    let flow: NgFlowService;
+    beforeEach(() => {
+      flow = newFlow();
+      bridge.register('f', flow);
+    });
+
+    it('add_nodes appends multiple nodes', async () => {
+      const res = await transport.call('add_nodes', {
+        nodes: [
+          { id: 'a', position: { x: 0, y: 0 }, data: {} },
+          { id: 'b', position: { x: 100, y: 0 }, data: {} },
+        ],
+      });
+      expect('result' in res).toBe(true);
+      expect(flow.getNodes().map((n) => n.id).sort()).toEqual(['a', 'b']);
+    });
+
+    it('add_edges appends multiple edges', async () => {
+      flow.setNodes([makeNode('a'), makeNode('b'), makeNode('c')]);
+      await transport.call('add_edges', {
+        edges: [
+          { id: 'a-b', source: 'a', target: 'b' },
+          { id: 'b-c', source: 'b', target: 'c' },
+        ],
+      });
+      expect(flow.getEdges().map((e) => e.id).sort()).toEqual(['a-b', 'b-c']);
+    });
+
+    it('update_node_data merges into node.data only', async () => {
+      flow.setNodes([{ ...makeNode('n'), data: { x: 1, y: 2 } } as Node]);
+      await transport.call('update_node_data', { id: 'n', dataPatch: { y: 99, z: 3 } });
+      expect(flow.getNode('n')?.data).toEqual({ x: 1, y: 99, z: 3 });
+    });
+
+    it('update_edge_data merges into edge.data only', async () => {
+      flow.setNodes([makeNode('a'), makeNode('b')]);
+      flow.setEdges([{ id: 'e', source: 'a', target: 'b', data: { a: 1 } } as Edge]);
+      await transport.call('update_edge_data', { id: 'e', dataPatch: { b: 2 } });
+      expect(flow.getEdge('e')?.data).toEqual({ a: 1, b: 2 });
+    });
+  });
+
+  describe('selection tools', () => {
+    let flow: NgFlowService;
+    beforeEach(() => {
+      flow = newFlow();
+      bridge.register('f', flow);
+      flow.setNodes([makeNode('a'), makeNode('b'), makeNode('c')]);
+      flow.setEdges([
+        { id: 'a-b', source: 'a', target: 'b' } as Edge,
+        { id: 'b-c', source: 'b', target: 'c' } as Edge,
+      ]);
+    });
+
+    it('select_nodes replaces selection by default', async () => {
+      await transport.call('select_nodes', { nodeIds: ['a'] });
+      expect(flow.selectedNodes().map((n) => n.id)).toEqual(['a']);
+
+      await transport.call('select_nodes', { nodeIds: ['b'] });
+      expect(flow.selectedNodes().map((n) => n.id)).toEqual(['b']);
+    });
+
+    it('select_nodes with additive=true extends selection', async () => {
+      await transport.call('select_nodes', { nodeIds: ['a'] });
+      await transport.call('select_nodes', { nodeIds: ['b'], additive: true });
+      expect(flow.selectedNodes().map((n) => n.id).sort()).toEqual(['a', 'b']);
+    });
+
+    it('select_edges replaces edge selection', async () => {
+      await transport.call('select_edges', { edgeIds: ['a-b'] });
+      expect(flow.selectedEdges().map((e) => e.id)).toEqual(['a-b']);
+    });
+
+    it('deselect_all clears both', async () => {
+      await transport.call('select_nodes', { nodeIds: ['a', 'b'], additive: true });
+      await transport.call('select_edges', { edgeIds: ['a-b'] });
+      await transport.call('deselect_all');
+      expect(flow.selectedNodes().length).toBe(0);
+      expect(flow.selectedEdges().length).toBe(0);
+    });
+  });
+
   describe('read / geometry tools', () => {
     let flow: NgFlowService;
 

@@ -466,6 +466,52 @@ export class AngflowAgentBridge {
       const duration = typeof params['duration'] === 'number' ? (params['duration'] as number) : undefined;
       return flow.fitBounds(bounds, { padding, duration });
     });
+
+    this.handlers.set('add_nodes', (flow, params) => {
+      const nodes = requireArray(params, 'nodes') as Node[];
+      flow.addNodes(nodes);
+      return nodes.map((n) => flow.getNode(n.id)).filter((n): n is Node => !!n);
+    });
+
+    this.handlers.set('add_edges', (flow, params) => {
+      const edges = requireArray(params, 'edges') as Edge[];
+      flow.addEdges(edges);
+      return edges.map((e) => flow.getEdge(e.id)).filter((e): e is Edge => !!e);
+    });
+
+    this.handlers.set('update_node_data', (flow, params) => {
+      const id = requireString(params, 'id');
+      const dataPatch = requireObject(params, 'dataPatch');
+      flow.updateNodeData(id, dataPatch);
+      return flow.getNode(id) ?? null;
+    });
+
+    this.handlers.set('update_edge_data', (flow, params) => {
+      const id = requireString(params, 'id');
+      const dataPatch = requireObject(params, 'dataPatch');
+      flow.updateEdgeData(id, dataPatch);
+      return flow.getEdge(id) ?? null;
+    });
+
+    this.handlers.set('select_nodes', (flow, params) => {
+      const nodeIds = optionalStringArray(params, 'nodeIds');
+      if (!nodeIds) throw new InvalidParamsError('Param "nodeIds" must be an array of strings.');
+      const additive = typeof params['additive'] === 'boolean' ? (params['additive'] as boolean) : false;
+      flow.setSelection({ nodeIds, additive });
+      return { selectedNodeIds: flow.selectedNodes().map((n) => n.id) };
+    });
+
+    this.handlers.set('select_edges', (flow, params) => {
+      const edgeIds = optionalStringArray(params, 'edgeIds');
+      if (!edgeIds) throw new InvalidParamsError('Param "edgeIds" must be an array of strings.');
+      const additive = typeof params['additive'] === 'boolean' ? (params['additive'] as boolean) : false;
+      flow.setSelection({ edgeIds, additive });
+      return { selectedEdgeIds: flow.selectedEdges().map((e) => e.id) };
+    });
+
+    this.handlers.set('deselect_all', (flow) => {
+      flow.setSelection({ nodeIds: [], edgeIds: [], additive: false });
+    });
   }
 }
 
