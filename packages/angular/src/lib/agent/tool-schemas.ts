@@ -563,7 +563,9 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
   },
   {
     name: 'select_edges',
-    description: 'Select the given edge ids. additive replaces (default) or adds to current selection.',
+    description:
+      'Select the given edge ids. additive=false (default) replaces the current selection; ' +
+      'additive=true adds to it.',
     inputSchema: {
       type: 'object',
       properties: {
