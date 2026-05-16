@@ -284,25 +284,30 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * Selection changes flow through the normal change pipeline, so consumers
    * subscribed to `(nodesChange)` / `(edgesChange)` will see selection-change
    * entries.
+   *
+   * Pass `{}` (or empty arrays) with `additive: false` (the default) to clear
+   * the entire selection.
    */
   setSelection(params: { nodeIds?: string[]; edgeIds?: string[]; additive?: boolean }): void {
     const additive = params.additive ?? false;
     const nodeIds = params.nodeIds;
     const edgeIds = params.edgeIds;
 
-    if (!additive) {
-      this.store.unselectNodesAndEdges();
-    }
+    this.store.batch(() => {
+      if (!additive) {
+        this.store.unselectNodesAndEdges();
+      }
 
-    if (nodeIds && nodeIds.length > 0) {
-      const changes = nodeIds.map((id) => ({ id, type: 'select' as const, selected: true }));
-      this.store.triggerNodeChanges(changes as NodeChange<NodeType>[]);
-    }
+      if (nodeIds && nodeIds.length > 0) {
+        const changes = nodeIds.map((id) => ({ id, type: 'select' as const, selected: true }));
+        this.store.triggerNodeChanges(changes as NodeChange<NodeType>[]);
+      }
 
-    if (edgeIds && edgeIds.length > 0) {
-      const changes = edgeIds.map((id) => ({ id, type: 'select' as const, selected: true }));
-      this.store.triggerEdgeChanges(changes as EdgeChange<EdgeType>[]);
-    }
+      if (edgeIds && edgeIds.length > 0) {
+        const changes = edgeIds.map((id) => ({ id, type: 'select' as const, selected: true }));
+        this.store.triggerEdgeChanges(changes as EdgeChange<EdgeType>[]);
+      }
+    });
   }
 
   // ── Batch ─────────────────────────────────────────────────────────────
