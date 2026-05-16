@@ -553,6 +553,173 @@ describe('AngflowAgentBridge', () => {
       expect(flow.selectedNodes().map((n) => n.id)).toEqual(['b']);
     });
   });
+
+  describe('history (undo/redo)', () => {
+    async function flushEffects(): Promise<void> {
+      TestBed.tick();
+      await new Promise<void>((r) => queueMicrotask(r));
+    }
+
+    let flow: NgFlowService;
+    beforeEach(() => {
+      flow = newFlow();
+      bridge.register('f', flow);
+    });
+
+    it('undo restores prior nodes state', async () => {
+      await transport.call('add_node', { node: { id: 'a', position: { x: 0, y: 0 }, data: {} } });
+      expect(flow.getNodes().map((n) => n.id)).toEqual(['a']);
+
+      const undoRes = await transport.call('undo');
+      expect((undoRes as { result: { undone: number } }).result.undone).toBe(1);
+      expect(flow.getNodes()).toEqual([]);
+    });
+
+    it('redo re-applies the undone state', async () => {
+      await transport.call('add_node', { node: { id: 'a', position: { x: 0, y: 0 }, data: {} } });
+      await transport.call('undo');
+      const redoRes = await transport.call('redo');
+      expect((redoRes as { result: { redone: number } }).result.redone).toBe(1);
+      expect(flow.getNodes().map((n) => n.id)).toEqual(['a']);
+    });
+
+    it('selection ops do NOT capture history', async () => {
+      flow.setNodes([makeNode('a')]);
+      // Initial selection is empty; capture stack should be empty.
+      let status = (await transport.call('history_status')) as { result: { pastDepth: number } };
+      expect(status.result.pastDepth).toBe(0);
+
+      await transport.call('select_nodes', { nodeIds: ['a'] });
+      status = (await transport.call('history_status')) as { result: { pastDepth: number } };
+      expect(status.result.pastDepth).toBe(0);
+    });
+
+    it('viewport ops do NOT capture history', async () => {
+      await transport.call('zoom_in');
+      const status = (await transport.call('history_status')) as { result: { pastDepth: number } };
+      expect(status.result.pastDepth).toBe(0);
+    });
+
+    it('apply_changes creates a single history entry when ops include mutation', async () => {
+      await transport.call('apply_changes', {
+        ops: [
+          { op: 'add_node', node: { id: 'a', position: { x: 0, y: 0 }, data: {} } },
+          { op: 'add_node', node: { id: 'b', position: { x: 100, y: 0 }, data: {} } },
+        ],
+      });
+      const status = (await transport.call('history_status')) as { result: { pastDepth: number } };
+      expect(status.result.pastDepth).toBe(1);
+    });
+
+    it('apply_changes with only selection ops does NOT capture history', async () => {
+      flow.setNodes([makeNode('a')]);
+      await transport.call('apply_changes', {
+        ops: [{ op: 'select_nodes', nodeIds: ['a'] }],
+      });
+      const status = (await transport.call('history_status')) as { result: { pastDepth: number } };
+      expect(status.result.pastDepth).toBe(0);
+    });
+
+    it('rolled-back apply_changes does NOT capture history', async () => {
+      flow.setNodes([makeNode('a')]);
+      await transport.call('apply_changes', {
+        ops: [{ op: 'update_node', id: 'nope', patch: { data: {} } }],
+      });
+      const status = (await transport.call('history_status')) as { result: { pastDepth: number } };
+      expect(status.result.pastDepth).toBe(0);
+    });
+
+    it('clear_history empties both stacks', async () => {
+      await transport.call('add_node', { node: { id: 'a', position: { x: 0, y: 0 }, data: {} } });
+      await transport.call('undo');
+      await transport.call('clear_history');
+      const status = (await transport.call('history_status')) as {
+        result: { canUndo: boolean; canRedo: boolean };
+      };
+      expect(status.result.canUndo).toBe(false);
+      expect(status.result.canRedo).toBe(false);
+    });
+
+    it('flow.history is emitted on capture, undo, redo, and clear', async () => {
+      await flushEffects();
+      transport.events.length = 0;
+
+      await transport.call('add_node', { node: { id: 'a', position: { x: 0, y: 0 }, data: {} } });
+      await flushEffects();
+      expect(transport.events.some((e) => 'event' in e && e.event === 'flow.history')).toBe(true);
+
+      transport.events.length = 0;
+      await transport.call('undo');
+      await flushEffects();
+      expect(transport.events.some((e) => 'event' in e && e.event === 'flow.history')).toBe(true);
+
+      transport.events.length = 0;
+      await transport.call('redo');
+      await flushEffects();
+      expect(transport.events.some((e) => 'event' in e && e.event === 'flow.history')).toBe(true);
+
+      transport.events.length = 0;
+      await transport.call('clear_history');
+      await flushEffects();
+      expect(transport.events.some((e) => 'event' in e && e.event === 'flow.history')).toBe(true);
+    });
+
+    it('maxDepth caps the history stack', async () => {
+      // Reset bridge with a tiny maxDepth.
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          provideZonelessChangeDetection(),
+          provideAgentBridge({ transports: [transport], history: { maxDepth: 2 } }),
+        ],
+      });
+      const b = TestBed.inject(AngflowAgentBridge);
+      const child = Injector.create({
+        providers: [FlowStore, NgFlowService],
+        parent: TestBed.inject(Injector),
+      });
+      const f = child.get(NgFlowService);
+      b.register('f', f);
+
+      for (let i = 0; i < 5; i++) {
+        await transport.call('add_node', {
+          node: { id: `n${i}`, position: { x: i * 10, y: 0 }, data: {} },
+        });
+      }
+      const status = (await transport.call('history_status')) as { result: { pastDepth: number } };
+      expect(status.result.pastDepth).toBe(2);
+    });
+  });
+});
+
+describe('history disabled (history: false)', () => {
+  let bridge2: AngflowAgentBridge;
+  let transport2: CapturingTransport;
+  let flow: NgFlowService;
+  beforeEach(() => {
+    transport2 = new CapturingTransport();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideAgentBridge({ transports: [transport2], history: false }),
+      ],
+    });
+    bridge2 = TestBed.inject(AngflowAgentBridge);
+    const child = Injector.create({
+      providers: [FlowStore, NgFlowService],
+      parent: TestBed.inject(Injector),
+    });
+    flow = child.get(NgFlowService);
+    bridge2.register('f', flow);
+  });
+
+  it('undo is a no-op when history is disabled', async () => {
+    await transport2.call('add_node', { node: { id: 'a', position: { x: 0, y: 0 }, data: {} } });
+    const res = await transport2.call('undo');
+    expect((res as { result: { undone: number } }).result.undone).toBe(0);
+    expect(flow.getNodes().map((n) => n.id)).toEqual(['a']);
+  });
 });
 
 describe('WindowTransport', () => {

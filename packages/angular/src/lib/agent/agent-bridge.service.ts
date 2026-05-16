@@ -13,6 +13,8 @@ import {
 
 import type { NgFlowService } from '../services/ng-flow.service';
 import type { Node, Edge } from '../types';
+import { AgentHistory } from './history';
+import type { AgentHistoryOptions } from './history';
 import { AGENT_TOOL_SCHEMAS } from './tool-schemas';
 import type {
   AgentInbound,
@@ -24,10 +26,30 @@ import type {
 /** Provider token holding the user-supplied transport(s). */
 export const AGENT_TRANSPORTS = new InjectionToken<AgentTransport[]>('AngflowAgentTransports');
 
+/** Provider token for history config. `false` disables history entirely. */
+export const AGENT_HISTORY_OPTIONS = new InjectionToken<AgentHistoryOptions | false>(
+  'AngflowAgentHistoryOptions',
+);
+
 const ERROR_INVALID_PARAMS = -32602;
 const ERROR_METHOD_NOT_FOUND = -32601;
 const ERROR_FLOW_NOT_FOUND = -32000;
 const ERROR_INTERNAL = -32603;
+
+const MUTATING_TOOLS = new Set<string>([
+  'add_node',
+  'add_nodes',
+  'add_edge',
+  'add_edges',
+  'update_node',
+  'update_node_data',
+  'update_edge',
+  'update_edge_data',
+  'delete_elements',
+  'set_nodes',
+  'set_edges',
+]);
+// apply_changes is treated specially — see dispatch logic.
 
 type RegisteredFlow = {
   service: NgFlowService;
@@ -70,6 +92,7 @@ export class AngflowAgentBridge {
 
   private readonly flows = new Map<string, RegisteredFlow>();
   private readonly transports: AgentTransport[];
+  private readonly history: AgentHistory | null;
   private readonly handlers = new Map<string, ToolHandler>();
   private readonly injector = inject(Injector);
   private started = false;
@@ -79,8 +102,11 @@ export class AngflowAgentBridge {
 
   constructor(
     @Optional() @Inject(AGENT_TRANSPORTS) transports: AgentTransport[] | null,
+    @Optional() @Inject(AGENT_HISTORY_OPTIONS) historyOptions: AgentHistoryOptions | false | null,
   ) {
     this.transports = transports ?? [];
+    this.history =
+      historyOptions === false ? null : new AgentHistory(historyOptions ?? undefined);
     this.installHandlers();
     this.start();
   }
@@ -112,6 +138,7 @@ export class AngflowAgentBridge {
     if (!entry) return;
     entry.watcher.destroy();
     this.flows.delete(id);
+    this.history?.dropFlow(id);
     this.registeredFlows.set(Array.from(this.flows.keys()));
     this.emit({ event: 'flow.unregistered', params: { flowId: id } });
   }
@@ -163,7 +190,38 @@ export class AngflowAgentBridge {
         return { id: req.id, result };
       }
       const flow = this.resolveFlow(params['flowId']);
+      const flowId = this.findFlowId(flow);
+      const isApplyChanges = req.method === 'apply_changes';
+
+      // Pre-mutation snapshot for history capture. Skipped for non-mutating tools.
+      let snapshot: { nodes: readonly Node[]; edges: readonly Edge[] } | null = null;
+      if (this.history && (MUTATING_TOOLS.has(req.method) || isApplyChanges)) {
+        snapshot = { nodes: flow.getNodes().slice(), edges: flow.getEdges().slice() };
+      }
+
       const result = await handler(flow, params);
+
+      // Commit the captured snapshot to history. For apply_changes, the handler
+      // either succeeded entirely or threw and was rolled back already.
+      if (snapshot && flowId && this.history) {
+        if (isApplyChanges) {
+          const ops = (params['ops'] as Array<Record<string, unknown>>) ?? [];
+          const hasNonSelection = ops.some(
+            (o) =>
+              o['op'] !== 'select_nodes' &&
+              o['op'] !== 'select_edges' &&
+              o['op'] !== 'deselect_all',
+          );
+          if (hasNonSelection) {
+            this.history.capture(flowId, snapshot);
+            this.emitHistory(flowId);
+          }
+        } else {
+          this.history.capture(flowId, snapshot);
+          this.emitHistory(flowId);
+        }
+      }
+
       return { id: req.id, result: result ?? null };
     } catch (err) {
       if (err instanceof FlowNotFoundError) {
@@ -190,6 +248,19 @@ export class AngflowAgentBridge {
         },
       };
     }
+  }
+
+  private findFlowId(flow: NgFlowService): string | null {
+    for (const [id, entry] of this.flows.entries()) {
+      if (entry.service === flow) return id;
+    }
+    return null;
+  }
+
+  private emitHistory(flowId: string): void {
+    if (!this.history) return;
+    const status = this.history.status(flowId);
+    this.emit({ event: 'flow.history', params: { flowId, ...status } });
   }
 
   private emit(evt: AgentEvent): void {
@@ -557,6 +628,57 @@ export class AngflowAgentBridge {
       }
 
       return { results };
+    });
+
+    this.handlers.set('undo', (flow, params) => {
+      if (!this.history) return { undone: 0, canUndo: false, canRedo: false };
+      const flowId = this.findFlowId(flow);
+      if (!flowId) return { undone: 0, canUndo: false, canRedo: false };
+      const steps = typeof params['steps'] === 'number' ? (params['steps'] as number) : 1;
+      const current = { nodes: flow.getNodes().slice(), edges: flow.getEdges().slice() };
+      const target = this.history.undo(flowId, steps, current);
+      if (target) {
+        flow.batch(() => {
+          flow.setNodes(target.nodes as Node[]);
+          flow.setEdges(target.edges as Edge[]);
+        });
+      }
+      this.emitHistory(flowId);
+      const status = this.history.status(flowId);
+      return { undone: target ? steps : 0, canUndo: status.canUndo, canRedo: status.canRedo };
+    });
+
+    this.handlers.set('redo', (flow, params) => {
+      if (!this.history) return { redone: 0, canUndo: false, canRedo: false };
+      const flowId = this.findFlowId(flow);
+      if (!flowId) return { redone: 0, canUndo: false, canRedo: false };
+      const steps = typeof params['steps'] === 'number' ? (params['steps'] as number) : 1;
+      const current = { nodes: flow.getNodes().slice(), edges: flow.getEdges().slice() };
+      const target = this.history.redo(flowId, steps, current);
+      if (target) {
+        flow.batch(() => {
+          flow.setNodes(target.nodes as Node[]);
+          flow.setEdges(target.edges as Edge[]);
+        });
+      }
+      this.emitHistory(flowId);
+      const status = this.history.status(flowId);
+      return { redone: target ? steps : 0, canUndo: status.canUndo, canRedo: status.canRedo };
+    });
+
+    this.handlers.set('history_status', (flow) => {
+      if (!this.history) return { canUndo: false, canRedo: false, pastDepth: 0, futureDepth: 0 };
+      const flowId = this.findFlowId(flow);
+      if (!flowId) return { canUndo: false, canRedo: false, pastDepth: 0, futureDepth: 0 };
+      return this.history.status(flowId);
+    });
+
+    this.handlers.set('clear_history', (flow) => {
+      if (!this.history) return;
+      const flowId = this.findFlowId(flow);
+      if (!flowId) return;
+      this.history.clear(flowId);
+      this.emitHistory(flowId);
     });
   }
 }

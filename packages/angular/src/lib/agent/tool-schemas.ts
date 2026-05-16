@@ -605,4 +605,48 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'undo',
+    description:
+      'Undo the last mutating tool call (or `steps` of them). Restores the snapshot taken before the mutation. ' +
+      'No-op when there is nothing to undo. Returns { undone, canUndo, canRedo }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        steps: { type: 'number' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'redo',
+    description: 'Inverse of undo. Returns { redone, canUndo, canRedo }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        steps: { type: 'number' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'history_status',
+    description: 'Return { canUndo, canRedo, pastDepth, futureDepth } for the flow.',
+    inputSchema: {
+      type: 'object',
+      properties: { flowId: { type: 'string' } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'clear_history',
+    description: 'Drop both undo and redo stacks for the flow.',
+    inputSchema: {
+      type: 'object',
+      properties: { flowId: { type: 'string' } },
+      additionalProperties: false,
+    },
+  },
 ];
