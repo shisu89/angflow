@@ -172,6 +172,16 @@ export class AngflowAgentBridge {
       if (err instanceof InvalidParamsError) {
         return { id: req.id, error: { code: ERROR_INVALID_PARAMS, message: err.message } };
       }
+      if (err instanceof ApplyChangesError) {
+        return {
+          id: req.id,
+          error: {
+            code: ERROR_INTERNAL,
+            message: err.message,
+            data: { failedIndex: err.failedIndex },
+          },
+        };
+      }
       return {
         id: req.id,
         error: {
@@ -512,11 +522,52 @@ export class AngflowAgentBridge {
     this.handlers.set('deselect_all', (flow) => {
       flow.setSelection({ nodeIds: [], edgeIds: [], additive: false });
     });
+
+    this.handlers.set('apply_changes', (flow, params) => {
+      const ops = requireArray(params, 'ops') as Array<Record<string, unknown>>;
+
+      // Capture snapshot for rollback. Viewport is not part of the snapshot per design.
+      const snapshot = {
+        nodes: flow.getNodes().slice(),
+        edges: flow.getEdges().slice(),
+      };
+
+      const results: Array<{ ok: true; value: unknown }> = [];
+      let failure: { failedIndex: number; cause: unknown } | null = null;
+
+      flow.batch(() => {
+        for (let i = 0; i < ops.length; i++) {
+          try {
+            results.push({ ok: true, value: executeOp(flow, ops[i]) });
+          } catch (err) {
+            failure = { failedIndex: i, cause: err };
+            break;
+          }
+        }
+      });
+
+      if (failure) {
+        flow.batch(() => {
+          flow.setNodes(snapshot.nodes as Node[]);
+          flow.setEdges(snapshot.edges as Edge[]);
+        });
+        const f = failure as { failedIndex: number; cause: unknown };
+        const message = f.cause instanceof Error ? f.cause.message : String(f.cause);
+        throw new ApplyChangesError(f.failedIndex, message);
+      }
+
+      return { results };
+    });
   }
 }
 
 class FlowNotFoundError extends Error {}
 class InvalidParamsError extends Error {}
+class ApplyChangesError extends Error {
+  constructor(public readonly failedIndex: number, message: string) {
+    super(message);
+  }
+}
 
 function signatureOf(params: {
   flowId: string;
@@ -532,6 +583,110 @@ function signatureOf(params: {
   const v = `${params.viewport.x},${params.viewport.y},${params.viewport.zoom}`;
   const s = `${params.selection.nodeIds.join(',')}/${params.selection.edgeIds.join(',')}`;
   return `${n}#${e}#${v}#${s}`;
+}
+
+function executeOp(flow: NgFlowService, op: Record<string, unknown>): unknown {
+  const kind = op['op'];
+  switch (kind) {
+    case 'add_node': {
+      const node = op['node'] as Node;
+      if (!node || typeof node !== 'object') throw new InvalidParamsError('add_node: missing "node".');
+      flow.addNodes(node);
+      return flow.getNode(node.id) ?? null;
+    }
+    case 'add_nodes': {
+      const nodes = op['nodes'] as Node[];
+      if (!Array.isArray(nodes)) throw new InvalidParamsError('add_nodes: "nodes" must be an array.');
+      flow.addNodes(nodes);
+      return nodes.map((n) => flow.getNode(n.id)).filter((n): n is Node => !!n);
+    }
+    case 'add_edge': {
+      const edge = op['edge'] as Edge;
+      if (!edge || typeof edge !== 'object') throw new InvalidParamsError('add_edge: missing "edge".');
+      flow.addEdges(edge);
+      return flow.getEdge(edge.id) ?? null;
+    }
+    case 'add_edges': {
+      const edges = op['edges'] as Edge[];
+      if (!Array.isArray(edges)) throw new InvalidParamsError('add_edges: "edges" must be an array.');
+      flow.addEdges(edges);
+      return edges.map((e) => flow.getEdge(e.id)).filter((e): e is Edge => !!e);
+    }
+    case 'update_node': {
+      const id = op['id'];
+      const patch = op['patch'];
+      if (typeof id !== 'string') throw new InvalidParamsError('update_node: "id" must be a string.');
+      if (!patch || typeof patch !== 'object') throw new InvalidParamsError('update_node: "patch" must be an object.');
+      if (!flow.getNode(id)) throw new InvalidParamsError(`update_node: node "${id}" not found.`);
+      flow.updateNode(id, patch as Partial<Node>);
+      return flow.getNode(id) ?? null;
+    }
+    case 'update_node_data': {
+      const id = op['id'];
+      const dataPatch = op['dataPatch'];
+      if (typeof id !== 'string') throw new InvalidParamsError('update_node_data: "id" must be a string.');
+      if (!dataPatch || typeof dataPatch !== 'object') throw new InvalidParamsError('update_node_data: "dataPatch" must be an object.');
+      if (!flow.getNode(id)) throw new InvalidParamsError(`update_node_data: node "${id}" not found.`);
+      flow.updateNodeData(id, dataPatch as Record<string, unknown>);
+      return flow.getNode(id) ?? null;
+    }
+    case 'update_edge': {
+      const id = op['id'];
+      const patch = op['patch'];
+      if (typeof id !== 'string') throw new InvalidParamsError('update_edge: "id" must be a string.');
+      if (!patch || typeof patch !== 'object') throw new InvalidParamsError('update_edge: "patch" must be an object.');
+      if (!flow.getEdge(id)) throw new InvalidParamsError(`update_edge: edge "${id}" not found.`);
+      flow.updateEdge(id, patch as Partial<Edge>);
+      return flow.getEdge(id) ?? null;
+    }
+    case 'update_edge_data': {
+      const id = op['id'];
+      const dataPatch = op['dataPatch'];
+      if (typeof id !== 'string') throw new InvalidParamsError('update_edge_data: "id" must be a string.');
+      if (!dataPatch || typeof dataPatch !== 'object') throw new InvalidParamsError('update_edge_data: "dataPatch" must be an object.');
+      if (!flow.getEdge(id)) throw new InvalidParamsError(`update_edge_data: edge "${id}" not found.`);
+      flow.updateEdgeData(id, dataPatch as Record<string, unknown>);
+      return flow.getEdge(id) ?? null;
+    }
+    case 'delete_elements': {
+      const nodeIds = Array.isArray(op['nodeIds']) ? (op['nodeIds'] as string[]) : [];
+      const edgeIds = Array.isArray(op['edgeIds']) ? (op['edgeIds'] as string[]) : [];
+      // deleteElements is async because of onBeforeDelete; inside apply_changes we
+      // intentionally do not await — the synchronous setNodes/setEdges paths are
+      // what we need for rollback semantics. Skip onBeforeDelete hooks inside batches.
+      const allEdgeIds = new Set(edgeIds);
+      for (const e of flow.getEdges()) {
+        if (nodeIds.includes(e.source) || nodeIds.includes(e.target)) allEdgeIds.add(e.id);
+      }
+      if (nodeIds.length > 0) {
+        flow.setNodes(flow.getNodes().filter((n) => !nodeIds.includes(n.id)));
+      }
+      if (allEdgeIds.size > 0) {
+        flow.setEdges(flow.getEdges().filter((e) => !allEdgeIds.has(e.id)));
+      }
+      return { deletedNodeIds: nodeIds, deletedEdgeIds: Array.from(allEdgeIds) };
+    }
+    case 'select_nodes': {
+      const nodeIds = op['nodeIds'];
+      if (!Array.isArray(nodeIds)) throw new InvalidParamsError('select_nodes: "nodeIds" must be an array.');
+      const additive = typeof op['additive'] === 'boolean' ? (op['additive'] as boolean) : false;
+      flow.setSelection({ nodeIds: nodeIds as string[], additive });
+      return null;
+    }
+    case 'select_edges': {
+      const edgeIds = op['edgeIds'];
+      if (!Array.isArray(edgeIds)) throw new InvalidParamsError('select_edges: "edgeIds" must be an array.');
+      const additive = typeof op['additive'] === 'boolean' ? (op['additive'] as boolean) : false;
+      flow.setSelection({ edgeIds: edgeIds as string[], additive });
+      return null;
+    }
+    case 'deselect_all': {
+      flow.setSelection({ nodeIds: [], edgeIds: [], additive: false });
+      return null;
+    }
+    default:
+      throw new InvalidParamsError(`Unknown op kind: ${String(kind)}`);
+  }
 }
 
 function requireString(params: Record<string, unknown>, key: string): string {

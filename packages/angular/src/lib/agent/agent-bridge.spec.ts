@@ -481,6 +481,78 @@ describe('AngflowAgentBridge', () => {
       expect((res as { result: unknown }).result).toBeNull();
     });
   });
+
+  describe('apply_changes', () => {
+    async function flushEffects(): Promise<void> {
+      TestBed.tick();
+      await new Promise<void>((r) => queueMicrotask(r));
+    }
+
+    let flow: NgFlowService;
+    beforeEach(() => {
+      flow = newFlow();
+      bridge.register('f', flow);
+    });
+
+    it('runs a batch of ops in a single reactivity cycle', async () => {
+      await flushEffects();
+      transport.events.length = 0;
+
+      const res = await transport.call('apply_changes', {
+        ops: [
+          { op: 'add_node', node: { id: 'a', position: { x: 0, y: 0 }, data: {} } },
+          { op: 'add_node', node: { id: 'b', position: { x: 100, y: 0 }, data: {} } },
+          { op: 'add_edge', edge: { id: 'a-b', source: 'a', target: 'b' } },
+        ],
+      });
+      await flushEffects();
+
+      expect('result' in res).toBe(true);
+      const result = (res as { result: { results: { ok: true; value: unknown }[] } }).result;
+      expect(result.results).toHaveLength(3);
+      expect(result.results.every((r) => r.ok)).toBe(true);
+
+      expect(flow.getNodes().map((n) => n.id).sort()).toEqual(['a', 'b']);
+      expect(flow.getEdges().map((e) => e.id)).toEqual(['a-b']);
+
+      const stateEvents = transport.events.filter((e) => 'event' in e && e.event === 'flow.state');
+      expect(stateEvents.length).toBe(1);
+    });
+
+    it('rolls back on bad op and returns failedIndex', async () => {
+      flow.setNodes([makeNode('a')]);
+      await flushEffects();
+      transport.events.length = 0;
+
+      const res = await transport.call('apply_changes', {
+        ops: [
+          { op: 'add_node', node: { id: 'b', position: { x: 0, y: 0 }, data: {} } },
+          { op: 'update_node', id: 'does-not-exist', patch: { data: {} } },
+        ],
+      });
+
+      // We treat the missing id as a failure; verify error shape.
+      expect('error' in res).toBe(true);
+      const error = (res as { error: { code: number; message: string; data?: { failedIndex?: number } } }).error;
+      expect(error.code).toBe(-32603);
+      expect(error.data?.failedIndex).toBe(1);
+
+      // Net state: still only 'a'.
+      expect(flow.getNodes().map((n) => n.id)).toEqual(['a']);
+    });
+
+    it('apply_changes with select_nodes inside does not throw', async () => {
+      flow.setNodes([makeNode('a')]);
+      const res = await transport.call('apply_changes', {
+        ops: [
+          { op: 'add_node', node: { id: 'b', position: { x: 0, y: 0 }, data: {} } },
+          { op: 'select_nodes', nodeIds: ['b'] },
+        ],
+      });
+      expect('result' in res).toBe(true);
+      expect(flow.selectedNodes().map((n) => n.id)).toEqual(['b']);
+    });
+  });
 });
 
 describe('WindowTransport', () => {
