@@ -275,6 +275,36 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     this.store.triggerEdgeChanges([{ id, type: 'replace', item: next }]);
   }
 
+  /**
+   * Set or modify node/edge selection programmatically. Independent of the
+   * global `multiSelectionActive()` mode — pass `additive: true` to add to the
+   * current selection, omit it (or pass `false`) to replace the current
+   * selection with the given ids.
+   *
+   * Selection changes flow through the normal change pipeline, so consumers
+   * subscribed to `(nodesChange)` / `(edgesChange)` will see selection-change
+   * entries.
+   */
+  setSelection(params: { nodeIds?: string[]; edgeIds?: string[]; additive?: boolean }): void {
+    const additive = params.additive ?? false;
+    const nodeIds = params.nodeIds;
+    const edgeIds = params.edgeIds;
+
+    if (!additive) {
+      this.store.unselectNodesAndEdges();
+    }
+
+    if (nodeIds && nodeIds.length > 0) {
+      const changes = nodeIds.map((id) => ({ id, type: 'select' as const, selected: true }));
+      this.store.triggerNodeChanges(changes as NodeChange<NodeType>[]);
+    }
+
+    if (edgeIds && edgeIds.length > 0) {
+      const changes = edgeIds.map((id) => ({ id, type: 'select' as const, selected: true }));
+      this.store.triggerEdgeChanges(changes as EdgeChange<EdgeType>[]);
+    }
+  }
+
   // ── Batch ─────────────────────────────────────────────────────────────
 
   /**
