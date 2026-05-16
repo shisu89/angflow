@@ -338,6 +338,99 @@ export class AngflowAgentBridge {
     });
 
     this.handlers.set('get_viewport', (flow) => flow.getViewport());
+
+    this.handlers.set('get_internal_node', (flow, params) => {
+      const id = requireString(params, 'id');
+      const internal = flow.getInternalNode(id);
+      if (!internal) return null;
+      return {
+        id: internal.id,
+        positionAbsolute: internal.internals?.positionAbsolute ?? internal.position,
+        measured: internal.measured
+          ? { width: internal.measured.width, height: internal.measured.height }
+          : null,
+        handleBounds: internal.internals?.handleBounds ?? null,
+      };
+    });
+
+    this.handlers.set('get_nodes_bounds', (flow, params) => {
+      const nodeIds = optionalStringArray(params, 'nodeIds');
+      const nodes = nodeIds ? flow.getNodes(nodeIds) : flow.getNodes();
+      return flow.getNodesBounds(nodes);
+    });
+
+    this.handlers.set('get_intersecting_nodes', (flow, params) => {
+      const id = requireString(params, 'id');
+      const partially = typeof params['partially'] === 'boolean' ? (params['partially'] as boolean) : true;
+      const node = flow.getNode(id);
+      if (!node) return [];
+      return flow.getIntersectingNodes(node, partially);
+    });
+
+    this.handlers.set('is_node_in_area', (flow, params) => {
+      const id = requireString(params, 'id');
+      const area = requireObject(params, 'area') as { x: number; y: number; width: number; height: number };
+      const partially = typeof params['partially'] === 'boolean' ? (params['partially'] as boolean) : true;
+      const node = flow.getNode(id);
+      if (!node) return false;
+      return flow.isNodeIntersecting(node, area, partially);
+    });
+
+    this.handlers.set('get_outgoers', (flow, params) => {
+      const id = requireString(params, 'id');
+      // Use the signal-based selector then read its current value to stay non-reactive at the JSON boundary.
+      return flow.selectOutgoers(id)();
+    });
+
+    this.handlers.set('get_incomers', (flow, params) => {
+      const id = requireString(params, 'id');
+      return flow.selectIncomers(id)();
+    });
+
+    this.handlers.set('get_connected_edges', (flow, params) => {
+      const nodeIds = optionalStringArray(params, 'nodeIds');
+      if (!nodeIds) throw new InvalidParamsError('Param "nodeIds" must be an array of strings.');
+      return flow.getConnectedEdges(nodeIds);
+    });
+
+    this.handlers.set('get_node_connections', (flow, params) => {
+      const nodeId = requireString(params, 'nodeId');
+      return flow.getNodeConnections(nodeId);
+    });
+
+    this.handlers.set('get_handle_connections', (flow, params) => {
+      const nodeId = requireString(params, 'nodeId');
+      const type = requireString(params, 'type');
+      if (type !== 'source' && type !== 'target') {
+        throw new InvalidParamsError('Param "type" must be "source" or "target".');
+      }
+      const handleId = typeof params['handleId'] === 'string' ? (params['handleId'] as string) : undefined;
+      return flow.getHandleConnections({ nodeId, type, id: handleId });
+    });
+
+    this.handlers.set('get_handle_data', (flow, params) => {
+      const nodeId = requireString(params, 'nodeId');
+      const type = requireString(params, 'type');
+      if (type !== 'source' && type !== 'target') {
+        throw new InvalidParamsError('Param "type" must be "source" or "target".');
+      }
+      const rawHandleId = params['handleId'];
+      if (rawHandleId !== null && typeof rawHandleId !== 'string') {
+        throw new InvalidParamsError('Param "handleId" must be a string or null.');
+      }
+      return flow.getHandleData(nodeId, rawHandleId as string | null, type) ?? null;
+    });
+
+    this.handlers.set('screen_to_flow_position', (flow, params) => {
+      const position = requireObject(params, 'position') as { x: number; y: number };
+      const snapToGrid = typeof params['snapToGrid'] === 'boolean' ? (params['snapToGrid'] as boolean) : undefined;
+      return flow.screenToFlowPosition(position, snapToGrid !== undefined ? { snapToGrid } : undefined);
+    });
+
+    this.handlers.set('flow_to_screen_position', (flow, params) => {
+      const position = requireObject(params, 'position') as { x: number; y: number };
+      return flow.flowToScreenPosition(position);
+    });
   }
 }
 

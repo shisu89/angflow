@@ -246,6 +246,71 @@ describe('AngflowAgentBridge', () => {
       await expect(bridge.callTool('nope')).rejects.toThrow();
     });
   });
+
+  describe('read / geometry tools', () => {
+  let flow: NgFlowService;
+
+  beforeEach(() => {
+    flow = newFlow();
+    bridge.register('f', flow);
+    flow.setNodes([
+      { ...makeNode('a'), position: { x: 0, y: 0 }, width: 100, height: 50 },
+      { ...makeNode('b'), position: { x: 200, y: 0 }, width: 100, height: 50 },
+      { ...makeNode('c'), position: { x: 400, y: 0 }, width: 100, height: 50 },
+    ] as Node[]);
+    flow.setEdges([
+      { id: 'a-b', source: 'a', target: 'b' },
+      { id: 'b-c', source: 'b', target: 'c' },
+    ] as Edge[]);
+  });
+
+  it('get_outgoers returns downstream neighbors', async () => {
+    const res = await transport.call('get_outgoers', { id: 'a' });
+    expect('result' in res).toBe(true);
+    expect((res as { result: Node[] }).result.map((n) => n.id)).toEqual(['b']);
+  });
+
+  it('get_incomers returns upstream neighbors', async () => {
+    const res = await transport.call('get_incomers', { id: 'c' });
+    expect((res as { result: Node[] }).result.map((n) => n.id)).toEqual(['b']);
+  });
+
+  it('get_connected_edges returns edges touching given nodes', async () => {
+    const res = await transport.call('get_connected_edges', { nodeIds: ['b'] });
+    expect((res as { result: Edge[] }).result.map((e) => e.id).sort()).toEqual(['a-b', 'b-c']);
+  });
+
+  it('get_nodes_bounds covers all nodes', async () => {
+    const res = await transport.call('get_nodes_bounds');
+    const rect = (res as { result: { x: number; y: number; width: number; height: number } }).result;
+    expect(rect.x).toBe(0);
+    expect(rect.y).toBe(0);
+    expect(rect.width).toBeGreaterThanOrEqual(500);
+  });
+
+  it('get_internal_node returns a serializable view', async () => {
+    const res = await transport.call('get_internal_node', { id: 'a' });
+    const node = (res as { result: { id: string; positionAbsolute: { x: number; y: number } } | null }).result;
+    expect(node).toBeTruthy();
+    expect(node!.id).toBe('a');
+    expect(node!.positionAbsolute).toBeDefined();
+    // Result must round-trip through JSON without throwing.
+    expect(() => JSON.parse(JSON.stringify(node))).not.toThrow();
+  });
+
+  it('get_internal_node returns null for missing id', async () => {
+    const res = await transport.call('get_internal_node', { id: 'nope' });
+    expect((res as { result: unknown }).result).toBeNull();
+  });
+
+  it('screen_to_flow_position and flow_to_screen_position round-trip approximately', async () => {
+    // Without a real DOM bounding box, this is a smoke test on the API surface.
+    const toFlow = await transport.call('screen_to_flow_position', { position: { x: 10, y: 20 } });
+    expect('result' in toFlow).toBe(true);
+    const toScreen = await transport.call('flow_to_screen_position', { position: { x: 0, y: 0 } });
+    expect('result' in toScreen).toBe(true);
+  });
+  });
 });
 
 describe('WindowTransport', () => {

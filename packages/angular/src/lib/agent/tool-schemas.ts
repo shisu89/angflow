@@ -237,4 +237,186 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'get_internal_node',
+    description:
+      'Return computed internal data for a node: positionAbsolute (after parent transforms), measured size, ' +
+      'and per-handle bounds. Returns null if the node does not exist. Slim, serializable view of the InternalNode.',
+    inputSchema: {
+      type: 'object',
+      properties: { flowId: { type: 'string' }, id: { type: 'string' } },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_nodes_bounds',
+    description:
+      'Return the axis-aligned bounding rect that contains the given nodes ' +
+      '(or every node when nodeIds is omitted).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        nodeIds: { type: 'array', items: { type: 'string' } },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_intersecting_nodes',
+    description:
+      'Return nodes whose bounding box intersects the given node\'s bounding box. ' +
+      'When partially is false, only fully-contained nodes are returned.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        id: { type: 'string' },
+        partially: { type: 'boolean' },
+      },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'is_node_in_area',
+    description:
+      'Whether the given node\'s bounding box intersects the rect. ' +
+      'When partially is false, only full containment counts.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        id: { type: 'string' },
+        area: {
+          type: 'object',
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+            width: { type: 'number' },
+            height: { type: 'number' },
+          },
+          required: ['x', 'y', 'width', 'height'],
+        },
+        partially: { type: 'boolean' },
+      },
+      required: ['id', 'area'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_outgoers',
+    description: 'Return nodes that have an incoming edge from the given node id.',
+    inputSchema: {
+      type: 'object',
+      properties: { flowId: { type: 'string' }, id: { type: 'string' } },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_incomers',
+    description: 'Return nodes that have an outgoing edge into the given node id.',
+    inputSchema: {
+      type: 'object',
+      properties: { flowId: { type: 'string' }, id: { type: 'string' } },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_connected_edges',
+    description: 'Return all edges that are incident to any of the given node ids (either end).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        nodeIds: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['nodeIds'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_node_connections',
+    description: 'Return all HandleConnection objects for every handle on the given node.',
+    inputSchema: {
+      type: 'object',
+      properties: { flowId: { type: 'string' }, nodeId: { type: 'string' } },
+      required: ['nodeId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_handle_connections',
+    description:
+      'Return HandleConnections for a specific handle. Pass handleId to scope to a named handle, ' +
+      'or omit to get every connection of that type on the node.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        nodeId: { type: 'string' },
+        type: { type: 'string', enum: ['source', 'target'] },
+        handleId: { type: 'string' },
+      },
+      required: ['nodeId', 'type'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_handle_data',
+    description:
+      'Look up user-attached data on a handle (registered via <ng-flow-handle [data]="...">). ' +
+      'Returns undefined if no data is attached.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        nodeId: { type: 'string' },
+        handleId: { type: ['string', 'null'] },
+        type: { type: 'string', enum: ['source', 'target'] },
+      },
+      required: ['nodeId', 'handleId', 'type'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'screen_to_flow_position',
+    description:
+      'Convert a viewport/client coordinate (e.g., MouseEvent.clientX/clientY) into a position in flow coordinates. ' +
+      'Honors snapToGrid unless overridden.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        position: {
+          type: 'object',
+          properties: { x: { type: 'number' }, y: { type: 'number' } },
+          required: ['x', 'y'],
+        },
+        snapToGrid: { type: 'boolean' },
+      },
+      required: ['position'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'flow_to_screen_position',
+    description: 'Inverse of screen_to_flow_position: convert a flow-space point to viewport/client coordinates.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        position: {
+          type: 'object',
+          properties: { x: { type: 'number' }, y: { type: 'number' } },
+          required: ['x', 'y'],
+        },
+      },
+      required: ['position'],
+      additionalProperties: false,
+    },
+  },
 ];
