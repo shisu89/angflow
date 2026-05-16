@@ -467,6 +467,11 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       if (nodesChanged) {
         // Bump version to trigger template re-render without full rebuild
         this.bumpVersion();
+        // Re-emit the nodes signal so any downstream effect (e.g. the agent
+        // bridge watcher) that depends on `nodes()` observes the drag. Objects
+        // are mutated in place above so identity is preserved for templates;
+        // we only swap the array reference.
+        this.nodes.set([...currentNodes]);
       }
     } else {
       // Full path: apply all change types (add, remove, select, dimensions, etc.)

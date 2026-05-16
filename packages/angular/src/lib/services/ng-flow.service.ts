@@ -323,6 +323,15 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   // ── Delete ────────────────────────────────────────────────────────────
 
   /**
+   * Whether the host has registered an `onBeforeDelete` veto hook on this flow.
+   * Useful for callers (e.g. the agent bridge) that take a synchronous deletion
+   * path and want to detect when they're silently bypassing the host's veto.
+   */
+  hasOnBeforeDeleteHook(): boolean {
+    return this.store.onBeforeDelete !== null;
+  }
+
+  /**
    * Delete the specified nodes and/or edges. Edges connected to deleted nodes
    * are also removed. If an `onBeforeDelete` hook is set, it runs first and
    * can veto the deletion.

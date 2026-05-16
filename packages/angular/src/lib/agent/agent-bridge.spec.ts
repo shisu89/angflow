@@ -90,6 +90,34 @@ describe('AngflowAgentBridge', () => {
       expect('result' in res && res.result).toEqual(['main']);
     });
 
+    it('re-registering the same service is idempotent (no extra flow.registered)', () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      transport.events.length = 0;
+      bridge.register('main', flow);
+      const reEmits = transport.events.filter((e) => 'event' in e && e.event === 'flow.registered');
+      expect(reEmits.length).toBe(0);
+    });
+
+    it('re-registering with a different service drops history and re-emits flow.registered', async () => {
+      const a = newFlow();
+      bridge.register('main', a);
+      await transport.call('add_node', {
+        node: { id: 'x', position: { x: 0, y: 0 }, data: {} },
+      });
+      let status = (await transport.call('history_status')) as { result: { pastDepth: number } };
+      expect(status.result.pastDepth).toBe(1);
+
+      const b = newFlow();
+      transport.events.length = 0;
+      bridge.register('main', b);
+      const reEmit = transport.events.find((e) => 'event' in e && e.event === 'flow.registered');
+      expect(reEmit).toBeTruthy();
+
+      status = (await transport.call('history_status')) as { result: { pastDepth: number } };
+      expect(status.result.pastDepth).toBe(0);
+    });
+
     it('unregister() removes the flow and emits flow.unregistered', () => {
       const flow = newFlow();
       bridge.register('main', flow);
@@ -188,6 +216,37 @@ describe('AngflowAgentBridge', () => {
       const res = await transport.call('add_node', {});
       expect('error' in res && res.error.code).toBe(-32602);
     });
+
+    it('add_node with missing position returns INVALID_PARAMS', async () => {
+      const res = await transport.call('add_node', { node: { id: 'x', data: {} } });
+      expect('error' in res && res.error.code).toBe(-32602);
+    });
+
+    it('add_node with non-numeric position.x returns INVALID_PARAMS', async () => {
+      const res = await transport.call('add_node', {
+        node: { id: 'x', position: { x: 'oops', y: 0 }, data: {} },
+      });
+      expect('error' in res && res.error.code).toBe(-32602);
+    });
+
+    it('add_edge with missing source returns INVALID_PARAMS', async () => {
+      const res = await transport.call('add_edge', { edge: { id: 'e', target: 'b' } });
+      expect('error' in res && res.error.code).toBe(-32602);
+    });
+
+    it('add_node with NaN position returns INVALID_PARAMS', async () => {
+      const res = await transport.call('add_node', {
+        node: { id: 'x', position: { x: Number.NaN, y: 0 }, data: {} },
+      });
+      expect('error' in res && res.error.code).toBe(-32602);
+    });
+
+    it('add_node with empty id returns INVALID_PARAMS', async () => {
+      const res = await transport.call('add_node', {
+        node: { id: '', position: { x: 0, y: 0 }, data: {} },
+      });
+      expect('error' in res && res.error.code).toBe(-32602);
+    });
   });
 
   describe('state events', () => {
@@ -211,6 +270,103 @@ describe('AngflowAgentBridge', () => {
       );
       expect(stateEvents.length).toBeGreaterThan(0);
       expect(stateEvents.at(-1)!.params.nodes.map((n) => n.id)).toEqual(['a']);
+    });
+
+    it('emits flow.state for update_node_data (data-only mutation)', async () => {
+      const flow = newFlow();
+      flow.setNodes([{ ...makeNode('n1'), data: { count: 0 } } as Node]);
+      bridge.register('f', flow);
+      await flushEffects();
+      transport.events.length = 0;
+
+      await transport.call('update_node_data', { id: 'n1', dataPatch: { count: 99 } });
+      await flushEffects();
+
+      const stateEvents = transport.events.filter(
+        (e): e is { event: string; params: { nodes: Node[] } } =>
+          'event' in e && e.event === 'flow.state',
+      );
+      expect(stateEvents.length).toBe(1);
+      expect(stateEvents[0].params.nodes[0].data).toEqual({ count: 99 });
+    });
+
+    it('emits flow.state for update_edge_data (data-only mutation)', async () => {
+      const flow = newFlow();
+      flow.setNodes([makeNode('a'), makeNode('b')]);
+      flow.setEdges([{ id: 'e', source: 'a', target: 'b', data: { x: 1 } } as Edge]);
+      bridge.register('f', flow);
+      await flushEffects();
+      transport.events.length = 0;
+
+      await transport.call('update_edge_data', { id: 'e', dataPatch: { x: 2 } });
+      await flushEffects();
+
+      const stateEvents = transport.events.filter(
+        (e): e is { event: string; params: { edges: Edge[] } } =>
+          'event' in e && e.event === 'flow.state',
+      );
+      expect(stateEvents.length).toBe(1);
+      expect(stateEvents[0].params.edges[0].data).toEqual({ x: 2 });
+    });
+
+    it('emits flow.state when toggling node.hidden via update_node', async () => {
+      const flow = newFlow();
+      flow.setNodes([makeNode('n1')]);
+      bridge.register('f', flow);
+      await flushEffects();
+      transport.events.length = 0;
+
+      await transport.call('update_node', { id: 'n1', patch: { hidden: true } });
+      await flushEffects();
+
+      const stateEvents = transport.events.filter(
+        (e) => 'event' in e && e.event === 'flow.state',
+      );
+      expect(stateEvents.length).toBe(1);
+    });
+
+    it('emits flow.state for a position-only change (drag fast-path)', async () => {
+      const flow = newFlow();
+      flow.setNodes([makeNode('a')]);
+      bridge.register('f', flow);
+      await flushEffects();
+      transport.events.length = 0;
+
+      // Simulate what XYDrag does: emit a position-only NodeChange via the
+      // store. Bypasses the bridge's update_node path so we exercise the
+      // FlowStore drag fast-path directly.
+      const store = (flow as unknown as { store: { triggerNodeChanges: (c: unknown[]) => void } }).store;
+      store.triggerNodeChanges([{ id: 'a', type: 'position', position: { x: 50, y: 50 }, dragging: true }]);
+      await flushEffects();
+
+      const stateEvents = transport.events.filter(
+        (e): e is { event: string; params: { nodes: Node[] } } =>
+          'event' in e && e.event === 'flow.state',
+      );
+      expect(stateEvents.length).toBe(1);
+      expect(stateEvents[0].params.nodes[0].position).toEqual({ x: 50, y: 50 });
+    });
+
+    it('does not emit flow.state after unregister even if effect was already scheduled', async () => {
+      const flow = newFlow();
+      const unreg = bridge.register('f', flow);
+      await flushEffects();
+      transport.events.length = 0;
+
+      // Schedule the watcher effect: signal write → effect dirty.
+      flow.setNodes([makeNode('a')]);
+      // Run the effect (which queues an emit microtask) WITHOUT draining
+      // the queued microtask. Then unregister before the microtask runs.
+      TestBed.tick();
+      unreg();
+      // Now drain. The queued microtask must see the destroyed flag and bail.
+      await new Promise<void>((r) => queueMicrotask(r));
+      await new Promise<void>((r) => queueMicrotask(r));
+
+      const stateEvents = transport.events.filter(
+        (e) => 'event' in e && e.event === 'flow.state',
+      );
+      expect(stateEvents.length).toBe(0);
     });
 
     it('coalesces rapid changes within one microtask', async () => {
@@ -244,6 +400,38 @@ describe('AngflowAgentBridge', () => {
 
     it('bridge.callTool throws on unknown method', async () => {
       await expect(bridge.callTool('nope')).rejects.toThrow();
+    });
+
+    it('bridge.callTool captures history (parity with transport)', async () => {
+      const flow = newFlow();
+      bridge.register('f', flow);
+
+      await bridge.callTool('add_node', {
+        node: { id: 'n1', position: { x: 0, y: 0 }, data: {} },
+      });
+      const undo = (await bridge.callTool('undo')) as { undone: number };
+      expect(undo.undone).toBe(1);
+      expect(flow.getNodes()).toEqual([]);
+    });
+
+    it('bridge.callTool throws structured error with code on invalid params', async () => {
+      const flow = newFlow();
+      bridge.register('f', flow);
+
+      await expect(
+        bridge.callTool('add_node', {}),
+      ).rejects.toMatchObject({ code: -32602 });
+    });
+
+    it('bridge.callTool emits flow.history (parity with transport)', async () => {
+      const flow = newFlow();
+      bridge.register('f', flow);
+      transport.events.length = 0;
+
+      await bridge.callTool('add_node', {
+        node: { id: 'n1', position: { x: 0, y: 0 }, data: {} },
+      });
+      expect(transport.events.some((e) => 'event' in e && e.event === 'flow.history')).toBe(true);
     });
   });
 
@@ -541,6 +729,46 @@ describe('AngflowAgentBridge', () => {
       expect(flow.getNodes().map((n) => n.id)).toEqual(['a']);
     });
 
+    it('warns once when delete_elements is used inside apply_changes with onBeforeDelete set', async () => {
+      flow.setNodes([makeNode('a'), makeNode('b')]);
+      // Register an onBeforeDelete hook on the store.
+      const store = (flow as unknown as { store: { onBeforeDelete: unknown } }).store;
+      store.onBeforeDelete = () => true;
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        await transport.call('apply_changes', {
+          ops: [{ op: 'delete_elements', nodeIds: ['a'] }],
+        });
+        await transport.call('apply_changes', {
+          ops: [{ op: 'delete_elements', nodeIds: ['b'] }],
+        });
+
+        const bypassWarns = warnSpy.mock.calls.filter((c) =>
+          String(c[0]).includes('apply_changes/delete_elements bypasses onBeforeDelete'),
+        );
+        expect(bypassWarns.length).toBe(1); // once per bridge lifetime
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('does not warn about onBeforeDelete bypass when no hook is registered', async () => {
+      flow.setNodes([makeNode('a')]);
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        await transport.call('apply_changes', {
+          ops: [{ op: 'delete_elements', nodeIds: ['a'] }],
+        });
+        const bypassWarns = warnSpy.mock.calls.filter((c) =>
+          String(c[0]).includes('apply_changes/delete_elements bypasses onBeforeDelete'),
+        );
+        expect(bypassWarns.length).toBe(0);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
     it('apply_changes with select_nodes inside does not throw', async () => {
       flow.setNodes([makeNode('a')]);
       const res = await transport.call('apply_changes', {
@@ -699,6 +927,102 @@ describe('AngflowAgentBridge', () => {
       const status = (await transport.call('history_status')) as { result: { pastDepth: number } };
       expect(status.result.pastDepth).toBe(2);
     });
+  });
+});
+
+describe('onError hook', () => {
+  it('captures transport.send failures via the provideAgentBridge onError callback', async () => {
+    const errors: Array<{ err: unknown; kind: string }> = [];
+    const failing: AgentTransport = {
+      start: () => undefined,
+      send: () => {
+        throw new Error('boom');
+      },
+      stop: () => undefined,
+    };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideAgentBridge({
+          transports: [failing],
+          onError: (err, ctx) => errors.push({ err, kind: ctx.kind }),
+        }),
+      ],
+    });
+    const bridge = TestBed.inject(AngflowAgentBridge);
+    const child = Injector.create({
+      providers: [FlowStore, NgFlowService],
+      parent: TestBed.inject(Injector),
+    });
+    // Registering triggers a flow.registered emit → transport.send throws.
+    bridge.register('f', child.get(NgFlowService));
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].kind).toBe('transport-send');
+    expect((errors[0].err as Error).message).toBe('boom');
+  });
+
+  it('reports unexpected handler throws via onError with kind=dispatch', async () => {
+    const errors: Array<{ err: unknown; kind: string; method?: string }> = [];
+    const transport = new CapturingTransport();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideAgentBridge({
+          transports: [transport],
+          onError: (err, ctx) =>
+            errors.push({
+              err,
+              kind: ctx.kind,
+              method: ctx.kind === 'dispatch' ? ctx.method : undefined,
+            }),
+        }),
+      ],
+    });
+    const bridge = TestBed.inject(AngflowAgentBridge);
+    const child = Injector.create({
+      providers: [FlowStore, NgFlowService],
+      parent: TestBed.inject(Injector),
+    });
+    const flow = child.get(NgFlowService);
+    bridge.register('f', flow);
+
+    // Force an unexpected throw inside a handler by monkey-patching the
+    // service to throw on a normally-non-throwing method.
+    (flow as unknown as { getNodes: () => unknown }).getNodes = () => {
+      throw new Error('synthetic bug');
+    };
+
+    const res = await transport.call('get_nodes');
+    expect('error' in res && res.error.code).toBe(-32603);
+    expect(errors.length).toBe(1);
+    expect(errors[0].kind).toBe('dispatch');
+    expect(errors[0].method).toBe('get_nodes');
+  });
+
+  it('captures rejected transport.start() via onError', async () => {
+    const errors: unknown[] = [];
+    const failing: AgentTransport = {
+      start: () => Promise.reject(new Error('start-fail')),
+      send: () => undefined,
+      stop: () => undefined,
+    };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideAgentBridge({
+          transports: [failing],
+          onError: (err) => errors.push(err),
+        }),
+      ],
+    });
+    TestBed.inject(AngflowAgentBridge);
+    // start() returns synchronously; the rejection surfaces on a microtask.
+    await new Promise<void>((r) => queueMicrotask(r));
+    expect(errors.length).toBe(1);
+    expect((errors[0] as Error).message).toBe('start-fail');
   });
 });
 

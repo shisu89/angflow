@@ -8,7 +8,6 @@ import {
   inject,
   runInInjectionContext,
   signal,
-  type EffectRef,
 } from '@angular/core';
 
 import type { NgFlowService } from '../services/ng-flow.service';
@@ -30,6 +29,11 @@ export const AGENT_TRANSPORTS = new InjectionToken<AgentTransport[]>('AngflowAge
 export const AGENT_HISTORY_OPTIONS = new InjectionToken<AgentHistoryOptions | false>(
   'AngflowAgentHistoryOptions',
 );
+
+/** Optional error sink. Receives transport/dispatch failures that the bridge swallows. */
+export const AGENT_ON_ERROR = new InjectionToken<
+  (err: unknown, ctx: { kind: 'transport-start' | 'transport-send' | 'dispatch'; transport?: AgentTransport; method?: string }) => void
+>('AngflowAgentOnError');
 
 const ERROR_INVALID_PARAMS = -32602;
 const ERROR_METHOD_NOT_FOUND = -32601;
@@ -53,7 +57,8 @@ const MUTATING_TOOLS = new Set<string>([
 
 type RegisteredFlow = {
   service: NgFlowService;
-  watcher: EffectRef;
+  /** Tears down the watcher and prevents any in-flight microtask from emitting. */
+  dispose: () => void;
 };
 
 type ToolHandler = (
@@ -96,19 +101,36 @@ export class AngflowAgentBridge {
   private readonly handlers = new Map<string, ToolHandler>();
   private readonly injector = inject(Injector);
   private started = false;
+  private nextInProcessId = 1;
+  private warnedOnBeforeDeleteBypass = false;
 
   /** Bumped every time a flow registers/unregisters. Useful for diagnostics. */
   readonly registeredFlows = signal<string[]>([]);
 
+  private readonly onError:
+    | ((err: unknown, ctx: { kind: 'transport-start' | 'transport-send' | 'dispatch'; transport?: AgentTransport; method?: string }) => void)
+    | null;
+
   constructor(
     @Optional() @Inject(AGENT_TRANSPORTS) transports: AgentTransport[] | null,
     @Optional() @Inject(AGENT_HISTORY_OPTIONS) historyOptions: AgentHistoryOptions | false | null,
+    @Optional() @Inject(AGENT_ON_ERROR) onError: ((err: unknown, ctx: { kind: 'transport-start' | 'transport-send' | 'dispatch'; transport?: AgentTransport; method?: string }) => void) | null,
   ) {
     this.transports = transports ?? [];
     this.history =
       historyOptions === false ? null : new AgentHistory(historyOptions ?? undefined);
+    this.onError = onError ?? null;
     this.installHandlers();
     this.start();
+  }
+
+  private reportError(err: unknown, ctx: { kind: 'transport-start' | 'transport-send' | 'dispatch'; transport?: AgentTransport; method?: string }): void {
+    if (!this.onError) return;
+    try {
+      this.onError(err, ctx);
+    } catch {
+      // An onError handler must not crash the bridge.
+    }
   }
 
   /**
@@ -121,12 +143,22 @@ export class AngflowAgentBridge {
    * `(init)` on `<ng-flow>` and pair with `OnDestroy`.
    */
   register(id: string, flow: NgFlowService): () => void {
-    if (this.flows.has(id)) {
-      this.flows.get(id)!.watcher.destroy();
+    const existing = this.flows.get(id);
+    if (existing) {
+      // Idempotent re-register: same id + same service is a no-op so callers
+      // can safely call from (init) without tracking lifecycle.
+      if (existing.service === flow) {
+        return () => this.unregister(id);
+      }
+      // Different service under the same id: tear down the old watcher and
+      // drop history (the previous snapshots refer to a different graph and
+      // restoring them into this service would corrupt it).
+      existing.dispose();
+      this.history?.dropFlow(id);
     }
 
-    const watcher = this.watchFlow(id, flow);
-    this.flows.set(id, { service: flow, watcher });
+    const dispose = this.watchFlow(id, flow);
+    this.flows.set(id, { service: flow, dispose });
     this.registeredFlows.set(Array.from(this.flows.keys()));
     this.emit({ event: 'flow.registered', params: { flowId: id } });
 
@@ -136,7 +168,7 @@ export class AngflowAgentBridge {
   unregister(id: string): void {
     const entry = this.flows.get(id);
     if (!entry) return;
-    entry.watcher.destroy();
+    entry.dispose();
     this.flows.delete(id);
     this.history?.dropFlow(id);
     this.registeredFlows.set(Array.from(this.flows.keys()));
@@ -149,20 +181,24 @@ export class AngflowAgentBridge {
   }
 
   /**
-   * Invoke a tool directly without going through a transport. Useful for
-   * in-process callers (tests, devtools snippets, Angular components that
-   * want to share the same dispatch logic).
+   * Invoke a tool directly without going through a transport. Behaves
+   * identically to a JSON-RPC request: captures a history snapshot, emits
+   * `flow.history` / `flow.state` events, and throws a structured error
+   * (with `code` and `data` attached) on failure.
    */
   async callTool(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
-    const handler = this.handlers.get(method);
-    if (!handler) {
-      throw new Error(`Unknown tool: ${method}`);
+    const response = await this.dispatch({
+      id: `in-process:${this.nextInProcessId++}`,
+      method,
+      params,
+    });
+    if ('error' in response) {
+      const err = new Error(response.error.message) as Error & { code?: number; data?: unknown };
+      err.code = response.error.code;
+      err.data = response.error.data;
+      throw err;
     }
-    if (method === 'list_flows') {
-      return handler(null as unknown as NgFlowService, params);
-    }
-    const flow = this.resolveFlow(params['flowId']);
-    return handler(flow, params);
+    return response.result;
   }
 
   // ── Internals ────────────────────────────────────────────────────────
@@ -171,7 +207,16 @@ export class AngflowAgentBridge {
     if (this.started) return;
     this.started = true;
     for (const t of this.transports) {
-      void t.start((req) => this.dispatch(req));
+      try {
+        const maybePromise = t.start((req) => this.dispatch(req));
+        if (maybePromise && typeof (maybePromise as Promise<void>).then === 'function') {
+          (maybePromise as Promise<void>).catch((err) =>
+            this.reportError(err, { kind: 'transport-start', transport: t }),
+          );
+        }
+      } catch (err) {
+        this.reportError(err, { kind: 'transport-start', transport: t });
+      }
     }
   }
 
@@ -194,9 +239,15 @@ export class AngflowAgentBridge {
       const isApplyChanges = req.method === 'apply_changes';
 
       // Pre-mutation snapshot for history capture. Skipped for non-mutating tools.
+      // Shallow-clone each element so subsequent in-place mutations (notably
+      // the drag fast-path in FlowStore) can't retroactively corrupt the
+      // snapshot we already captured.
       let snapshot: { nodes: readonly Node[]; edges: readonly Edge[] } | null = null;
       if (this.history && (MUTATING_TOOLS.has(req.method) || isApplyChanges)) {
-        snapshot = { nodes: flow.getNodes().slice(), edges: flow.getEdges().slice() };
+        snapshot = {
+          nodes: flow.getNodes().map((n) => ({ ...n })) as Node[],
+          edges: flow.getEdges().map((e) => ({ ...e })) as Edge[],
+        };
       }
 
       const result = await handler(flow, params);
@@ -240,6 +291,10 @@ export class AngflowAgentBridge {
           },
         };
       }
+      // Anything that lands here is an unexpected throw inside a handler — a
+      // bug or an underlying service failure. Surface it via onError so the
+      // host can log / report it; the wire response is still -32603.
+      this.reportError(err, { kind: 'dispatch', method: req.method });
       return {
         id: req.id,
         error: {
@@ -267,8 +322,10 @@ export class AngflowAgentBridge {
     for (const t of this.transports) {
       try {
         t.send(evt);
-      } catch {
-        // Transport errors are isolated per-transport; never let one break the bridge.
+      } catch (err) {
+        // Transport errors are isolated per-transport; never let one break the
+        // bridge. Forward to onError if the host wants to observe them.
+        this.reportError(err, { kind: 'transport-send', transport: t });
       }
     }
   }
@@ -290,10 +347,11 @@ export class AngflowAgentBridge {
     return this.flows.values().next().value!.service;
   }
 
-  private watchFlow(id: string, flow: NgFlowService): EffectRef {
+  private watchFlow(id: string, flow: NgFlowService): () => void {
     let pending = false;
+    let destroyed = false;
     let lastSignature = '';
-    return runInInjectionContext(this.injector, () =>
+    const ref = runInInjectionContext(this.injector, () =>
       effect(() => {
         // Touch every signal we want to broadcast so the effect re-runs on change.
         flow.nodes();
@@ -306,6 +364,10 @@ export class AngflowAgentBridge {
         pending = true;
         queueMicrotask(() => {
           pending = false;
+          // A queued microtask may outlive the effect (unregister between
+          // effect run and microtask drain). Drop late emissions so we never
+          // push state for a flowId that's no longer registered.
+          if (destroyed) return;
           // Re-read on flush so coalesced bursts see the latest state.
           const params = {
             flowId: id,
@@ -318,7 +380,8 @@ export class AngflowAgentBridge {
             },
           };
           // Suppress duplicate emissions when controlled-mode round-trips bounce
-          // the same state through the store twice. Cheap signature: ids + counts.
+          // identical state through the store twice. See signatureOf for the
+          // field set; it must cover anything a mutating tool can change.
           const sig = signatureOf(params);
           if (sig === lastSignature) return;
           lastSignature = sig;
@@ -326,6 +389,10 @@ export class AngflowAgentBridge {
         });
       }),
     );
+    return () => {
+      destroyed = true;
+      ref.destroy();
+    };
   }
 
   private installHandlers(): void {
@@ -351,13 +418,13 @@ export class AngflowAgentBridge {
     });
 
     this.handlers.set('add_node', (flow, params) => {
-      const node = requireObject(params, 'node') as Node;
+      const node = validateNodeShape(requireObject(params, 'node'), 'add_node');
       flow.addNodes(node);
       return flow.getNode(node.id) ?? null;
     });
 
     this.handlers.set('add_edge', (flow, params) => {
-      const edge = requireObject(params, 'edge') as Edge;
+      const edge = validateEdgeShape(requireObject(params, 'edge'), 'add_edge');
       flow.addEdges(edge);
       return flow.getEdge(edge.id) ?? null;
     });
@@ -390,12 +457,16 @@ export class AngflowAgentBridge {
     });
 
     this.handlers.set('set_nodes', (flow, params) => {
-      const nodes = requireArray(params, 'nodes') as Node[];
+      const nodes = requireArray(params, 'nodes').map((n, i) =>
+        validateNodeShape(n, `set_nodes[${i}]`),
+      );
       flow.setNodes(nodes);
     });
 
     this.handlers.set('set_edges', (flow, params) => {
-      const edges = requireArray(params, 'edges') as Edge[];
+      const edges = requireArray(params, 'edges').map((e, i) =>
+        validateEdgeShape(e, `set_edges[${i}]`),
+      );
       flow.setEdges(edges);
     });
 
@@ -549,13 +620,17 @@ export class AngflowAgentBridge {
     });
 
     this.handlers.set('add_nodes', (flow, params) => {
-      const nodes = requireArray(params, 'nodes') as Node[];
+      const nodes = requireArray(params, 'nodes').map((n, i) =>
+        validateNodeShape(n, `add_nodes[${i}]`),
+      );
       flow.addNodes(nodes);
       return nodes.map((n) => flow.getNode(n.id)).filter((n): n is Node => !!n);
     });
 
     this.handlers.set('add_edges', (flow, params) => {
-      const edges = requireArray(params, 'edges') as Edge[];
+      const edges = requireArray(params, 'edges').map((e, i) =>
+        validateEdgeShape(e, `add_edges[${i}]`),
+      );
       flow.addEdges(edges);
       return edges.map((e) => flow.getEdge(e.id)).filter((e): e is Edge => !!e);
     });
@@ -597,10 +672,32 @@ export class AngflowAgentBridge {
     this.handlers.set('apply_changes', (flow, params) => {
       const ops = requireArray(params, 'ops') as Array<Record<string, unknown>>;
 
-      // Capture snapshot for rollback. Viewport is not part of the snapshot per design.
+      // apply_changes' delete_elements op takes the synchronous setNodes/
+      // setEdges path so the whole batch can roll back, which means
+      // onBeforeDelete is bypassed (it can't be awaited inside a rollback-
+      // capable batch). Warn once per bridge lifetime if the host actually
+      // has the veto hook registered — otherwise the silent veto-loss is
+      // very hard to discover.
+      if (!this.warnedOnBeforeDeleteBypass && flow.hasOnBeforeDeleteHook()) {
+        const hasDelete = ops.some((o) => o['op'] === 'delete_elements');
+        if (hasDelete) {
+          this.warnedOnBeforeDeleteBypass = true;
+          // eslint-disable-next-line no-console
+          console.warn(
+            '[angflow] apply_changes/delete_elements bypasses onBeforeDelete. ' +
+              'Call the standalone `delete_elements` tool if you need the veto hook.',
+          );
+        }
+      }
+
+      // Capture snapshot for rollback. Viewport is intentionally excluded.
+      // Shallow-clone each element so in-place field assignments (e.g.
+      // FlowStore's drag fast-path writing `node.position` / `node.dragging`)
+      // cannot corrupt the snapshot mid-batch. We do not deep-clone `data`
+      // because mutating `data` directly violates the documented contract.
       const snapshot = {
-        nodes: flow.getNodes().slice(),
-        edges: flow.getEdges().slice(),
+        nodes: flow.getNodes().map((n) => ({ ...n })) as Node[],
+        edges: flow.getEdges().map((e) => ({ ...e })) as Edge[],
       };
 
       const results: Array<{ ok: true; value: unknown }> = [];
@@ -635,7 +732,10 @@ export class AngflowAgentBridge {
       const flowId = this.findFlowId(flow);
       if (!flowId) return { undone: 0, canUndo: false, canRedo: false };
       const steps = typeof params['steps'] === 'number' ? (params['steps'] as number) : 1;
-      const current = { nodes: flow.getNodes().slice(), edges: flow.getEdges().slice() };
+      const current = {
+        nodes: flow.getNodes().map((n) => ({ ...n })) as Node[],
+        edges: flow.getEdges().map((e) => ({ ...e })) as Edge[],
+      };
       const result = this.history.undo(flowId, steps, current);
       if (result) {
         flow.batch(() => {
@@ -653,7 +753,10 @@ export class AngflowAgentBridge {
       const flowId = this.findFlowId(flow);
       if (!flowId) return { redone: 0, canUndo: false, canRedo: false };
       const steps = typeof params['steps'] === 'number' ? (params['steps'] as number) : 1;
-      const current = { nodes: flow.getNodes().slice(), edges: flow.getEdges().slice() };
+      const current = {
+        nodes: flow.getNodes().map((n) => ({ ...n })) as Node[],
+        edges: flow.getEdges().map((e) => ({ ...e })) as Edge[],
+      };
       const result = this.history.redo(flowId, steps, current);
       if (result) {
         flow.batch(() => {
@@ -691,48 +794,85 @@ class ApplyChangesError extends Error {
   }
 }
 
+/**
+ * Build a stable signature of the emit payload, used to suppress duplicate
+ * emissions when controlled-mode round-trips bounce identical state through
+ * the store twice. Must hash every field that can change via a mutating
+ * tool — including `data`, `style`, `type`, `hidden`, `animated`, `label` —
+ * otherwise `update_node_data` / `update_edge_data` updates would be silently
+ * dropped.
+ */
 function signatureOf(params: {
   flowId: string;
-  nodes: readonly { id: string; position: { x: number; y: number }; measured?: { width?: number; height?: number } }[];
-  edges: readonly { id: string; source: string; target: string }[];
+  nodes: readonly Node[];
+  edges: readonly Edge[];
   viewport: { x: number; y: number; zoom: number };
   selection: { nodeIds: string[]; edgeIds: string[] };
 }): string {
-  const n = params.nodes
-    .map((n) => `${n.id}:${n.position.x},${n.position.y}:${n.measured?.width ?? '-'}x${n.measured?.height ?? '-'}`)
-    .join('|');
-  const e = params.edges.map((e) => `${e.id}:${e.source}>${e.target}`).join('|');
-  const v = `${params.viewport.x},${params.viewport.y},${params.viewport.zoom}`;
-  const s = `${params.selection.nodeIds.join(',')}/${params.selection.edgeIds.join(',')}`;
-  return `${n}#${e}#${v}#${s}`;
+  // Curated subset of node/edge fields that surface in `flow.state` consumers
+  // (renderers, history, agents). Order is fixed by the literal so JSON.stringify
+  // produces a deterministic string.
+  const n = params.nodes.map((node) => ({
+    id: node.id,
+    p: [node.position.x, node.position.y],
+    m: node.measured ? [node.measured.width ?? null, node.measured.height ?? null] : null,
+    t: node.type ?? null,
+    h: node.hidden === true,
+    d: node.data ?? null,
+    s: node.style ?? null,
+  }));
+  const e = params.edges.map((edge) => ({
+    id: edge.id,
+    src: edge.source,
+    tgt: edge.target,
+    sh: edge.sourceHandle ?? null,
+    th: edge.targetHandle ?? null,
+    t: edge.type ?? null,
+    h: edge.hidden === true,
+    a: edge.animated === true,
+    l: edge.label ?? null,
+    d: edge.data ?? null,
+    s: edge.style ?? null,
+  }));
+  try {
+    return JSON.stringify({ n, e, v: params.viewport, sel: params.selection });
+  } catch {
+    // Defensive: if any field is non-serializable (e.g. cyclic data), fall back
+    // to a coarser signature so dedup never silently swallows updates.
+    return `__nonserializable__:${Date.now()}:${Math.random()}`;
+  }
 }
 
 function executeOp(flow: NgFlowService, op: Record<string, unknown>): unknown {
   const kind = op['op'];
   switch (kind) {
     case 'add_node': {
-      const node = op['node'] as Node;
-      if (!node || typeof node !== 'object') throw new InvalidParamsError('add_node: missing "node".');
+      const node = validateNodeShape(op['node'], 'apply_changes/add_node');
       flow.addNodes(node);
       return flow.getNode(node.id) ?? null;
     }
     case 'add_nodes': {
-      const nodes = op['nodes'] as Node[];
+      const nodes = op['nodes'];
       if (!Array.isArray(nodes)) throw new InvalidParamsError('add_nodes: "nodes" must be an array.');
-      flow.addNodes(nodes);
-      return nodes.map((n) => flow.getNode(n.id)).filter((n): n is Node => !!n);
+      const validated = nodes.map((n, i) =>
+        validateNodeShape(n, `apply_changes/add_nodes[${i}]`),
+      );
+      flow.addNodes(validated);
+      return validated.map((n) => flow.getNode(n.id)).filter((n): n is Node => !!n);
     }
     case 'add_edge': {
-      const edge = op['edge'] as Edge;
-      if (!edge || typeof edge !== 'object') throw new InvalidParamsError('add_edge: missing "edge".');
+      const edge = validateEdgeShape(op['edge'], 'apply_changes/add_edge');
       flow.addEdges(edge);
       return flow.getEdge(edge.id) ?? null;
     }
     case 'add_edges': {
-      const edges = op['edges'] as Edge[];
+      const edges = op['edges'];
       if (!Array.isArray(edges)) throw new InvalidParamsError('add_edges: "edges" must be an array.');
-      flow.addEdges(edges);
-      return edges.map((e) => flow.getEdge(e.id)).filter((e): e is Edge => !!e);
+      const validated = edges.map((e, i) =>
+        validateEdgeShape(e, `apply_changes/add_edges[${i}]`),
+      );
+      flow.addEdges(validated);
+      return validated.map((e) => flow.getEdge(e.id)).filter((e): e is Edge => !!e);
     }
     case 'update_node': {
       const id = op['id'];
@@ -838,4 +978,45 @@ function optionalStringArray(params: Record<string, unknown>, key: string): stri
     throw new InvalidParamsError(`Param "${key}" must be an array of strings.`);
   }
   return value as string[];
+}
+
+/** Validate that `value` is a structurally valid Node payload for add_*. */
+function validateNodeShape(value: unknown, ctx: string): Node {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new InvalidParamsError(`${ctx}: node must be an object.`);
+  }
+  const n = value as Record<string, unknown>;
+  if (typeof n['id'] !== 'string' || n['id'].length === 0) {
+    throw new InvalidParamsError(`${ctx}: node.id must be a non-empty string.`);
+  }
+  const pos = n['position'];
+  if (!pos || typeof pos !== 'object' || Array.isArray(pos)) {
+    throw new InvalidParamsError(`${ctx}: node.position must be { x, y }.`);
+  }
+  const p = pos as Record<string, unknown>;
+  if (typeof p['x'] !== 'number' || typeof p['y'] !== 'number') {
+    throw new InvalidParamsError(`${ctx}: node.position.{x,y} must be numbers.`);
+  }
+  if (!Number.isFinite(p['x'] as number) || !Number.isFinite(p['y'] as number)) {
+    throw new InvalidParamsError(`${ctx}: node.position.{x,y} must be finite (no NaN/Infinity).`);
+  }
+  return value as Node;
+}
+
+/** Validate that `value` is a structurally valid Edge payload for add_*. */
+function validateEdgeShape(value: unknown, ctx: string): Edge {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new InvalidParamsError(`${ctx}: edge must be an object.`);
+  }
+  const e = value as Record<string, unknown>;
+  if (typeof e['id'] !== 'string' || e['id'].length === 0) {
+    throw new InvalidParamsError(`${ctx}: edge.id must be a non-empty string.`);
+  }
+  if (typeof e['source'] !== 'string' || e['source'].length === 0) {
+    throw new InvalidParamsError(`${ctx}: edge.source must be a non-empty string.`);
+  }
+  if (typeof e['target'] !== 'string' || e['target'].length === 0) {
+    throw new InvalidParamsError(`${ctx}: edge.target must be a non-empty string.`);
+  }
+  return value as Edge;
 }

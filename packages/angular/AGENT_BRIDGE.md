@@ -33,6 +33,9 @@ export const appConfig: ApplicationConfig = {
     provideAgentBridge({
       transports: [new WindowTransport()],
       history: { maxDepth: 100 },  // default; pass `false` to disable
+      // Optional. Receives transport / dispatch errors the bridge would
+      // otherwise swallow (start() rejection, send() throw).
+      onError: (err, ctx) => console.warn('[agent-bridge]', ctx.kind, err),
     }),
   ],
 };
@@ -51,9 +54,15 @@ ngOnDestroy() { this.unregister?.(); }
 
 After this, the browser devtools console can do `await angflow.callTool('add_node', { node: {…} })`.
 
+**In-process calls.** Inside Angular code, `bridge.callTool(method, params)` is equivalent to a JSON-RPC request through a transport: it captures a history snapshot, emits `flow.history` / `flow.state` events, and throws a structured error (with `code` and `data` attached) on failure. Use this whenever you want the bridge's full semantics — `undo`/`redo` only sees mutations that went through `callTool` or a transport.
+
+**Re-registration.** `register(id, service)` is idempotent for the same service instance — calling it twice with the same `(id, service)` is a no-op (no extra `flow.registered` event, history preserved). Calling it with a different `NgFlowService` under the same id tears down the previous watcher, drops the previous history stack (since those snapshots refer to a different graph), and emits `flow.registered` again.
+
 ## Tool catalog
 
 Every tool takes an optional `flowId` (omit when only one flow is registered; required otherwise). All payloads use the `Node` / `Edge` types from `@angflow/angular`.
+
+**Payload validation.** `add_node`, `add_nodes`, `set_nodes`, and the corresponding `add_node` / `add_nodes` ops inside `apply_changes` require each node to have a non-empty string `id` and a `position: { x: number, y: number }`. The edge variants require non-empty string `id`, `source`, and `target`. Malformed payloads fail with `-32602` *before* reaching `NgFlowService`.
 
 ### Discovery / read
 
@@ -191,13 +200,13 @@ await angflow.callTool('apply_changes', {
 
 **`set_nodes` and `set_edges` are NOT valid ops inside `apply_changes`.** Use the incremental ops instead.
 
-**`delete_elements` inside `apply_changes` skips the `onBeforeDelete` hook.** The standalone `delete_elements` tool awaits `onBeforeDelete` if the host has registered one. Inside `apply_changes`, deletions go through synchronous `setNodes`/`setEdges` filters so the whole batch can roll back on failure — there is no opportunity to await an async veto. If your app relies on `onBeforeDelete` to gate deletions, call the standalone `delete_elements` tool instead.
+**`delete_elements` inside `apply_changes` skips the `onBeforeDelete` hook.** The standalone `delete_elements` tool awaits `onBeforeDelete` if the host has registered one. Inside `apply_changes`, deletions go through synchronous `setNodes`/`setEdges` filters so the whole batch can roll back on failure — there is no opportunity to await an async veto. If your app relies on `onBeforeDelete` to gate deletions, call the standalone `delete_elements` tool instead. The bridge emits a one-time `console.warn` the first time this combination occurs (`apply_changes` containing `delete_elements` while the host has `onBeforeDelete` set), so the silent veto-loss is discoverable.
 
 **Snapshot-rollback semantics:**
 
-1. Before any op executes, `apply_changes` captures a snapshot of `{ nodes, edges }` (viewport is intentionally excluded).
+1. Before any op executes, `apply_changes` captures a snapshot of `{ nodes, edges }` (viewport is intentionally excluded). Each node and edge is shallow-cloned so concurrent in-place mutations cannot corrupt the snapshot.
 2. All ops run inside `service.batch()`.
-3. If any op throws, the snapshot is restored via `setNodes`/`setEdges` inside another `batch()` call. A single coalesced `flow.state` event is emitted after the rollback.
+3. If any op throws, the snapshot is restored via `setNodes`/`setEdges` inside another `batch()` call. Because the rolled-back state is byte-for-byte identical to the pre-call state, the `flow.state` dedup will normally suppress the emission — consumers should treat the JSON-RPC error response (`-32603` with `failedIndex`) as the signal that the batch was rolled back, not absence of a state event.
 4. On success, a single coalesced `flow.state` event is emitted after all ops complete.
 
 **History:** A successful `apply_changes` that includes at least one non-selection op (i.e., at least one op that is not `select_nodes`, `select_edges`, or `deselect_all`) creates exactly one undo entry. A batch that is entirely selection ops creates no undo entry. A rolled-back `apply_changes` creates no undo entry.
@@ -267,6 +276,8 @@ Emitted synchronously after every mutating tool call (before `flow.state`), and 
 | `-32603` | Internal error from the underlying `NgFlowService` call |
 
 **Note:** `apply_changes` rollback errors use code `-32603` and carry `data: { failedIndex }` in the error object indicating which op caused the failure.
+
+**Swallowed transport failures.** A throwing `transport.send` or a rejected `transport.start()` does not crash the bridge. Pass `onError: (err, ctx)` to `provideAgentBridge` to receive these. `ctx.kind` is `'transport-start'`, `'transport-send'`, or `'dispatch'`. The bridge always remains responsive.
 
 ## Two ways to call
 

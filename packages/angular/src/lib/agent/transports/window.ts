@@ -46,6 +46,17 @@ export class WindowTransport implements AgentTransport {
     this.requestHandler = handler;
     if (typeof window === 'undefined') return;
 
+    const winRec = window as unknown as Record<string, unknown>;
+    if (winRec[this.namespace] !== undefined) {
+      // Surface the collision so a second WindowTransport (or a host that
+      // already owns the namespace) doesn't silently lose its API.
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[angflow] WindowTransport: window.${this.namespace} is already set and will be overwritten. ` +
+          `Pass { namespace: '…' } to disambiguate.`,
+      );
+    }
+
     const api: AngflowWindowApi = {
       callTool: (method, params = {}) => this.handleCallTool(method, params),
       subscribe: (h) => {
@@ -55,7 +66,7 @@ export class WindowTransport implements AgentTransport {
       toolSchemas: AGENT_TOOL_SCHEMAS,
     };
 
-    (window as unknown as Record<string, unknown>)[this.namespace] = api;
+    winRec[this.namespace] = api;
   }
 
   send(frame: AgentOutbound): void {
