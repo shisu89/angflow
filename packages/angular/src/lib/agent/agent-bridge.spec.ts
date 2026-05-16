@@ -248,68 +248,114 @@ describe('AngflowAgentBridge', () => {
   });
 
   describe('read / geometry tools', () => {
-  let flow: NgFlowService;
+    let flow: NgFlowService;
 
-  beforeEach(() => {
-    flow = newFlow();
-    bridge.register('f', flow);
-    flow.setNodes([
-      { ...makeNode('a'), position: { x: 0, y: 0 }, width: 100, height: 50 },
-      { ...makeNode('b'), position: { x: 200, y: 0 }, width: 100, height: 50 },
-      { ...makeNode('c'), position: { x: 400, y: 0 }, width: 100, height: 50 },
-    ] as Node[]);
-    flow.setEdges([
-      { id: 'a-b', source: 'a', target: 'b' },
-      { id: 'b-c', source: 'b', target: 'c' },
-    ] as Edge[]);
-  });
+    beforeEach(() => {
+      flow = newFlow();
+      bridge.register('f', flow);
+      flow.setNodes([
+        { ...makeNode('a'), position: { x: 0, y: 0 }, width: 100, height: 50 },
+        { ...makeNode('b'), position: { x: 200, y: 0 }, width: 100, height: 50 },
+        { ...makeNode('c'), position: { x: 400, y: 0 }, width: 100, height: 50 },
+      ] as Node[]);
+      flow.setEdges([
+        { id: 'a-b', source: 'a', target: 'b' },
+        { id: 'b-c', source: 'b', target: 'c' },
+      ] as Edge[]);
+    });
 
-  it('get_outgoers returns downstream neighbors', async () => {
-    const res = await transport.call('get_outgoers', { id: 'a' });
-    expect('result' in res).toBe(true);
-    expect((res as { result: Node[] }).result.map((n) => n.id)).toEqual(['b']);
-  });
+    it('get_outgoers returns downstream neighbors', async () => {
+      const res = await transport.call('get_outgoers', { id: 'a' });
+      expect('result' in res).toBe(true);
+      expect((res as { result: Node[] }).result.map((n) => n.id)).toEqual(['b']);
+    });
 
-  it('get_incomers returns upstream neighbors', async () => {
-    const res = await transport.call('get_incomers', { id: 'c' });
-    expect((res as { result: Node[] }).result.map((n) => n.id)).toEqual(['b']);
-  });
+    it('get_incomers returns upstream neighbors', async () => {
+      const res = await transport.call('get_incomers', { id: 'c' });
+      expect((res as { result: Node[] }).result.map((n) => n.id)).toEqual(['b']);
+    });
 
-  it('get_connected_edges returns edges touching given nodes', async () => {
-    const res = await transport.call('get_connected_edges', { nodeIds: ['b'] });
-    expect((res as { result: Edge[] }).result.map((e) => e.id).sort()).toEqual(['a-b', 'b-c']);
-  });
+    it('get_connected_edges returns edges touching given nodes', async () => {
+      const res = await transport.call('get_connected_edges', { nodeIds: ['b'] });
+      expect((res as { result: Edge[] }).result.map((e) => e.id).sort()).toEqual(['a-b', 'b-c']);
+    });
 
-  it('get_nodes_bounds covers all nodes', async () => {
-    const res = await transport.call('get_nodes_bounds');
-    const rect = (res as { result: { x: number; y: number; width: number; height: number } }).result;
-    expect(rect.x).toBe(0);
-    expect(rect.y).toBe(0);
-    expect(rect.width).toBeGreaterThanOrEqual(500);
-  });
+    it('get_nodes_bounds covers all nodes', async () => {
+      const res = await transport.call('get_nodes_bounds');
+      const rect = (res as { result: { x: number; y: number; width: number; height: number } }).result;
+      expect(rect.x).toBe(0);
+      expect(rect.y).toBe(0);
+      expect(rect.width).toBeGreaterThanOrEqual(500);
+    });
 
-  it('get_internal_node returns a serializable view', async () => {
-    const res = await transport.call('get_internal_node', { id: 'a' });
-    const node = (res as { result: { id: string; positionAbsolute: { x: number; y: number } } | null }).result;
-    expect(node).toBeTruthy();
-    expect(node!.id).toBe('a');
-    expect(node!.positionAbsolute).toBeDefined();
-    // Result must round-trip through JSON without throwing.
-    expect(() => JSON.parse(JSON.stringify(node))).not.toThrow();
-  });
+    it('get_internal_node returns a serializable view', async () => {
+      const res = await transport.call('get_internal_node', { id: 'a' });
+      const node = (res as { result: { id: string; positionAbsolute: { x: number; y: number } } | null }).result;
+      expect(node).toBeTruthy();
+      expect(node!.id).toBe('a');
+      expect(node!.positionAbsolute).toBeDefined();
+      // Result must round-trip through JSON without throwing.
+      expect(() => JSON.parse(JSON.stringify(node))).not.toThrow();
+    });
 
-  it('get_internal_node returns null for missing id', async () => {
-    const res = await transport.call('get_internal_node', { id: 'nope' });
-    expect((res as { result: unknown }).result).toBeNull();
-  });
+    it('get_internal_node returns null for missing id', async () => {
+      const res = await transport.call('get_internal_node', { id: 'nope' });
+      expect((res as { result: unknown }).result).toBeNull();
+    });
 
-  it('screen_to_flow_position and flow_to_screen_position round-trip approximately', async () => {
-    // Without a real DOM bounding box, this is a smoke test on the API surface.
-    const toFlow = await transport.call('screen_to_flow_position', { position: { x: 10, y: 20 } });
-    expect('result' in toFlow).toBe(true);
-    const toScreen = await transport.call('flow_to_screen_position', { position: { x: 0, y: 0 } });
-    expect('result' in toScreen).toBe(true);
-  });
+    it('screen_to_flow_position and flow_to_screen_position round-trip approximately', async () => {
+      // Without a real DOM bounding box, this is a smoke test on the API surface.
+      const toFlow = await transport.call('screen_to_flow_position', { position: { x: 10, y: 20 } });
+      expect('result' in toFlow).toBe(true);
+      const toScreen = await transport.call('flow_to_screen_position', { position: { x: 0, y: 0 } });
+      expect('result' in toScreen).toBe(true);
+    });
+
+    it('get_intersecting_nodes returns empty array for a non-overlapping node', async () => {
+      const res = await transport.call('get_intersecting_nodes', { id: 'a' });
+      expect('result' in res).toBe(true);
+      expect((res as { result: Node[] }).result).toEqual([]);
+    });
+
+    it('is_node_in_area returns true when the node is inside the area', async () => {
+      const res = await transport.call('is_node_in_area', {
+        id: 'a',
+        area: { x: -10, y: -10, width: 200, height: 100 },
+      });
+      expect((res as { result: boolean }).result).toBe(true);
+    });
+
+    it('is_node_in_area returns false when the node is outside the area', async () => {
+      const res = await transport.call('is_node_in_area', {
+        id: 'a',
+        area: { x: 1000, y: 1000, width: 100, height: 100 },
+      });
+      expect((res as { result: boolean }).result).toBe(false);
+    });
+
+    it('get_node_connections returns an array (possibly empty) for a node', async () => {
+      const res = await transport.call('get_node_connections', { nodeId: 'a' });
+      expect('result' in res).toBe(true);
+      expect(Array.isArray((res as { result: unknown[] }).result)).toBe(true);
+    });
+
+    it('get_handle_connections rejects an invalid `type` value', async () => {
+      const res = await transport.call('get_handle_connections', {
+        nodeId: 'a',
+        type: 'both',
+      });
+      expect('error' in res).toBe(true);
+      expect((res as { error: { code: number } }).error.code).toBe(-32602);
+    });
+
+    it('get_handle_data returns null when no data is attached', async () => {
+      const res = await transport.call('get_handle_data', {
+        nodeId: 'a',
+        handleId: null,
+        type: 'source',
+      });
+      expect((res as { result: unknown }).result).toBeNull();
+    });
   });
 });
 

@@ -369,7 +369,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
     name: 'get_handle_data',
     description:
       'Look up user-attached data on a handle (registered via <ng-flow-handle [data]="...">). ' +
-      'Returns undefined if no data is attached.',
+      'Returns null if no data is attached.',
     inputSchema: {
       type: 'object',
       properties: {
