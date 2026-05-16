@@ -14,7 +14,8 @@ import type {
   XYPosition,
 } from '@angflow/system';
 
-import type { InternalNode, Node, CSSProperties } from './nodes';
+import type { InternalNode, Node } from './nodes';
+import type { CSSProperties } from './general';
 
 /**
  * Options for edge label rendering.
@@ -45,11 +46,19 @@ export type Edge<
     pathOptions?: BezierPathOptions | SmoothStepPathOptions | StepPathOptions;
   };
 
-export type BuiltInEdge =
-  | Edge<Record<string, unknown>, 'smoothstep'>
-  | Edge<Record<string, unknown>, 'default'>
-  | Edge<Record<string, unknown>, 'step'>
-  | Edge<Record<string, unknown>, 'straight'>;
+type SmoothStepEdge<EdgeData extends Record<string, unknown> = Record<string, unknown>> =
+  Edge<EdgeData, 'smoothstep'> & { pathOptions?: SmoothStepPathOptions };
+
+type BezierEdge<EdgeData extends Record<string, unknown> = Record<string, unknown>> =
+  Edge<EdgeData, 'default'> & { pathOptions?: BezierPathOptions };
+
+type StepEdge<EdgeData extends Record<string, unknown> = Record<string, unknown>> =
+  Edge<EdgeData, 'step'> & { pathOptions?: StepPathOptions };
+
+type StraightEdge<EdgeData extends Record<string, unknown> = Record<string, unknown>> =
+  Edge<EdgeData, 'straight'>;
+
+export type BuiltInEdge = SmoothStepEdge | BezierEdge | StepEdge | StraightEdge;
 
 export type EdgeMouseHandler<EdgeType extends Edge = Edge> = (event: MouseEvent, edge: EdgeType) => void;
 

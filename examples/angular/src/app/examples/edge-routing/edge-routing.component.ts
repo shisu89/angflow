@@ -6,7 +6,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
 } from '@angflow/angular';
-import type { Node, Edge, Connection, NodeChange, EdgeChange } from '@angflow/angular';
+import type { Node, Edge, BuiltInEdge, Connection, NodeChange, EdgeChange } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -35,17 +35,17 @@ const NODES: Node[] = [
   { id: '20', position: { x: 950, y: 750 }, data: { label: 'Target' }, sourcePosition: Position.Top,    targetPosition: Position.Top,    style: NODE_BG },
 ];
 
-const EDGES: Edge[] = [
-  { id:  'e1-2', source:  '1', target:  '2', pathOptions: { offset: 30 }, interactionWidth: 0 },
-  { id:  'e3-4', source:  '3', target:  '4', pathOptions: { borderRadius: 2 }, interactionWidth: 0 },
-  { id:  'e4-5', source:  '5', target:  '6' },
-  { id:  'e7-8', source:  '7', target:  '8' },
-  { id: 'e9-10', source:  '9', target: '10', label: 'stepPosition: 0.2', pathOptions: { stepPosition: 0.2 }, interactionWidth: 0 },
-  { id: 'e11-12', source: '11', target: '12', label: 'stepPosition: 0.5 (default)', pathOptions: { stepPosition: 0.5 }, interactionWidth: 0 },
-  { id: 'e13-14', source: '13', target: '14', label: 'stepPosition: 0.8', pathOptions: { stepPosition: 0.8 }, interactionWidth: 0 },
-  { id: 'e15-16', source: '15', target: '16', label: 'stepPosition: 0.2', pathOptions: { stepPosition: 0.2 }, interactionWidth: 0 },
-  { id: 'e17-18', source: '17', target: '18', label: 'stepPosition: 0.5', pathOptions: { stepPosition: 0.5 }, interactionWidth: 0 },
-  { id: 'e19-20', source: '19', target: '20', label: 'stepPosition: 0.8', pathOptions: { stepPosition: 0.8 }, interactionWidth: 0 },
+const EDGES: BuiltInEdge[] = [
+  { id:  'e1-2', type: 'smoothstep', source:  '1', target:  '2', pathOptions: { offset: 30 }, interactionWidth: 0 },
+  { id:  'e3-4', type: 'smoothstep', source:  '3', target:  '4', pathOptions: { borderRadius: 2 }, interactionWidth: 0 },
+  { id:  'e4-5', type: 'smoothstep', source:  '5', target:  '6' },
+  { id:  'e7-8', type: 'smoothstep', source:  '7', target:  '8' },
+  { id: 'e9-10', type: 'smoothstep', source:  '9', target: '10', label: 'stepPosition: 0.2', pathOptions: { stepPosition: 0.2 }, interactionWidth: 0 },
+  { id: 'e11-12', type: 'smoothstep', source: '11', target: '12', label: 'stepPosition: 0.5 (default)', pathOptions: { stepPosition: 0.5 }, interactionWidth: 0 },
+  { id: 'e13-14', type: 'smoothstep', source: '13', target: '14', label: 'stepPosition: 0.8', pathOptions: { stepPosition: 0.8 }, interactionWidth: 0 },
+  { id: 'e15-16', type: 'smoothstep', source: '15', target: '16', label: 'stepPosition: 0.2', pathOptions: { stepPosition: 0.2 }, interactionWidth: 0 },
+  { id: 'e17-18', type: 'smoothstep', source: '17', target: '18', label: 'stepPosition: 0.5', pathOptions: { stepPosition: 0.5 }, interactionWidth: 0 },
+  { id: 'e19-20', type: 'smoothstep', source: '19', target: '20', label: 'stepPosition: 0.8', pathOptions: { stepPosition: 0.8 }, interactionWidth: 0 },
 ];
 
 const DEFAULT_EDGE_OPTIONS = {

@@ -12,11 +12,18 @@ For the polished example gallery (free and pro examples alike), visit **https://
 ## Running locally
 
 ```bash
-pnpm install      # run from the repo root
+# From the repo root — first-time setup
+pnpm install
+pnpm -F @angflow/system build
+pnpm -F @angflow/angular build
+
+# Start the dev server
 pnpm --filter angular-examples dev
 ```
 
 Open http://localhost:4200, pick an example from the header `<select>`.
+
+The example consumes `@angflow/angular` and `@angflow/system` via pnpm `workspace:*` — but both packages' `exports` point at `dist/`, which is gitignored. So a fresh clone needs the two `build` commands above before `ng serve` can resolve the workspace packages. Subsequent edits in `packages/angular/src/` need a rebuild (`pnpm -F @angflow/angular build`) before the dev server picks them up; `packages/system` has a watch script (`npm run dev` inside `packages/system/`) for live rebuilds.
 
 ## Adding a new example
 

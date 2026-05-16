@@ -72,8 +72,8 @@ npm publish --access public
 ### examples/angular
 - Angular dev example at `examples/angular/`
 - Consumes `@angflow/angular` and `@angflow/system` via pnpm `workspace:*` dependencies
-- No build/pack step needed — changes in `packages/angular` and `packages/system` reflect immediately
-- Good for development iteration
+- **Initial setup requires building both packages** — `dist/` is gitignored, and the packages' `exports` point at `dist/`, so `ng serve` will fail with `TS2307: Cannot find module '@angflow/angular'` on a fresh clone until you run `pnpm -F @angflow/system build && pnpm -F @angflow/angular build`
+- After the initial build, ongoing changes still require a rebuild of the affected package — `packages/system` has a `npm run dev` watch script; `packages/angular` does not, so run `npm run build` in `packages/angular` after each change, then restart `ng serve` if it doesn't hot-reload
 
 ## Key Commands
 

@@ -109,12 +109,19 @@ A demo app lives in this repo at [`examples/angular/`](./examples/angular). It's
 ### Running it
 
 ```bash
-pnpm install       # from the repo root (first time only)
+# First-time setup (from the repo root)
+pnpm install
+pnpm -F @angflow/system build
+pnpm -F @angflow/angular build
+
+# Start the dev server
 cd examples/angular
 npm run dev        # or: npm start / npx ng serve
 ```
 
 > **Note:** Use `pnpm install` (not `npm install`), and run it from the repo root — not from `examples/angular/` or any other subdirectory. npm doesn't understand the `workspace:*` protocol, and running an install inside a subdirectory bypasses the workspace, so either will fail with `EUNSUPPORTEDPROTOCOL`. Once installed, `npm run` and `pnpm run` are interchangeable for the scripts.
+
+> **Why the build step?** The example consumes `@angflow/angular` and `@angflow/system` via pnpm `workspace:*` symlinks, but both packages' `package.json` `exports` point at `dist/` — and `dist/` is gitignored. Without an initial build, the example will fail to compile with `TS2307: Cannot find module '@angflow/angular'`.
 
 Then open http://localhost:4200. The app redirects to `/gallery/overview` by default.
 
@@ -147,7 +154,19 @@ The app is organized into three sections, reachable from the sidebar:
 
 ### How it consumes the library
 
-The example app depends on `@angflow/angular` and `@angflow/system` as pnpm `workspace:*` dependencies (see [`examples/angular/package.json`](./examples/angular/package.json)), so edits in `packages/angular/` and `packages/system/` are picked up immediately — no build, pack, or reinstall step needed. Just restart the dev server if the change doesn't hot-reload.
+The example app depends on `@angflow/angular` and `@angflow/system` as pnpm `workspace:*` dependencies (see [`examples/angular/package.json`](./examples/angular/package.json)). The packages' `exports` point at `dist/`, so changes in `packages/angular/src/` or `packages/system/src/` require rebuilding the affected package before the dev server picks them up:
+
+```bash
+# After editing packages/system/src — or run `npm run dev` in that dir for a watch build
+pnpm -F @angflow/system build
+
+# After editing packages/angular/src
+pnpm -F @angflow/angular build
+
+# Then restart ng serve if the change doesn't hot-reload
+```
+
+`packages/system` has a `npm run dev` watch script that rebuilds on every save; `packages/angular` does not, so it needs a manual `npm run build` after each change.
 
 ## Coming from React Flow?
 
