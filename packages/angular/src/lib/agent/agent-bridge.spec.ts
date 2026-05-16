@@ -583,6 +583,16 @@ describe('AngflowAgentBridge', () => {
       expect(flow.getNodes().map((n) => n.id)).toEqual(['a']);
     });
 
+    it('undo reports the actual number consumed when steps exceeds depth', async () => {
+      await transport.call('add_node', { node: { id: 'a', position: { x: 0, y: 0 }, data: {} } });
+      await transport.call('add_node', { node: { id: 'b', position: { x: 100, y: 0 }, data: {} } });
+
+      const res = await transport.call('undo', { steps: 5 });
+      // Only 2 mutations in history; undo with steps:5 should report undone:2, not 5.
+      expect((res as { result: { undone: number } }).result.undone).toBe(2);
+      expect(flow.getNodes()).toEqual([]);
+    });
+
     it('selection ops do NOT capture history', async () => {
       flow.setNodes([makeNode('a')]);
       // Initial selection is empty; capture stack should be empty.

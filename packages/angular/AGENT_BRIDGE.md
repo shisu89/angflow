@@ -191,6 +191,8 @@ await angflow.callTool('apply_changes', {
 
 **`set_nodes` and `set_edges` are NOT valid ops inside `apply_changes`.** Use the incremental ops instead.
 
+**`delete_elements` inside `apply_changes` skips the `onBeforeDelete` hook.** The standalone `delete_elements` tool awaits `onBeforeDelete` if the host has registered one. Inside `apply_changes`, deletions go through synchronous `setNodes`/`setEdges` filters so the whole batch can roll back on failure — there is no opportunity to await an async veto. If your app relies on `onBeforeDelete` to gate deletions, call the standalone `delete_elements` tool instead.
+
 **Snapshot-rollback semantics:**
 
 1. Before any op executes, `apply_changes` captures a snapshot of `{ nodes, edges }` (viewport is intentionally excluded).

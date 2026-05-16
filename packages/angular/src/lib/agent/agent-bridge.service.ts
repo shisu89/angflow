@@ -636,16 +636,16 @@ export class AngflowAgentBridge {
       if (!flowId) return { undone: 0, canUndo: false, canRedo: false };
       const steps = typeof params['steps'] === 'number' ? (params['steps'] as number) : 1;
       const current = { nodes: flow.getNodes().slice(), edges: flow.getEdges().slice() };
-      const target = this.history.undo(flowId, steps, current);
-      if (target) {
+      const result = this.history.undo(flowId, steps, current);
+      if (result) {
         flow.batch(() => {
-          flow.setNodes(target.nodes as Node[]);
-          flow.setEdges(target.edges as Edge[]);
+          flow.setNodes(result.snapshot.nodes as Node[]);
+          flow.setEdges(result.snapshot.edges as Edge[]);
         });
       }
       this.emitHistory(flowId);
       const status = this.history.status(flowId);
-      return { undone: target ? steps : 0, canUndo: status.canUndo, canRedo: status.canRedo };
+      return { undone: result?.consumed ?? 0, canUndo: status.canUndo, canRedo: status.canRedo };
     });
 
     this.handlers.set('redo', (flow, params) => {
@@ -654,16 +654,16 @@ export class AngflowAgentBridge {
       if (!flowId) return { redone: 0, canUndo: false, canRedo: false };
       const steps = typeof params['steps'] === 'number' ? (params['steps'] as number) : 1;
       const current = { nodes: flow.getNodes().slice(), edges: flow.getEdges().slice() };
-      const target = this.history.redo(flowId, steps, current);
-      if (target) {
+      const result = this.history.redo(flowId, steps, current);
+      if (result) {
         flow.batch(() => {
-          flow.setNodes(target.nodes as Node[]);
-          flow.setEdges(target.edges as Edge[]);
+          flow.setNodes(result.snapshot.nodes as Node[]);
+          flow.setEdges(result.snapshot.edges as Edge[]);
         });
       }
       this.emitHistory(flowId);
       const status = this.history.status(flowId);
-      return { redone: target ? steps : 0, canUndo: status.canUndo, canRedo: status.canRedo };
+      return { redone: result?.consumed ?? 0, canUndo: status.canUndo, canRedo: status.canRedo };
     });
 
     this.handlers.set('history_status', (flow) => {
