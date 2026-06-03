@@ -5,6 +5,7 @@ import {
   computed,
   input,
   output,
+  reflectComponentType,
   Type,
   Injector,
   AfterViewInit,
@@ -47,11 +48,12 @@ const builtInNodeTypes: NodeTypes = {
         [class.selected]="node.selected"
         [class.draggable]="node.draggable !== false && store.nodesDraggable()"
         [class.dragging]="node.dragging"
-        [class.selectable]="node.selectable !== false"
-        [class.connectable]="true"
+        [class.selectable]="node.selectable !== false && store.elementsSelectable()"
+        [class.connectable]="(node.connectable ?? store.nodesConnectable())"
         [class.connection-target]="store.connectionTargetNodeId() === node.id"
         [ngFlowDrag]="node.id"
         [ngFlowDragDisabled]="node.draggable === false || !store.nodesDraggable()"
+        [ngFlowDragSelectable]="node.selectable !== false && store.elementsSelectable()"
         [ngFlowDragHandleSelector]="node.dragHandle"
         [ngFlowDragNoDragClass]="store.noDragClassName()"
         role="button"
@@ -108,7 +110,8 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
 
   private nodeInjectorCache = new Map<string, Injector>();
   private nodeContextCache = new Map<string, NgFlowNodeContext<unknown>>();
-  private nodeInputsCache = new Map<string, { version: number; inputs: Record<string, unknown> }>();
+  private nodeInputsCache = new Map<string, { key: string; inputs: Record<string, unknown> }>();
+  private declaredInputsCache = new WeakMap<Type<unknown>, Set<string> | null>();
   private resizeObserver: ResizeObserver | null = null;
 
   private mutationObserver: MutationObserver | null = null;
@@ -351,27 +354,49 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
 
   getNodeInputs(node: InternalNode): Record<string, unknown> {
     const version = this.store.version();
+    const nodesConnectable = this.store.nodesConnectable();
+    const key = `${version}:${nodesConnectable ? 1 : 0}:${node.type ?? 'default'}`;
     const cached = this.nodeInputsCache.get(node.id);
-    if (cached && cached.version === version) {
+    if (cached && cached.key === key) {
       return cached.inputs;
     }
 
-    const inputs: Record<string, unknown> = {
+    const allInputs: Record<string, unknown> = {
       id: node.id,
       data: node.data,
       type: node.type,
       selected: node.selected ?? false,
       dragging: node.dragging ?? false,
       zIndex: node.internals?.z ?? 0,
-      isConnectable: true,
+      isConnectable: node.connectable ?? nodesConnectable,
       positionAbsoluteX: node.internals?.positionAbsolute?.x ?? node.position.x,
       positionAbsoluteY: node.internals?.positionAbsolute?.y ?? node.position.y,
       sourcePosition: node.sourcePosition,
       targetPosition: node.targetPosition,
       dragHandle: node.dragHandle,
     };
-    this.nodeInputsCache.set(node.id, { version, inputs });
+
+    // Only push keys the target component actually declares as inputs.
+    // Components that use injectNgFlowNode() (the DI-based API) omit input()
+    // declarations entirely; pushing unknown keys via ngComponentOutlet would
+    // throw NG0303 on every render.
+    const declared = this.getDeclaredInputs(this.getNodeComponent(node.type));
+    const inputs: Record<string, unknown> = declared
+      ? Object.fromEntries(Object.entries(allInputs).filter(([k]) => declared.has(k)))
+      : allInputs;
+
+    this.nodeInputsCache.set(node.id, { key, inputs });
     return inputs;
+  }
+
+  private getDeclaredInputs(Component: Type<unknown>): Set<string> | null {
+    if (this.declaredInputsCache.has(Component)) {
+      return this.declaredInputsCache.get(Component) ?? null;
+    }
+    const mirror = reflectComponentType(Component);
+    const set = mirror ? new Set(mirror.inputs.map((i) => i.templateName)) : null;
+    this.declaredInputsCache.set(Component, set);
+    return set;
   }
 
   private buildNodeContext(nodeId: string): NgFlowNodeContext<unknown> {
@@ -388,7 +413,10 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
       selected: computed(() => getNode()?.selected ?? false),
       dragging: computed(() => getNode()?.dragging ?? false),
       zIndex: computed(() => getNode()?.internals?.z ?? 0),
-      isConnectable: computed(() => true),
+      isConnectable: computed(() => {
+        const n = getNode();
+        return n?.connectable ?? store.nodesConnectable();
+      }),
       position: computed(() => {
         const n = getNode();
         return {

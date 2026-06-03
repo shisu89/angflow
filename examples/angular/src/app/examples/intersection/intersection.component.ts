@@ -1,10 +1,9 @@
-import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, viewChild } from '@angular/core';
 import {
   NgFlowComponent,
   BackgroundComponent,
   ControlsComponent,
   MiniMapComponent,
-  NgFlowService,
   applyNodeChanges,
   applyEdgeChanges,
 } from '@angflow/angular';
@@ -54,7 +53,7 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
   `],
 })
 export class IntersectionExampleComponent {
-  private readonly flow = inject(NgFlowService);
+  private readonly flow = viewChild.required(NgFlowComponent);
 
   nodes: Node[] = [
     { id: '0', data: { label: 'rectangle' }, position: { x:   0, y:   0 }, width: 100, height: 100, draggable: false, style: { opacity: 0.5 } },
@@ -71,8 +70,9 @@ export class IntersectionExampleComponent {
   onConnect(connection: Connection): void { this.edges = addEdge(connection, this.edges) as Edge[]; }
 
   onNodeDrag(draggedNode: Node): void {
-    const intersectingIds = new Set(this.flow.getIntersectingNodes(draggedNode).map((n) => n.id));
-    const isIntersecting = this.flow.isNodeIntersecting(draggedNode, { x: 0, y: 0, width: 100, height: 100 });
+    const flow = this.flow().service;
+    const intersectingIds = new Set(flow.getIntersectingNodes(draggedNode).map((n) => n.id));
+    const isIntersecting = flow.isNodeIntersecting(draggedNode, { x: 0, y: 0, width: 100, height: 100 });
     console.log('intersecting fixed rect:', isIntersecting);
     this.nodes = this.nodes.map((n) => ({
       ...n,

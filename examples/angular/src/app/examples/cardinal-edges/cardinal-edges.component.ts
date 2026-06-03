@@ -8,7 +8,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
 } from '@angflow/angular';
-import type { Node, Edge, Connection } from '@angflow/angular';
+import type { Node, Edge, Connection, NodeChange, EdgeChange } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -143,12 +143,12 @@ export class CardinalEdgesExampleComponent {
     { id: 'e3-4', source: '3', target: '4', sourceHandle: 'right', targetHandle: 'left' },
   ];
 
-  onNodesChange(changes: any[]): void {
+  onNodesChange(changes: NodeChange[]): void {
     this.nodes = applyNodeChanges(changes, this.nodes);
     this.recomputeEdgeHandles();
   }
 
-  onEdgesChange(changes: any[]): void {
+  onEdgesChange(changes: EdgeChange[]): void {
     this.edges = applyEdgeChanges(changes, this.edges);
   }
 

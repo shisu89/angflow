@@ -1,10 +1,9 @@
-import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, viewChild } from '@angular/core';
 import * as dagre from 'dagre';
 import {
   NgFlowComponent,
   ControlsComponent,
   PanelComponent,
-  NgFlowService,
   Position,
   MarkerType,
   applyNodeChanges,
@@ -93,7 +92,7 @@ const INITIAL_EDGES: Edge[] = [
   `],
 })
 export class LayoutingExampleComponent {
-  private readonly flow = inject(NgFlowService);
+  private readonly flow = viewChild.required(NgFlowComponent);
 
   readonly nodeExtent = NODE_EXTENT;
 
@@ -147,9 +146,9 @@ export class LayoutingExampleComponent {
     }));
   }
 
-  fitAll(): void { this.flow.fitView(); }
+  fitAll(): void { this.flow().service.fitView(); }
 
   fitFirstTwo(): void {
-    this.flow.fitView({ nodes: this.nodes.slice(0, 2) });
+    this.flow().service.fitView({ nodes: this.nodes.slice(0, 2) });
   }
 }

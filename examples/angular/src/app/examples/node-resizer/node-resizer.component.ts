@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, Type } from '@angular/core';
+import { Component, ChangeDetectionStrategy, Type } from '@angular/core';
 import {
   NgFlowComponent,
   HandleComponent,
@@ -8,10 +8,13 @@ import {
   Position,
   applyNodeChanges,
   applyEdgeChanges,
+  injectNgFlowNode,
 } from '@angflow/angular';
-import type { Node, Edge, Connection } from '@angflow/angular';
+import type { Node, Edge, Connection, NodeChange, EdgeChange } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
+
+interface ResizableData { label: string }
 
 @Component({
   selector: 'app-resizable-node',
@@ -28,7 +31,7 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
     />
     <ng-flow-handle type="target" [position]="Position.Left" />
     <div class="resizable">
-      <div class="resizable__header">{{ data()?.label || 'Resize me' }}</div>
+      <div class="resizable__header">{{ node.data()?.label ?? 'Resize me' }}</div>
       <div class="resizable__hint">Drag the corners</div>
     </div>
     <ng-flow-handle type="source" [position]="Position.Right" />
@@ -67,18 +70,7 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
 })
 export class ResizableNodeComponent {
   readonly Position = Position;
-  readonly id = input.required<string>();
-  readonly data = input<any>();
-  readonly selected = input(false);
-  readonly type = input<string>();
-  readonly dragging = input(false);
-  readonly zIndex = input(0);
-  readonly isConnectable = input(true);
-  readonly positionAbsoluteX = input(0);
-  readonly positionAbsoluteY = input(0);
-  readonly sourcePosition = input<any>();
-  readonly targetPosition = input<any>();
-  readonly dragHandle = input<string>();
+  readonly node = injectNgFlowNode<ResizableData>();
 }
 
 @Component({
@@ -105,14 +97,7 @@ export class ResizableNodeComponent {
       </ng-flow>
     </app-example-card>
   `,
-  styles: [`
-    :host {
-      display: flex;
-      flex: 1;
-      min-width: 0;
-      min-height: 0;
-    }
-  `],
+  styles: [`:host { display: flex; flex: 1; min-width: 0; min-height: 0; }`],
 })
 export class NodeResizerExampleComponent {
   nodeTypes: Record<string, Type<unknown>> = {
@@ -140,11 +125,11 @@ export class NodeResizerExampleComponent {
     { id: 'e1-2', source: '1', target: '2', animated: true },
   ];
 
-  onNodesChange(changes: any[]): void {
+  onNodesChange(changes: NodeChange[]): void {
     this.nodes = applyNodeChanges(changes, this.nodes);
   }
 
-  onEdgesChange(changes: any[]): void {
+  onEdgesChange(changes: EdgeChange[]): void {
     this.edges = applyEdgeChanges(changes, this.edges);
   }
 

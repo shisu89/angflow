@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, Type } from '@angular/core';
+import { Component, ChangeDetectionStrategy, Type } from '@angular/core';
 import {
   NgFlowComponent,
   HandleComponent,
@@ -20,7 +20,7 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
     <ng-flow-handle type="target" [position]="Position.Left" />
     <div class="dh-body">
       <span>Only draggable here →</span>
-      <span class="custom-drag-handle" aria-label="drag handle"></span>
+      <span class="custom-drag-handle" role="button" aria-label="Drag handle"></span>
     </div>
     <ng-flow-handle type="source" [position]="Position.Right" />
   `,
@@ -41,18 +41,6 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
 })
 export class DragHandleNodeComponent {
   readonly Position = Position;
-  readonly id = input.required<string>();
-  readonly data = input<any>();
-  readonly selected = input(false);
-  readonly type = input<string>();
-  readonly dragging = input(false);
-  readonly zIndex = input(0);
-  readonly isConnectable = input(true);
-  readonly positionAbsoluteX = input(0);
-  readonly positionAbsoluteY = input(0);
-  readonly sourcePosition = input<any>();
-  readonly targetPosition = input<any>();
-  readonly dragHandle = input<string>();
 }
 
 @Component({

@@ -8,7 +8,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
 } from '@angflow/angular';
-import type { Node, Edge, Connection } from '@angflow/angular';
+import type { Node, Edge, Connection, NodeChange, EdgeChange } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -202,11 +202,11 @@ export class FloatingEdgesExampleComponent {
     { id: 'e4-6', source: '4', sourceHandle: 'out', target: '6', targetHandle: 'auto' },
   ];
 
-  onNodesChange(changes: any[]): void {
+  onNodesChange(changes: NodeChange[]): void {
     this.nodes = applyNodeChanges(changes, this.nodes);
   }
 
-  onEdgesChange(changes: any[]): void {
+  onEdgesChange(changes: EdgeChange[]): void {
     this.edges = applyEdgeChanges(changes, this.edges);
   }
 

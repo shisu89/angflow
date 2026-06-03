@@ -1,9 +1,8 @@
-import { Component, ChangeDetectionStrategy, signal, inject, OnDestroy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, viewChild, OnDestroy } from '@angular/core';
 import {
   NgFlowComponent,
   BackgroundComponent,
   MiniMapComponent,
-  FlowStore,
   applyNodeChanges,
   applyEdgeChanges,
 } from '@angflow/angular';
@@ -68,7 +67,7 @@ const CANCEL_AFTER = 5; // seconds
   `],
 })
 export class CancelConnectionExampleComponent implements OnDestroy {
-  private readonly store = inject(FlowStore);
+  private readonly flow = viewChild.required(NgFlowComponent);
 
   readonly counting = signal(false);
   readonly remaining = signal(CANCEL_AFTER);
@@ -102,7 +101,7 @@ export class CancelConnectionExampleComponent implements OnDestroy {
       this.remaining.set(Math.max(0, CANCEL_AFTER - elapsed));
     }, 100);
     this.timeoutHandle = setTimeout(() => {
-      this.store.cancelConnection();
+      this.flow().store.cancelConnection();
       this.stopCountdown();
     }, CANCEL_AFTER * 1000);
   }

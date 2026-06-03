@@ -7,7 +7,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
 } from '@angflow/angular';
-import type { Node, Edge, Connection } from '@angflow/angular';
+import type { Node, Edge, Connection, NodeChange, EdgeChange } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -34,7 +34,7 @@ const CATEGORY_COLORS: Record<Category, string> = {
   template: `
     <app-example-card
       title="MiniMap (custom)"
-      description="Customize the MiniMap per-node with GetMiniMapNodeAttribute callbacks — here, each node's mini-map color reflects its category."
+      description="Customize the MiniMap per-node with GetMiniMapNodeAttribute callbacks — here, each node's mini-map color reflects its category. (Note: rendering a fully custom node component inside the minimap is not yet wired in @angflow/angular; the React equivalent supports it.)"
     >
       <ng-flow
         [nodes]="nodes"
@@ -103,11 +103,11 @@ export class MinimapCustomExampleComponent {
     return cat ? CATEGORY_COLORS[cat] : '#cbd5e1';
   };
 
-  onNodesChange(changes: any[]): void {
+  onNodesChange(changes: NodeChange[]): void {
     this.nodes = applyNodeChanges(changes, this.nodes) as CategoryNode[];
   }
 
-  onEdgesChange(changes: any[]): void {
+  onEdgesChange(changes: EdgeChange[]): void {
     this.edges = applyEdgeChanges(changes, this.edges);
   }
 

@@ -7,7 +7,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
 } from '@angflow/angular';
-import type { Node, Edge, Connection, XYPosition } from '@angflow/angular';
+import type { Node, Edge, Connection, XYPosition, NodeChange, EdgeChange } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -165,11 +165,11 @@ export class DragFromSidebarExampleComponent {
     ];
   }
 
-  onNodesChange(changes: any[]): void {
+  onNodesChange(changes: NodeChange[]): void {
     this.nodes = applyNodeChanges(changes, this.nodes);
   }
 
-  onEdgesChange(changes: any[]): void {
+  onEdgesChange(changes: EdgeChange[]): void {
     this.edges = applyEdgeChanges(changes, this.edges);
   }
 

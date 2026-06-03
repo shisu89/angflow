@@ -9,7 +9,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
 } from '@angflow/angular';
-import type { Node, Edge, Connection } from '@angflow/angular';
+import type { Node, Edge, Connection, NodeChange, EdgeChange } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -97,27 +97,14 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
 })
 export class LabeledEdgeComponent {
   readonly id = input<string>();
-  readonly source = input<string>();
-  readonly target = input<string>();
   readonly sourceX = input(0);
   readonly sourceY = input(0);
   readonly targetX = input(0);
   readonly targetY = input(0);
   readonly sourcePosition = input<Position>(Position.Bottom);
   readonly targetPosition = input<Position>(Position.Top);
-  readonly data = input<any>();
+  readonly data = input<{ label?: string }>();
   readonly markerEnd = input<string>();
-  readonly markerStart = input<string>();
-  readonly selected = input(false);
-  readonly animated = input(false);
-  readonly label = input<string>();
-  readonly interactionWidth = input<number>();
-  readonly sourceHandleId = input<string | null>();
-  readonly targetHandleId = input<string | null>();
-  readonly selectable = input<boolean>();
-  readonly deletable = input<boolean>();
-  readonly type = input<string>();
-  readonly pathOptions = input<unknown>();
 
   readonly pathData = computed(() => {
     const [d, labelX, labelY] = getBezierPath({
@@ -191,11 +178,11 @@ export class CustomEdgeExampleComponent {
     { id: 'e2-3', source: '2', target: '3', type: 'labeled', data: { label: 'publish' } },
   ];
 
-  onNodesChange(changes: any[]): void {
+  onNodesChange(changes: NodeChange[]): void {
     this.nodes = applyNodeChanges(changes, this.nodes);
   }
 
-  onEdgesChange(changes: any[]): void {
+  onEdgesChange(changes: EdgeChange[]): void {
     this.edges = applyEdgeChanges(changes, this.edges);
   }
 

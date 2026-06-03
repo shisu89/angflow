@@ -67,7 +67,16 @@ export class DragDirective implements OnInit, OnChanges, OnDestroy {
   }
 
   private updateDrag(): void {
-    if (this.disabled() || !this.el.nativeElement || !this.dragInstance) {
+    if (!this.el.nativeElement || !this.dragInstance) {
+      return;
+    }
+
+    // Mirrors React's useDrag effect: destroy the d3-drag binding when
+    // disabled, re-bind on every input change otherwise. Without this, flags
+    // like `isSelectable` get stuck on the value they had when `disabled`
+    // first flipped true, because we'd silently skip update().
+    if (this.disabled()) {
+      this.dragInstance.destroy();
       return;
     }
 

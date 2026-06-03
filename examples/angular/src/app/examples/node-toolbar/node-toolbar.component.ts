@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, signal, Type } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, Type } from '@angular/core';
 import {
   NgFlowComponent,
   BackgroundComponent,
@@ -8,8 +8,9 @@ import {
   Position,
   applyNodeChanges,
   applyEdgeChanges,
+  injectNgFlowNode,
 } from '@angflow/angular';
-import type { Node, Edge, Connection } from '@angflow/angular';
+import type { Node, Edge, Connection, NodeChange, EdgeChange } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -28,13 +29,13 @@ type ToolbarNodeData = {
   template: `
     <ng-flow-node-toolbar [position]="Position.Top">
       <div class="toolbar">
-        <button type="button" class="toolbar__btn" (click)="data()?.onCopy?.()">Copy</button>
-        <button type="button" class="toolbar__btn toolbar__btn--danger" (click)="data()?.onDelete?.()">Delete</button>
+        <button type="button" class="toolbar__btn" aria-label="Copy node" (click)="node.data()?.onCopy?.()">Copy</button>
+        <button type="button" class="toolbar__btn toolbar__btn--danger" aria-label="Delete node" (click)="node.data()?.onDelete?.()">Delete</button>
       </div>
     </ng-flow-node-toolbar>
     <ng-flow-handle type="target" [position]="Position.Left" />
-    <div class="node" [class.node--selected]="selected()">
-      <div class="node__label">{{ data()?.label }}</div>
+    <div class="node" [class.node--selected]="node.selected()">
+      <div class="node__label">{{ node.data()?.label }}</div>
     </div>
     <ng-flow-handle type="source" [position]="Position.Right" />
   `,
@@ -43,13 +44,12 @@ type ToolbarNodeData = {
       min-width: 140px;
       padding: 12px 18px;
       background: #ffffff;
-      border: 1px solid #e2e8f0;
+      border: 1px solid #1a192b;
       border-radius: 8px;
       box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
       transition: border-color 120ms ease, box-shadow 120ms ease;
     }
     .node:hover {
-      border-color: #cbd5e1;
       box-shadow: 0 2px 4px rgba(15, 23, 42, 0.06), 0 4px 10px rgba(15, 23, 42, 0.08);
     }
     .node--selected {
@@ -91,18 +91,7 @@ type ToolbarNodeData = {
 })
 export class ToolbarNodeComponent {
   readonly Position = Position;
-  readonly id = input.required<string>();
-  readonly data = input<ToolbarNodeData>();
-  readonly selected = input(false);
-  readonly type = input<string>();
-  readonly dragging = input(false);
-  readonly zIndex = input(0);
-  readonly isConnectable = input(true);
-  readonly positionAbsoluteX = input(0);
-  readonly positionAbsoluteY = input(0);
-  readonly sourcePosition = input<any>();
-  readonly targetPosition = input<any>();
-  readonly dragHandle = input<string>();
+  readonly node = injectNgFlowNode<ToolbarNodeData>();
 }
 
 @Component({
@@ -150,11 +139,11 @@ export class NodeToolbarExampleComponent {
     { id: 'e3-4', source: '3', target: '4' },
   ]);
 
-  onNodesChange(changes: any[]): void {
+  onNodesChange(changes: NodeChange[]): void {
     this.nodes.update((ns) => applyNodeChanges(changes, ns));
   }
 
-  onEdgesChange(changes: any[]): void {
+  onEdgesChange(changes: EdgeChange[]): void {
     this.edges.update((es) => applyEdgeChanges(changes, es));
   }
 

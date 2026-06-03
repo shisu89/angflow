@@ -5,6 +5,8 @@ import {
   computed,
   output,
   input,
+  signal,
+  reflectComponentType,
   Type,
   NO_ERRORS_SCHEMA,
 } from '@angular/core';
@@ -91,6 +93,7 @@ const builtInEdgeTypes: EdgeTypes = {
         [class.selected]="edge.selected"
         [class.animated]="edge.animated"
         [class.selectable]="edge.selectable !== false"
+        [class.updating]="hoveredAnchorEdgeId() === edge.id || reconnectingEdgeId() === edge.id"
         [style.z-index]="getEdgeZIndex(edge)"
         [attr.aria-label]="getEdgeAriaLabel(edge)"
         [attr.tabindex]="store.edgesFocusable() ? 0 : -1"
@@ -137,13 +140,15 @@ const builtInEdgeTypes: EdgeTypes = {
               [attr.stroke-width]="edge.interactionWidth ?? 20"
               style="pointer-events: all;"
             />
-            <path
-              class="ng-flow__edge-path xy-flow__edge-path"
-              [attr.d]="getEdgePath(ei)"
-              [attr.marker-start]="ei['markerStart']"
-              [attr.marker-end]="ei['markerEnd']"
-              [attr.style]="getEdgePathStyle(edge)"
-            />
+            @if (reconnectingEdgeId() !== edge.id) {
+              <path
+                class="ng-flow__edge-path xy-flow__edge-path"
+                [attr.d]="getEdgePath(ei)"
+                [attr.marker-start]="ei['markerStart']"
+                [attr.marker-end]="ei['markerEnd']"
+                [attr.style]="getEdgePathStyle(edge)"
+              />
+            }
           }
           @if (isEdgeReconnectable(edge)) {
             <circle
@@ -154,6 +159,8 @@ const builtInEdgeTypes: EdgeTypes = {
               stroke="transparent"
               fill="transparent"
               (mousedown)="onReconnectSourceMouseDown($event, edge)"
+              (mouseenter)="hoveredAnchorEdgeId.set(edge.id)"
+              (mouseleave)="onReconnectAnchorLeave(edge.id)"
             />
             <circle
               class="xy-flow__edgeupdater xy-flow__edgeupdater-target"
@@ -163,6 +170,8 @@ const builtInEdgeTypes: EdgeTypes = {
               stroke="transparent"
               fill="transparent"
               (mousedown)="onReconnectTargetMouseDown($event, edge)"
+              (mouseenter)="hoveredAnchorEdgeId.set(edge.id)"
+              (mouseleave)="onReconnectAnchorLeave(edge.id)"
             />
           }
         </g>
@@ -179,7 +188,7 @@ const builtInEdgeTypes: EdgeTypes = {
       interaction path, so this overlay is pointer-events: none.
     -->
     @for (edge of visibleEdges(); track edge.id) {
-      @if (!edge.hidden && isCustomEdge(edge.type)) {
+      @if (!edge.hidden && isCustomEdge(edge.type) && reconnectingEdgeId() !== edge.id) {
         @let ei = getEdgeInputs(edge);
         <div
           class="ng-flow__custom-edge"
@@ -192,7 +201,7 @@ const builtInEdgeTypes: EdgeTypes = {
           [style.z-index]="getEdgeZIndex(edge)"
         >
           <ng-container
-            *ngComponentOutlet="getEdgeComponent(edge.type); inputs: ei"
+            *ngComponentOutlet="getEdgeComponent(edge.type); inputs: getEdgeComponentInputs(edge, ei)"
           />
         </div>
       }
@@ -218,6 +227,11 @@ export class EdgeRendererComponent {
   readonly store = inject(FlowStore);
 
   readonly reconnectRadius = input(10);
+
+  /** Edge id whose reconnect anchor is currently hovered. Drives the `updating` style. */
+  readonly hoveredAnchorEdgeId = signal<string | null>(null);
+  /** Edge id currently being reconnected. The original path is hidden so the in-progress connection line is the only visible cue. */
+  readonly reconnectingEdgeId = signal<string | null>(null);
 
   readonly edgeClick = output<{ event: MouseEvent; edge: Edge }>();
   readonly edgeDoubleClick = output<{ event: MouseEvent; edge: Edge }>();
@@ -310,6 +324,30 @@ export class EdgeRendererComponent {
   getEdgeComponent(type?: string): Type<unknown> {
     const resolvedType = type || 'default';
     return this.customEdgeTypes()[resolvedType] ?? builtInEdgeTypes[resolvedType] ?? BezierEdgeComponent;
+  }
+
+  private declaredInputsCache = new WeakMap<Type<unknown>, Set<string> | null>();
+
+  /**
+   * Filters `getEdgeInputs()` down to keys the custom edge component actually
+   * declares as inputs. Without this, ngComponentOutlet throws NG0303 once per
+   * undeclared key per render — components that only declare a subset (custom
+   * edges typically only need geometry, data, markerEnd) would spam errors.
+   */
+  getEdgeComponentInputs(edge: Edge, all: Record<string, unknown>): Record<string, unknown> {
+    const declared = this.getDeclaredInputs(this.getEdgeComponent(edge.type));
+    if (!declared) return all;
+    return Object.fromEntries(Object.entries(all).filter(([k]) => declared.has(k)));
+  }
+
+  private getDeclaredInputs(Component: Type<unknown>): Set<string> | null {
+    if (this.declaredInputsCache.has(Component)) {
+      return this.declaredInputsCache.get(Component) ?? null;
+    }
+    const mirror = reflectComponentType(Component);
+    const set = mirror ? new Set(mirror.inputs.map((i) => i.templateName)) : null;
+    this.declaredInputsCache.set(Component, set);
+    return set;
   }
 
   getEdgeInputs(edge: Edge): Record<string, any> {
@@ -507,6 +545,10 @@ export class EdgeRendererComponent {
     });
   }
 
+  onReconnectAnchorLeave(edgeId: string): void {
+    if (this.hoveredAnchorEdgeId() === edgeId) this.hoveredAnchorEdgeId.set(null);
+  }
+
   private handleEdgeReconnect(
     event: MouseEvent,
     edge: Edge,
@@ -516,6 +558,7 @@ export class EdgeRendererComponent {
     const isTarget = oppositeHandle.type === 'target';
 
     this.reconnectStart.emit({ event, edge, handleType: oppositeHandle.type });
+    this.reconnectingEdgeId.set(edge.id);
 
     XYHandle.onPointerDown(event, {
       autoPanOnConnect: store.autoPanOnConnect(),
@@ -545,6 +588,8 @@ export class EdgeRendererComponent {
         this.reconnect.emit({ edge, connection });
       },
       onReconnectEnd: (evt: MouseEvent | TouchEvent, connectionState: FinalConnectionState) => {
+        this.reconnectingEdgeId.set(null);
+        this.hoveredAnchorEdgeId.set(null);
         this.reconnectEnd.emit({ event: evt, edge, handleType: oppositeHandle.type, connectionState });
       },
       onConnectionTargetChange: (nodeId: string | null) => {

@@ -12,7 +12,7 @@ import { Position } from '@angflow/system';
   imports: [HandleComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <ng-flow-handle type="target" [position]="Position.Top" />
+    <ng-flow-handle type="target" [position]="Position.Top" [isConnectable]="isConnectable()" />
     <div>{{ data()?.label }}</div>
   `,
 })

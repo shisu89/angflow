@@ -1,11 +1,10 @@
-import { Component, ChangeDetectionStrategy, signal, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, viewChild } from '@angular/core';
 import {
   NgFlowComponent,
   BackgroundComponent,
   ControlsComponent,
   MiniMapComponent,
   PanelComponent,
-  NgFlowService,
   applyNodeChanges,
   applyEdgeChanges,
 } from '@angflow/angular';
@@ -66,7 +65,7 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
   `],
 })
 export class ControlledViewportExampleComponent {
-  private readonly flow = inject(NgFlowService);
+  private readonly flow = viewChild.required(NgFlowComponent);
 
   readonly viewportA = signal<Viewport>({ x: 0, y: 0, zoom: 1 });
   readonly viewportB = signal<Viewport>({ x: 100, y: 100, zoom: 1.5 });
@@ -100,7 +99,7 @@ export class ControlledViewportExampleComponent {
     target.update((v) => ({ ...v, y: v.y + 10 }));
   }
 
-  fit(): void { this.flow.fitView(); }
+  fit(): void { this.flow().service.fitView(); }
 
   toggle(): void { this.currentIndex.set(this.currentIndex() === 0 ? 1 : 0); }
 }

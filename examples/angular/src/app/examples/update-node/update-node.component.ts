@@ -1,7 +1,6 @@
-import { Component, ChangeDetectionStrategy, signal, inject, effect } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, viewChild, effect } from '@angular/core';
 import {
   NgFlowComponent,
-  NgFlowService,
   applyNodeChanges,
   applyEdgeChanges,
 } from '@angflow/angular';
@@ -59,7 +58,11 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
   `],
 })
 export class UpdateNodeExampleComponent {
-  private readonly flow = inject(NgFlowService);
+  // Non-required: viewChild signals resolve after the view is created, but
+  // constructor effects flush their first tick before that. Guarding with `?.`
+  // and bailing on the first tick is simpler than wrapping every effect in
+  // afterNextRender.
+  private readonly flow = viewChild(NgFlowComponent);
 
   readonly nodeName = signal('Node 1');
   readonly nodeBg = signal('#eee');
@@ -75,15 +78,21 @@ export class UpdateNodeExampleComponent {
   constructor() {
     effect(() => {
       const label = this.nodeName();
-      this.flow.updateNode('1', (n) => ({ data: { ...n.data, label } }));
+      const service = this.flow()?.service;
+      if (!service) return;
+      service.updateNode('1', (n) => ({ data: { ...n.data, label } }));
     });
     effect(() => {
       const bg = this.nodeBg();
-      this.flow.updateNode('1', (n) => ({ style: { ...n.style, backgroundColor: bg } }));
+      const service = this.flow()?.service;
+      if (!service) return;
+      service.updateNode('1', (n) => ({ style: { ...n.style, backgroundColor: bg } }));
     });
     effect(() => {
       const hidden = this.nodeHidden();
-      this.flow.updateNode('1', () => ({ hidden }));
+      const service = this.flow()?.service;
+      if (!service) return;
+      service.updateNode('1', () => ({ hidden }));
     });
   }
 
@@ -96,6 +105,6 @@ export class UpdateNodeExampleComponent {
   setHidden(event: Event): void { this.nodeHidden.set((event.target as HTMLInputElement).checked); }
 
   bumpPosition(): void {
-    this.flow.updateNode('1', (n) => ({ position: { x: n.position.x + 10, y: n.position.y } }));
+    this.flow()?.service.updateNode('1', (n) => ({ position: { x: n.position.x + 10, y: n.position.y } }));
   }
 }

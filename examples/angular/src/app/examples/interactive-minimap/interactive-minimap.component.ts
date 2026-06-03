@@ -1,11 +1,10 @@
-import { Component, ChangeDetectionStrategy, signal, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, viewChild } from '@angular/core';
 import {
   NgFlowComponent,
   BackgroundComponent,
   ControlsComponent,
   MiniMapComponent,
   PanelComponent,
-  NgFlowService,
   applyNodeChanges,
   applyEdgeChanges,
 } from '@angflow/angular';
@@ -88,7 +87,7 @@ const INITIAL_NODES: Node[] = [
   `],
 })
 export class InteractiveMinimapExampleComponent {
-  private readonly flow = inject(NgFlowService);
+  private readonly flow = viewChild.required(NgFlowComponent);
 
   readonly invertPan = signal(false);
 
@@ -99,7 +98,7 @@ export class InteractiveMinimapExampleComponent {
   onEdgesChange(changes: EdgeChange[]): void { this.edges = applyEdgeChanges(changes, this.edges); }
   onConnect(connection: Connection): void { this.edges = addEdge(connection, this.edges) as Edge[]; }
 
-  resetViewport(): void { this.flow.setViewport({ x: 0, y: 0, zoom: 1 }); }
+  resetViewport(): void { this.flow().service.setViewport({ x: 0, y: 0, zoom: 1 }); }
 
   scatter(): void {
     this.nodes = this.nodes.map((n) => ({
@@ -117,5 +116,5 @@ export class InteractiveMinimapExampleComponent {
 
   toggleInvert(): void { this.invertPan.set(!this.invertPan()); }
 
-  logToObject(): void { console.log(this.flow.toObject()); }
+  logToObject(): void { console.log(this.flow().service.toObject()); }
 }

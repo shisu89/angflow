@@ -1,7 +1,6 @@
-import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, viewChild } from '@angular/core';
 import {
   NgFlowComponent,
-  NgFlowService,
   applyNodeChanges,
   applyEdgeChanges,
 } from '@angflow/angular';
@@ -37,7 +36,7 @@ const getId = () => `${nextId++}`;
   styles: [`:host { display: flex; flex: 1; min-width: 0; min-height: 0; }`],
 })
 export class AddNodeOnEdgeDropExampleComponent {
-  private readonly flow = inject(NgFlowService);
+  private readonly flow = viewChild.required(NgFlowComponent);
 
   private connectingNodeId: string | null = null;
 
@@ -66,7 +65,7 @@ export class AddNodeOnEdgeDropExampleComponent {
 
     if (!('clientX' in event)) return;
     const me = event as MouseEvent;
-    const pos = this.flow.screenToFlowPosition({ x: me.clientX, y: me.clientY });
+    const pos = this.flow().service.screenToFlowPosition({ x: me.clientX, y: me.clientY });
 
     const id = getId();
     const newNode: Node = {

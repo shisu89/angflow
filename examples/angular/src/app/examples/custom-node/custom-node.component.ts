@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, Type } from '@angular/core';
+import { Component, ChangeDetectionStrategy, Type } from '@angular/core';
 import {
   NgFlowComponent,
   HandleComponent,
@@ -7,12 +7,18 @@ import {
   Position,
   applyNodeChanges,
   applyEdgeChanges,
+  injectNgFlowNode,
 } from '@angflow/angular';
-import type { Node, Edge, Connection } from '@angflow/angular';
+import type { Node, Edge, Connection, NodeChange, EdgeChange } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
-// Custom node: an "emoji card" showing an icon, title, and subtitle
+interface EmojiData { icon: string; title: string; subtitle: string }
+
+// Custom node: an "emoji card" showing an icon, title, and subtitle. Uses the
+// recommended injection-based API (injectNgFlowNode) — the alternative is to
+// declare per-property inputs by hand; see custom-node-inject for the
+// equivalent example with explanatory framing.
 @Component({
   selector: 'app-emoji-node',
   standalone: true,
@@ -20,11 +26,11 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
   imports: [HandleComponent],
   template: `
     <ng-flow-handle type="target" [position]="Position.Top" />
-    <div class="emoji-node" [class.selected]="selected()">
-      <div class="emoji-node__icon">{{ data()?.icon || '*' }}</div>
+    <div class="emoji-node" [class.selected]="node.selected()">
+      <div class="emoji-node__icon">{{ node.data()?.icon ?? '*' }}</div>
       <div class="emoji-node__text">
-        <div class="emoji-node__title">{{ data()?.title || 'Untitled' }}</div>
-        <div class="emoji-node__subtitle">{{ data()?.subtitle || '' }}</div>
+        <div class="emoji-node__title">{{ node.data()?.title ?? 'Untitled' }}</div>
+        <div class="emoji-node__subtitle">{{ node.data()?.subtitle ?? '' }}</div>
       </div>
     </div>
     <ng-flow-handle type="source" [position]="Position.Bottom" />
@@ -72,18 +78,7 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
 })
 export class EmojiNodeComponent {
   readonly Position = Position;
-  readonly id = input.required<string>();
-  readonly data = input<any>();
-  readonly selected = input(false);
-  readonly type = input<string>();
-  readonly dragging = input(false);
-  readonly zIndex = input(0);
-  readonly isConnectable = input(true);
-  readonly positionAbsoluteX = input(0);
-  readonly positionAbsoluteY = input(0);
-  readonly sourcePosition = input<any>();
-  readonly targetPosition = input<any>();
-  readonly dragHandle = input<string>();
+  readonly node = injectNgFlowNode<EmojiData>();
 }
 
 @Component({
@@ -94,7 +89,7 @@ export class EmojiNodeComponent {
   template: `
     <app-example-card
       title="Custom Node"
-      description="Build a node from scratch with your own template and styling. Wire up source/target handles with HandleComponent. This example uses signal inputs per node property; for the newer injection-based API, see Custom node (inject)."
+      description="Build a node from scratch with your own template and styling. Wire source/target handles with HandleComponent, read reactive per-node state with injectNgFlowNode()."
     >
       <ng-flow
         [nodes]="nodes"
@@ -110,14 +105,7 @@ export class EmojiNodeComponent {
       </ng-flow>
     </app-example-card>
   `,
-  styles: [`
-    :host {
-      display: flex;
-      flex: 1;
-      min-width: 0;
-      min-height: 0;
-    }
-  `],
+  styles: [`:host { display: flex; flex: 1; min-width: 0; min-height: 0; }`],
 })
 export class CustomNodeExampleComponent {
   nodeTypes: Record<string, Type<unknown>> = {
@@ -150,11 +138,11 @@ export class CustomNodeExampleComponent {
     { id: 'e2-3', source: '2', target: '3', animated: true },
   ];
 
-  onNodesChange(changes: any[]): void {
+  onNodesChange(changes: NodeChange[]): void {
     this.nodes = applyNodeChanges(changes, this.nodes);
   }
 
-  onEdgesChange(changes: any[]): void {
+  onEdgesChange(changes: EdgeChange[]): void {
     this.edges = applyEdgeChanges(changes, this.edges);
   }
 

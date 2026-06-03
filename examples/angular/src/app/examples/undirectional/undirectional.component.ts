@@ -1,10 +1,9 @@
-import { Component, ChangeDetectionStrategy, input, inject, Type } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, viewChild, Type } from '@angular/core';
 import {
   NgFlowComponent,
   HandleComponent,
   ConnectionMode,
   ConnectionLineType,
-  NgFlowService,
   Position,
   applyNodeChanges,
   applyEdgeChanges,
@@ -89,7 +88,7 @@ export class UndirectionalExampleComponent {
   readonly ConnectionMode = ConnectionMode;
   readonly ConnectionLineType = ConnectionLineType;
 
-  private readonly flow = inject(NgFlowService);
+  private readonly flow = viewChild.required(NgFlowComponent);
 
   nodeTypes: Record<string, Type<unknown>> = { custom: UndirectionalNodeComponent };
 
@@ -129,7 +128,10 @@ export class UndirectionalExampleComponent {
   }
 
   onPaneClick(event: MouseEvent): void {
-    const flowPos = this.flow.screenToFlowPosition({ x: event.clientX, y: event.clientY });
-    this.nodes = [...this.nodes, { id: genId(), type: 'custom', position: flowPos, data: {} }];
+    const flowPos = this.flow().service.screenToFlowPosition({ x: event.clientX, y: event.clientY });
+    this.nodes = [
+      ...this.nodes,
+      { id: genId(), type: 'custom', position: flowPos, origin: [0.5, 0.5], data: {} },
+    ];
   }
 }

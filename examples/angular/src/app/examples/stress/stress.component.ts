@@ -1,10 +1,9 @@
-import { Component, ChangeDetectionStrategy, signal, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, viewChild } from '@angular/core';
 import {
   NgFlowComponent,
   BackgroundComponent,
   ControlsComponent,
   PanelComponent,
-  NgFlowService,
   applyNodeChanges,
   applyEdgeChanges,
 } from '@angflow/angular';
@@ -75,7 +74,7 @@ const INITIAL = getNodesAndEdges(25, 25);
   `],
 })
 export class StressExampleComponent {
-  private readonly flow = inject(NgFlowService);
+  private readonly flow = viewChild.required(NgFlowComponent);
 
   readonly mounted = signal(true);
 
@@ -199,7 +198,7 @@ export class StressExampleComponent {
         y: Math.random() * window.innerHeight * 4,
       },
     }));
-    this.flow.fitView();
+    this.flow().service.fitView();
   }
 
   updateElements(): void {

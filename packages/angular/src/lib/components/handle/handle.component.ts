@@ -12,7 +12,15 @@ import {
   Optional,
   Inject,
 } from '@angular/core';
-import { Position, XYHandle, type HandleType, type Connection, type ConnectionState } from '@angflow/system';
+import {
+  Position,
+  XYHandle,
+  getHostForElement,
+  type HandleType,
+  type Connection,
+  type ConnectionState,
+  type IsValidConnection,
+} from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 import { NODE_ID } from '../../services/tokens';
 
@@ -163,6 +171,13 @@ export class HandleComponent implements OnInit, OnDestroy {
 
     const startHandle = store.connectionClickStartHandle();
 
+    // To open a click-connect, this handle must be usable as a start.
+    // Once a start handle is recorded we no longer gate here — completion is
+    // validated via XYHandle.isValid below, which checks the target's
+    // `.connectable` / `.connectableend` classes (driven by isConnectable /
+    // isConnectableEnd inputs).
+    if (!startHandle && !this.isConnectableStart()) return;
+
     if (!startHandle) {
       // First click — store this handle as the start of the connection
       store.connectionClickStartHandle.set({
@@ -181,22 +196,29 @@ export class HandleComponent implements OnInit, OnDestroy {
         handleType: this.type(),
       });
     } else {
-      // Second click — complete the connection
-      const isSource = startHandle.type === 'source';
-      const connection = {
-        source: isSource ? startHandle.nodeId : this.nodeId,
-        sourceHandle: isSource ? startHandle.handleId : this.handleId(),
-        target: isSource ? this.nodeId : startHandle.nodeId,
-        targetHandle: isSource ? this.handleId() : startHandle.handleId,
-      };
-
-      // Validate using per-handle or store-level validation
+      // Second click — validate target handle via XYHandle.isValid, which
+      // inspects the handle's CSS classes (`connectable`, `connectableend`)
+      // and the connection mode, then runs the user validator.
       const handleValidation = this.isValidConnection();
       const storeValidation = store.isValidConnection();
       const validationFn = handleValidation ?? storeValidation;
 
-      if (!validationFn || validationFn(connection as Connection)) {
-        this.handleConnect.emit(connection as Connection);
+      const doc = getHostForElement(event.target);
+      const { connection, isValid } = XYHandle.isValid(event, {
+        handle: { nodeId: this.nodeId, id: this.handleId(), type: this.type() },
+        connectionMode: store.connectionMode(),
+        fromNodeId: startHandle.nodeId,
+        fromHandleId: startHandle.handleId ?? null,
+        fromType: startHandle.type,
+        isValidConnection: validationFn as IsValidConnection | undefined,
+        doc,
+        lib: store.lib(),
+        flowId: store.rfId(),
+        nodeLookup: store.nodeLookup,
+      });
+
+      if (isValid && connection) {
+        this.handleConnect.emit(connection);
         store.onConnect?.(connection);
       }
 

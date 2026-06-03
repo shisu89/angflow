@@ -1,11 +1,10 @@
-import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, viewChild } from '@angular/core';
 import {
   NgFlowComponent,
   BackgroundComponent,
   ControlsComponent,
   MiniMapComponent,
   PanelComponent,
-  NgFlowService,
   applyNodeChanges,
   applyEdgeChanges,
 } from '@angflow/angular';
@@ -69,7 +68,7 @@ const C: Node = { id: 'c', data: { label: 'C' }, position: { x: 400, y: 100 } };
   `],
 })
 export class SetNodesBatchingExampleComponent {
-  private readonly flow = inject(NgFlowService);
+  private readonly flow = viewChild.required(NgFlowComponent);
 
   nodes: Node[] = [];
   edges: Edge[] = [];
@@ -93,19 +92,22 @@ export class SetNodesBatchingExampleComponent {
 
   queueMultipleUpdateNodes(): void {
     this.queueMultipleSetNodes();
-    this.flow.updateNode('a', (n) => ({ position: { x: n.position.x + 20, y: n.position.y + 20 } }));
-    this.flow.updateNode('b', (n) => ({ position: { x: n.position.x + 20, y: n.position.y + 20 } }));
-    this.flow.updateNode('c', (n) => ({ position: { x: n.position.x + 20, y: n.position.y + 20 } }));
-    this.flow.updateNode('a', (n) => ({ data: { ...n.data, label: `A ${Date.now()}` } }));
-    this.flow.updateNode('b', (n) => ({ data: { ...n.data, label: `B ${Date.now()}` } }));
-    this.flow.updateNode('c', (n) => ({ data: { ...n.data, label: `C ${Date.now()}` } }));
+    const flow = this.flow().service;
+    flow.updateNode('a', (n) => ({ position: { x: n.position.x + 20, y: n.position.y + 20 } }));
+    flow.updateNode('b', (n) => ({ position: { x: n.position.x + 20, y: n.position.y + 20 } }));
+    flow.updateNode('c', (n) => ({ position: { x: n.position.x + 20, y: n.position.y + 20 } }));
+    flow.updateNode('a', (n) => ({ data: { ...n.data, label: `A ${Date.now()}` } }));
+    flow.updateNode('b', (n) => ({ data: { ...n.data, label: `B ${Date.now()}` } }));
+    flow.updateNode('c', (n) => ({ data: { ...n.data, label: `C ${Date.now()}` } }));
   }
 
   updateNodeDataBurst(): void {
-    this.nodes.forEach((n) => this.flow.updateNodeData(n.id, { label: 'node update' }));
+    const flow = this.flow().service;
+    this.nodes.forEach((n) => flow.updateNodeData(n.id, { label: 'node update' }));
   }
 
   updateEdgeBurst(): void {
-    this.edges.forEach((e) => this.flow.updateEdge(e.id, { label: 'edge update' }));
+    const flow = this.flow().service;
+    this.edges.forEach((e) => flow.updateEdge(e.id, { label: 'edge update' }));
   }
 }

@@ -54,6 +54,9 @@ const PAN_ON_DRAG = [1, 2];
         (paneClick)="onPaneClick($event)"
         (selectionStart)="onSelectionStart($event)"
         (selectionEnd)="onSelectionEnd($event)"
+        (pointerdown)="onPointerDown($event)"
+        (pointerup)="onPointerUp($event)"
+        (click)="onClick($event)"
       >
         <ng-flow-background variant="cross" />
         <ng-flow-controls />
@@ -113,4 +116,7 @@ export class FigmaExampleComponent {
   onPaneClick(event: MouseEvent): void { console.log('pane click', event); }
   onSelectionStart(event: MouseEvent): void { console.log('on selection start', event); }
   onSelectionEnd(event: MouseEvent): void { console.log('on selection end', event); }
+  onPointerDown(event: PointerEvent): void { console.log('pointer down', event); }
+  onPointerUp(event: PointerEvent): void { console.log('pointer up', event); }
+  onClick(event: MouseEvent): void { console.log('click', event); }
 }

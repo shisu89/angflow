@@ -13,7 +13,7 @@ import { Position } from '@angflow/system';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div>{{ data()?.label }}</div>
-    <ng-flow-handle type="source" [position]="Position.Bottom" />
+    <ng-flow-handle type="source" [position]="Position.Bottom" [isConnectable]="isConnectable()" />
   `,
 })
 export class InputNodeComponent {

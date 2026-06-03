@@ -10,7 +10,7 @@ import {
   applyEdgeChanges,
   applyNodeChanges,
 } from '@angflow/angular';
-import type { Connection, Edge, Node } from '@angflow/angular';
+import type { Connection, Edge, EdgeChange, Node, NodeChange } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -192,11 +192,11 @@ export class AgentBridgeExampleComponent implements OnDestroy {
     this.unregister?.();
   }
 
-  onNodesChange(changes: any[]): void {
+  onNodesChange(changes: NodeChange[]): void {
     this.nodes = applyNodeChanges(changes, this.nodes);
   }
 
-  onEdgesChange(changes: any[]): void {
+  onEdgesChange(changes: EdgeChange[]): void {
     this.edges = applyEdgeChanges(changes, this.edges);
   }
 

@@ -7,7 +7,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
 } from '@angflow/angular';
-import type { Node, Edge } from '@angflow/angular';
+import type { Node, Edge, NodeChange, EdgeChange } from '@angflow/angular';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
 const EDGE_TYPES = ['default', 'straight', 'step', 'smoothstep', 'simplebezier'] as const;
@@ -91,11 +91,11 @@ export class EdgeTypesExampleComponent {
     this.edges = this.edges.map(e => ({ ...e, type }));
   }
 
-  onNodesChange(changes: any[]): void {
+  onNodesChange(changes: NodeChange[]): void {
     this.nodes = applyNodeChanges(changes, this.nodes);
   }
 
-  onEdgesChange(changes: any[]): void {
+  onEdgesChange(changes: EdgeChange[]): void {
     this.edges = applyEdgeChanges(changes, this.edges);
   }
 }

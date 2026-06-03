@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, Type } from '@angular/core';
+import { Component, ChangeDetectionStrategy, Type } from '@angular/core';
 import {
   NgFlowComponent,
   BackgroundComponent,
@@ -21,7 +21,7 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
     <ng-flow-handle type="target" [position]="Position.Left" />
     <div class="dh-body">Custom node</div>
     <ng-flow-handle type="source" [position]="Position.Right">
-      <button class="detached-handle" aria-label="source handle">➡️</button>
+      <button class="detached-handle" type="button" aria-label="Create connection">➡️</button>
     </ng-flow-handle>
   `,
   styles: [`
@@ -39,18 +39,6 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
 })
 export class DetachedHandleNodeComponent {
   readonly Position = Position;
-  readonly id = input.required<string>();
-  readonly data = input<any>();
-  readonly selected = input(false);
-  readonly type = input<string>();
-  readonly dragging = input(false);
-  readonly zIndex = input(0);
-  readonly isConnectable = input(true);
-  readonly positionAbsoluteX = input(0);
-  readonly positionAbsoluteY = input(0);
-  readonly sourcePosition = input<any>();
-  readonly targetPosition = input<any>();
-  readonly dragHandle = input<string>();
 }
 
 @Component({

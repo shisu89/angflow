@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, computed, inject, effect, OnDestroy, Type } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, computed, inject, viewChild, effect, OnDestroy, Type } from '@angular/core';
 import {
   NgFlowComponent,
   BackgroundComponent,
@@ -97,7 +97,9 @@ export class MovingHandleNodeComponent {
   styles: [`:host { display: flex; flex: 1; min-width: 0; min-height: 0; }`],
 })
 export class MovingHandlesExampleComponent implements OnDestroy {
-  private readonly flow = inject(NgFlowService);
+  // Non-required: constructor effects flush before viewChild resolves; guarding
+  // with `?.` is simpler than wrapping in afterNextRender.
+  private readonly flow = viewChild(NgFlowComponent);
 
   nodeTypes: Record<string, Type<unknown>> = { movingHandle: MovingHandleNodeComponent };
 
@@ -117,13 +119,15 @@ export class MovingHandlesExampleComponent implements OnDestroy {
 
   constructor() {
     effect(() => {
-      const inProgress = this.flow.connection().inProgress;
+      const flow = this.flow()?.service;
+      if (!flow) return;
+      const inProgress = flow.connection().inProgress;
       if (!inProgress) return;
       const nodeIds = this.nodes.filter((n) => n.type === 'movingHandle').map((n) => n.id);
       const startTime = performance.now();
       const tick = () => {
         if (performance.now() - startTime < 500) {
-          this.flow.updateNodeInternals(nodeIds);
+          flow.updateNodeInternals(nodeIds);
           this.rafHandle = requestAnimationFrame(tick);
         } else {
           this.rafHandle = null;

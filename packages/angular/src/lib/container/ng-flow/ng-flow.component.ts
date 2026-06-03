@@ -213,7 +213,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   implements OnInit, AfterViewInit, OnDestroy
 {
   readonly store = inject(FlowStore) as unknown as FlowStore<NodeType, EdgeType>;
-  private readonly ngFlowService = inject(NgFlowService) as unknown as NgFlowService<NodeType, EdgeType>;
+  readonly service = inject(NgFlowService) as unknown as NgFlowService<NodeType, EdgeType>;
   private readonly containerRef = viewChild<ElementRef<HTMLDivElement>>('container');
   private readonly paneRef = viewChild(PaneComponent);
 
@@ -851,7 +851,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     }
 
     // Emit init event
-    this.init.emit(this.ngFlowService);
+    this.init.emit(this.service);
   }
 
   ngOnDestroy(): void {
