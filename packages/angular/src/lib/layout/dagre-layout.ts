@@ -30,7 +30,7 @@ export const dagreLayout: AgentLayoutFn = (nodes, edges, opts) => {
   layout(g);
   const positions: Record<string, { x: number; y: number }> = {};
   for (const n of nodes) {
-    const placed = g.node(n.id) as { x: number; y: number; width: number; height: number };
+    const placed = g.node(n.id) as { x: number; y: number };
     // dagre positions nodes by center; angflow positions by top-left corner.
     positions[n.id] = { x: placed.x - n.width / 2, y: placed.y - n.height / 2 };
   }

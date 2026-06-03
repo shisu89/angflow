@@ -34,6 +34,20 @@ describe('dagreLayout', () => {
     expect(positions['a'].x).toBeLessThan(positions['b'].x);
   });
 
+  it('BT puts the source below its targets', async () => {
+    const positions = await dagreLayout([N('a'), N('b')], [{ source: 'a', target: 'b' }], {
+      direction: 'BT',
+    });
+    expect(positions['a'].y).toBeGreaterThan(positions['b'].y);
+  });
+
+  it('RL puts the source right of its targets', async () => {
+    const positions = await dagreLayout([N('a'), N('b')], [{ source: 'a', target: 'b' }], {
+      direction: 'RL',
+    });
+    expect(positions['a'].x).toBeGreaterThan(positions['b'].x);
+  });
+
   it('siblings in the same rank do not overlap', async () => {
     const positions = await dagreLayout(
       [N('a'), N('b'), N('c')],
@@ -49,5 +63,17 @@ describe('dagreLayout', () => {
   it('handles a graph with no edges', async () => {
     const positions = await dagreLayout([N('a'), N('b')], [], { direction: 'TB' });
     expect(Object.keys(positions).sort()).toEqual(['a', 'b']);
+  });
+
+  it('separates siblings with the default nodeSep when none is given', async () => {
+    const positions = await dagreLayout(
+      [N('a'), N('b'), N('c')],
+      [
+        { source: 'a', target: 'b' },
+        { source: 'a', target: 'c' },
+      ],
+      { direction: 'TB' },
+    );
+    expect(Math.abs(positions['b'].x - positions['c'].x)).toBeGreaterThanOrEqual(100);
   });
 });
