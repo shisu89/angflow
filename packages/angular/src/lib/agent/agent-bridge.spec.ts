@@ -1071,6 +1071,57 @@ describe('AngflowAgentBridge', () => {
       await b.callTool('layout_nodes', { fitView: false });
       expect(flow.getNode('a')?.position).toEqual({ x: 42, y: 7 });
     });
+
+    it('skips nodes deleted while an async layout fn runs (no phantom history)', async () => {
+      let flowRef: NgFlowService;
+      const slowLayout: AgentLayoutFn = async (nodes) => {
+        // Simulate a human deleting node "b" while layout computes.
+        flowRef.setNodes(flowRef.getNodes().filter((n) => n.id !== 'b'));
+        return Object.fromEntries(nodes.map((n) => [n.id, { x: 10, y: 10 }]));
+      };
+      const { bridge: b, newFlow: nf } = setupWithLayout(slowLayout);
+      const flow = nf();
+      flowRef = flow;
+      b.register('main', flow);
+      flow.setNodes([makeNode('a'), makeNode('b')]);
+      const result = (await b.callTool('layout_nodes', { fitView: false })) as {
+        positions: Record<string, unknown>;
+      };
+      // Only the surviving node is applied/reported.
+      expect(Object.keys(result.positions)).toEqual(['a']);
+      expect(flow.getNode('a')?.position).toEqual({ x: 10, y: 10 });
+      // History captured (a position WAS applied) — exactly one entry.
+      const status = (await b.callTool('history_status')) as { pastDepth: number };
+      expect(status.pastDepth).toBe(1);
+    });
+
+    it('captures no history when ALL target nodes vanish during the layout await', async () => {
+      let flowRef: NgFlowService;
+      const slowLayout: AgentLayoutFn = async (nodes) => {
+        flowRef.setNodes([]);
+        return Object.fromEntries(nodes.map((n) => [n.id, { x: 10, y: 10 }]));
+      };
+      const { bridge: b, newFlow: nf } = setupWithLayout(slowLayout);
+      const flow = nf();
+      flowRef = flow;
+      b.register('main', flow);
+      flow.setNodes([makeNode('a')]);
+      const result = (await b.callTool('layout_nodes', { fitView: false })) as {
+        positions: Record<string, unknown>;
+      };
+      expect(result.positions).toEqual({});
+      const status = (await b.callTool('history_status')) as { pastDepth: number };
+      expect(status.pastDepth).toBe(0);
+    });
+
+    it('an array return from the layout fn yields -32603', async () => {
+      const arrayLayout = (() => [{ x: 0, y: 0 }]) as unknown as AgentLayoutFn;
+      const { bridge: b, newFlow: nf } = setupWithLayout(arrayLayout);
+      const flow = nf();
+      b.register('main', flow);
+      flow.setNodes([makeNode('a')]);
+      await expect(b.callTool('layout_nodes', { fitView: false })).rejects.toMatchObject({ code: -32603 });
+    });
   });
 
   describe('history (undo/redo)', () => {

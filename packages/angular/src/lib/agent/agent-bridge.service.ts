@@ -881,8 +881,8 @@ export class AngflowAgentBridge {
         nodeSep,
         rankSep,
       });
-      if (!raw || typeof raw !== 'object') {
-        throw new Error('layout function returned a non-object result');
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        throw new Error('layout function must return an object map of nodeId -> {x, y}.');
       }
 
       // Validate the full result BEFORE applying anything so a bad position
@@ -913,23 +913,29 @@ export class AngflowAgentBridge {
         );
       }
 
+      // Re-check existence at apply time: the graph may have changed while the
+      // (possibly async) layout fn ran — e.g. a human deleted a node. Only
+      // nodes that still exist are moved, reported, and counted for history.
+      const actuallyApplied: Record<string, { x: number; y: number }> = {};
       flow.batch(() => {
         for (const [id, position] of Object.entries(applied)) {
+          if (!flow.getNode(id)) continue;
           flow.updateNode(id, { position });
+          actuallyApplied[id] = position;
         }
       });
 
       const shouldFit = params['fitView'] !== false;
-      if (shouldFit && Object.keys(applied).length > 0) {
+      if (shouldFit && Object.keys(actuallyApplied).length > 0) {
         try {
           await flow.fitView({});
-        } catch {
-          // fitView is best-effort: in jsdom / headless environments there is no
-          // real panZoom instance wired up, so this call may throw. The layout
-          // itself has already been applied — swallow the viewport error only.
+        } catch (err) {
+          // Best-effort viewport fit: never fail the tool over a cosmetic step,
+          // but surface the error to hosts observing onError.
+          this.reportError(err, { kind: 'dispatch', method: 'layout_nodes' });
         }
       }
-      return { positions: applied };
+      return { positions: actuallyApplied };
     });
   }
 }
