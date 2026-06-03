@@ -27,12 +27,14 @@
 ```ts
 // app.config.ts
 import { provideAgentBridge, WindowTransport } from '@angflow/angular';
+import { dagreLayout } from '@angflow/angular/layout';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideAgentBridge({
       transports: [new WindowTransport()],
       history: { maxDepth: 100 },  // default; pass `false` to disable
+      layout: dagreLayout,         // optional; enables the layout_nodes tool
       // Optional. Receives transport / dispatch errors the bridge would
       // otherwise swallow (start() rejection, send() throw).
       onError: (err, ctx) => console.warn('[agent-bridge]', ctx.kind, err),
@@ -158,6 +160,16 @@ Every tool takes an optional `flowId` (omit when only one flow is registered; re
 | `apply_changes` | `ops: Op[]` | `{ results: Array<{ ok: true; value: unknown }> }` |
 
 See the **Transactional batch** section below for semantics and the full op-kind list.
+
+### Layout
+
+Requires a layout function to be passed to `provideAgentBridge({ layout: dagreLayout })`. When omitted, the tool fails with `-32601`.
+
+| Tool | Params | Returns |
+|---|---|---|
+| `layout_nodes` | `direction?: 'TB' \| 'LR' \| 'BT' \| 'RL'` (default `'TB'`), `nodeIds?: string[]` (omit = all nodes), `nodeSep?: number`, `rankSep?: number`, `fitView?: boolean` (default `true`) | `{ positions: Record<nodeId, { x: number; y: number }> }` |
+
+`layout_nodes` computes tidy positions using the host-configured layout engine (typically dagre), applies them in one undoable step, and fits the viewport. When `nodeIds` is supplied, only those nodes and the edges among them form the layout subgraph — nodes outside the subset are left untouched. The `dagreLayout` adapter ships in `@angflow/angular/layout` (next task).
 
 ### History
 
@@ -333,7 +345,7 @@ The bridge maintains per-flow snapshot stacks of `{ nodes, edges }` (viewport is
 ### Capture rule
 
 Tools that **do** capture a history entry (mutating tools):
-`add_node`, `add_nodes`, `add_edge`, `add_edges`, `update_node`, `update_node_data`, `update_edge`, `update_edge_data`, `delete_elements`, `set_nodes`, `set_edges`, and `apply_changes` (when it includes at least one non-selection op).
+`add_node`, `add_nodes`, `add_edge`, `add_edges`, `update_node`, `update_node_data`, `update_edge`, `update_edge_data`, `delete_elements`, `set_nodes`, `set_edges`, `apply_changes` (when it includes at least one non-selection op), and `layout_nodes` (captures one entry per successful call that applied ≥1 position; a failed or empty layout captures nothing).
 
 Tools that **do not** capture a history entry:
 - Selection tools (`select_nodes`, `select_edges`, `deselect_all`)
@@ -341,6 +353,7 @@ Tools that **do not** capture a history entry:
 - Read / geometry / coordinate tools (all read-only by definition)
 - `apply_changes` when all ops are selection-only
 - A rolled-back `apply_changes`
+- `layout_nodes` when the layout function throws or returns no valid positions
 
 ### Bridge-only scope — known limitation
 
@@ -373,12 +386,14 @@ Emitted synchronously after every mutating tool call (before `flow.state`), and 
 
 | Code | Meaning |
 |---|---|
-| `-32601` | Unknown tool name |
+| `-32601` | Unknown tool name — or a known tool whose required capability is absent (e.g. `layout_nodes` without a configured layout function) |
 | `-32602` | Invalid params (wrong type, missing required key) |
 | `-32000` | Flow not found (bad/missing `flowId`) |
 | `-32603` | Internal error from the underlying `NgFlowService` call |
 
 **Note:** `apply_changes` rollback errors use code `-32603` and carry `data: { failedIndex }` in the error object indicating which op caused the failure.
+
+**`layout_nodes` without a configured layout function** returns `-32601` with the message `"layout_nodes unavailable: no layout function configured. Pass \`layout\` to provideAgentBridge (e.g. dagreLayout from @angflow/angular/layout)."`. This is `-32601` (not `-32602`) because the issue is a missing capability on the deployment side, not a malformed request.
 
 **Swallowed transport failures.** A throwing `transport.send` or a rejected `transport.start()` does not crash the bridge. Pass `onError: (err, ctx)` to `provideAgentBridge` to receive these. `ctx.kind` is `'transport-start'`, `'transport-send'`, or `'dispatch'`. The bridge always remains responsive.
 
@@ -403,6 +418,5 @@ Emitted synchronously after every mutating tool call (before `flow.state`), and 
 Not yet exposed (but planned or noted):
 - **Undo/redo for user-driven changes** — bridge history only tracks bridge-initiated mutations (see History section).
 - **Copy/paste** — no clipboard API in the bridge yet.
-- **Auto-layout** — no automatic layout (dagre, elk, etc.) built in; callers can compute positions and use `apply_changes`.
 - **Runtime node/edge type registration** — cannot register new Angular component types at runtime via the bridge.
 - **Pane/read-only toggles** — cannot toggle `panOnDrag`, `nodesDraggable`, `nodesConnectable`, etc. via the bridge yet.

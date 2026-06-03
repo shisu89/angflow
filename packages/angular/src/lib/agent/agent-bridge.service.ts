@@ -12,7 +12,7 @@ import {
 
 import type { NgFlowService } from '../services/ng-flow.service';
 import type { Node, Edge } from '../types';
-import type { NodeTemplateSpec } from '../types/node-template';
+import type { AgentLayoutFn, NodeTemplateSpec } from '../types/node-template';
 import { AgentHistory } from './history';
 import type { AgentHistoryOptions } from './history';
 import { AGENT_TOOL_SCHEMAS } from './tool-schemas';
@@ -35,6 +35,9 @@ export const AGENT_HISTORY_OPTIONS = new InjectionToken<AgentHistoryOptions | fa
 export const AGENT_ON_ERROR = new InjectionToken<
   (err: unknown, ctx: { kind: 'transport-start' | 'transport-send' | 'dispatch'; transport?: AgentTransport; method?: string }) => void
 >('AngflowAgentOnError');
+
+/** Optional host-provided layout function backing the `layout_nodes` tool. */
+export const AGENT_LAYOUT = new InjectionToken<AgentLayoutFn>('AngflowAgentLayout');
 
 const ERROR_INVALID_PARAMS = -32602;
 const ERROR_METHOD_NOT_FOUND = -32601;
@@ -101,6 +104,7 @@ export class AngflowAgentBridge {
   private readonly history: AgentHistory | null;
   private readonly handlers = new Map<string, ToolHandler>();
   private readonly injector = inject(Injector);
+  private readonly layoutFn: AgentLayoutFn | null;
   private started = false;
   private nextInProcessId = 1;
   private warnedOnBeforeDeleteBypass = false;
@@ -116,11 +120,13 @@ export class AngflowAgentBridge {
     @Optional() @Inject(AGENT_TRANSPORTS) transports: AgentTransport[] | null,
     @Optional() @Inject(AGENT_HISTORY_OPTIONS) historyOptions: AgentHistoryOptions | false | null,
     @Optional() @Inject(AGENT_ON_ERROR) onError: ((err: unknown, ctx: { kind: 'transport-start' | 'transport-send' | 'dispatch'; transport?: AgentTransport; method?: string }) => void) | null,
+    @Optional() @Inject(AGENT_LAYOUT) layoutFn: AgentLayoutFn | null,
   ) {
     this.transports = transports ?? [];
     this.history =
       historyOptions === false ? null : new AgentHistory(historyOptions ?? undefined);
     this.onError = onError ?? null;
+    this.layoutFn = layoutFn ?? null;
     this.installHandlers();
     this.start();
   }
@@ -238,13 +244,14 @@ export class AngflowAgentBridge {
       const flow = this.resolveFlow(params['flowId']);
       const flowId = this.findFlowId(flow);
       const isApplyChanges = req.method === 'apply_changes';
+      const isLayout = req.method === 'layout_nodes';
 
       // Pre-mutation snapshot for history capture. Skipped for non-mutating tools.
       // Shallow-clone each element so subsequent in-place mutations (notably
       // the drag fast-path in FlowStore) can't retroactively corrupt the
       // snapshot we already captured.
       let snapshot: { nodes: readonly Node[]; edges: readonly Edge[] } | null = null;
-      if (this.history && (MUTATING_TOOLS.has(req.method) || isApplyChanges)) {
+      if (this.history && (MUTATING_TOOLS.has(req.method) || isApplyChanges || isLayout)) {
         snapshot = {
           nodes: flow.getNodes().map((n) => ({ ...n })) as Node[],
           edges: flow.getEdges().map((e) => ({ ...e })) as Edge[],
@@ -268,6 +275,15 @@ export class AngflowAgentBridge {
             this.history.capture(flowId, snapshot);
             this.emitHistory(flowId);
           }
+        } else if (isLayout) {
+          // Capture only when at least one position was applied — an empty
+          // layout pass must not pollute the undo stack.
+          const positions =
+            (result as { positions?: Record<string, unknown> } | null)?.positions ?? {};
+          if (Object.keys(positions).length > 0) {
+            this.history.capture(flowId, snapshot);
+            this.emitHistory(flowId);
+          }
         } else {
           this.history.capture(flowId, snapshot);
           this.emitHistory(flowId);
@@ -278,6 +294,9 @@ export class AngflowAgentBridge {
     } catch (err) {
       if (err instanceof FlowNotFoundError) {
         return { id: req.id, error: { code: ERROR_FLOW_NOT_FOUND, message: err.message } };
+      }
+      if (err instanceof MethodUnavailableError) {
+        return { id: req.id, error: { code: ERROR_METHOD_NOT_FOUND, message: err.message } };
       }
       if (err instanceof InvalidParamsError) {
         return { id: req.id, error: { code: ERROR_INVALID_PARAMS, message: err.message } };
@@ -815,11 +834,110 @@ export class AngflowAgentBridge {
     this.handlers.set('list_node_templates', (flow) => ({
       templates: flow.getNodeTemplates(),
     }));
+
+    this.handlers.set('layout_nodes', async (flow, params) => {
+      if (!this.layoutFn) {
+        throw new MethodUnavailableError(
+          'layout_nodes unavailable: no layout function configured. ' +
+            'Pass `layout` to provideAgentBridge (e.g. dagreLayout from @angflow/angular/layout).',
+        );
+      }
+      const direction = params['direction'] ?? 'TB';
+      if (typeof direction !== 'string' || !['TB', 'LR', 'BT', 'RL'].includes(direction)) {
+        throw new InvalidParamsError('Param "direction" must be one of: TB, LR, BT, RL.');
+      }
+      const nodeSep = typeof params['nodeSep'] === 'number' ? (params['nodeSep'] as number) : undefined;
+      const rankSep = typeof params['rankSep'] === 'number' ? (params['rankSep'] as number) : undefined;
+      const nodeIds = optionalStringArray(params, 'nodeIds');
+      if (nodeIds) {
+        for (const id of nodeIds) {
+          if (!flow.getNode(id)) {
+            throw new InvalidParamsError(`Param "nodeIds" contains unknown node id "${id}".`);
+          }
+        }
+      }
+      const targetNodes = nodeIds
+        ? nodeIds.map((id) => flow.getNode(id)!)
+        : flow.getNodes();
+      const idSet = new Set(targetNodes.map((n) => n.id));
+
+      const layoutNodes = targetNodes.map((n) => {
+        const internal = flow.getInternalNode(n.id);
+        return {
+          id: n.id,
+          width: internal?.measured?.width ?? n.width ?? 150,
+          height: internal?.measured?.height ?? n.height ?? 40,
+          position: { x: n.position.x, y: n.position.y },
+        };
+      });
+      // Induced subgraph: only edges with BOTH endpoints in the target set.
+      const layoutEdges = flow
+        .getEdges()
+        .filter((e) => idSet.has(e.source) && idSet.has(e.target))
+        .map((e) => ({ source: e.source, target: e.target }));
+
+      const raw = await this.layoutFn(layoutNodes, layoutEdges, {
+        direction: direction as 'TB' | 'LR' | 'BT' | 'RL',
+        nodeSep,
+        rankSep,
+      });
+      if (!raw || typeof raw !== 'object') {
+        throw new Error('layout function returned a non-object result');
+      }
+
+      // Validate the full result BEFORE applying anything so a bad position
+      // rolls back cleanly (nothing applied, no history entry).
+      const applied: Record<string, { x: number; y: number }> = {};
+      const unknownIds: string[] = [];
+      for (const [id, pos] of Object.entries(raw as Record<string, { x: number; y: number }>)) {
+        if (!idSet.has(id)) {
+          unknownIds.push(id);
+          continue;
+        }
+        if (
+          !pos ||
+          typeof pos.x !== 'number' ||
+          typeof pos.y !== 'number' ||
+          !Number.isFinite(pos.x) ||
+          !Number.isFinite(pos.y)
+        ) {
+          throw new Error(`layout function returned an invalid position for node "${id}"`);
+        }
+        applied[id] = { x: pos.x, y: pos.y };
+      }
+      if (unknownIds.length > 0) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[angflow] layout_nodes: layout function returned positions for unknown node ids ` +
+            `(ignored): ${unknownIds.join(', ')}`,
+        );
+      }
+
+      flow.batch(() => {
+        for (const [id, position] of Object.entries(applied)) {
+          flow.updateNode(id, { position });
+        }
+      });
+
+      const shouldFit = params['fitView'] !== false;
+      if (shouldFit && Object.keys(applied).length > 0) {
+        try {
+          await flow.fitView({});
+        } catch {
+          // fitView is best-effort: in jsdom / headless environments there is no
+          // real panZoom instance wired up, so this call may throw. The layout
+          // itself has already been applied — swallow the viewport error only.
+        }
+      }
+      return { positions: applied };
+    });
   }
 }
 
 class FlowNotFoundError extends Error {}
 class InvalidParamsError extends Error {}
+/** Tool exists in the catalog but the deployment lacks a required capability. Maps to -32601. */
+class MethodUnavailableError extends Error {}
 class ApplyChangesError extends Error {
   constructor(public readonly failedIndex: number, message: string) {
     super(message);
@@ -1015,12 +1133,19 @@ function optionalStringArray(params: Record<string, unknown>, key: string): stri
 const BADGE_COLOR_SET = new Set(['slate', 'indigo', 'emerald', 'amber', 'rose']);
 const HANDLE_POSITION_SET = new Set(['top', 'right', 'bottom', 'left']);
 
+const KNOWN_SPEC_KEYS = new Set(['title', 'icon', 'accent', 'variant', 'badges', 'fields', 'body', 'handles']);
+
 /** Validate a NodeTemplateSpec payload. Throws InvalidParamsError naming the offending field. */
 function validateTemplateSpec(value: unknown, ctx: string): NodeTemplateSpec {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new InvalidParamsError(`${ctx}: spec must be an object.`);
   }
   const s = value as Record<string, unknown>;
+  for (const key of Object.keys(s)) {
+    if (!KNOWN_SPEC_KEYS.has(key)) {
+      throw new InvalidParamsError(`${ctx}: unknown spec key "${key}".`);
+    }
+  }
   for (const key of ['title', 'icon', 'accent', 'body']) {
     if (s[key] !== undefined && typeof s[key] !== 'string') {
       throw new InvalidParamsError(`${ctx}: spec.${key} must be a string.`);

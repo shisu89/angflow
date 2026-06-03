@@ -687,6 +687,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
         name: { type: 'string', description: 'Type name nodes will reference via node.type.' },
         spec: {
           type: 'object',
+          additionalProperties: false,
           properties: {
             title: { type: 'string', description: 'Card title; supports {{data.x}}.' },
             icon: {
@@ -700,6 +701,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
               type: 'array',
               items: {
                 type: 'object',
+                additionalProperties: false,
                 properties: {
                   text: { type: 'string' },
                   color: { type: 'string', enum: ['slate', 'indigo', 'emerald', 'amber', 'rose'] },
@@ -712,6 +714,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
               type: 'array',
               items: {
                 type: 'object',
+                additionalProperties: false,
                 properties: {
                   label: { type: 'string' },
                   value: { type: 'string', description: 'Supports {{data.x}}.' },
@@ -725,6 +728,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
               type: 'array',
               items: {
                 type: 'object',
+                additionalProperties: false,
                 properties: {
                   type: { type: 'string', enum: ['source', 'target'] },
                   position: { type: 'string', enum: ['top', 'right', 'bottom', 'left'] },
@@ -757,6 +761,35 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
     inputSchema: {
       type: 'object',
       properties: { flowId: { type: 'string' } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'layout_nodes',
+    description:
+      'Auto-layout nodes using the host-configured layout engine (typically dagre). ' +
+      'Computes tidy positions for the whole graph (or the nodeIds subset and the edges ' +
+      'among them), applies them in one undoable step, and fits the viewport unless ' +
+      'fitView is false. Returns the applied positions. Prefer this over computing ' +
+      'coordinates manually whenever you add more than a couple of nodes.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        direction: {
+          type: 'string',
+          enum: ['TB', 'LR', 'BT', 'RL'],
+          description: 'Rank direction: top-bottom (default), left-right, bottom-top, right-left.',
+        },
+        nodeIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Subset to lay out; omit to lay out all nodes.',
+        },
+        nodeSep: { type: 'number', description: 'Separation between nodes in the same rank (px).' },
+        rankSep: { type: 'number', description: 'Separation between ranks (px).' },
+        fitView: { type: 'boolean', description: 'Fit the viewport afterwards. Default true.' },
+      },
       additionalProperties: false,
     },
   },

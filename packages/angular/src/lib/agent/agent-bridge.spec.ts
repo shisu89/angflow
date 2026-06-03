@@ -8,6 +8,7 @@ import { provideAgentBridge } from './provide-agent-bridge';
 import { WindowTransport } from './transports/window';
 import type { AgentOutbound, AgentTransport, AgentInbound, AgentResponse } from './types';
 import type { Node, Edge } from '../types';
+import type { AgentLayoutFn } from '../types/node-template';
 
 function makeNode(id: string, overrides: Partial<Node> = {}): Node {
   return { id, position: { x: 0, y: 0 }, data: {}, type: 'default', ...overrides };
@@ -57,6 +58,28 @@ function setup(transports: AgentTransport[] = []): {
     return child.get(NgFlowService);
   };
 
+  return { bridge, newFlow };
+}
+
+function setupWithLayout(layout: AgentLayoutFn, transports: AgentTransport[] = []): {
+  bridge: AngflowAgentBridge;
+  newFlow: () => NgFlowService;
+} {
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({
+    providers: [
+      provideZonelessChangeDetection(),
+      provideAgentBridge({ transports, layout }),
+    ],
+  });
+  const bridge = TestBed.inject(AngflowAgentBridge);
+  const newFlow = (): NgFlowService => {
+    const child = Injector.create({
+      providers: [FlowStore, NgFlowService],
+      parent: TestBed.inject(Injector),
+    });
+    return child.get(NgFlowService);
+  };
   return { bridge, newFlow };
 }
 
@@ -880,6 +903,7 @@ describe('AngflowAgentBridge', () => {
       [{ handles: [{ type: 'middle' }] }],
       [{ handles: [{ type: 'source', position: 'center' }] }],
       [{ title: 42 }],
+      [{ html: '<b>x</b>' }],
     ])('rejects malformed spec %j with -32602', async (badSpec) => {
       await expect(
         bridge.callTool('register_node_template', { name: 'ok-name', spec: badSpec }),
@@ -904,6 +928,148 @@ describe('AngflowAgentBridge', () => {
       await bridge.callTool('register_node_template', { name: 's', spec: {} });
       const status = (await bridge.callTool('history_status')) as { pastDepth: number };
       expect(status.pastDepth).toBe(0);
+    });
+  });
+
+  describe('layout_nodes', () => {
+    /** Stacks every node at x = 100·index, y = 0 — deterministic and assertable. */
+    const fakeLayout: AgentLayoutFn = (nodes) => {
+      const positions: Record<string, { x: number; y: number }> = {};
+      nodes.forEach((n, i) => (positions[n.id] = { x: i * 100, y: 0 }));
+      return positions;
+    };
+
+    it('fails with -32601 and an actionable message when no layout fn is configured', async () => {
+      // uses the OUTER setup (no layout) — bridge/newFlow from the surrounding beforeEach
+      const flow = newFlow();
+      bridge.register('main', flow);
+      await expect(bridge.callTool('layout_nodes', {})).rejects.toMatchObject({
+        code: -32601,
+        message: expect.stringContaining('no layout function configured'),
+      });
+    });
+
+    it('applies returned positions and returns them', async () => {
+      const { bridge: b, newFlow: nf } = setupWithLayout(fakeLayout);
+      const flow = nf();
+      b.register('main', flow);
+      flow.setNodes([makeNode('a'), makeNode('b')]);
+      const result = (await b.callTool('layout_nodes', { fitView: false })) as {
+        positions: Record<string, { x: number; y: number }>;
+      };
+      expect(result.positions).toEqual({ a: { x: 0, y: 0 }, b: { x: 100, y: 0 } });
+      expect(flow.getNode('a')?.position).toEqual({ x: 0, y: 0 });
+      expect(flow.getNode('b')?.position).toEqual({ x: 100, y: 0 });
+    });
+
+    it('lays out only the induced subgraph when nodeIds is given', async () => {
+      const seen: Array<{ nodes: string[]; edges: Array<{ source: string; target: string }> }> = [];
+      const spy: AgentLayoutFn = (nodes, edges) => {
+        seen.push({ nodes: nodes.map((n) => n.id), edges });
+        return Object.fromEntries(nodes.map((n) => [n.id, { x: 0, y: 0 }]));
+      };
+      const { bridge: b, newFlow: nf } = setupWithLayout(spy);
+      const flow = nf();
+      b.register('main', flow);
+      flow.setNodes([makeNode('a'), makeNode('b'), makeNode('c', { position: { x: 9, y: 9 } })]);
+      flow.setEdges([
+        { id: 'e1', source: 'a', target: 'b' } as Edge,
+        { id: 'e2', source: 'b', target: 'c' } as Edge,
+      ]);
+      await b.callTool('layout_nodes', { nodeIds: ['a', 'b'], fitView: false });
+      expect(seen[0].nodes).toEqual(['a', 'b']);
+      expect(seen[0].edges).toEqual([{ source: 'a', target: 'b' }]);
+      expect(flow.getNode('c')?.position).toEqual({ x: 9, y: 9 });
+    });
+
+    it('rejects unknown nodeIds with -32602', async () => {
+      const { bridge: b, newFlow: nf } = setupWithLayout(fakeLayout);
+      const flow = nf();
+      b.register('main', flow);
+      flow.setNodes([makeNode('a')]);
+      await expect(
+        b.callTool('layout_nodes', { nodeIds: ['a', 'ghost'] }),
+      ).rejects.toMatchObject({ code: -32602 });
+    });
+
+    it('rejects a bad direction with -32602', async () => {
+      const { bridge: b, newFlow: nf } = setupWithLayout(fakeLayout);
+      b.register('main', nf());
+      await expect(
+        b.callTool('layout_nodes', { direction: 'DIAGONAL' }),
+      ).rejects.toMatchObject({ code: -32602 });
+    });
+
+    it('drops unknown ids from the layout result with a console.warn', async () => {
+      const sloppy: AgentLayoutFn = () => ({ a: { x: 1, y: 1 }, ghost: { x: 9, y: 9 } });
+      const { bridge: b, newFlow: nf } = setupWithLayout(sloppy);
+      const flow = nf();
+      b.register('main', flow);
+      flow.setNodes([makeNode('a')]);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const result = (await b.callTool('layout_nodes', { fitView: false })) as {
+        positions: Record<string, unknown>;
+      };
+      expect(result.positions).toEqual({ a: { x: 1, y: 1 } });
+      expect(warn).toHaveBeenCalledOnce();
+      warn.mockRestore();
+    });
+
+    it('a throwing layout fn yields -32603 and changes nothing', async () => {
+      const boom: AgentLayoutFn = () => {
+        throw new Error('layout exploded');
+      };
+      const { bridge: b, newFlow: nf } = setupWithLayout(boom);
+      const flow = nf();
+      b.register('main', flow);
+      flow.setNodes([makeNode('a', { position: { x: 5, y: 5 } })]);
+      await expect(b.callTool('layout_nodes', {})).rejects.toMatchObject({ code: -32603 });
+      expect(flow.getNode('a')?.position).toEqual({ x: 5, y: 5 });
+      const status = (await b.callTool('history_status')) as { pastDepth: number };
+      expect(status.pastDepth).toBe(0);
+    });
+
+    it('an invalid position in the layout result yields -32603 and applies nothing', async () => {
+      const bad: AgentLayoutFn = () => ({ a: { x: Number.NaN, y: 0 } });
+      const { bridge: b, newFlow: nf } = setupWithLayout(bad);
+      const flow = nf();
+      b.register('main', flow);
+      flow.setNodes([makeNode('a', { position: { x: 5, y: 5 } })]);
+      await expect(b.callTool('layout_nodes', { fitView: false })).rejects.toMatchObject({ code: -32603 });
+      expect(flow.getNode('a')?.position).toEqual({ x: 5, y: 5 });
+    });
+
+    it('a successful layout creates exactly one history entry, undo restores positions', async () => {
+      const { bridge: b, newFlow: nf } = setupWithLayout(fakeLayout);
+      const flow = nf();
+      b.register('main', flow);
+      flow.setNodes([makeNode('a', { position: { x: 5, y: 5 } }), makeNode('b', { position: { x: 6, y: 6 } })]);
+      await b.callTool('layout_nodes', { fitView: false });
+      const status = (await b.callTool('history_status')) as { pastDepth: number };
+      expect(status.pastDepth).toBe(1);
+      await b.callTool('undo');
+      expect(flow.getNode('a')?.position).toEqual({ x: 5, y: 5 });
+      expect(flow.getNode('b')?.position).toEqual({ x: 6, y: 6 });
+    });
+
+    it('an empty graph creates no history entry', async () => {
+      const { bridge: b, newFlow: nf } = setupWithLayout(fakeLayout);
+      const flow = nf();
+      b.register('main', flow);
+      await b.callTool('layout_nodes', { fitView: false });
+      const status = (await b.callTool('history_status')) as { pastDepth: number };
+      expect(status.pastDepth).toBe(0);
+    });
+
+    it('awaits an async layout fn', async () => {
+      const asyncLayout: AgentLayoutFn = async (nodes) =>
+        Object.fromEntries(nodes.map((n) => [n.id, { x: 42, y: 7 }]));
+      const { bridge: b, newFlow: nf } = setupWithLayout(asyncLayout);
+      const flow = nf();
+      b.register('main', flow);
+      flow.setNodes([makeNode('a')]);
+      await b.callTool('layout_nodes', { fitView: false });
+      expect(flow.getNode('a')?.position).toEqual({ x: 42, y: 7 });
     });
   });
 

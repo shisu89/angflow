@@ -1,7 +1,8 @@
 import { type EnvironmentProviders, makeEnvironmentProviders } from '@angular/core';
-import { AGENT_HISTORY_OPTIONS, AGENT_ON_ERROR, AGENT_TRANSPORTS } from './agent-bridge.service';
+import { AGENT_HISTORY_OPTIONS, AGENT_LAYOUT, AGENT_ON_ERROR, AGENT_TRANSPORTS } from './agent-bridge.service';
 import type { AgentHistoryOptions } from './history';
 import type { AgentTransport } from './types';
+import type { AgentLayoutFn } from '../types/node-template';
 
 export type AgentBridgeErrorContext =
   | { kind: 'transport-start'; transport: AgentTransport }
@@ -20,6 +21,13 @@ export interface AgentBridgeConfig {
    * this to log or report.
    */
   onError?: (err: unknown, ctx: AgentBridgeErrorContext) => void;
+  /**
+   * Optional layout function backing the `layout_nodes` tool. Import the
+   * turnkey dagre adapter from `@angflow/angular/layout`, or supply your own.
+   * When omitted, `layout_nodes` fails with a "no layout function configured"
+   * error.
+   */
+  layout?: AgentLayoutFn;
 }
 
 /**
@@ -49,5 +57,6 @@ export function provideAgentBridge(config: AgentBridgeConfig): EnvironmentProvid
       useValue: config.history ?? { maxDepth: 100 },
     },
     ...(config.onError ? [{ provide: AGENT_ON_ERROR, useValue: config.onError }] : []),
+    ...(config.layout ? [{ provide: AGENT_LAYOUT, useValue: config.layout }] : []),
   ]);
 }
