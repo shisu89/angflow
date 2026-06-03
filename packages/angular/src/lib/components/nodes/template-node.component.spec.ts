@@ -125,4 +125,35 @@ describe('TemplateNodeComponent', () => {
     fixture.detectChanges();
     expect(el.querySelector('.ng-flow__template-node')).toBeNull();
   });
+
+  it('accent with injected CSS does not escape the style binding', () => {
+    const { el } = mount({ title: 't', accent: 'red; background:url(http://evil)' }, {});
+    expect(el.innerHTML).not.toContain('evil');
+  });
+
+  it('applies a valid accent color via style bindings', () => {
+    const { el } = mount({ title: 't', accent: 'rgb(79, 70, 229)' }, {});
+    const card = el.querySelector('.ng-flow__template-node') as HTMLElement;
+    expect(card.style.borderLeftColor).toBe('rgb(79, 70, 229)');
+  });
+
+  it('renders interpolated body text', () => {
+    const { el } = mount({ body: 'runs {{data.name}}' }, { name: 'api' });
+    expect(el.querySelector('.ng-flow__template-node__body')?.textContent).toBe('runs api');
+  });
+
+  it('toggles the selected class from the selected input', () => {
+    const { fixture, el } = mount({ title: 't' }, {});
+    expect(el.querySelector('.ng-flow__template-node--selected')).toBeNull();
+    fixture.componentRef.setInput('selected', true);
+    fixture.detectChanges();
+    expect(el.querySelector('.ng-flow__template-node--selected')).not.toBeNull();
+  });
+
+  it('re-interpolates when node data changes', () => {
+    const { fixture, el } = mount({ title: '{{data.name}}' }, { name: 'v1' });
+    fixture.componentRef.setInput('data', { name: 'v2' });
+    fixture.detectChanges();
+    expect(el.querySelector('.ng-flow__template-node__title')?.textContent).toBe('v2');
+  });
 });
