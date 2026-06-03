@@ -15,6 +15,7 @@ import { FlowStore } from '../../services/flow-store.service';
 import { NG_FLOW_NODE_CONTEXT } from '../../services/tokens';
 import { TemplateNodeComponent } from '../../components/nodes/template-node.component';
 import { DefaultNodeComponent } from '../../components/nodes/default-node.component';
+import { InputNodeComponent } from '../../components/nodes/input-node.component';
 import type { Node } from '../../types';
 
 describe('NodeRendererComponent.getNodeInjector', () => {
@@ -171,7 +172,7 @@ describe('node template resolution', () => {
 
   it('built-in types are never shadowed by registry templates', () => {
     store.nodeTemplates.set(new Map([['input', {}]]));
-    expect(component.getNodeComponent('input')).not.toBe(TemplateNodeComponent);
+    expect(component.getNodeComponent('input')).toBe(InputNodeComponent);
   });
 
   it('unregistering live falls back to DefaultNodeComponent', () => {
@@ -179,5 +180,16 @@ describe('node template resolution', () => {
     expect(component.getNodeComponent('service')).toBe(TemplateNodeComponent);
     store.nodeTemplates.set(new Map());
     expect(component.getNodeComponent('service')).toBe(DefaultNodeComponent);
+  });
+
+  it('busts the inputs cache when a template is registered for an existing type', () => {
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'service' } as Node]);
+    const internal = store.nodeLookup.get('n1')!;
+    const before = component.getNodeInputs(internal);
+    store.nodeTemplates.set(new Map([['service', { title: 't' }]]));
+    const after = component.getNodeInputs(internal);
+    // A registry change switches the resolved component class, so cached inputs
+    // (filtered against the old class) must not be reused.
+    expect(after).not.toBe(before);
   });
 });

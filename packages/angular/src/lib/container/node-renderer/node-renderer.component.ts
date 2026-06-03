@@ -363,7 +363,8 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
   getNodeInputs(node: InternalNode): Record<string, unknown> {
     const version = this.store.version();
     const nodesConnectable = this.store.nodesConnectable();
-    const key = `${version}:${nodesConnectable ? 1 : 0}:${node.type ?? 'default'}`;
+    const isTemplate = this.store.nodeTemplates().has(node.type ?? 'default') ? 1 : 0;
+    const key = `${version}:${nodesConnectable ? 1 : 0}:${node.type ?? 'default'}:${isTemplate}`;
     const cached = this.nodeInputsCache.get(node.id);
     if (cached && cached.key === key) {
       return cached.inputs;
