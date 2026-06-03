@@ -791,6 +791,9 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * Later sources win for duplicate names, mirroring renderer precedence
    * (host components shadow built-ins; templates cannot collide — the bridge
    * rejects registration of names claimed by builtin/host).
+   * Note: content-projected `<ng-template ngFlowNodeType>` types are reported
+   * as 'host' — both host sources are equivalent from an agent's perspective
+   * (app-provided, data contract unknown, not overridable).
    */
   getNodeTypeNames(): Array<{ name: string; source: 'builtin' | 'host' | 'template' }> {
     const result = new Map<string, 'builtin' | 'host' | 'template'>();

@@ -649,4 +649,27 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'list_node_types',
+    description:
+      'List every node type name renderable on a flow, tagged with its source: ' +
+      '"builtin" (shipped with the library), "host" (registered by the application — ' +
+      'its expected data shape is app-specific), or "template" (a data-driven template ' +
+      'created via register_node_template — introspect its spec with list_node_templates).',
+    inputSchema: {
+      type: 'object',
+      properties: { flowId: { type: 'string' } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'list_edge_types',
+    description:
+      'List every edge type name renderable on a flow, tagged "builtin" or "host".',
+    inputSchema: {
+      type: 'object',
+      properties: { flowId: { type: 'string' } },
+      additionalProperties: false,
+    },
+  },
 ];

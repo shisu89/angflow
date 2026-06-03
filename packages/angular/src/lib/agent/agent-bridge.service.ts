@@ -783,6 +783,9 @@ export class AngflowAgentBridge {
       this.history.clear(flowId);
       this.emitHistory(flowId);
     });
+
+    this.handlers.set('list_node_types', (flow) => ({ types: flow.getNodeTypeNames() }));
+    this.handlers.set('list_edge_types', (flow) => ({ types: flow.getEdgeTypeNames() }));
   }
 }
 

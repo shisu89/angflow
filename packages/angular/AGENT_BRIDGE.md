@@ -76,6 +76,15 @@ Every tool takes an optional `flowId` (omit when only one flow is registered; re
 | `get_edge` | `id: string` | `Edge \| null` |
 | `get_viewport` | — | `{ x, y, zoom }` |
 
+### Discovery — types & templates
+
+| Tool | Params | Returns |
+|---|---|---|
+| `list_node_types` | — | `{ types: Array<{ name, source: 'builtin' \| 'host' \| 'template' }> }` |
+| `list_edge_types` | — | `{ types: Array<{ name, source: 'builtin' \| 'host' }> }` |
+
+`source` tells the agent how to treat a type: `builtin` ships with the library; `host` is app-registered (component or content template — its `data` contract is app-specific); `template` is a data-driven template registered at runtime (see `register_node_template`).
+
 ### Read — geometry / graph queries
 
 | Tool | Params | Returns |

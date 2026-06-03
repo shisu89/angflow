@@ -930,6 +930,43 @@ describe('AngflowAgentBridge', () => {
   });
 });
 
+describe('type discovery tools', () => {
+  let bridge: AngflowAgentBridge;
+  let newFlow: () => NgFlowService;
+
+  beforeEach(() => {
+    ({ bridge, newFlow } = setup([]));
+  });
+
+  it('list_node_types reports builtin node types', async () => {
+    const flow = newFlow();
+    bridge.register('main', flow);
+    const result = (await bridge.callTool('list_node_types')) as {
+      types: Array<{ name: string; source: string }>;
+    };
+    expect(result.types).toContainEqual({ name: 'default', source: 'builtin' });
+    expect(result.types).toContainEqual({ name: 'group', source: 'builtin' });
+  });
+
+  it('list_edge_types reports builtin edge types', async () => {
+    const flow = newFlow();
+    bridge.register('main', flow);
+    const result = (await bridge.callTool('list_edge_types')) as {
+      types: Array<{ name: string; source: string }>;
+    };
+    expect(result.types).toContainEqual({ name: 'smoothstep', source: 'builtin' });
+  });
+
+  it('discovery tools are read-only (no history entry)', async () => {
+    const flow = newFlow();
+    bridge.register('main', flow);
+    await bridge.callTool('list_node_types');
+    await bridge.callTool('list_edge_types');
+    const status = (await bridge.callTool('history_status')) as { pastDepth: number };
+    expect(status.pastDepth).toBe(0);
+  });
+});
+
 describe('onError hook', () => {
   it('captures transport.send failures via the provideAgentBridge onError callback', async () => {
     const errors: Array<{ err: unknown; kind: string }> = [];
