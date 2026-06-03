@@ -18,7 +18,7 @@
                                                               └──────────────┘
 ```
 
-- **Bridge** — root-scoped service. Holds a registry of `flowId → NgFlowService`, routes inbound tool calls to the right service, and emits `flow.state` events when any registered flow's signals change (coalesced via microtask).
+- **Bridge** — root-scoped service. Holds a registry of `flowId → NgFlowService`, routes inbound tool calls to the right service, and emits `flow.state` events when any registered flow's signals change (coalesced via microtask). Each flow also carries a per-flow node-template registry (see `register_node_template`) and supports an optional host-pluggable layout function (see `layout_nodes`).
 - **Transport** — anything implementing `AgentTransport`. Bundled: `WindowTransport` (exposes `window.angflow`), `WebSocketTransport`. Add custom ones for postMessage, CDP, MCP servers, etc.
 - **Tool schemas** — `AGENT_TOOL_SCHEMAS` is a JSON-Schema array suitable for direct use as Anthropic/OpenAI `tools`.
 
@@ -27,6 +27,7 @@
 ```ts
 // app.config.ts
 import { provideAgentBridge, WindowTransport } from '@angflow/angular';
+// dagreLayout requires the optional peer dep @dagrejs/dagre >= 3
 import { dagreLayout } from '@angflow/angular/layout';
 
 export const appConfig: ApplicationConfig = {
@@ -169,7 +170,7 @@ Requires a layout function to be passed to `provideAgentBridge({ layout: dagreLa
 |---|---|---|
 | `layout_nodes` | `direction?: 'TB' \| 'LR' \| 'BT' \| 'RL'` (default `'TB'`), `nodeIds?: string[]` (omit = all nodes), `nodeSep?: number`, `rankSep?: number`, `fitView?: boolean` (default `true`) | `{ positions: Record<nodeId, { x: number; y: number }> }` |
 
-`layout_nodes` computes tidy positions using the host-configured layout engine (typically dagre), applies them in one undoable step, and fits the viewport. When `nodeIds` is supplied, only those nodes and the edges among them form the layout subgraph — nodes outside the subset are left untouched. The `dagreLayout` adapter ships in `@angflow/angular/layout` (next task).
+`layout_nodes` computes tidy positions using the host-configured layout engine (typically dagre), applies them in one undoable step, and fits the viewport. When `nodeIds` is supplied, only those nodes and the edges among them form the layout subgraph — nodes outside the subset are left untouched. The `dagreLayout` adapter ships in `@angflow/angular/layout` (requires the optional peer dep `@dagrejs/dagre >= 3`).
 
 ### History
 
@@ -351,6 +352,7 @@ Tools that **do not** capture a history entry:
 - Selection tools (`select_nodes`, `select_edges`, `deselect_all`)
 - Viewport tools (`fit_view`, `set_viewport`, `zoom_in`, `zoom_out`, `zoom_to`, `set_center`, `fit_bounds`)
 - Read / geometry / coordinate tools (all read-only by definition)
+- Node/edge type discovery and template management (`list_node_types`, `list_edge_types`, `register_node_template`, `unregister_node_template`, `list_node_templates`) — templates are rendering config, not graph state
 - `apply_changes` when all ops are selection-only
 - A rolled-back `apply_changes`
 - `layout_nodes` when the layout function throws or returns no valid positions
@@ -411,12 +413,13 @@ Emitted synchronously after every mutating tool call (before `flow.state`), and 
 3. The handler receives `(flow: NgFlowService, params)` — call into the existing service API; do not reach into the store directly.
 4. If the new behavior should appear in `flow.state` events, make sure the underlying mutation writes to one of the signals already watched (`nodes`, `edges`, `viewport`, `selectedNodes`, `selectedEdges`); if not, extend the watcher in `watchFlow()`.
 5. If the tool mutates `nodes` or `edges`, add it to the `MUTATING_TOOLS` set at the top of `agent-bridge.service.ts` so history capture fires automatically.
-6. Update this doc — at minimum, add the tool to the catalog table.
+6. If the tool's history capture is conditional (like `layout_nodes`, which only captures when ≥1 position was applied), handle it in `dispatch()` instead of `MUTATING_TOOLS`.
+7. Update this doc — at minimum, add the tool to the catalog table.
 
 ## Known gaps
 
 Not yet exposed (but planned or noted):
 - **Undo/redo for user-driven changes** — bridge history only tracks bridge-initiated mutations (see History section).
 - **Copy/paste** — no clipboard API in the bridge yet.
-- **Runtime node/edge type registration** — cannot register new Angular component types at runtime via the bridge.
 - **Pane/read-only toggles** — cannot toggle `panOnDrag`, `nodesDraggable`, `nodesConnectable`, etc. via the bridge yet.
+- **Edge templates** — `register_edge_template` is not implemented; `list_edge_types` ships for discovery only.

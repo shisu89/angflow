@@ -9,6 +9,7 @@ export { DefaultNodeComponent } from './components/nodes/default-node.component'
 export { InputNodeComponent } from './components/nodes/input-node.component';
 export { OutputNodeComponent } from './components/nodes/output-node.component';
 export { GroupNodeComponent } from './components/nodes/group-node.component';
+export { TemplateNodeComponent } from './components/nodes/template-node.component';
 
 // Edge components
 export { BaseEdgeComponent } from './components/edges/base-edge.component';
