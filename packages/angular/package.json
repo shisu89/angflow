@@ -66,9 +66,9 @@
   },
   "devDependencies": {
     "@analogjs/vite-plugin-angular": "^2.5.3",
-    "@angular/compiler": ">=19.0.0",
-    "@angular/compiler-cli": ">=19.0.0",
-    "@angular/platform-browser": "^21.2.7",
+    "@angular/compiler": "^21.2.15",
+    "@angular/compiler-cli": "^21.2.15",
+    "@angular/platform-browser": "^21.2.15",
     "@angular/platform-browser-dynamic": "^21.2.7",
     "@dagrejs/dagre": "^3.0.0",
     "jsdom": "^29.0.1",

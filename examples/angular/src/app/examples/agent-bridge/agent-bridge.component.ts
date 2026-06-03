@@ -60,6 +60,19 @@ const off = angflow.subscribe(e => console.log(e))
   ],
 {{ '}' }})</pre>
             <pre class="agent-panel__code">await angflow.callTool('undo')</pre>
+            <pre class="agent-panel__code">await angflow.callTool('register_node_template', {{ '{' }}
+  name: 'service',
+  spec: {{ '{' }}
+    title: '{{ '{' }}{{ '{' }}data.name{{ '}' }}{{ '}' }}', icon: 'server', accent: '#4f46e5',
+    badges: [{{ '{' }} text: '{{ '{' }}{{ '{' }}data.env{{ '}' }}{{ '}' }}', color: 'amber', showIf: 'data.env' {{ '}' }}],
+    fields: [{{ '{' }} label: 'Port', value: '{{ '{' }}{{ '{' }}data.port{{ '}' }}{{ '}' }}', showIf: 'data.port' {{ '}' }}],
+  {{ '}' }},
+{{ '}' }})
+await angflow.callTool('add_nodes', {{ '{' }} nodes: [
+  {{ '{' }} id: 's1', type: 'service', position: {{ '{' }} x: 0, y: 0 {{ '}' }}, data: {{ '{' }} name: 'api', port: 8080, env: 'prod' {{ '}' }} {{ '}' }},
+  {{ '{' }} id: 's2', type: 'service', position: {{ '{' }} x: 0, y: 0 {{ '}' }}, data: {{ '{' }} name: 'worker', port: 9090 {{ '}' }} {{ '}' }},
+] {{ '}' }})</pre>
+            <pre class="agent-panel__code">await angflow.callTool('layout_nodes', {{ '{' }} direction: 'LR' {{ '}' }})</pre>
             <div class="agent-panel__title">History</div>
             <div class="agent-panel__history">
               @if (historyStatus(); as h) {
