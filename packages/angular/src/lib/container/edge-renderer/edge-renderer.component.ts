@@ -37,6 +37,7 @@ import type { Edge, EdgeTypes } from '../../types';
 
 const builtInEdgeTypeNames = new Set(['default', 'bezier', 'straight', 'step', 'smoothstep', 'simplebezier']);
 
+// Keep the key set in sync with BUILT_IN_EDGE_TYPE_NAMES in services/ng-flow.service.ts.
 const builtInEdgeTypes: EdgeTypes = {
   default: BezierEdgeComponent,
   bezier: BezierEdgeComponent,

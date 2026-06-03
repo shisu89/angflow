@@ -21,8 +21,10 @@ import { DefaultNodeComponent } from '../../components/nodes/default-node.compon
 import { InputNodeComponent } from '../../components/nodes/input-node.component';
 import { OutputNodeComponent } from '../../components/nodes/output-node.component';
 import { GroupNodeComponent } from '../../components/nodes/group-node.component';
+import { TemplateNodeComponent } from '../../components/nodes/template-node.component';
 import type { Node, InternalNode, NodeTypes, NgFlowNodeContext } from '../../types';
 
+// Keep the key set in sync with BUILT_IN_NODE_TYPE_NAMES in services/ng-flow.service.ts.
 const builtInNodeTypes: NodeTypes = {
   default: DefaultNodeComponent,
   input: InputNodeComponent,
@@ -306,7 +308,13 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
 
   getNodeComponent(type?: string): Type<unknown> {
     const resolvedType = type || 'default';
-    return this.customNodeTypes()[resolvedType] ?? builtInNodeTypes[resolvedType] ?? DefaultNodeComponent;
+    const hostOrBuiltIn = this.customNodeTypes()[resolvedType] ?? builtInNodeTypes[resolvedType];
+    if (hostOrBuiltIn) return hostOrBuiltIn;
+    // Agent-registered data-driven templates: reading the registry signal here
+    // makes the template binding reactive — registering/unregistering a
+    // template re-renders affected nodes with no host involvement.
+    if (this.store.nodeTemplates().has(resolvedType)) return TemplateNodeComponent;
+    return DefaultNodeComponent;
   }
 
   getNodeInjector(nodeId: string): Injector {

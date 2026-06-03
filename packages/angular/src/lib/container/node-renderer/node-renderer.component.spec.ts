@@ -8,11 +8,13 @@
  * (those tests provide the context manually via a stub).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { TestBed } from '@angular/core/testing';
+import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { NodeRendererComponent } from './node-renderer.component';
 import { FlowStore } from '../../services/flow-store.service';
 import { NG_FLOW_NODE_CONTEXT } from '../../services/tokens';
+import { TemplateNodeComponent } from '../../components/nodes/template-node.component';
+import { DefaultNodeComponent } from '../../components/nodes/default-node.component';
 import type { Node } from '../../types';
 
 describe('NodeRendererComponent.getNodeInjector', () => {
@@ -133,5 +135,49 @@ describe('NodeRendererComponent.getNodeInputs / context isConnectable', () => {
 
     store.nodesConnectable.set(false);
     expect(context.isConnectable()).toBe(false);
+  });
+});
+
+describe('node template resolution', () => {
+  let store: FlowStore;
+  let component: NodeRendererComponent;
+  let fixture: ComponentFixture<NodeRendererComponent>;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NodeRendererComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    store = TestBed.inject(FlowStore);
+    fixture = TestBed.createComponent(NodeRendererComponent);
+    component = fixture.componentInstance;
+  });
+
+  it('resolves a registered template type to TemplateNodeComponent', () => {
+    store.nodeTemplates.set(new Map([['service', { title: 'svc' }]]));
+    expect(component.getNodeComponent('service')).toBe(TemplateNodeComponent);
+  });
+
+  it('falls back to DefaultNodeComponent for unknown types', () => {
+    expect(component.getNodeComponent('nope')).toBe(DefaultNodeComponent);
+  });
+
+  it('host component types take precedence over registry templates', () => {
+    store.nodeTemplates.set(new Map([['service', {}]]));
+    fixture.componentRef.setInput('customNodeTypes', { service: DefaultNodeComponent });
+    expect(component.getNodeComponent('service')).toBe(DefaultNodeComponent);
+  });
+
+  it('built-in types are never shadowed by registry templates', () => {
+    store.nodeTemplates.set(new Map([['input', {}]]));
+    expect(component.getNodeComponent('input')).not.toBe(TemplateNodeComponent);
+  });
+
+  it('unregistering live falls back to DefaultNodeComponent', () => {
+    store.nodeTemplates.set(new Map([['service', {}]]));
+    expect(component.getNodeComponent('service')).toBe(TemplateNodeComponent);
+    store.nodeTemplates.set(new Map());
+    expect(component.getNodeComponent('service')).toBe(DefaultNodeComponent);
   });
 });
