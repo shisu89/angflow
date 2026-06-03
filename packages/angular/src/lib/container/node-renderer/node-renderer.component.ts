@@ -6,6 +6,9 @@ import {
   input,
   output,
   reflectComponentType,
+  runInInjectionContext,
+  isSignal,
+  ɵSIGNAL,
   Type,
   Injector,
   AfterViewInit,
@@ -394,9 +397,58 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
       return this.declaredInputsCache.get(Component) ?? null;
     }
     const mirror = reflectComponentType(Component);
-    const set = mirror ? new Set(mirror.inputs.map((i) => i.templateName)) : null;
+    let set: Set<string> | null;
+    if (!mirror) {
+      // No component def found — pass all inputs through.
+      set = null;
+    } else if (mirror.inputs.length > 0) {
+      // AOT-compiled component with properly registered signal/decorator inputs.
+      set = new Set(mirror.inputs.map((i) => i.templateName));
+    } else {
+      // mirror.inputs is empty. This can mean two things:
+      //   (a) The component genuinely has no inputs (DI-only pattern).
+      //   (b) We are in a JIT environment (vitest) where the Angular AOT compiler
+      //       transform did not run — signal-based input() declarations are not
+      //       registered in ɵcmp.inputs in JIT mode, so reflectComponentType
+      //       returns an empty array even for components that DO declare inputs.
+      // Fall back to probing an instance in the injection context so we can
+      // inspect its own properties for InputSignal markers.
+      set = this.probeDeclaredInputsByInstantiation(Component);
+    }
     this.declaredInputsCache.set(Component, set);
     return set;
+  }
+
+  /**
+   * Fallback for JIT environments (e.g. vitest) where signal inputs are not
+   * registered in ɵcmp.inputs. Creates a temporary instance of the component
+   * inside the parent injection context, then inspects own properties for
+   * InputSignal objects (identified by the applyValueToInputSignal method on
+   * the SIGNAL node). Returns an empty Set for DI-only components (no signal
+   * inputs found), or null if instantiation fails (treat as pass-through).
+   */
+  private probeDeclaredInputsByInstantiation(Component: Type<unknown>): Set<string> | null {
+    try {
+      const keys = new Set<string>();
+      runInInjectionContext(this.parentInjector, () => {
+        const inst = new (Component as any)();
+        for (const key of Object.keys(inst)) {
+          const val = inst[key];
+          if (isSignal(val)) {
+            const node = (val as any)[ɵSIGNAL as unknown as symbol];
+            if (node && typeof node.applyValueToInputSignal === 'function') {
+              keys.add(key);
+            }
+          }
+        }
+      });
+      // Return the found keys if any; otherwise an empty Set for DI-only components.
+      return keys;
+    } catch {
+      // Instantiation failed (e.g. required services missing from parentInjector).
+      // Pass all inputs through rather than incorrectly blocking them.
+      return null;
+    }
   }
 
   private buildNodeContext(nodeId: string): NgFlowNodeContext<unknown> {
