@@ -44,6 +44,8 @@ describe('resolveTemplatePath', () => {
     expect(resolveTemplatePath('data.a.b', { a: null })).toBeUndefined();
     expect(resolveTemplatePath('data.a.b', { a: 5 })).toBeUndefined();
     expect(resolveTemplatePath('data.a', null)).toBeUndefined();
+    expect(resolveTemplatePath('data', null)).toBeUndefined();
+    expect(resolveTemplatePath('data', undefined)).toBeUndefined();
   });
 });
 
@@ -81,6 +83,10 @@ describe('interpolateTemplateString', () => {
   it('renders dangerous-looking expressions as empty, not as code', () => {
     expect(interpolateTemplateString('{{constructor.constructor}}', {})).toBe('');
     expect(interpolateTemplateString('{{data.__proto__.polluted}}', {})).toBe('');
+  });
+
+  it('serializes the whole data object for {{data}}', () => {
+    expect(interpolateTemplateString('{{data}}', { a: 1 })).toBe('{"a":1}');
   });
 
   it('passes <script> through as inert text (caller binds as text, never HTML)', () => {

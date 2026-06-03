@@ -23,7 +23,8 @@ export function resolveTemplatePath(expr: string, data: unknown): unknown {
   return current;
 }
 
-/** Replace every `{{data.x}}` in `template` with its resolved value (or ''). */
+/** Replace every `{{…}}` token in `template` with its resolved value (or '').
+ * Only `data.x` paths resolve to a value; all other expressions resolve to ''. */
 export function interpolateTemplateString(template: string, data: unknown): string {
   return template.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_match, expr: string) => {
     const value = resolveTemplatePath(expr, data);

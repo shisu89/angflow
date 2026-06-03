@@ -713,6 +713,13 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       this.store.onBeforeDelete = this.onBeforeDelete() ?? null;
     });
 
+    // Sync registered type names → store for agent-bridge discovery.
+    effect(() => {
+      this.store.hostNodeTypeNames.set(Object.keys(this.nodeTypes()));
+      this.store.hostEdgeTypeNames.set(Object.keys(this.edgeTypes()));
+      this.store.contentNodeTemplateNames.set(Array.from(this.nodeTemplateMap().keys()));
+    });
+
     effect(() => {
       this.store.setMinZoom(this.minZoom());
     });

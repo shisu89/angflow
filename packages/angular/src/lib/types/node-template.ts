@@ -40,7 +40,7 @@ export interface NodeTemplateSpec {
   title?: string;
   /** Icon name resolved against the built-in glyph set; unknown names render nothing. */
   icon?: string;
-  /** Accent color (header text / left border). Any CSS color string. */
+  /** Accent color (header text / left border). Any CSS color; Angular sanitizes the style binding. */
   accent?: string;
   /** Layout density. Default 'detailed'. */
   variant?: 'compact' | 'detailed';

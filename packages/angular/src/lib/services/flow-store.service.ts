@@ -42,6 +42,7 @@ import {
 } from '@angflow/system';
 
 import type { Node, Edge, InternalNode } from '../types';
+import type { NodeTemplateSpec } from '../types/node-template';
 import { applyNodeChanges, applyEdgeChanges, createSelectionChange, getSelectionChanges } from '../utils/changes';
 
 @Injectable()
@@ -145,6 +146,16 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   readonly elevateNodesOnSelect = signal(true);
   readonly elevateEdgesOnSelect = signal(true);
   readonly selectNodesOnDrag = signal(true);
+
+  // ── Agent template registry & type discovery ─────────────────────────
+  /** Data-driven node templates registered at runtime (via the agent bridge). */
+  readonly nodeTemplates = signal<ReadonlyMap<string, NodeTemplateSpec>>(new Map());
+  /** Type names supplied by the host via the `nodeTypes` input on <ng-flow>. */
+  readonly hostNodeTypeNames = signal<string[]>([]);
+  /** Type names supplied by the host via the `edgeTypes` input on <ng-flow>. */
+  readonly hostEdgeTypeNames = signal<string[]>([]);
+  /** Type names from content-projected `<ng-template ngFlowNodeType>` templates. */
+  readonly contentNodeTemplateNames = signal<string[]>([]);
 
   readonly connectionMode = signal<ConnectionMode>(ConnectionMode.Strict);
   readonly connection = signal<ConnectionState>({ ...initialConnection });

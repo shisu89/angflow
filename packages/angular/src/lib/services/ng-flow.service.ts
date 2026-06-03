@@ -24,6 +24,12 @@ import {
 
 import { FlowStore } from './flow-store.service';
 import type { Node, Edge, InternalNode, NgFlowInstance, NgFlowJsonObject, DeleteElementsOptions } from '../types';
+import type { NodeTemplateSpec } from '../types/node-template';
+
+/** Keep in sync with `builtInNodeTypes` in container/node-renderer/node-renderer.component.ts. */
+const BUILT_IN_NODE_TYPE_NAMES = ['default', 'input', 'output', 'group'] as const;
+/** Keep in sync with `builtInEdgeTypes` in container/edge-renderer/edge-renderer.component.ts. */
+const BUILT_IN_EDGE_TYPE_NAMES = ['default', 'bezier', 'straight', 'step', 'smoothstep', 'simplebezier'] as const;
 
 /**
  * Imperative API for controlling a flow instance: zoom, pan, fit-view,
@@ -744,5 +750,62 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
       this.store.maxZoom(),
       padding
     );
+  }
+
+  // ── Node templates (agent bridge) ─────────────────────────────────────
+
+  /** Reactive view of the data-driven node templates registered on this flow. */
+  readonly nodeTemplates: Signal<ReadonlyMap<string, NodeTemplateSpec>> = computed(() =>
+    this.store.nodeTemplates(),
+  );
+
+  /** Register (or overwrite) a data-driven node template. Renders live via signals. */
+  registerNodeTemplate(name: string, spec: NodeTemplateSpec): void {
+    const next = new Map(this.store.nodeTemplates());
+    next.set(name, spec);
+    this.store.nodeTemplates.set(next);
+  }
+
+  /** Remove a registered template. Returns whether it existed. */
+  unregisterNodeTemplate(name: string): boolean {
+    const current = this.store.nodeTemplates();
+    if (!current.has(name)) return false;
+    const next = new Map(current);
+    next.delete(name);
+    this.store.nodeTemplates.set(next);
+    return true;
+  }
+
+  /** List registered templates with their full specs. */
+  getNodeTemplates(): Array<{ name: string; spec: NodeTemplateSpec }> {
+    return Array.from(this.store.nodeTemplates().entries()).map(([name, spec]) => ({
+      name,
+      spec,
+    }));
+  }
+
+  // ── Type discovery (agent bridge) ──────────────────────────────────────
+
+  /**
+   * Every node type name renderable on this flow, tagged with its source.
+   * Later sources win for duplicate names, mirroring renderer precedence
+   * (host components shadow built-ins; templates cannot collide — the bridge
+   * rejects registration of names claimed by builtin/host).
+   */
+  getNodeTypeNames(): Array<{ name: string; source: 'builtin' | 'host' | 'template' }> {
+    const result = new Map<string, 'builtin' | 'host' | 'template'>();
+    for (const name of BUILT_IN_NODE_TYPE_NAMES) result.set(name, 'builtin');
+    for (const name of this.store.hostNodeTypeNames()) result.set(name, 'host');
+    for (const name of this.store.contentNodeTemplateNames()) result.set(name, 'host');
+    for (const name of this.store.nodeTemplates().keys()) result.set(name, 'template');
+    return Array.from(result.entries()).map(([name, source]) => ({ name, source }));
+  }
+
+  /** Every edge type name renderable on this flow, tagged with its source. */
+  getEdgeTypeNames(): Array<{ name: string; source: 'builtin' | 'host' | 'template' }> {
+    const result = new Map<string, 'builtin' | 'host' | 'template'>();
+    for (const name of BUILT_IN_EDGE_TYPE_NAMES) result.set(name, 'builtin');
+    for (const name of this.store.hostEdgeTypeNames()) result.set(name, 'host');
+    return Array.from(result.entries()).map(([name, source]) => ({ name, source }));
   }
 }
