@@ -29,6 +29,10 @@
       "types": "./dist/esm/index.d.ts",
       "default": "./dist/esm/index.js"
     },
+    "./layout": {
+      "types": "./dist/esm/lib/layout/index.d.ts",
+      "default": "./dist/esm/lib/layout/index.js"
+    },
     "./dist/style.css": "./dist/style.css",
     "./dist/base.css": "./dist/base.css"
   },
@@ -52,7 +56,13 @@
   "peerDependencies": {
     "@angular/common": ">=19.0.0",
     "@angular/core": ">=19.0.0",
+    "@dagrejs/dagre": ">=1.0.0",
     "rxjs": ">=7.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@dagrejs/dagre": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@analogjs/vite-plugin-angular": "^2.5.3",
@@ -60,6 +70,7 @@
     "@angular/compiler-cli": ">=19.0.0",
     "@angular/platform-browser": "^21.2.7",
     "@angular/platform-browser-dynamic": "^21.2.7",
+    "@dagrejs/dagre": "^3.0.0",
     "jsdom": "^29.0.1",
     "typescript": "5.9.3",
     "vitest": "^4.1.2"
