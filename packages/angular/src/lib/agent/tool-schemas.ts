@@ -665,7 +665,95 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
   {
     name: 'list_edge_types',
     description:
-      'List every edge type name renderable on a flow, tagged "builtin" or "host".',
+      'List every edge type name renderable on a flow, tagged "builtin" (shipped with the library) or "host" (registered by the application). Use before creating or updating edges to discover valid type values.',
+    inputSchema: {
+      type: 'object',
+      properties: { flowId: { type: 'string' } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'register_node_template',
+    description:
+      'Register (or overwrite) a data-driven node template under `name`. Nodes with ' +
+      '`type === name` render as a card built from the spec. Strings support {{data.x}} ' +
+      'interpolation against each node\'s `data` (dotted paths only — no expressions). ' +
+      'Fails with -32602 if `name` is already a builtin or host-registered component type. ' +
+      'Not undoable via the undo tool (templates are rendering config, not graph state).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        name: { type: 'string', description: 'Type name nodes will reference via node.type.' },
+        spec: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'Card title; supports {{data.x}}.' },
+            icon: {
+              type: 'string',
+              description:
+                'Built-in icon name: database, server, queue, cloud, user, document, bolt, settings.',
+            },
+            accent: { type: 'string', description: 'CSS color for header/border accent.' },
+            variant: { type: 'string', enum: ['compact', 'detailed'] },
+            badges: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  text: { type: 'string' },
+                  color: { type: 'string', enum: ['slate', 'indigo', 'emerald', 'amber', 'rose'] },
+                  showIf: { type: 'string', description: 'Dotted data path, e.g. "data.env".' },
+                },
+                required: ['text'],
+              },
+            },
+            fields: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  label: { type: 'string' },
+                  value: { type: 'string', description: 'Supports {{data.x}}.' },
+                  showIf: { type: 'string' },
+                },
+                required: ['label', 'value'],
+              },
+            },
+            body: { type: 'string', description: 'Free body text; supports {{data.x}}.' },
+            handles: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  type: { type: 'string', enum: ['source', 'target'] },
+                  position: { type: 'string', enum: ['top', 'right', 'bottom', 'left'] },
+                  id: { type: 'string' },
+                },
+                required: ['type'],
+              },
+            },
+          },
+        },
+      },
+      required: ['name', 'spec'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'unregister_node_template',
+    description:
+      'Remove a data-driven node template. Existing nodes of that type fall back to the default node renderer.',
+    inputSchema: {
+      type: 'object',
+      properties: { flowId: { type: 'string' }, name: { type: 'string' } },
+      required: ['name'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'list_node_templates',
+    description: 'List every registered data-driven node template with its full spec.',
     inputSchema: {
       type: 'object',
       properties: { flowId: { type: 'string' } },

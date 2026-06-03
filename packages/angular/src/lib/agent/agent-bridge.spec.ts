@@ -782,6 +782,131 @@ describe('AngflowAgentBridge', () => {
     });
   });
 
+  describe('type discovery tools', () => {
+    it('list_node_types reports builtin node types', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const result = (await bridge.callTool('list_node_types')) as {
+        types: Array<{ name: string; source: string }>;
+      };
+      expect(result.types).toContainEqual({ name: 'default', source: 'builtin' });
+      expect(result.types).toContainEqual({ name: 'group', source: 'builtin' });
+    });
+
+    it('list_edge_types reports builtin edge types', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const result = (await bridge.callTool('list_edge_types')) as {
+        types: Array<{ name: string; source: string }>;
+      };
+      expect(result.types).toContainEqual({ name: 'smoothstep', source: 'builtin' });
+    });
+
+    it('discovery tools are read-only (no history entry)', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      await bridge.callTool('list_node_types');
+      await bridge.callTool('list_edge_types');
+      const status = (await bridge.callTool('history_status')) as { pastDepth: number };
+      expect(status.pastDepth).toBe(0);
+    });
+  });
+
+  describe('node template tools', () => {
+    let flow: NgFlowService;
+
+    beforeEach(() => {
+      flow = newFlow();
+      bridge.register('main', flow);
+    });
+
+    it('register_node_template stores a spec and returns { name }', async () => {
+      const result = await bridge.callTool('register_node_template', {
+        name: 'service',
+        spec: { title: '{{data.name}}', accent: '#4f46e5' },
+      });
+      expect(result).toEqual({ name: 'service' });
+      expect(flow.getNodeTemplates()).toHaveLength(1);
+    });
+
+    it('appears in list_node_types as source "template"', async () => {
+      await bridge.callTool('register_node_template', { name: 'service', spec: {} });
+      const result = (await bridge.callTool('list_node_types')) as {
+        types: Array<{ name: string; source: string }>;
+      };
+      expect(result.types).toContainEqual({ name: 'service', source: 'template' });
+    });
+
+    it('re-registering overwrites', async () => {
+      await bridge.callTool('register_node_template', { name: 's', spec: { title: 'v1' } });
+      await bridge.callTool('register_node_template', { name: 's', spec: { title: 'v2' } });
+      expect(flow.getNodeTemplates()).toEqual([{ name: 's', spec: { title: 'v2' } }]);
+    });
+
+    it('rejects names claimed by builtin types with -32602', async () => {
+      await expect(
+        bridge.callTool('register_node_template', { name: 'default', spec: {} }),
+      ).rejects.toMatchObject({ code: -32602 });
+    });
+
+    it('rejects names claimed by host types with -32602', async () => {
+      // Needs the FlowStore behind the flow, so build this one inline instead
+      // of via newFlow() (which returns only the service). Same pattern as the
+      // spec file's existing helper:
+      const child = Injector.create({
+        providers: [FlowStore, NgFlowService],
+        parent: TestBed.inject(Injector),
+      });
+      const hostFlow = child.get(NgFlowService);
+      const store = child.get(FlowStore);
+      bridge.register('host-flow', hostFlow);
+      store.hostNodeTypeNames.set(['decision']);
+      await expect(
+        bridge.callTool('register_node_template', { flowId: 'host-flow', name: 'decision', spec: {} }),
+      ).rejects.toMatchObject({ code: -32602 });
+    });
+
+    it('rejects an empty name with -32602', async () => {
+      await expect(
+        bridge.callTool('register_node_template', { name: '', spec: {} }),
+      ).rejects.toMatchObject({ code: -32602 });
+    });
+
+    it.each([
+      [{ variant: 'fancy' }],
+      [{ badges: [{ text: 1 }] }],
+      [{ badges: [{ text: 'x', color: 'red' }] }],
+      [{ fields: [{ label: 'x' }] }],
+      [{ handles: [{ type: 'middle' }] }],
+      [{ handles: [{ type: 'source', position: 'center' }] }],
+      [{ title: 42 }],
+    ])('rejects malformed spec %j with -32602', async (badSpec) => {
+      await expect(
+        bridge.callTool('register_node_template', { name: 'ok-name', spec: badSpec }),
+      ).rejects.toMatchObject({ code: -32602 });
+    });
+
+    it('unregister_node_template removes and reports { removed }', async () => {
+      await bridge.callTool('register_node_template', { name: 's', spec: {} });
+      expect(await bridge.callTool('unregister_node_template', { name: 's' })).toEqual({ removed: true });
+      expect(await bridge.callTool('unregister_node_template', { name: 's' })).toEqual({ removed: false });
+    });
+
+    it('list_node_templates returns full specs', async () => {
+      const spec = { title: 't', fields: [{ label: 'l', value: 'v' }] };
+      await bridge.callTool('register_node_template', { name: 's', spec });
+      expect(await bridge.callTool('list_node_templates')).toEqual({
+        templates: [{ name: 's', spec }],
+      });
+    });
+
+    it('template registration creates no history entry', async () => {
+      await bridge.callTool('register_node_template', { name: 's', spec: {} });
+      const status = (await bridge.callTool('history_status')) as { pastDepth: number };
+      expect(status.pastDepth).toBe(0);
+    });
+  });
+
   describe('history (undo/redo)', () => {
     async function flushEffects(): Promise<void> {
       TestBed.tick();
@@ -927,43 +1052,6 @@ describe('AngflowAgentBridge', () => {
       const status = (await transport.call('history_status')) as { result: { pastDepth: number } };
       expect(status.result.pastDepth).toBe(2);
     });
-  });
-});
-
-describe('type discovery tools', () => {
-  let bridge: AngflowAgentBridge;
-  let newFlow: () => NgFlowService;
-
-  beforeEach(() => {
-    ({ bridge, newFlow } = setup([]));
-  });
-
-  it('list_node_types reports builtin node types', async () => {
-    const flow = newFlow();
-    bridge.register('main', flow);
-    const result = (await bridge.callTool('list_node_types')) as {
-      types: Array<{ name: string; source: string }>;
-    };
-    expect(result.types).toContainEqual({ name: 'default', source: 'builtin' });
-    expect(result.types).toContainEqual({ name: 'group', source: 'builtin' });
-  });
-
-  it('list_edge_types reports builtin edge types', async () => {
-    const flow = newFlow();
-    bridge.register('main', flow);
-    const result = (await bridge.callTool('list_edge_types')) as {
-      types: Array<{ name: string; source: string }>;
-    };
-    expect(result.types).toContainEqual({ name: 'smoothstep', source: 'builtin' });
-  });
-
-  it('discovery tools are read-only (no history entry)', async () => {
-    const flow = newFlow();
-    bridge.register('main', flow);
-    await bridge.callTool('list_node_types');
-    await bridge.callTool('list_edge_types');
-    const status = (await bridge.callTool('history_status')) as { pastDepth: number };
-    expect(status.pastDepth).toBe(0);
   });
 });
 

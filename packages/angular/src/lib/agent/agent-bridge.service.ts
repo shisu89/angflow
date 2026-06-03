@@ -12,6 +12,7 @@ import {
 
 import type { NgFlowService } from '../services/ng-flow.service';
 import type { Node, Edge } from '../types';
+import type { NodeTemplateSpec } from '../types/node-template';
 import { AgentHistory } from './history';
 import type { AgentHistoryOptions } from './history';
 import { AGENT_TOOL_SCHEMAS } from './tool-schemas';
@@ -786,6 +787,34 @@ export class AngflowAgentBridge {
 
     this.handlers.set('list_node_types', (flow) => ({ types: flow.getNodeTypeNames() }));
     this.handlers.set('list_edge_types', (flow) => ({ types: flow.getEdgeTypeNames() }));
+
+    this.handlers.set('register_node_template', (flow, params) => {
+      const name = requireString(params, 'name');
+      if (name.length === 0) {
+        throw new InvalidParamsError('Param "name" must be a non-empty string.');
+      }
+      const spec = validateTemplateSpec(requireObject(params, 'spec'), 'register_node_template');
+      const claimed = flow
+        .getNodeTypeNames()
+        .find((t) => t.name === name && t.source !== 'template');
+      if (claimed) {
+        throw new InvalidParamsError(
+          `register_node_template: "${name}" is already registered by the ` +
+            `${claimed.source === 'builtin' ? 'library' : 'host application'} and cannot be overridden.`,
+        );
+      }
+      flow.registerNodeTemplate(name, spec);
+      return { name };
+    });
+
+    this.handlers.set('unregister_node_template', (flow, params) => {
+      const name = requireString(params, 'name');
+      return { removed: flow.unregisterNodeTemplate(name) };
+    });
+
+    this.handlers.set('list_node_templates', (flow) => ({
+      templates: flow.getNodeTemplates(),
+    }));
   }
 }
 
@@ -981,6 +1010,84 @@ function optionalStringArray(params: Record<string, unknown>, key: string): stri
     throw new InvalidParamsError(`Param "${key}" must be an array of strings.`);
   }
   return value as string[];
+}
+
+const BADGE_COLOR_SET = new Set(['slate', 'indigo', 'emerald', 'amber', 'rose']);
+const HANDLE_POSITION_SET = new Set(['top', 'right', 'bottom', 'left']);
+
+/** Validate a NodeTemplateSpec payload. Throws InvalidParamsError naming the offending field. */
+function validateTemplateSpec(value: unknown, ctx: string): NodeTemplateSpec {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new InvalidParamsError(`${ctx}: spec must be an object.`);
+  }
+  const s = value as Record<string, unknown>;
+  for (const key of ['title', 'icon', 'accent', 'body']) {
+    if (s[key] !== undefined && typeof s[key] !== 'string') {
+      throw new InvalidParamsError(`${ctx}: spec.${key} must be a string.`);
+    }
+  }
+  if (s['variant'] !== undefined && s['variant'] !== 'compact' && s['variant'] !== 'detailed') {
+    throw new InvalidParamsError(`${ctx}: spec.variant must be "compact" or "detailed".`);
+  }
+  if (s['badges'] !== undefined) {
+    if (!Array.isArray(s['badges'])) throw new InvalidParamsError(`${ctx}: spec.badges must be an array.`);
+    (s['badges'] as unknown[]).forEach((raw, i) => {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        throw new InvalidParamsError(`${ctx}: spec.badges[${i}] must be an object.`);
+      }
+      const b = raw as Record<string, unknown>;
+      if (typeof b['text'] !== 'string') {
+        throw new InvalidParamsError(`${ctx}: spec.badges[${i}].text must be a string.`);
+      }
+      if (b['color'] !== undefined && !BADGE_COLOR_SET.has(b['color'] as string)) {
+        throw new InvalidParamsError(
+          `${ctx}: spec.badges[${i}].color must be one of: ${Array.from(BADGE_COLOR_SET).join(', ')}.`,
+        );
+      }
+      if (b['showIf'] !== undefined && typeof b['showIf'] !== 'string') {
+        throw new InvalidParamsError(`${ctx}: spec.badges[${i}].showIf must be a string.`);
+      }
+    });
+  }
+  if (s['fields'] !== undefined) {
+    if (!Array.isArray(s['fields'])) throw new InvalidParamsError(`${ctx}: spec.fields must be an array.`);
+    (s['fields'] as unknown[]).forEach((raw, i) => {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        throw new InvalidParamsError(`${ctx}: spec.fields[${i}] must be an object.`);
+      }
+      const f = raw as Record<string, unknown>;
+      if (typeof f['label'] !== 'string') {
+        throw new InvalidParamsError(`${ctx}: spec.fields[${i}].label must be a string.`);
+      }
+      if (typeof f['value'] !== 'string') {
+        throw new InvalidParamsError(`${ctx}: spec.fields[${i}].value must be a string.`);
+      }
+      if (f['showIf'] !== undefined && typeof f['showIf'] !== 'string') {
+        throw new InvalidParamsError(`${ctx}: spec.fields[${i}].showIf must be a string.`);
+      }
+    });
+  }
+  if (s['handles'] !== undefined) {
+    if (!Array.isArray(s['handles'])) throw new InvalidParamsError(`${ctx}: spec.handles must be an array.`);
+    (s['handles'] as unknown[]).forEach((raw, i) => {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        throw new InvalidParamsError(`${ctx}: spec.handles[${i}] must be an object.`);
+      }
+      const h = raw as Record<string, unknown>;
+      if (h['type'] !== 'source' && h['type'] !== 'target') {
+        throw new InvalidParamsError(`${ctx}: spec.handles[${i}].type must be "source" or "target".`);
+      }
+      if (h['position'] !== undefined && !HANDLE_POSITION_SET.has(h['position'] as string)) {
+        throw new InvalidParamsError(
+          `${ctx}: spec.handles[${i}].position must be one of: top, right, bottom, left.`,
+        );
+      }
+      if (h['id'] !== undefined && typeof h['id'] !== 'string') {
+        throw new InvalidParamsError(`${ctx}: spec.handles[${i}].id must be a string.`);
+      }
+    });
+  }
+  return value as NodeTemplateSpec;
 }
 
 /** Validate that `value` is a structurally valid Node payload for add_*. */

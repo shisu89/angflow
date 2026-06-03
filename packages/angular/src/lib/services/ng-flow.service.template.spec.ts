@@ -43,6 +43,10 @@ describe('NgFlowService node templates', () => {
     expect(flow.getNodeTemplates()).toEqual([]);
   });
 
+  it('unregisterNodeTemplate returns false on a fresh (empty) registry', () => {
+    expect(flow.unregisterNodeTemplate('ghost')).toBe(false);
+  });
+
   it('registry writes replace the map reference (signal consumers re-fire)', () => {
     const before = store.nodeTemplates();
     flow.registerNodeTemplate('a', {});

@@ -82,6 +82,9 @@ Every tool takes an optional `flowId` (omit when only one flow is registered; re
 |---|---|---|
 | `list_node_types` | — | `{ types: Array<{ name, source: 'builtin' \| 'host' \| 'template' }> }` |
 | `list_edge_types` | — | `{ types: Array<{ name, source: 'builtin' \| 'host' }> }` |
+| `register_node_template` | `name: string`, `spec: NodeTemplateSpec` | Overwrites an existing template of the same name; rejects builtin/host names with `-32602`. Returns `{ name }` |
+| `unregister_node_template` | `name: string` | `{ removed: boolean }`; nodes of that type fall back to the default renderer |
+| `list_node_templates` | — | `{ templates: Array<{ name, spec }> }` |
 
 `source` tells the agent how to treat a type: `builtin` ships with the library; `host` is app-registered (component or content template — its `data` contract is app-specific); `template` is a data-driven template registered at runtime (see `register_node_template`).
 
@@ -231,6 +234,97 @@ await angflow.callTool('apply_changes', {
 ```
 
 `failedIndex` is the zero-based index of the first op that threw.
+
+## Node templates
+
+Node templates are JSON-serialisable rendering specs that let an agent define new card-style node types at runtime without shipping Angular components.
+
+### NodeTemplateSpec interface
+
+```ts
+interface NodeTemplateSpec {
+  /** Card title. Supports {{data.x}} interpolation. */
+  title?: string;
+  /** Icon name resolved against the built-in glyph set; unknown names render nothing. */
+  icon?: string;
+  /** Accent color (header text / left border). Any CSS color; Angular sanitizes the style binding. */
+  accent?: string;
+  /** Layout density. Default 'detailed'. */
+  variant?: 'compact' | 'detailed';
+  badges?: NodeTemplateBadge[];
+  fields?: NodeTemplateField[];
+  /** Free body text (interpolated), shown under fields. */
+  body?: string;
+  /** Defaults to one target handle (left) and one source handle (right) when omitted. */
+  handles?: NodeTemplateHandle[];
+}
+
+interface NodeTemplateBadge {
+  text: string;                       // Supports {{data.x}} interpolation.
+  color?: 'slate' | 'indigo' | 'emerald' | 'amber' | 'rose';  // defaults to 'slate'
+  showIf?: string;                    // Dotted data path; badge renders only when truthy.
+}
+
+interface NodeTemplateField {
+  label: string;                      // Row label (literal, not interpolated).
+  value: string;                      // Row value. Supports {{data.x}} interpolation.
+  showIf?: string;                    // Dotted data path; row renders only when truthy.
+}
+
+interface NodeTemplateHandle {
+  type: 'source' | 'target';
+  position?: 'top' | 'right' | 'bottom' | 'left';  // Defaults: target → 'left', source → 'right'.
+  id?: string;
+}
+```
+
+### Interpolation semantics
+
+String fields (`title`, `value`, `body`, badge `text`) support `{{data.x}}` placeholders:
+
+- Paths are **dotted only** — `data.env`, `data.config.region`. No expressions, no bracket notation, no function calls.
+- The leading `data` segment is **required** — `{{name}}` resolves nothing; use `{{data.name}}`.
+- Own-properties only — prototype-chain properties are not accessible.
+- Unknown paths render as an empty string (no error).
+- Output is inserted via Angular text bindings only — never set as `innerHTML`. There is no XSS risk.
+
+`showIf` fields use the **same path resolution** with truthiness evaluation — a badge or field renders when the resolved value is truthy, and is hidden otherwise.
+
+### Badge palette
+
+The `color` field on badges is restricted to an allowlisted palette: `slate`, `indigo`, `emerald`, `amber`, `rose`. The bridge rejects unknown color values with `-32602`. The `accent` field on the spec root is the only place a raw CSS color string is accepted; it is bound via Angular's sanitized style bindings.
+
+### Icon names
+
+The built-in glyph set recognizes: `database`, `server`, `queue`, `cloud`, `user`, `document`, `bolt`, `settings`. Any other value renders nothing (no error).
+
+### Rendering precedence
+
+When resolving a `node.type`, the renderer applies the following priority order (highest first):
+
+1. Content-projected `<ng-template ngFlowNodeType>` — defined inside the `<ng-flow>` template by the host component.
+2. Host `nodeTypes` component map — Angular components registered via the `[nodeTypes]` input.
+3. Built-in types — `default`, `input`, `output`, `group`.
+4. Agent templates — registered via `register_node_template`.
+5. Default node fallback — used when no match is found.
+
+This means agent templates cannot shadow builtin or host-registered types. `register_node_template` enforces this by rejecting `builtin` and `host` names with `-32602`.
+
+### History note
+
+Template registration and unregistration are **never captured by undo/redo**. Templates are rendering config, not graph state. Example sequence:
+
+```
+register_node_template { name: 'svc', spec: { title: '{{data.name}}' } }
+add_node { id: 'n1', type: 'svc', ... }
+undo
+```
+
+After `undo`: node `n1` is removed from the graph, but the `svc` template remains registered. The template outlives the undo stack entry that created nodes of that type.
+
+### Lifecycle
+
+Templates live in memory per `NgFlowService` instance. They are **not persisted** across page reloads. To restore templates after a reload, re-call `register_node_template` for each entry returned by `list_node_templates` from the previous session (or store the specs in your own persistence layer and replay them on boot).
 
 ## History
 
