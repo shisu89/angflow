@@ -35,7 +35,6 @@ import { AgentChatService } from './agent-chat.service';
       <div class="ng-flow__agent-chat__messages" #scroller>
         @for (m of chat.messages(); track m.id) {
           <div
-            class="ng-flow__agent-chat__bubble"
             [class]="'ng-flow__agent-chat__bubble ng-flow__agent-chat__bubble--' + m.role"
           >
             @if (m.text) {
@@ -67,17 +66,17 @@ import { AgentChatService } from './agent-chat.service';
 
       <div class="ng-flow__agent-chat__composer">
         <textarea
-          #composer
           rows="2"
           [placeholder]="placeholder()"
           [disabled]="chat.busy()"
+          [value]="draft()"
           (input)="draft.set($any($event.target).value)"
           (keydown.enter)="onEnter($event)"
         ></textarea>
         <button
           type="button"
           class="ng-flow__agent-chat__send"
-          [disabled]="chat.busy()"
+          [disabled]="chat.busy() || draft().trim().length === 0"
           (click)="submit()"
         >▶</button>
       </div>
@@ -201,7 +200,6 @@ export class AgentChatComponent {
   readonly draft = signal('');
 
   private readonly scroller = viewChild<ElementRef<HTMLDivElement>>('scroller');
-  private readonly textarea = viewChild<ElementRef<HTMLTextAreaElement>>('composer');
 
   constructor() {
     // Auto-scroll on new messages. setTimeout schedules after render —
@@ -228,10 +226,6 @@ export class AgentChatComponent {
     const text = this.draft().trim();
     if (!text) return;
     this.draft.set('');
-    // Clear the DOM value immediately so the test (and the user) sees an empty
-    // textarea without waiting for the next CD cycle.
-    const ta = this.textarea()?.nativeElement;
-    if (ta) ta.value = '';
     void this.chat.send(text);
   }
 }

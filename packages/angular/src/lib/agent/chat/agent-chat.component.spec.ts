@@ -47,6 +47,7 @@ describe('AgentChatComponent', () => {
     const input = el.querySelector('textarea')!;
     input.value = 'hello agent';
     input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
     (el.querySelector('.ng-flow__agent-chat__send') as HTMLButtonElement).click();
     await vi.waitFor(() => expect(chat.messages()).toHaveLength(2));
     fixture.detectChanges();
