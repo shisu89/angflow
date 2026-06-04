@@ -9,6 +9,7 @@ angflow/
   packages/
     system/                # Framework-agnostic core (D3-based)
     angular/               # Angular wrapper library
+    mcp/                   # MCP server exposing the agent bridge to MCP clients
     react/                 # Original React wrapper (reference)
     svelte/                # Original Svelte wrapper (reference)
   examples/
@@ -62,6 +63,17 @@ npm run build
 npm publish --access public
 ```
 
+### @angflow/mcp
+
+`@angflow/mcp` contains a build-time snapshot of the agent tool catalog. Republish it (patch bump) whenever `AGENT_TOOL_SCHEMAS` in `@angflow/angular` changes — its drift test will fail until the snapshot is regenerated (`pnpm -F @angflow/mcp run generate:schemas`).
+
+```bash
+cd packages/mcp
+npm version patch
+npm run build
+npm publish --access public
+```
+
 ### Version bumps
 - `npm version patch` — bug fixes (0.0.1 → 0.0.2)
 - `npm version minor` — new features (0.0.1 → 0.1.0)
@@ -86,6 +98,9 @@ npm publish --access public
 | Pack system | `npm pack` | `packages/system` |
 | Publish system | `npm publish --access public` | `packages/system` |
 | Publish angular | `npm publish --access public` | `packages/angular` |
+| Build mcp | `npm run build` | `packages/mcp` |
+| Test mcp | `npm run test` | `packages/mcp` |
+| Publish mcp | `npm publish --access public` | `packages/mcp` |
 | Run angular example | `npm run dev` | `examples/angular` |
 | Build angular example | `npm run build` | `examples/angular` |
 
@@ -115,3 +130,4 @@ The `AngflowAgentBridge` (in `packages/angular/src/lib/agent/`) exposes flows to
 - Adding or modifying a transport (`transports/*.ts`)
 - Adding or changing a push event in `watchFlow()`
 - Changing the `register` / `unregister` / `callTool` public surface on `AngflowAgentBridge`
+- Adding/changing a tool also requires regenerating the `@angflow/mcp` schema snapshot (`pnpm -F @angflow/mcp run generate:schemas`) — its drift test fails otherwise.

@@ -406,6 +406,16 @@ Emitted synchronously after every mutating tool call (before `flow.state`), and 
 
 `WindowTransport` is a thin shim over option 2 that lets you do `await window.angflow.callTool(...)` from the devtools console.
 
+## MCP server
+
+`@angflow/mcp` (in `packages/mcp/`) exposes this entire tool catalog to MCP
+clients (Claude Code, Claude Desktop, Cursor): it hosts the WebSocket endpoint
+a `WebSocketTransport` dials and re-publishes every tool above 1:1, plus a
+server-local `canvas_status` tool. Tool schemas are snapshotted from
+`AGENT_TOOL_SCHEMAS` at build time — when you add or change a tool here,
+rebuild/republish `@angflow/mcp` (its drift test fails until regenerated).
+See [`packages/mcp/README.md`](../mcp/README.md) for setup.
+
 ## Adding a new tool
 
 1. Add a schema entry in `src/lib/agent/tool-schemas.ts`.
