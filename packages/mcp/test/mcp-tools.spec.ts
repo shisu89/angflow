@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { installTools, type CallToolFn, type StatusFn } from '../src/mcp-tools';
+import { installTools, formatToolError, type CallToolFn, type StatusFn } from '../src/mcp-tools';
 import { AGENT_TOOL_SCHEMAS } from '../src/generated/tool-schemas';
 import {
   BridgeToolError,
@@ -130,5 +130,41 @@ describe('installTools', () => {
     const result = await client.callTool({ name: 'not_a_tool', arguments: {} });
     expect(result.isError).toBe(true);
     expect(textOf(result)).toContain('Unknown tool');
+  });
+});
+
+describe('formatToolError', () => {
+  it('formats BridgeToolError with code and data', () => {
+    expect(formatToolError(new BridgeToolError(-32602, 'bad param', { field: 'x' }))).toBe(
+      '[-32602] bad param data: {"field":"x"}',
+    );
+  });
+
+  it('formats BridgeToolError without data', () => {
+    expect(formatToolError(new BridgeToolError(-32601, 'unknown'))).toBe('[-32601] unknown');
+  });
+
+  it('formats NoCanvasError with wiring guidance', () => {
+    const text = formatToolError(new NoCanvasError('ws://127.0.0.1:9999'));
+    expect(text).toContain('ws://127.0.0.1:9999');
+    expect(text).toContain('WebSocketTransport');
+  });
+
+  it('formats CanvasTimeoutError with tool and timeout', () => {
+    const text = formatToolError(new CanvasTimeoutError('fit_view', 5000));
+    expect(text).toContain('fit_view');
+    expect(text).toContain('5000');
+  });
+
+  it('formats CanvasDisconnectedError exactly once with the get_state advice', () => {
+    const text = formatToolError(new CanvasDisconnectedError('add_node'));
+    expect(text).toContain('add_node');
+    expect(text).toContain('call get_state');
+    expect(text.match(/effect is unknown/gi)?.length).toBe(1);
+  });
+
+  it('falls back to the message for unknown errors', () => {
+    expect(formatToolError(new Error('surprise'))).toBe('surprise');
+    expect(formatToolError('raw string')).toBe('raw string');
   });
 });

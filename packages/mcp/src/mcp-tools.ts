@@ -62,7 +62,7 @@ export function formatToolError(err: unknown): string {
     );
   }
   if (err instanceof CanvasDisconnectedError) {
-    return `${err.message}. Its effect is unknown — call get_state after the canvas reconnects.`;
+    return `${err.message} — call get_state after the canvas reconnects.`;
   }
   if (err instanceof CanvasTimeoutError) {
     return err.message;
@@ -70,6 +70,10 @@ export function formatToolError(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+/**
+ * @param server Must be constructed with capabilities: { tools: {} } — the SDK
+ *   rejects the request-handler registrations otherwise.
+ */
 export function installTools(server: Server, schemas: AgentToolSchema[], deps: InstallToolsDeps): void {
   const known = new Set(schemas.map((s) => s.name));
 

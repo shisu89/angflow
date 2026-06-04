@@ -76,9 +76,10 @@ describe('CanvasSocket lifecycle', () => {
     const first = makeCanvas({ mode: 'silent' });
     await first.connect(`ws://127.0.0.1:${cs.port}`);
     const pending = cs.call('get_state', {});
+    const expectation = expect(pending).rejects.toBeInstanceOf(CanvasDisconnectedError);
     const second = makeCanvas({ handlers: { ping: () => 'pong-2' } });
     await second.connect(`ws://127.0.0.1:${cs.port}`);
-    await expect(pending).rejects.toBeInstanceOf(CanvasDisconnectedError);
+    await expectation;
     expect(await cs.call('ping', {})).toBe('pong-2');
   });
 });
