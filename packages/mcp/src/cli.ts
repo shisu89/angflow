@@ -50,12 +50,12 @@ if (values.version) {
 const port = Number(values.port);
 const timeoutMs = Number(values.timeout);
 const logLevel = values['log-level'] as LogLevel;
-if (!Number.isInteger(port) || port < 0 || port > 65535) {
+if (String(values.port).trim() === '' || !Number.isInteger(port) || port < 0 || port > 65535) {
   // eslint-disable-next-line no-console
   console.error(`[angflow-mcp] invalid --port: ${values.port}`);
   process.exit(1);
 }
-if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+if (String(values.timeout).trim() === '' || !Number.isFinite(timeoutMs) || timeoutMs <= 0) {
   // eslint-disable-next-line no-console
   console.error(`[angflow-mcp] invalid --timeout: ${values.timeout}`);
   process.exit(1);

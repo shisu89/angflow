@@ -74,7 +74,11 @@ export function createAngflowMcpServer(options: AngflowMcpServerOptions): Angflo
     },
     async stop() {
       await canvasSocket.stop();
-      await mcpServer.close();
+      try {
+        await mcpServer.close();
+      } catch {
+        // transport may already be closed during teardown
+      }
     },
   };
 }

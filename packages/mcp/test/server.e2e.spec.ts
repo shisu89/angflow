@@ -50,7 +50,10 @@ describe('angflow MCP server e2e (in-process)', () => {
     canvas = new FakeCanvas();
     await canvas.connect(running!.wsUrl);
     canvas.emit('flow.registered', { flowId: 'demo' });
-    await new Promise((r) => setTimeout(r, 50));
+    await expect.poll(async () => {
+      const s = JSON.parse(textOf(await client.callTool({ name: 'canvas_status', arguments: {} })));
+      return s.flows.length;
+    }).toBe(1);
 
     status = JSON.parse(textOf(await client.callTool({ name: 'canvas_status', arguments: {} })));
     expect(status.connected).toBe(true);
@@ -63,7 +66,10 @@ describe('angflow MCP server e2e (in-process)', () => {
       handlers: { add_node: (params) => ({ created: params?.['node'] }) },
     });
     await canvas.connect(running!.wsUrl);
-    await new Promise((r) => setTimeout(r, 20));
+    await expect.poll(async () => {
+      const s = JSON.parse(textOf(await client.callTool({ name: 'canvas_status', arguments: {} })));
+      return s.connected;
+    }).toBe(true);
     const result = await client.callTool({
       name: 'add_node',
       arguments: { node: { id: 'n1', position: { x: 0, y: 0 }, data: {} } },
@@ -84,9 +90,15 @@ describe('angflow MCP server e2e (in-process)', () => {
     canvas = new FakeCanvas();
     await canvas.connect(running!.wsUrl);
     canvas.emit('flow.registered', { flowId: 'demo' });
-    await new Promise((r) => setTimeout(r, 50));
+    await expect.poll(async () => {
+      const s = JSON.parse(textOf(await client.callTool({ name: 'canvas_status', arguments: {} })));
+      return s.flows.length;
+    }).toBe(1);
     canvas.close();
-    await new Promise((r) => setTimeout(r, 50));
+    await expect.poll(async () => {
+      const s = JSON.parse(textOf(await client.callTool({ name: 'canvas_status', arguments: {} })));
+      return s.connected;
+    }).toBe(false);
     const status = JSON.parse(textOf(await client.callTool({ name: 'canvas_status', arguments: {} })));
     expect(status.connected).toBe(false);
     expect(status.flows).toEqual([]);

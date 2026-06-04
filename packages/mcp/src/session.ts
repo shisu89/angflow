@@ -4,6 +4,7 @@
  * state via the passthrough tools, not from this mirror.
  */
 export class SessionMirror {
+  /** Informational only — canvas_status reads CanvasSocket.isConnected() as the authority; this flag exists for logging/diagnostics and future use. */
   connected = false;
   private readonly flows = new Map<string, unknown>();
 
