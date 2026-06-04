@@ -24,6 +24,7 @@
   },
   "scripts": {
     "generate:schemas": "tsx scripts/generate-schemas.ts",
+    "prepublishOnly": "npm run build",
     "build": "tsx scripts/generate-schemas.ts && tsc -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
