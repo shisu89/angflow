@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Injector, provideZonelessChangeDetection } from '@angular/core';
 import { FlowStore } from '../../services/flow-store.service';
@@ -262,5 +262,66 @@ describe('AgentChatService — tool loop', () => {
     await chat.send('two');
     // Fresh conversation: only the new user message in the wire history.
     expect(requests[1].messages).toHaveLength(1);
+  });
+
+  it('stop() mid-tools leaves history resumable (no dangling tool_use)', async () => {
+    const { chat, requests, bridge } = setup([
+      {
+        content: [
+          { type: 'tool_use', id: 'tu_a', name: 'get_state', input: {} },
+          { type: 'tool_use', id: 'tu_b', name: 'get_state', input: {} },
+        ],
+        stop_reason: 'tool_use',
+      },
+      textTurn('after resume'),
+    ]);
+
+    // Make stop() fire right after the FIRST tool completes (deterministic).
+    const orig = bridge.callTool.bind(bridge);
+    let firstCall = true;
+    (bridge as unknown as Record<string, unknown>)['callTool'] = async (n: string, a: unknown) => {
+      const r = await orig(n, a as Record<string, unknown>);
+      if (firstCall) {
+        firstCall = false;
+        chat.stop();
+      }
+      return r;
+    };
+
+    await chat.send('go');
+
+    // Resume: a new send must NOT be rejected — its request history must
+    // contain a tool_result for EVERY tool_use of the aborted turn.
+    await chat.send('continue');
+    const resumed = requests[requests.length - 1];
+    const toolUseIds: string[] = [];
+    const toolResultIds: string[] = [];
+    for (const m of resumed.messages) {
+      for (const b of m.content) {
+        if (b.type === 'tool_use') toolUseIds.push((b as { id: string }).id);
+        if (b.type === 'tool_result') toolResultIds.push((b as { tool_use_id: string }).tool_use_id);
+      }
+    }
+    for (const id of toolUseIds) {
+      expect(toolResultIds).toContain(id);
+    }
+  });
+
+  it('small maxHistory during a multi-round tool turn never produces an empty request', async () => {
+    const toolRound = (id: string): AgentChatResponse => ({
+      content: [{ type: 'tool_use', id, name: 'get_state', input: {} }],
+      stop_reason: 'tool_use',
+    });
+    const { chat, requests } = setup(
+      [toolRound('t1'), toolRound('t2'), textTurn('done')],
+      { maxHistory: 2 },
+    );
+    await chat.send('go');
+    for (const req of requests) {
+      expect(req.messages.length).toBeGreaterThan(0);
+      // First message must be a user turn (Anthropic requirement).
+      expect(req.messages[0].role).toBe('user');
+    }
+    expect(chat.error()).toBeNull();
   });
 });

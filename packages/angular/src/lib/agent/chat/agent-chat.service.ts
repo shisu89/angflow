@@ -128,7 +128,22 @@ export class AgentChatService {
               is_error: true,
             });
           }
-          if (this.stopped) return;
+          if (this.stopped) {
+            // Synthesize cancelled results for all not-yet-executed tool_uses
+            // so history never ends with a dangling assistant tool_use block.
+            // Anthropic rejects any request where a tool_use has no matching
+            // tool_result in the immediately following user turn.
+            for (let j = i + 1; j < toolUses.length; j++) {
+              results.push({
+                type: 'tool_result',
+                tool_use_id: toolUses[j].id,
+                content: '[cancelled] the user stopped this turn',
+                is_error: true,
+              });
+            }
+            this.history.push({ role: 'user', content: results });
+            return;
+          }
         }
         this.history.push({ role: 'user', content: results });
       }
@@ -150,18 +165,45 @@ export class AgentChatService {
   }
 
   private trimmedHistory(): AgentChatMessageParam[] {
-    let trimmed = this.history;
-    if (trimmed.length > this.config.maxHistory) {
-      trimmed = trimmed.slice(trimmed.length - this.config.maxHistory);
-      // Anthropic requires the first message to be a user turn — and a
-      // leading tool_result-only user turn is as confusing as an assistant
-      // turn, so drop until we reach a plain user text message.
-      while (
-        trimmed.length > 0 &&
-        !(trimmed[0].role === 'user' && trimmed[0].content.some((b) => b.type === 'text'))
-      ) {
-        trimmed = trimmed.slice(1);
+    if (this.history.length <= this.config.maxHistory) {
+      return this.history;
+    }
+
+    let trimmed = this.history.slice(this.history.length - this.config.maxHistory);
+    // Anthropic requires the first message to be a user turn — and a
+    // leading tool_result-only user turn is as confusing as an assistant
+    // turn, so drop until we reach a plain user text message.
+    while (
+      trimmed.length > 0 &&
+      !(trimmed[0].role === 'user' && trimmed[0].content.some((b) => b.type === 'text'))
+    ) {
+      trimmed = trimmed.slice(1);
+    }
+
+    if (trimmed.length === 0) {
+      // The repair loop emptied the slice — this happens when maxHistory is
+      // small and the tail lands entirely within a multi-round tool turn
+      // (assistant tool_use + user tool_result, no plain text leader).
+      // Protocol validity beats the soft cap: fall back to the most recent
+      // plain user-text boundary in the FULL history so that all tool_use /
+      // tool_result pairs of the current round are intact.
+      // Note: this may yield slightly more than maxHistory entries — that is
+      // the correct trade-off.
+      let fallbackIndex = -1;
+      for (let i = this.history.length - 1; i >= 0; i--) {
+        const m = this.history[i];
+        if (m.role === 'user' && m.content.some((b) => b.type === 'text')) {
+          fallbackIndex = i;
+          break;
+        }
       }
+      trimmed = fallbackIndex >= 0 ? this.history.slice(fallbackIndex) : this.history;
+    }
+
+    // Only collapse history when the trimmed result is valid (non-empty,
+    // user-text leader). This avoids destructively assigning [] when the
+    // repair fails, which would corrupt subsequent sends.
+    if (trimmed.length > 0 && trimmed[0].role === 'user') {
       this.history = trimmed;
     }
     return trimmed;
