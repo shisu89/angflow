@@ -29,7 +29,7 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
   template: `
     <app-example-card
       title="Agent bridge"
-      description="The agent bridge exposes this canvas to AI agents over a JSON-RPC API. Open the devtools console and try the snippets below — every call mutates this flow live."
+      description="The agent bridge exposes this canvas to AI agents over a JSON-RPC API. Open the devtools console and try the snippets below — every call mutates this flow live. Also connectable from Claude Code via @angflow/mcp — see packages/mcp/README.md."
     >
       <ng-flow
         [nodes]="nodes"
