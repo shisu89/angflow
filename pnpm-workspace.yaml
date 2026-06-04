@@ -1,6 +1,7 @@
 packages:
   - 'packages/system'
   - 'packages/angular'
+  - 'packages/mcp'
   - 'examples/angular'
   - 'tooling/*'
 allowBuilds:

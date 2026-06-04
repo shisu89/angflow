@@ -1,0 +1,44 @@
+{
+  "name": "@angflow/mcp",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "MCP server that exposes a live angflow canvas to AI agents (Claude Code, Claude Desktop, Cursor) over the agent-bridge WebSocket transport.",
+  "keywords": ["mcp", "model-context-protocol", "angflow", "agent", "diagram"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/angflow/angflow.git",
+    "directory": "packages/mcp"
+  },
+  "license": "MIT",
+  "bin": {
+    "angflow-mcp": "dist/cli.js"
+  },
+  "main": "dist/server.js",
+  "types": "dist/server.d.ts",
+  "files": ["dist", "README.md"],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "generate:schemas": "tsx scripts/generate-schemas.ts",
+    "build": "tsx scripts/generate-schemas.ts && tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@angflow/tsconfig": "workspace:*",
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.0",
+    "tsx": "^4.19.0",
+    "typescript": "5.9.3",
+    "vitest": "^4.1.2"
+  }
+}

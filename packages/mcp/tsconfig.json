@@ -1,0 +1,15 @@
+{
+  "display": "@angflow/mcp",
+  "extends": "@angflow/tsconfig/base.json",
+  "compilerOptions": {
+    "lib": ["esnext"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2022",
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
