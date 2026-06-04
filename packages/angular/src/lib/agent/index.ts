@@ -15,3 +15,4 @@ export type {
   AgentTransport,
   AgentToolSchema,
 } from './types';
+export * from './chat';

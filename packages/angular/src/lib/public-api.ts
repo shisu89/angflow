@@ -84,6 +84,17 @@ export {
   type AgentOutbound,
   type AgentTransport,
   type AgentToolSchema,
+  // Agent chat harness (AGENT_CHAT_CONFIG is intentionally omitted — internal)
+  provideAgentChat,
+  AgentChatService,
+  AgentChatComponent,
+  DEFAULT_AGENT_CHAT_SYSTEM_PROMPT,
+  type AgentChatConfig,
+  type AgentChatRequest,
+  type AgentChatResponse,
+  type CompleteFn,
+  type ChatMessage,
+  type ToolActivity,
 } from './agent';
 
 // Re-export everything from @angflow/system

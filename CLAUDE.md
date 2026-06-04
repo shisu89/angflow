@@ -131,3 +131,4 @@ The `AngflowAgentBridge` (in `packages/angular/src/lib/agent/`) exposes flows to
 - Adding or changing a push event in `watchFlow()`
 - Changing the `register` / `unregister` / `callTool` public surface on `AngflowAgentBridge`
 - Adding/changing a tool also requires regenerating the `@angflow/mcp` schema snapshot (`pnpm -F @angflow/mcp run generate:schemas`) — its drift test fails otherwise.
+- The in-browser chat harness (`src/lib/agent/chat/`) consumes `AGENT_TOOL_SCHEMAS` directly at runtime — no snapshot regeneration needed for it.

@@ -416,6 +416,19 @@ server-local `canvas_status` tool. Tool schemas are snapshotted from
 rebuild/republish `@angflow/mcp` (its drift test fails until regenerated).
 See [`packages/mcp/README.md`](../mcp/README.md) for setup.
 
+## In-browser chat harness
+
+`provideAgentChat({ complete })` + `<ng-flow-agent-chat>` (in
+`src/lib/agent/chat/`) embed a canvas copilot directly in the app: a headless
+`AgentChatService` runs an Anthropic-shaped tool-use loop, executing every
+`tool_use` block in-process via `bridge.callTool` — same semantics, history,
+and events as any other bridge caller. The `complete` function is the only
+path to the model (typically a fetch to the host's own backend proxy holding
+the API key server-side; the library never handles keys). Tools come straight
+from `AGENT_TOOL_SCHEMAS` at runtime — no snapshot, no regeneration step.
+See the `agent-chat` example and `examples/angular/server/agent-proxy.mjs`
+for the reference wiring.
+
 ## Adding a new tool
 
 1. Add a schema entry in `src/lib/agent/tool-schemas.ts`.
