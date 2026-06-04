@@ -45,6 +45,7 @@ import { FigmaExampleComponent } from './examples/figma/figma.component';
 import { LayoutingExampleComponent } from './examples/layouting/layouting.component';
 import { StressExampleComponent } from './examples/stress/stress.component';
 import { AgentBridgeExampleComponent } from './examples/agent-bridge/agent-bridge.component';
+import { AgentChatExampleComponent } from './examples/agent-chat/agent-chat.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
 
 export interface HarnessRoute {
@@ -100,6 +101,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Layouting',               path: 'layouting',               component: LayoutingExampleComponent },
   { name: 'Stress',                  path: 'stress',                  component: StressExampleComponent },
   { name: 'Agent bridge',            path: 'agent-bridge',            component: AgentBridgeExampleComponent },
+  { name: 'Agent chat',              path: 'agent-chat',              component: AgentChatExampleComponent },
   { name: 'Kitchen sink',            path: 'kitchen-sink',            component: KitchenSinkComponent },
 ];
 
