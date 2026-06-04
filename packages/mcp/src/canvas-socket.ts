@@ -107,6 +107,8 @@ export class CanvasSocket {
 
   async stop(): Promise<void> {
     this.rejectAllPending('stop');
+    // Order matters: WebSocketServer.close() does not terminate connected
+    // clients, so close the live socket first or stop() would hang.
     this.socket?.close();
     this.socket = null;
     await new Promise<void>((resolve) => {
@@ -127,6 +129,9 @@ export class CanvasSocket {
         reject(new CanvasTimeoutError(method, this.options.timeoutMs));
       }, this.options.timeoutMs);
       this.pending.set(id, { resolve, reject, timer, method });
+      // The catch guards synchronous throws only (already-CLOSED socket,
+      // serialization failure). An OPEN→CLOSING race does not throw here —
+      // ws queues the frame and the close handler rejects the pending call.
       try {
         this.socket!.send(JSON.stringify({ id, method, params }));
       } catch (err) {

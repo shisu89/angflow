@@ -70,6 +70,17 @@ describe('CanvasSocket lifecycle', () => {
     await good.connect(`ws://127.0.0.1:${cs.port}?token=sekret`);
     expect(await cs.call('ping', {})).toBe('pong');
   });
+
+  it('rejects the first canvas in-flight calls when replaced', async () => {
+    const cs = await makeSocket();
+    const first = makeCanvas({ mode: 'silent' });
+    await first.connect(`ws://127.0.0.1:${cs.port}`);
+    const pending = cs.call('get_state', {});
+    const second = makeCanvas({ handlers: { ping: () => 'pong-2' } });
+    await second.connect(`ws://127.0.0.1:${cs.port}`);
+    await expect(pending).rejects.toBeInstanceOf(CanvasDisconnectedError);
+    expect(await cs.call('ping', {})).toBe('pong-2');
+  });
 });
 
 describe('CanvasSocket calls', () => {
