@@ -9,7 +9,8 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "dev:zoneless": "ng run angular-examples:serve-zoneless",
-    "build:zoneless": "ng run angular-examples:build-zoneless"
+    "build:zoneless": "ng run angular-examples:build-zoneless",
+    "test:proxies": "node --test server/"
   },
   "dependencies": {
     "@angflow/angular": "workspace:*",
