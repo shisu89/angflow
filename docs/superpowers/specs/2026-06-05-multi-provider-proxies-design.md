@@ -12,8 +12,9 @@ Ollama exposes an OpenAI-compatible endpoint (`http://localhost:11434/v1`) with 
 
 ## Goals
 
-- `examples/angular/server/agent-proxy-openai.mjs` — self-contained `node:http` + global-`fetch` proxy translating to/from the OpenAI Chat Completions API. Env: `OPENAI_API_KEY`, `OPENAI_BASE_URL` (default `https://api.openai.com/v1`), `ANGFLOW_AGENT_MODEL` (default `gpt-4.1`), `PORT` (default 8787). Header comment documents the Ollama recipe (`OPENAI_BASE_URL=http://localhost:11434/v1 OPENAI_API_KEY=ollama`, pick a tools-capable model such as `llama3.1` or `qwen3`) and OpenRouter equivalent.
-- `examples/angular/server/agent-proxy-gemini.mjs` — same skeleton, translating to/from the Gemini `generateContent` REST API. Env: `GEMINI_API_KEY`, `ANGFLOW_AGENT_MODEL` (default `gemini-2.5-flash`), `PORT`.
+- `examples/angular/server/agent-proxy-openai.mjs` — self-contained `node:http` + global-`fetch` proxy translating to/from the OpenAI Chat Completions API. Env: `OPENAI_API_KEY`, `OPENAI_BASE_URL` (default `https://api.openai.com/v1`), `ANGFLOW_AGENT_MODEL` (default `gpt-5.2`), `PORT` (default 8787). Header comment documents the Ollama recipe (`OPENAI_BASE_URL=http://localhost:11434/v1 OPENAI_API_KEY=ollama`, pick a tools-capable model — Qwen3 is the most reliable tool-caller as of mid-2026; note that small local models can degrade with the catalog's 52 tools) and the OpenRouter equivalent.
+- `examples/angular/server/agent-proxy-gemini.mjs` — same skeleton, translating to/from the Gemini `generateContent` REST API. Env: `GEMINI_API_KEY`, `ANGFLOW_AGENT_MODEL` (default `gemini-3.5-flash`), `PORT`.
+- **End-user runtime model switching:** all three proxies (the two new ones AND a retrofit of `agent-proxy.mjs`) honor an optional `x-angflow-model` request header, validated against an `ANGFLOW_ALLOWED_MODELS` env allowlist (comma-separated; unset = header ignored, env default model always used). The host's `complete()` fn sets the header from its own UI state — zero library changes. The allowlist is mandatory for the header to take effect because the model name reaches the operator's bill.
 - Translation functions are pure and exported from each proxy module; `examples/angular/server/translate.test.mjs` covers them with Node's built-in `node --test` runner (zero new dependencies).
 - Same `/api/agent` endpoint, CORS handling, 502-on-upstream-error behavior, and production-caveat header comments as the existing Anthropic proxy — switching providers = starting a different proxy; the Angular app is untouched.
 - Docs: the chat-harness section of `packages/angular/AGENT_BRIDGE.md` gains a provider table (Anthropic / OpenAI / Gemini / Ollama+compatible) naming the three proxy files; the agent-chat example page description mentions provider choice.
@@ -38,7 +39,8 @@ Ollama exposes an OpenAI-compatible endpoint (`http://localhost:11434/v1`) with 
 | `is_error` tool results → OpenAI/Gemini | Prefix the result content with `[tool error] ` in the translated message (OpenAI `role:'tool'` content; Gemini `functionResponse.response`) | Neither provider has Anthropic's `is_error` flag; an explicit text prefix preserves the signal. |
 | stop_reason mapping | OpenAI: `tool_calls→tool_use`, `stop→end_turn`, `length→max_tokens`, else passthrough. Gemini: any `functionCall` parts present → `tool_use`; `finishReason MAX_TOKENS→max_tokens`; else `end_turn` | Matches the loop's three meaningful values; unknown reasons pass through (the loop treats non-`tool_use` as turn end). |
 | Testing | Pure exported translate functions + `node --test` file | The translation layers are the fiddly part (ID pairing, schema cleaning, JSON defense); Node's built-in runner needs no new infra in the examples app. Server skeletons remain manual-e2e like the Anthropic proxy. |
-| Defaults | `gpt-4.1` / `gemini-2.5-flash` | Capable tool-calling defaults at sane cost; overridable via `ANGFLOW_AGENT_MODEL`. |
+| Defaults | `gpt-5.2` / `gemini-3.5-flash` (current flagship tool-callers as of June 2026; verified against provider docs) | Capable tool-calling defaults at sane cost; overridable via `ANGFLOW_AGENT_MODEL`. Model names age — each proxy header notes its default's vintage. |
+| Runtime model switching | Optional `x-angflow-model` header, gated by `ANGFLOW_ALLOWED_MODELS` allowlist; header silently ignored when allowlist unset or value not allowlisted (env default used) | Lets an app expose an end-user model picker with zero library changes; never trusts an arbitrary client string into the operator's bill. User-confirmed. |
 
 ## Translation reference
 
@@ -87,7 +89,8 @@ Response (Gemini → ours):
 3. Gemini request translation: roles, functionCall/functionResponse parts, ID-table lookups, max_tokens placement.
 4. Gemini response translation: ID synthesis (`gemini-call-<n>` stable ordering), text+functionCall mixed parts, finishReason mapping.
 5. Schema cleaning: nested `additionalProperties` stripped at every depth; other keywords untouched.
-6. Manual e2e (user-run): start each proxy with a real key (or Ollama locally), converse via the agent-chat example.
+6. Model-switch gate (pure `resolveModel(headerValue, allowlistEnv, defaultModel)` helper, exported by each proxy): allowlisted header honored; non-allowlisted ignored; unset allowlist ignores the header entirely.
+7. Manual e2e (user-run): start each proxy with a real key (or Ollama locally), converse via the agent-chat example.
 
 ## Documentation
 
