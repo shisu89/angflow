@@ -29,7 +29,7 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
   template: `
     <app-example-card
       title="Agent chat"
-      description="An end-user copilot embedded in the app. Start the reference proxy (ANTHROPIC_API_KEY=... node server/agent-proxy.mjs from examples/angular), then ask the copilot to edit this canvas — e.g. &quot;add a database node, connect it to Process, and tidy the layout&quot;."
+      description="An end-user copilot embedded in the app. Start a reference proxy (Anthropic, OpenAI, Gemini, or Ollama via the OpenAI proxy — see server/ in examples/angular), then ask the copilot to edit this canvas — e.g. &quot;add a database node, connect it to Process, and tidy the layout&quot;."
     >
       <ng-flow
         [nodes]="nodes"

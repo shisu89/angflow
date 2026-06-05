@@ -429,6 +429,21 @@ from `AGENT_TOOL_SCHEMAS` at runtime — no snapshot, no regeneration step.
 See the `agent-chat` example and `examples/angular/server/agent-proxy.mjs`
 for the reference wiring.
 
+### Provider proxies (reference implementations in `examples/angular/server/`)
+
+| Provider | File | Key env | Default model (June 2026) | Notes |
+|---|---|---|---|---|
+| Anthropic | `agent-proxy.mjs` | `ANTHROPIC_API_KEY` | `claude-sonnet-4-6` | Near-passthrough (the wire shape is Anthropic's) |
+| OpenAI | `agent-proxy-openai.mjs` | `OPENAI_API_KEY` | `gpt-5.2` | Tool-call/finish-reason translation |
+| Ollama / OpenRouter / any OpenAI-compatible gateway | `agent-proxy-openai.mjs` + `OPENAI_BASE_URL` | `OPENAI_API_KEY` (dummy for Ollama) | set `ANGFLOW_AGENT_MODEL` (e.g. `qwen3`) | Local models: pick a tools-capable one; small models can degrade with the 52-tool catalog |
+| Gemini | `agent-proxy-gemini.mjs` | `GEMINI_API_KEY` | `gemini-3.5-flash` | Synthesizes tool-call ids; strips `additionalProperties` from schemas |
+
+All proxies accept an optional `x-angflow-model` request header for end-user
+runtime model switching, honored only when `ANGFLOW_ALLOWED_MODELS`
+(comma-separated) lists the value — the host's `complete()` fn sets the header;
+the library is unaware. Model-name defaults age; override via
+`ANGFLOW_AGENT_MODEL`.
+
 ## Adding a new tool
 
 1. Add a schema entry in `src/lib/agent/tool-schemas.ts`.
