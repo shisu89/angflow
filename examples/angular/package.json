@@ -10,7 +10,7 @@
     "test": "ng test",
     "dev:zoneless": "ng run angular-examples:serve-zoneless",
     "build:zoneless": "ng run angular-examples:build-zoneless",
-    "test:proxies": "node --test server/"
+    "test:proxies": "node --test server/translate.test.mjs"
   },
   "dependencies": {
     "@angflow/angular": "workspace:*",
