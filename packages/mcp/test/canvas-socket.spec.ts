@@ -184,4 +184,28 @@ describe('CanvasSocket events', () => {
     canvas.close();
     await expect.poll(() => disconnects).toBe(1);
   });
+
+  it('signals adoption via onConnect, including on replacement', async () => {
+    let connects = 0;
+    const cs = await makeSocket({ onConnect: () => connects++ });
+    const first = makeCanvas();
+    await first.connect(`ws://127.0.0.1:${cs.port}`);
+    await expect.poll(() => connects).toBe(1);
+    const second = makeCanvas();
+    await second.connect(`ws://127.0.0.1:${cs.port}`);
+    await expect.poll(() => connects).toBe(2);
+  });
+
+  it('onConnect fires after the socket is adopted (call() works inside it)', async () => {
+    let seeded: unknown = null;
+    let cs!: Awaited<ReturnType<typeof makeSocket>>;
+    cs = await makeSocket({
+      onConnect: () => {
+        void cs.call('list_flows', {}).then((r) => (seeded = r));
+      },
+    });
+    const canvas = makeCanvas({ handlers: { list_flows: () => ['demo'] } });
+    await canvas.connect(`ws://127.0.0.1:${cs.port}`);
+    await expect.poll(() => seeded).toEqual(['demo']);
+  });
 });

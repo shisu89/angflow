@@ -35,6 +35,18 @@ function textOf(result: unknown): string {
 }
 
 describe('angflow MCP server e2e (in-process)', () => {
+  it('seeds canvas_status flows via list_flows on connect (no events needed)', async () => {
+    const client = await startAll();
+    // A reconnecting canvas re-dials without re-emitting flow.registered —
+    // the server must seed the mirror itself.
+    canvas = new FakeCanvas({ handlers: { list_flows: () => ['demo', 'second'] } });
+    await canvas.connect(running!.wsUrl);
+    await expect.poll(async () => {
+      const s = JSON.parse(textOf(await client.callTool({ name: 'canvas_status', arguments: {} })));
+      return s.flows;
+    }).toEqual(['demo', 'second']);
+  });
+
   it('lists all snapshot tools + canvas_status over a real MCP session', async () => {
     const client = await startAll();
     const tools = await client.listTools();

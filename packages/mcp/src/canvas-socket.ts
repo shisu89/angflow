@@ -53,6 +53,12 @@ export interface CanvasSocketOptions {
   log: Logger;
   /** Push events (flow.state, flow.registered, …) from the canvas. */
   onEvent?: (event: string, params: Record<string, unknown> | undefined) => void;
+  /**
+   * Fired after a canvas connection is adopted (incl. a replacement
+   * connection). The socket is live when this runs, so `call()` works —
+   * used e.g. to seed state a reconnecting canvas won't re-announce.
+   */
+  onConnect?: () => void;
   /** Fired when the active canvas connection ends (incl. replacement). */
   onDisconnect?: () => void;
 }
@@ -175,6 +181,9 @@ export class CanvasSocket {
       this.options.onDisconnect?.();
     });
     socket.on('error', (err) => this.options.log.warn('canvas socket error:', err));
+
+    // Listeners are attached and the socket is adopted — safe to call() from here.
+    this.options.onConnect?.();
   }
 
   private onMessage(text: string): void {

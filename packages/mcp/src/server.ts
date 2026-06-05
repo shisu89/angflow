@@ -46,6 +46,23 @@ export function createAngflowMcpServer(options: AngflowMcpServerOptions): Angflo
       session.handleConnect();
       session.handleEvent(event, params);
     },
+    onConnect: () => {
+      session.handleConnect();
+      // A reconnecting canvas does not re-emit flow.registered (registration
+      // happened at page init, possibly against a previous server instance).
+      // Seed the mirror from the bridge's own registry so canvas_status is
+      // accurate immediately. Races with live events are harmless: the
+      // mirror's flow.registered handling is idempotent.
+      void canvasSocket
+        .call('list_flows', {})
+        .then((ids) => {
+          if (!Array.isArray(ids)) return;
+          for (const id of ids) {
+            if (typeof id === 'string') session.handleEvent('flow.registered', { flowId: id });
+          }
+        })
+        .catch((err) => log.debug('list_flows seed failed:', err));
+    },
     onDisconnect: () => session.handleDisconnect(),
   });
 
