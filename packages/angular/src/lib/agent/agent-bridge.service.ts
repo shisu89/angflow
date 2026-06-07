@@ -917,13 +917,13 @@ export class AngflowAgentBridge {
       // (possibly async) layout fn ran — e.g. a human deleted a node. Only
       // nodes that still exist are moved, reported, and counted for history.
       const actuallyApplied: Record<string, { x: number; y: number }> = {};
-      flow.batch(() => {
-        for (const [id, position] of Object.entries(applied)) {
-          if (!flow.getNode(id)) continue;
-          flow.updateNode(id, { position });
-          actuallyApplied[id] = position;
-        }
-      });
+      for (const [id, position] of Object.entries(applied)) {
+        if (!flow.getNode(id)) continue;
+        actuallyApplied[id] = position;
+      }
+      // Honors the host's [animate] input: positions tween when it's on, and
+      // the await keeps the subsequent fitView measuring settled positions.
+      await flow.setNodePositions(actuallyApplied);
 
       const shouldFit = params['fitView'] !== false;
       if (shouldFit && Object.keys(actuallyApplied).length > 0) {

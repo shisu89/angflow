@@ -170,7 +170,7 @@ Requires a layout function to be passed to `provideAgentBridge({ layout: dagreLa
 |---|---|---|
 | `layout_nodes` | `direction?: 'TB' \| 'LR' \| 'BT' \| 'RL'` (default `'TB'`), `nodeIds?: string[]` (omit = all nodes), `nodeSep?: number`, `rankSep?: number`, `fitView?: boolean` (default `true`) | `{ positions: Record<nodeId, { x: number; y: number }> }` |
 
-`layout_nodes` computes tidy positions using the host-configured layout engine (typically dagre), applies them in one undoable step, and fits the viewport. When `nodeIds` is supplied, only those nodes and the edges among them form the layout subgraph — nodes outside the subset are left untouched. The `dagreLayout` adapter ships in `@angflow/angular/layout` (requires the optional peer dep `@dagrejs/dagre >= 3`).
+`layout_nodes` computes tidy positions using the host-configured layout engine (typically dagre), applies them in one undoable step, and fits the viewport. When `nodeIds` is supplied, only those nodes and the edges among them form the layout subgraph — nodes outside the subset are left untouched. The `dagreLayout` adapter ships in `@angflow/angular/layout` (requires the optional peer dep `@dagrejs/dagre >= 3`). When the host enables `[animate]` on `<ng-flow>`, applied positions tween smoothly (default 300 ms) instead of jumping; the tool response is sent after the transition settles, and `fitView` measures the final positions.
 
 ### History
 
