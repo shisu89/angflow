@@ -123,6 +123,11 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
     // Entry-animation bookkeeping: diff node ids per render. The first
     // emission is the initial mount — never animated (no full-graph flash).
     effect(() => {
+      // Cost note: this rebuilds the id set on every nodes() emission — including
+      // every frame of a position tween (the store re-emits per rAF frame). The
+      // early returns below keep re-runs write-free, so the per-frame cost is one
+      // O(N) Set build; revisit with a dedicated add/remove-only signal if large
+      // graphs make this measurable.
       const ids = new Set(this.store.nodes().map((n) => n.id));
       const prev = this.previousNodeIds;
       this.previousNodeIds = ids;

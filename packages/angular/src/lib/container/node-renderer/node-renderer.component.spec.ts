@@ -272,4 +272,17 @@ describe('entry animation tracking', () => {
     component.onNodeAnimationEnd({ animationName: 'some-user-anim' } as AnimationEvent, 'b');
     expect(component.enteringNodeIds().has('b')).toBe(true);
   });
+
+  it('enabling animation later only animates nodes added after the toggle', async () => {
+    store.setNodes([node('a')]);
+    await fixture.whenStable();
+    store.setNodes([node('a'), node('b')]); // added while disabled
+    await fixture.whenStable();
+    store.animate.set(true);
+    store.setNodes([node('a'), node('b'), node('c')]); // added while enabled
+    await fixture.whenStable();
+    expect(component.enteringNodeIds().has('c')).toBe(true);
+    expect(component.enteringNodeIds().has('b')).toBe(false);
+    expect(component.enteringNodeIds().has('a')).toBe(false);
+  });
 });
