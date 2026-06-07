@@ -46,16 +46,19 @@ export function getFloatingEndpoint(nodeRect: NodeRect, referencePoint: Point): 
  * Used to choose sourcePosition/targetPosition for path-shape helpers (bezier, step)
  * when the endpoint is floating rather than anchored to a handle with a declared position.
  *
- * Tiebreak: at exact corners (|dx| === |dy|), the Y axis wins via strict `>`, so the
- * function returns Top or Bottom rather than Left or Right.
+ * Tiebreak: at exact corners (normalized |dx| === |dy|), the Y axis wins via strict `>`,
+ * so the function returns Top or Bottom rather than Left or Right.
  */
 export function inferSide(intersection: Point, nodeRect: NodeRect): Position {
   const cx = nodeRect.x + nodeRect.width / 2;
   const cy = nodeRect.y + nodeRect.height / 2;
-  const dx = intersection.x - cx;
-  const dy = intersection.y - cy;
+  // Normalize by half-extents so the comparison identifies the border segment
+  // the point actually lies on (matches getFloatingEndpoint's crossing-axis
+  // choice); raw deltas misclassify top/bottom points on non-square nodes.
+  const nx = (intersection.x - cx) / (nodeRect.width / 2);
+  const ny = (intersection.y - cy) / (nodeRect.height / 2);
 
-  return Math.abs(dx) > Math.abs(dy)
-    ? (dx > 0 ? Position.Right : Position.Left)
-    : (dy > 0 ? Position.Bottom : Position.Top);
+  return Math.abs(nx) > Math.abs(ny)
+    ? (nx > 0 ? Position.Right : Position.Left)
+    : (ny > 0 ? Position.Bottom : Position.Top);
 }

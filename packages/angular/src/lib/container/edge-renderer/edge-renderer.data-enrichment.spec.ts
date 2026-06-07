@@ -242,10 +242,8 @@ describe('edgeMode="floating"', () => {
     expect(inputs['sourceY']).toBeCloseTo(50, 2);
     expect(inputs['targetX']).toBeCloseTo(312.5, 2);
     expect(inputs['targetY']).toBeCloseTo(200, 2);
-    // inferSide: dx=37.5, dy=25 → |dx| > |dy| → Right (intersection on the right-bottom border region)
-    expect(inputs['sourcePosition']).toBe(Position.Right);
-    // inferSide on target: dx=-37.5, dy=-25 → |dx| > |dy| → Left
-    expect(inputs['targetPosition']).toBe(Position.Left);
+    expect(inputs['sourcePosition']).toBe(Position.Bottom);
+    expect(inputs['targetPosition']).toBe(Position.Top);
   });
 
   it('default mode keeps the fixed bottom-center/top-center fallback', () => {
