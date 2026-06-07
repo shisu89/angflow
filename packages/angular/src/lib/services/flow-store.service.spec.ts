@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { computed } from '@angular/core';
 import type { NodeChange } from '@angflow/system';
 import { FlowStore } from './flow-store.service';
@@ -611,7 +611,7 @@ describe('FlowStore', () => {
     });
   });
 
-  // ── handle data registry ──────────────────────────────────────────────
+  // ── handle data registry (inside FlowStore describe block) ──────────
 
   describe('handle data registry', () => {
     it('registerHandleData stores a value retrievable by getHandleData', () => {
@@ -694,5 +694,112 @@ describe('FlowStore', () => {
       store.reset();
       expect(store.handleDataRegistry().size).toBe(0);
     });
+  });
+});
+
+describe('tweenNodePositions', () => {
+  let frames: FrameRequestCallback[];
+  let now: number;
+
+  beforeEach(() => {
+    frames = [];
+    now = 0;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      frames.push(cb);
+      return frames.length;
+    });
+    vi.stubGlobal('cancelAnimationFrame', () => {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  function tick(toTime: number) {
+    now = toTime;
+    const cb = frames.shift();
+    expect(cb).toBeDefined();
+    cb!(now);
+  }
+
+  it('interpolates positions each frame and lands exactly on the target', async () => {
+    const store = new FlowStore();
+    store.setNodes([makeNode('a')]);
+    const done = store.tweenNodePositions({ a: { x: 100, y: 50 } }, 100);
+
+    tick(50); // halfway
+    const mid = store.nodeLookup.get('a')!.position;
+    expect(mid.x).toBeGreaterThan(0);
+    expect(mid.x).toBeLessThan(100);
+
+    tick(100); // complete
+    expect(store.nodeLookup.get('a')!.position).toEqual({ x: 100, y: 50 });
+    await done; // promise resolves on completion
+  });
+
+  it('emits position changes through the change pipeline while tweening', () => {
+    const store = new FlowStore();
+    store.setNodes([makeNode('a')]);
+    const seen: NodeChange[] = [];
+    store.onNodesChange = (changes) => seen.push(...changes);
+
+    store.tweenNodePositions({ a: { x: 100, y: 0 } }, 100);
+    tick(50);
+    expect(seen.some((c) => c.type === 'position')).toBe(true);
+  });
+
+  it('a user drag cancels that node\'s tween', async () => {
+    const store = new FlowStore();
+    store.setNodes([makeNode('a'), makeNode('b')]);
+    const done = store.tweenNodePositions({ a: { x: 100, y: 0 }, b: { x: 0, y: 100 } }, 100);
+
+    tick(10);
+    // Simulate XYDrag moving node a.
+    store.updateNodePositions(
+      new Map([['a', { id: 'a', position: { x: 7, y: 7 }, internals: {}, measured: {} }]]),
+      true,
+    );
+    tick(100); // b's tween completes; a must stay where the drag put it
+    expect(store.nodeLookup.get('a')!.position).toEqual({ x: 7, y: 7 });
+    expect(store.nodeLookup.get('b')!.position).toEqual({ x: 0, y: 100 });
+    await done; // resolves even though one node was cancelled
+  });
+
+  it('retargeting replaces the tween from the current interpolated position', () => {
+    const store = new FlowStore();
+    store.setNodes([makeNode('a')]);
+    store.tweenNodePositions({ a: { x: 100, y: 0 } }, 100);
+    tick(50);
+    const midX = store.nodeLookup.get('a')!.position.x;
+    store.tweenNodePositions({ a: { x: 0, y: 0 } }, 100); // back to origin
+    tick(150); // retargeted tween started at t=50, so it completes here
+    expect(store.nodeLookup.get('a')!.position).toEqual({ x: 0, y: 0 });
+    expect(midX).toBeGreaterThan(0); // sanity: it really was mid-flight
+  });
+
+  it('resolves immediately for unknown ids or already-at-target positions', async () => {
+    const store = new FlowStore();
+    store.setNodes([makeNode('a')]);
+    await store.tweenNodePositions({ nope: { x: 1, y: 1 }, a: { x: 0, y: 0 } }, 100);
+    expect(frames.length).toBe(0); // no loop started
+  });
+});
+
+describe('animate signal helpers', () => {
+  it('animationEnabled reflects the animate signal', () => {
+    const store = new FlowStore();
+    expect(store.animationEnabled()).toBe(false);
+    store.animate.set(true);
+    expect(store.animationEnabled()).toBe(true);
+    store.animate.set({ duration: 200 });
+    expect(store.animationEnabled()).toBe(true);
+  });
+  it('animationDuration defaults to 300 and honors the override', () => {
+    const store = new FlowStore();
+    expect(store.animationDuration()).toBe(300);
+    store.animate.set({ duration: 200 });
+    expect(store.animationDuration()).toBe(200);
   });
 });

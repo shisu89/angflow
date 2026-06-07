@@ -1,4 +1,4 @@
-import { Injectable, signal, computed, type WritableSignal, type Signal } from '@angular/core';
+import { Injectable, OnDestroy, signal, computed, type WritableSignal, type Signal } from '@angular/core';
 import {
   adoptUserNodes,
   updateAbsolutePositions,
@@ -44,9 +44,10 @@ import {
 import type { Node, Edge, InternalNode } from '../types';
 import type { NodeTemplateSpec } from '../types/node-template';
 import { applyNodeChanges, applyEdgeChanges, createSelectionChange, getSelectionChanges } from '../utils/changes';
+import { sampleTween, prefersReducedMotion, type TweenEntry } from '../utils/position-tween';
 
 @Injectable()
-export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edge> {
+export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edge> implements OnDestroy {
   // ── Writable signals ──────────────────────────────────────────────────
 
   readonly rfId = signal('1');
@@ -187,6 +188,26 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
    * the `edgeMode` input on `<ng-flow>`.
    */
   readonly edgeMode = signal<'handles' | 'floating'>('handles');
+
+  /**
+   * Animation master switch, mirrored from the `[animate]` input on
+   * `<ng-flow>`: `false` (default) | `true` | `{ duration?: number }`.
+   * Controls node entry animation and position tweening.
+   */
+  readonly animate = signal<boolean | { duration?: number }>(false);
+
+  /** True when animations should run (input on, OS reduced-motion off). */
+  animationEnabled(): boolean {
+    const a = this.animate();
+    return (a === true || (typeof a === 'object' && a !== null)) && !prefersReducedMotion();
+  }
+
+  /** Tween/entry duration in ms. Default 300. */
+  animationDuration(): number {
+    const a = this.animate();
+    return typeof a === 'object' && a !== null && a.duration != null ? a.duration : 300;
+  }
+
   readonly ariaLiveMessage = signal('');
 
   // ── Default edge options ───────────────────────────────────────────
@@ -382,6 +403,8 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     const conn = this.connection();
 
     for (const [id, dragItem] of nodeDragItems) {
+      // A user drag takes ownership of the node — kill any in-flight tween.
+      if (this.positionTweens.size > 0) this.cancelPositionTween(id);
       const node = this.nodeLookup.get(id);
       const expandParent = !!(node?.expandParent && node?.parentId && dragItem?.position);
 
@@ -425,6 +448,96 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     }
 
     this.triggerNodeChanges(changes as NodeChange<NodeType>[]);
+  }
+
+  // ── Position tweening ───────────────────────────────────────────────────
+  // One shared rAF loop interpolates every active tween and pushes plain
+  // position changes through triggerNodeChanges, so nodes AND edges re-render
+  // together each frame (edges read store positions — CSS transforms would
+  // detach them). Zoneless-safe: the rAF callback only writes signals.
+
+  private readonly positionTweens = new Map<string, TweenEntry>();
+  private tweenWaiters: Array<{ ids: Set<string>; resolve: () => void }> = [];
+  private tweenRafId: number | null = null;
+
+  /**
+   * Animate the given nodes from their current positions to `positions` over
+   * `duration` ms. Unknown ids and zero-distance moves are skipped. Resolves
+   * when every requested node has finished (or had its tween cancelled by a
+   * drag / retarget).
+   */
+  tweenNodePositions(positions: Record<string, { x: number; y: number }>, duration: number): Promise<void> {
+    const start = performance.now();
+    const ids: string[] = [];
+    for (const [id, to] of Object.entries(positions)) {
+      const node = this.nodeLookup.get(id);
+      if (!node) continue;
+      const current = node.internals?.positionAbsolute ?? node.position;
+      const from = { x: current.x, y: current.y };
+      if (from.x === to.x && from.y === to.y) {
+        this.positionTweens.delete(id);
+        continue;
+      }
+      // Retarget: overwriting the entry restarts from the live position.
+      this.positionTweens.set(id, { from, to: { x: to.x, y: to.y }, start, duration });
+      ids.push(id);
+    }
+    if (ids.length === 0) {
+      this.settleTweenWaiters();
+      return Promise.resolve();
+    }
+    this.ensureTweenLoop();
+    return new Promise((resolve) => {
+      this.tweenWaiters.push({ ids: new Set(ids), resolve });
+    });
+  }
+
+  /** Cancel one node's active tween (no-op when none). Used by drag. */
+  cancelPositionTween(id: string): void {
+    if (this.positionTweens.delete(id)) {
+      this.settleTweenWaiters();
+    }
+  }
+
+  private ensureTweenLoop(): void {
+    if (this.tweenRafId !== null) return;
+    const step = () => {
+      const now = performance.now();
+      const changes: NodeChange[] = [];
+      const finished: string[] = [];
+      for (const [id, entry] of this.positionTweens) {
+        const { position, done } = sampleTween(entry, now);
+        changes.push({ id, type: 'position', position });
+        if (done) finished.push(id);
+      }
+      for (const id of finished) this.positionTweens.delete(id);
+      if (changes.length > 0) {
+        this.triggerNodeChanges(changes as NodeChange<NodeType>[]);
+      }
+      this.settleTweenWaiters();
+      this.tweenRafId = this.positionTweens.size > 0 ? requestAnimationFrame(step) : null;
+    };
+    this.tweenRafId = requestAnimationFrame(step);
+  }
+
+  private settleTweenWaiters(): void {
+    if (this.tweenWaiters.length === 0) return;
+    this.tweenWaiters = this.tweenWaiters.filter((w) => {
+      for (const id of w.ids) {
+        if (this.positionTweens.has(id)) return true;
+      }
+      w.resolve();
+      return false;
+    });
+  }
+
+  ngOnDestroy(): void {
+    if (this.tweenRafId !== null) {
+      cancelAnimationFrame(this.tweenRafId);
+      this.tweenRafId = null;
+    }
+    this.positionTweens.clear();
+    this.settleTweenWaiters();
   }
 
   triggerNodeChanges(changes: NodeChange<NodeType>[]): void {
