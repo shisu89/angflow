@@ -10,4 +10,5 @@ import { layoutNodes } from './layout-nodes';
  * provideAgentBridge({ transports: [...], layout: dagreLayout });
  * ```
  */
+// opts always carries direction: the agent bridge validates and defaults it before calling.
 export const dagreLayout: AgentLayoutFn = (nodes, edges, opts) => layoutNodes(nodes, edges, opts);

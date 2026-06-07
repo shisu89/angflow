@@ -48,4 +48,10 @@ describe('layoutNodes', () => {
     );
     expect(Math.abs(positions['b'].x - positions['c'].x)).toBeGreaterThanOrEqual(100);
   });
+
+  it('treats width: null / height: null as absent and falls back to defaults', () => {
+    const positions = layoutNodes([{ id: 'a', width: null, height: null }], [], { direction: 'TB' });
+    expect(Number.isFinite(positions['a'].x)).toBe(true);
+    expect(Number.isFinite(positions['a'].y)).toBe(true);
+  });
 });

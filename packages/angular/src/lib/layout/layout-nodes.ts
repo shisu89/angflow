@@ -38,7 +38,7 @@ const DEFAULT_HEIGHT = 40;
  * ```
  *
  * Dimensions resolve per node as `measured` → `width`/`height` →
- * `initialWidth`/`initialHeight` → 150×40. Lives in the
+ * `initialWidth`/`initialHeight` → 150×40. Edges referencing ids not present in `nodes` are ignored in the result. Lives in the
  * `@angflow/angular/layout` subpath so `@dagrejs/dagre` (an optional peer
  * dependency) is only pulled into bundles that import it.
  */
