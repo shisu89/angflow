@@ -13,6 +13,7 @@ import { EdgeTypesExampleComponent } from './examples/edge-types/edge-types.comp
 import { NodeToolbarExampleComponent } from './examples/node-toolbar/node-toolbar.component';
 import { EdgeToolbarExampleComponent } from './examples/edge-toolbar/edge-toolbar.component';
 import { FloatingEdgesExampleComponent } from './examples/floating-edges/floating-edges.component';
+import { FloatingTidyExampleComponent } from './examples/floating-tidy/floating-tidy.component';
 import { CardinalEdgesExampleComponent } from './examples/cardinal-edges/cardinal-edges.component';
 import { ClickDistanceExampleComponent } from './examples/click-distance/click-distance.component';
 import { ZIndexModeExampleComponent } from './examples/z-index-mode/z-index-mode.component';
@@ -70,6 +71,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Node toolbar',          path: 'node-toolbar',          component: NodeToolbarExampleComponent },
   { name: 'Edge toolbar',          path: 'edge-toolbar',          component: EdgeToolbarExampleComponent },
   { name: 'Floating edges',        path: 'floating-edges',        component: FloatingEdgesExampleComponent },
+  { name: 'Floating mode + tidy',  path: 'floating-tidy',         component: FloatingTidyExampleComponent },
   { name: 'Cardinal edges',        path: 'cardinal-edges',        component: CardinalEdgesExampleComponent },
   { name: 'Click distance',        path: 'click-distance',        component: ClickDistanceExampleComponent },
   { name: 'Cancel connection',     path: 'cancel-connection',     component: CancelConnectionExampleComponent },
