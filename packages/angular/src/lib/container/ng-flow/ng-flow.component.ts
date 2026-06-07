@@ -465,6 +465,24 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   /** Default fill color for SVG edge markers. */
   readonly defaultMarkerColor = input<string | null>('#b1b1b7');
 
+  /**
+   * 'handles' (default): edges attach at declared handles. 'floating': edges
+   * ignore handles and attach where the line to the peer node's center crosses
+   * the node border — no handle boilerplate needed. Nodes without handles
+   * cannot originate interactive drag-connections; declared handles still work
+   * for starting connections in floating mode.
+   */
+  readonly edgeMode = input<'handles' | 'floating'>('handles');
+
+  /**
+   * Enable node animations: entry fade/scale for newly added nodes and smooth
+   * position tweening for programmatic moves (`setNodePositions`,
+   * `applyLayout`, the agent bridge's `layout_nodes`). Pass `{ duration }` to
+   * change the default 300ms. Disabled automatically under
+   * `prefers-reduced-motion`. Dragging is never animated.
+   */
+  readonly animate = input<boolean | { duration?: number }>(false);
+
   // ── CSS class names ───────────────────────────────────────────────────
 
   /** Elements with this class prevent node dragging when interacted with. */
@@ -688,6 +706,8 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       this.store.debug.set(this.debug());
       this.store.zIndexMode.set(this.zIndexMode());
       this.store.onlyRenderVisibleElements.set(this.onlyRenderVisibleElements());
+      this.store.edgeMode.set(this.edgeMode());
+      this.store.animate.set(this.animate());
     });
 
     effect(() => {
