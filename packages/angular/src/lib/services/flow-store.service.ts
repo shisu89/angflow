@@ -459,20 +459,27 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   private readonly positionTweens = new Map<string, TweenEntry>();
   private tweenWaiters: Array<{ ids: Set<string>; resolve: () => void }> = [];
   private tweenRafId: number | null = null;
+  private tweenDestroyed = false;
 
   /**
    * Animate the given nodes from their current positions to `positions` over
-   * `duration` ms. Unknown ids and zero-distance moves are skipped. Resolves
-   * when every requested node has finished (or had its tween cancelled by a
-   * drag / retarget).
+   * `duration` ms. Positions are in `node.position` space — parent-relative
+   * for nodes with `parentId`, absolute for top-level nodes. This matches the
+   * space that `triggerNodeChanges` writes, keeping from/to/emitted coherent.
+   * Unknown ids and zero-distance moves are skipped. Resolves when every
+   * requested node has finished (or had its tween cancelled by a drag /
+   * retarget).
    */
   tweenNodePositions(positions: Record<string, { x: number; y: number }>, duration: number): Promise<void> {
+    if (this.tweenDestroyed) return Promise.resolve();
     const start = performance.now();
     const ids: string[] = [];
     for (const [id, to] of Object.entries(positions)) {
       const node = this.nodeLookup.get(id);
       if (!node) continue;
-      const current = node.internals?.positionAbsolute ?? node.position;
+      // Tween in node.position space (parent-relative for child nodes): this is
+      // the space triggerNodeChanges writes, so from/to/emitted stay coherent.
+      const current = node.position;
       const from = { x: current.x, y: current.y };
       if (from.x === to.x && from.y === to.y) {
         this.positionTweens.delete(id);
@@ -500,6 +507,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   }
 
   private ensureTweenLoop(): void {
+    if (this.tweenDestroyed) return;
     if (this.tweenRafId !== null) return;
     const step = () => {
       const now = performance.now();
@@ -532,6 +540,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   }
 
   ngOnDestroy(): void {
+    this.tweenDestroyed = true;
     if (this.tweenRafId !== null) {
       cancelAnimationFrame(this.tweenRafId);
       this.tweenRafId = null;

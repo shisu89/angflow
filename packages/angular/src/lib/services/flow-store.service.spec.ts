@@ -736,6 +736,7 @@ describe('tweenNodePositions', () => {
 
     tick(100); // complete
     expect(store.nodeLookup.get('a')!.position).toEqual({ x: 100, y: 50 });
+    expect(frames.length).toBe(0); // loop must have exited — no pending frame
     await done; // promise resolves on completion
   });
 
@@ -784,6 +785,44 @@ describe('tweenNodePositions', () => {
     store.setNodes([makeNode('a')]);
     await store.tweenNodePositions({ nope: { x: 1, y: 1 }, a: { x: 0, y: 0 } }, 100);
     expect(frames.length).toBe(0); // no loop started
+  });
+
+  it('tweens child nodes in parent-relative space (no first-frame jump)', async () => {
+    const store = new FlowStore();
+    store.setNodes([
+      makeNode('p', { position: { x: 100, y: 100 } }),
+      makeNode('c', { position: { x: 10, y: 10 }, parentId: 'p' } as Partial<Node> as Node),
+    ]);
+    const done = store.tweenNodePositions({ c: { x: 50, y: 50 } }, 100);
+    tick(1); // first frame, t≈0: must start at the RELATIVE position, not (110,110)
+    const c = store.nodeLookup.get('c')!;
+    expect(c.position.x).toBeLessThan(12);
+    expect(c.position.y).toBeLessThan(12);
+    tick(100);
+    expect(store.nodeLookup.get('c')!.position).toEqual({ x: 50, y: 50 });
+    await done;
+  });
+
+  it('ignores tweens started after destroy and leaves no frame queued', async () => {
+    const store = new FlowStore();
+    store.setNodes([makeNode('a')]);
+    store.ngOnDestroy();
+    await store.tweenNodePositions({ a: { x: 100, y: 0 } }, 100);
+    expect(frames.length).toBe(0);
+    expect(store.nodeLookup.get('a')!.position).toEqual({ x: 0, y: 0 });
+  });
+
+  it('ngOnDestroy mid-tween resolves waiters; leftover frame is a no-op', async () => {
+    const store = new FlowStore();
+    store.setNodes([makeNode('a')]);
+    const done = store.tweenNodePositions({ a: { x: 100, y: 0 } }, 100);
+    tick(50);
+    const midX = store.nodeLookup.get('a')!.position.x;
+    store.ngOnDestroy();
+    await done;
+    now = 100;
+    frames.shift()?.(now); // simulate a stale frame firing despite cancel
+    expect(store.nodeLookup.get('a')!.position.x).toBe(midX);
   });
 });
 
