@@ -12,6 +12,8 @@ import {
   OnDestroy,
   ElementRef,
   TemplateRef,
+  signal,
+  effect,
 } from '@angular/core';
 import { CommonModule, NgComponentOutlet, NgTemplateOutlet, NgStyle } from '@angular/common';
 import { FlowStore } from '../../services/flow-store.service';
@@ -66,6 +68,9 @@ const builtInNodeTypes: NodeTypes = {
         [attr.tabindex]="store.nodesFocusable() ? 0 : -1"
         [style.z-index]="getNodeZ(node)"
         [style.transform]="getNodeTransform(node)"
+        [class.xy-flow__node-enter]="enteringNodeIds().has(node.id)"
+        [style.animation-duration]="enteringNodeIds().has(node.id) ? store.animationDuration() + 'ms' : null"
+        (animationend)="onNodeAnimationEnd($event, node.id)"
         [style.width.px]="node.width ?? null"
         [style.height.px]="node.height ?? null"
         [ngStyle]="node.style"
@@ -109,6 +114,47 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
   readonly nodeMouseLeave = output<{ event: MouseEvent; node: Node }>();
 
   readonly visibleNodes = computed(() => this.store.visibleNodes());
+
+  /** Ids of nodes currently playing their entry animation. */
+  readonly enteringNodeIds = signal<ReadonlySet<string>>(new Set());
+  private previousNodeIds: Set<string> | null = null;
+
+  constructor() {
+    // Entry-animation bookkeeping: diff node ids per render. The first
+    // emission is the initial mount — never animated (no full-graph flash).
+    effect(() => {
+      const ids = new Set(this.store.nodes().map((n) => n.id));
+      const prev = this.previousNodeIds;
+      this.previousNodeIds = ids;
+      if (prev === null || !this.store.animationEnabled()) {
+        if (this.enteringNodeIds().size > 0) this.enteringNodeIds.set(new Set());
+        return;
+      }
+      const fresh: string[] = [];
+      for (const id of ids) {
+        if (!prev.has(id)) fresh.push(id);
+      }
+      // Prune entries for removed nodes; add the newcomers.
+      const current = this.enteringNodeIds();
+      const stale = [...current].filter((id) => !ids.has(id));
+      if (fresh.length === 0 && stale.length === 0) return;
+      const next = new Set([...current].filter((id) => ids.has(id)));
+      for (const id of fresh) next.add(id);
+      this.enteringNodeIds.set(next);
+    });
+  }
+
+  onNodeAnimationEnd(event: AnimationEvent, id: string): void {
+    // Only the library's enter keyframe — user animations on node content
+    // bubble the same event.
+    if (event.animationName !== 'xy-flow-node-enter') return;
+    if (!this.enteringNodeIds().has(id)) return;
+    this.enteringNodeIds.update((s) => {
+      const next = new Set(s);
+      next.delete(id);
+      return next;
+    });
+  }
 
   private nodeInjectorCache = new Map<string, Injector>();
   private nodeContextCache = new Map<string, NgFlowNodeContext<unknown>>();

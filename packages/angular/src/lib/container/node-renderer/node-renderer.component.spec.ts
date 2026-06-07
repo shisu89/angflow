@@ -193,3 +193,83 @@ describe('node template resolution', () => {
     expect(after).not.toBe(before);
   });
 });
+
+describe('entry animation tracking', () => {
+  let store: FlowStore;
+  let component: NodeRendererComponent;
+  let fixture: ComponentFixture<NodeRendererComponent>;
+
+  beforeEach(() => {
+    // jsdom doesn't provide ResizeObserver/MutationObserver — stub them so
+    // fixture.whenStable() (which triggers ngAfterViewInit) doesn't throw.
+    if (typeof (globalThis as any).ResizeObserver === 'undefined') {
+      (globalThis as any).ResizeObserver = class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      };
+    }
+    if (typeof (globalThis as any).MutationObserver === 'undefined') {
+      (globalThis as any).MutationObserver = class {
+        observe() {}
+        disconnect() {}
+      };
+    }
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NodeRendererComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    store = TestBed.inject(FlowStore);
+    fixture = TestBed.createComponent(NodeRendererComponent);
+    component = fixture.componentInstance;
+  });
+
+  const node = (id: string) => ({ id, data: {}, position: { x: 0, y: 0 } });
+
+  it('does not mark the initial batch as entering', async () => {
+    store.animate.set(true);
+    store.setNodes([node('a'), node('b')]);
+    await fixture.whenStable(); // flush effects
+    expect(component.enteringNodeIds().size).toBe(0);
+  });
+
+  it('marks nodes added after the initial render as entering', async () => {
+    store.animate.set(true);
+    store.setNodes([node('a')]);
+    await fixture.whenStable();
+    store.setNodes([node('a'), node('b')]);
+    await fixture.whenStable();
+    expect(component.enteringNodeIds().has('b')).toBe(true);
+    expect(component.enteringNodeIds().has('a')).toBe(false);
+  });
+
+  it('does nothing when animation is disabled', async () => {
+    store.setNodes([node('a')]);
+    await fixture.whenStable();
+    store.setNodes([node('a'), node('b')]);
+    await fixture.whenStable();
+    expect(component.enteringNodeIds().size).toBe(0);
+  });
+
+  it('clears the entering flag when its enter animation ends', async () => {
+    store.animate.set(true);
+    store.setNodes([node('a')]);
+    await fixture.whenStable();
+    store.setNodes([node('a'), node('b')]);
+    await fixture.whenStable();
+    component.onNodeAnimationEnd({ animationName: 'xy-flow-node-enter' } as AnimationEvent, 'b');
+    expect(component.enteringNodeIds().has('b')).toBe(false);
+  });
+
+  it('ignores animationend from other animations', async () => {
+    store.animate.set(true);
+    store.setNodes([node('a')]);
+    await fixture.whenStable();
+    store.setNodes([node('a'), node('b')]);
+    await fixture.whenStable();
+    component.onNodeAnimationEnd({ animationName: 'some-user-anim' } as AnimationEvent, 'b');
+    expect(component.enteringNodeIds().has('b')).toBe(true);
+  });
+});

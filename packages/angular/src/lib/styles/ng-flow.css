@@ -206,6 +206,21 @@ svg.xy-flow__connectionline {
   outline: none;
 }
 
+/* Entry animation — applied by the node renderer when [animate] is enabled.
+   Uses the standalone `scale` property so it composes with the inline
+   translate() transform instead of overriding it. */
+.xy-flow__node-enter {
+  animation: xy-flow-node-enter 300ms ease both;
+  transform-origin: 50% 50%;
+}
+@keyframes xy-flow-node-enter {
+  from { opacity: 0; scale: 0.92; }
+  to   { opacity: 1; scale: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .xy-flow__node-enter { animation: none; }
+}
+
 .xy-flow__node-input,
 .xy-flow__node-default,
 .xy-flow__node-output,
