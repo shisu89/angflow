@@ -64,6 +64,14 @@ export type GetMiniMapNodeAttribute<NodeType extends Node = Node> = (node: NodeT
           <!-- Background -->
           <rect x="-10000" y="-10000" width="20000" height="20000" [attr.fill]="bgColor() ?? '#f0f0f0'" />
           <!-- Nodes -->
+          <!--
+            Colors are bound as inline [style.*], NOT [attr.*]: the bundled
+            stylesheet sets a fill CSS property on .xy-flow__minimap-node, and a
+            CSS property always overrides an SVG fill presentation attribute.
+            Inline styles win over stylesheet rules, so the inputs actually take
+            effect. When an input is unset (undefined) we emit no inline value,
+            deferring to the stylesheet's CSS-variable theming (incl. dark mode).
+          -->
           @for (node of minimapNodes(); track node.id) {
             <rect
               class="xy-flow__minimap-node"
@@ -73,22 +81,20 @@ export type GetMiniMapNodeAttribute<NodeType extends Node = Node> = (node: NodeT
               [attr.width]="node.width"
               [attr.height]="node.height"
               [attr.rx]="nodeBorderRadius()"
-              [attr.fill]="getNodeColor(node)"
-              [attr.stroke]="getNodeStrokeColor(node)"
-              [attr.stroke-width]="nodeStrokeWidth()"
+              [style.fill]="getNodeColor(node)"
+              [style.stroke]="getNodeStrokeColor(node)"
+              [style.stroke-width]="nodeStrokeWidth()"
               (click)="onMinimapNodeClick($event, node)"
             />
           }
           <!-- Mask overlay: dim area outside viewport via evenodd path -->
-          @if (maskColor()) {
-            <path
-              class="xy-flow__minimap-mask"
-              [attr.d]="maskPath()"
-              [attr.fill]="maskColor()"
-              fill-rule="evenodd"
-              style="pointer-events: none;"
-            />
-          }
+          <path
+            class="xy-flow__minimap-mask"
+            [attr.d]="maskPath()"
+            [style.fill]="maskColor()"
+            fill-rule="evenodd"
+            style="pointer-events: none;"
+          />
           <!-- Viewport outline -->
           <rect
             [attr.x]="maskPosition().x"
@@ -124,10 +130,16 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
   /** Invert the pan direction when dragging on the minimap. */
   readonly inversePan = input(false);
 
-  /** Node fill color, or function mapping node → color. */
-  readonly nodeColor = input<string | GetMiniMapNodeAttribute>('#e2e2e2');
-  /** Node stroke color, or function mapping node → color. */
-  readonly nodeStrokeColor = input<string | GetMiniMapNodeAttribute>('transparent');
+  /**
+   * Node fill color, or function mapping node → color. Unset → falls back to
+   * the `--xy-minimap-node-background-color` theme variable via the stylesheet.
+   */
+  readonly nodeColor = input<string | GetMiniMapNodeAttribute>();
+  /**
+   * Node stroke color, or function mapping node → color. Unset → falls back to
+   * the `--xy-minimap-node-stroke-color` theme variable via the stylesheet.
+   */
+  readonly nodeStrokeColor = input<string | GetMiniMapNodeAttribute>();
   /** Node CSS class, or function mapping node → class. */
   readonly nodeClassName = input<string | GetMiniMapNodeAttribute>('');
   /** Corner radius (rx) for node rects. */
@@ -139,8 +151,11 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
 
   /** Background fill behind the nodes. Defaults to `#f0f0f0`. */
   readonly bgColor = input<string>();
-  /** Overlay fill for the area outside the current viewport. */
-  readonly maskColor = input<string>('rgba(240, 240, 240, 0.6)');
+  /**
+   * Overlay fill for the area outside the current viewport. Unset → falls back
+   * to the `--xy-minimap-mask-background-color` theme variable via the stylesheet.
+   */
+  readonly maskColor = input<string>();
   /** Stroke color of the viewport rectangle. */
   readonly maskStrokeColor = input<string>();
   /** Stroke width of the viewport rectangle (scaled by view scale). */
@@ -257,20 +272,23 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
     );
   });
 
-  getNodeColor(node: { _userNode?: Node }): string {
+  // Returns the resolved fill for a node, or undefined when the input is unset
+  // so no inline style is emitted and the stylesheet's CSS-variable theming
+  // (incl. dark mode) applies.
+  getNodeColor(node: { _userNode?: Node }): string | undefined {
     const color = this.nodeColor();
-    if (typeof color === 'function' && node._userNode) {
-      return color(node._userNode);
+    if (typeof color === 'function') {
+      return node._userNode ? color(node._userNode) : undefined;
     }
-    return typeof color === 'string' ? color : '#e2e2e2';
+    return color;
   }
 
-  getNodeStrokeColor(node: { _userNode?: Node }): string {
+  getNodeStrokeColor(node: { _userNode?: Node }): string | undefined {
     const strokeColor = this.nodeStrokeColor();
-    if (typeof strokeColor === 'function' && node._userNode) {
-      return strokeColor(node._userNode);
+    if (typeof strokeColor === 'function') {
+      return node._userNode ? strokeColor(node._userNode) : undefined;
     }
-    return typeof strokeColor === 'string' ? strokeColor : 'transparent';
+    return strokeColor;
   }
 
   getNodeClassName(node: { _userNode?: Node }): string {
