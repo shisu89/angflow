@@ -213,7 +213,8 @@ flow.applyLayout(layoutNodes, { direction: 'LR' });
 
 Options: `direction` (`'TB' | 'LR' | 'BT' | 'RL'`, default `'TB'`), `nodeSep`
 (default 50), `rankSep` (default 80). Node dimensions resolve from
-`measured` → `width`/`height` → 150×40. Any function with the same shape plugs
+`measured` → `width`/`height` → `initialWidth`/`initialHeight` → 150×40. Any
+function with the same shape plugs
 into `applyLayout` (elk, custom grids, …).
 
 ## Animations

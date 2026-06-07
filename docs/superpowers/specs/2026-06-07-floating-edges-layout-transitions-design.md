@@ -4,6 +4,7 @@
 **Status:** Approved
 **Source:** `brainstorm_agentic_app/docs/angflow-feedback.md` findings #1–#3 (test-flight feedback)
 **Scope:** `@angflow/angular` only — no `@angflow/system` changes, no agent tool schema changes.
+**Amendment (during implementation):** one authorized `@angflow/system` bugfix landed — `inferSide` now normalizes deltas by half-extents (raw deltas misclassified border sides on non-square nodes), surfaced by this spec's floating-mode tests. Behavior note: per-handle floating edges on non-square nodes get corrected `sourcePosition`/`targetPosition` (path curvature direction); endpoints unchanged.
 
 ## Background
 
