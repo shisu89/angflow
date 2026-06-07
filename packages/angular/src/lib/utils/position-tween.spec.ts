@@ -14,7 +14,7 @@ describe('easeInOutCubic', () => {
 });
 
 describe('sampleTween', () => {
-  const entry: TweenEntry = { from: { x: 0, y: 100 }, to: { x: 200, y: 100 }, start: 1000, duration: 100 };
+  const entry: TweenEntry = { from: { x: 0, y: 100 }, to: { x: 200, y: 300 }, start: 1000, duration: 100 };
 
   it('returns from at start and is not done', () => {
     const s = sampleTween(entry, 1000);
@@ -22,16 +22,25 @@ describe('sampleTween', () => {
     expect(s.done).toBe(false);
   });
   it('returns exactly to at/after the end and is done', () => {
-    expect(sampleTween(entry, 1100)).toEqual({ position: { x: 200, y: 100 }, done: true });
-    expect(sampleTween(entry, 1500)).toEqual({ position: { x: 200, y: 100 }, done: true });
+    expect(sampleTween(entry, 1100)).toEqual({ position: { x: 200, y: 300 }, done: true });
+    expect(sampleTween(entry, 1500)).toEqual({ position: { x: 200, y: 300 }, done: true });
   });
   it('is mid-flight halfway through', () => {
     const s = sampleTween(entry, 1050);
     expect(s.position.x).toBeGreaterThan(0);
     expect(s.position.x).toBeLessThan(200);
+    expect(s.position.y).toBeGreaterThan(100);
+    expect(s.position.y).toBeLessThan(300);
     expect(s.done).toBe(false);
   });
   it('clamps a time before start to from', () => {
     expect(sampleTween(entry, 0).position).toEqual({ x: 0, y: 100 });
+  });
+  it('treats duration <= 0 as instantly complete', () => {
+    for (const duration of [0, -50]) {
+      const s = sampleTween({ ...entry, duration }, entry.start);
+      expect(s.position).toEqual({ x: 200, y: 300 });
+      expect(s.done).toBe(true);
+    }
   });
 });
