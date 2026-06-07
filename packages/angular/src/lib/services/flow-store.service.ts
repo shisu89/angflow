@@ -180,6 +180,13 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   readonly ariaLabelConfig = signal<AriaLabelConfig>(defaultAriaLabelConfig);
 
   readonly onlyRenderVisibleElements = signal(false);
+  /**
+   * 'handles' (default): edges attach at declared handles. 'floating': edges
+   * ignore handles and attach at the ray-rect intersection from each node's
+   * border toward the peer node's center — zero handle boilerplate. Set via
+   * the `edgeMode` input on `<ng-flow>`.
+   */
+  readonly edgeMode = signal<'handles' | 'floating'>('handles');
   readonly ariaLiveMessage = signal('');
 
   // ── Default edge options ───────────────────────────────────────────

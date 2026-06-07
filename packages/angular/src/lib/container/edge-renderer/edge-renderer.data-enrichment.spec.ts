@@ -203,3 +203,96 @@ describe('floating endpoints', () => {
     expect(inputs['targetY']).toBeCloseTo(200, 2);
   });
 });
+
+describe('edgeMode="floating"', () => {
+  let store: FlowStore;
+  let component: EdgeRendererComponent;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [EdgeRendererComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    store = TestBed.inject(FlowStore);
+    const fixture = TestBed.createComponent(EdgeRendererComponent);
+    component = fixture.componentInstance;
+  });
+
+  /** Two handleless nodes: A at (0,0) 100x50, B at (300,200) 100x50. */
+  function seedHandleless() {
+    store.nodeLookup.set('A', {
+      id: 'A', position: { x: 0, y: 0 },
+      measured: { width: 100, height: 50 },
+      internals: { positionAbsolute: { x: 0, y: 0 }, handleBounds: null, z: 0 },
+    } as any);
+    store.nodeLookup.set('B', {
+      id: 'B', position: { x: 300, y: 200 },
+      measured: { width: 100, height: 50 },
+      internals: { positionAbsolute: { x: 300, y: 200 }, handleBounds: null, z: 0 },
+    } as any);
+  }
+
+  it('computes ray-rect endpoints for nodes with zero handles', () => {
+    store.edgeMode.set('floating');
+    seedHandleless();
+    const inputs = component.getEdgeInputs({ id: 'e', source: 'A', target: 'B' });
+    // Same geometry as the floating-handle test above: centers (50,25)→(350,225).
+    expect(inputs['sourceX']).toBeCloseTo(87.5, 2);
+    expect(inputs['sourceY']).toBeCloseTo(50, 2);
+    expect(inputs['targetX']).toBeCloseTo(312.5, 2);
+    expect(inputs['targetY']).toBeCloseTo(200, 2);
+    // inferSide: dx=37.5, dy=25 → |dx| > |dy| → Right (intersection on the right-bottom border region)
+    expect(inputs['sourcePosition']).toBe(Position.Right);
+    // inferSide on target: dx=-37.5, dy=-25 → |dx| > |dy| → Left
+    expect(inputs['targetPosition']).toBe(Position.Left);
+  });
+
+  it('default mode keeps the fixed bottom-center/top-center fallback', () => {
+    seedHandleless(); // edgeMode left at default 'handles'
+    const inputs = component.getEdgeInputs({ id: 'e', source: 'A', target: 'B' });
+    expect(inputs['sourceX']).toBeCloseTo(50, 2);
+    expect(inputs['sourceY']).toBeCloseTo(50, 2); // bottom of A
+    expect(inputs['targetX']).toBeCloseTo(350, 2);
+    expect(inputs['targetY']).toBeCloseTo(200, 2); // top of B
+  });
+
+  it('ignores declared non-floating handles when mode is floating', () => {
+    store.edgeMode.set('floating');
+    seedHandleless();
+    const nodeA = store.nodeLookup.get('A')! as any;
+    nodeA.internals.handleBounds = {
+      source: [{ id: 'sh', nodeId: 'A', x: 0, y: 0, position: Position.Right, type: 'source', width: 6, height: 6 }],
+      target: null,
+    };
+    const inputs = component.getEdgeInputs({ id: 'e', source: 'A', target: 'B', sourceHandle: 'sh' });
+    expect(inputs['sourceX']).toBeCloseTo(87.5, 2); // ray-rect, not the handle at (3,3)
+    expect(inputs['sourceY']).toBeCloseTo(50, 2);
+  });
+
+  it('uses width/height fallbacks for unmeasured (first-frame) nodes', () => {
+    store.edgeMode.set('floating');
+    // Same rects as seedHandleless, but via `width`/`height` with no `measured`.
+    store.nodeLookup.set('A', {
+      id: 'A', position: { x: 0, y: 0 }, width: 100, height: 50,
+      internals: { positionAbsolute: { x: 0, y: 0 }, handleBounds: null, z: 0 },
+    } as any);
+    store.nodeLookup.set('B', {
+      id: 'B', position: { x: 300, y: 200 }, width: 100, height: 50,
+      internals: { positionAbsolute: { x: 300, y: 200 }, handleBounds: null, z: 0 },
+    } as any);
+    const inputs = component.getEdgeInputs({ id: 'e', source: 'A', target: 'B' });
+    expect(inputs['sourceX']).toBeCloseTo(87.5, 2);
+    expect(inputs['sourceY']).toBeCloseTo(50, 2);
+  });
+
+  it('self-loops fall back to fixed endpoints even in floating mode', () => {
+    store.edgeMode.set('floating');
+    seedHandleless();
+    const inputs = component.getEdgeInputs({ id: 'self', source: 'A', target: 'A' });
+    expect(inputs['sourceX']).toBeCloseTo(50, 2);
+    expect(inputs['sourceY']).toBeCloseTo(50, 2); // bottom-center fallback
+    expect(inputs['targetX']).toBeCloseTo(50, 2);
+    expect(inputs['targetY']).toBeCloseTo(0, 2);  // top-center fallback
+  });
+});

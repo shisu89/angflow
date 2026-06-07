@@ -384,8 +384,11 @@ export class EdgeRendererComponent {
 
     // Self-loops ignore floating and fall back to fixed-handle positions (geometric degeneracy).
     const isSelfLoop = edge.source === edge.target;
-    const sourceFloating = !isSelfLoop && sourceHandle?.floating === true;
-    const targetFloating = !isSelfLoop && targetHandle?.floating === true;
+    // Global floating mode (edgeMode="floating" on <ng-flow>) floats every
+    // endpoint regardless of handles; otherwise the per-handle flag decides.
+    const floatingMode = this.store.edgeMode() === 'floating';
+    const sourceFloating = !isSelfLoop && (floatingMode || sourceHandle?.floating === true);
+    const targetFloating = !isSelfLoop && (floatingMode || targetHandle?.floating === true);
 
     const sourceRect = { x: sourcePos.x, y: sourcePos.y, width: sourceW, height: sourceH };
     const targetRect = { x: targetPos.x, y: targetPos.y, width: targetW, height: targetH };
