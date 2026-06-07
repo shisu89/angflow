@@ -180,6 +180,58 @@ flowService.screenToFlowPosition({ x: event.clientX, y: event.clientY });
 flowService.toObject(); // { nodes, edges, viewport }
 ```
 
+## Floating Edges
+
+Set `edgeMode="floating"` and edges attach wherever the line to the peer node's
+center crosses each node's border — no handle declarations needed:
+
+```html
+<ng-flow [nodes]="nodes" [edges]="edges" edgeMode="floating" />
+```
+
+Works with nodes that declare zero handles, which makes it ideal for
+programmatic / agent-driven graphs. Note: a node with no handles cannot
+originate an interactive drag-connection — declared handles still work for
+starting connections while rendering stays floating. For per-edge control in
+the default mode, set `floating` on individual handles instead:
+`<ng-flow-handle type="source" [floating]="true" />`.
+
+## Auto-Layout
+
+`layoutNodes` is a pure dagre wrapper — feed it your nodes and edges, get back
+a map of top-left positions:
+
+```ts
+import { layoutNodes } from '@angflow/angular/layout'; // needs @dagrejs/dagre installed
+
+const positions = layoutNodes(flow.getNodes(), flow.getEdges(), { direction: 'LR' });
+flow.setNodePositions(positions);
+
+// or in one call:
+flow.applyLayout(layoutNodes, { direction: 'LR' });
+```
+
+Options: `direction` (`'TB' | 'LR' | 'BT' | 'RL'`, default `'TB'`), `nodeSep`
+(default 50), `rankSep` (default 80). Node dimensions resolve from
+`measured` → `width`/`height` → 150×40. Any function with the same shape plugs
+into `applyLayout` (elk, custom grids, …).
+
+## Animations
+
+Turn on `[animate]` and the flow animates node entries (fade + scale) and
+programmatic position changes (smooth tween, edges tracking mid-flight):
+
+```html
+<ng-flow [nodes]="nodes" [edges]="edges" [animate]="true" />
+<!-- or tune the duration: -->
+<ng-flow [animate]="{ duration: 200 }" />
+```
+
+Animated paths: `setNodePositions`, `applyLayout`, and the agent bridge's
+`layout_nodes` tool. Dragging is never animated, a drag cancels any in-flight
+tween on that node, and everything is disabled under `prefers-reduced-motion`.
+Per-call override: `flow.setNodePositions(positions, { animate: false })`.
+
 ## Architecture
 
 - **Signal-based state** — Angular 17+ signals for fine-grained reactivity (no RxJS in the store)
