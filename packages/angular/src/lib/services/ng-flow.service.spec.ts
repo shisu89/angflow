@@ -308,3 +308,71 @@ describe('NgFlowService', () => {
     });
   });
 });
+
+describe('setNodePositions / applyLayout', () => {
+  let store: FlowStore;
+  let service: NgFlowService;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), FlowStore, NgFlowService],
+    });
+    store = TestBed.inject(FlowStore);
+    service = TestBed.inject(NgFlowService);
+  });
+
+  it('setNodePositions applies positions immediately when animation is off', async () => {
+    store.setNodes([
+      { id: 'a', data: {}, position: { x: 0, y: 0 } },
+      { id: 'b', data: {}, position: { x: 0, y: 0 } },
+    ]);
+    await service.setNodePositions({ a: { x: 10, y: 20 }, b: { x: 30, y: 40 } });
+    expect(store.nodeLookup.get('a')!.position).toEqual({ x: 10, y: 20 });
+    expect(store.nodeLookup.get('b')!.position).toEqual({ x: 30, y: 40 });
+  });
+
+  it('setNodePositions skips unknown ids without throwing', async () => {
+    store.setNodes([{ id: 'a', data: {}, position: { x: 0, y: 0 } }]);
+    await service.setNodePositions({ a: { x: 1, y: 1 }, ghost: { x: 9, y: 9 } });
+    expect(store.nodeLookup.get('a')!.position).toEqual({ x: 1, y: 1 });
+  });
+
+  it('setNodePositions routes through the tween when animation is requested', async () => {
+    store.setNodes([{ id: 'a', data: {}, position: { x: 0, y: 0 } }]);
+    const tween = vi.spyOn(store, 'tweenNodePositions').mockResolvedValue();
+    await service.setNodePositions({ a: { x: 100, y: 0 } }, { animate: { duration: 150 } });
+    expect(tween).toHaveBeenCalledWith({ a: { x: 100, y: 0 } }, 150);
+  });
+
+  it('per-call animate:false overrides the global animate signal', async () => {
+    store.animate.set(true);
+    store.setNodes([{ id: 'a', data: {}, position: { x: 0, y: 0 } }]);
+    const tween = vi.spyOn(store, 'tweenNodePositions');
+    await service.setNodePositions({ a: { x: 5, y: 5 } }, { animate: false });
+    expect(tween).not.toHaveBeenCalled();
+    expect(store.nodeLookup.get('a')!.position).toEqual({ x: 5, y: 5 });
+  });
+
+  it('applyLayout feeds store nodes/edges to the fn and applies its result', async () => {
+    store.setNodes([
+      { id: 'a', data: {}, position: { x: 0, y: 0 } },
+      { id: 'b', data: {}, position: { x: 0, y: 0 } },
+    ]);
+    store.setEdges([{ id: 'e', source: 'a', target: 'b' }]);
+    const layoutFn = vi.fn().mockReturnValue({ a: { x: 0, y: 0 }, b: { x: 0, y: 120 } });
+    await service.applyLayout(layoutFn, { direction: 'TB' });
+    expect(layoutFn).toHaveBeenCalledOnce();
+    const [nodesArg, edgesArg, optsArg] = layoutFn.mock.calls[0];
+    expect(nodesArg.map((n: { id: string }) => n.id)).toEqual(['a', 'b']);
+    expect(edgesArg).toHaveLength(1);
+    expect(optsArg).toEqual({ direction: 'TB' });
+    expect(store.nodeLookup.get('b')!.position).toEqual({ x: 0, y: 120 });
+  });
+
+  it('applyLayout awaits async layout functions', async () => {
+    store.setNodes([{ id: 'a', data: {}, position: { x: 0, y: 0 } }]);
+    await service.applyLayout(async () => ({ a: { x: 42, y: 42 } }));
+    expect(store.nodeLookup.get('a')!.position).toEqual({ x: 42, y: 42 });
+  });
+});

@@ -25,6 +25,7 @@ import {
 import { FlowStore } from './flow-store.service';
 import type { Node, Edge, InternalNode, NgFlowInstance, NgFlowJsonObject, DeleteElementsOptions } from '../types';
 import type { NodeTemplateSpec } from '../types/node-template';
+import { prefersReducedMotion } from '../utils/position-tween';
 
 /** Keep in sync with `builtInNodeTypes` in container/node-renderer/node-renderer.component.ts. */
 const BUILT_IN_NODE_TYPE_NAMES = ['default', 'input', 'output', 'group'] as const;
@@ -236,6 +237,77 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     const update = typeof dataUpdate === 'function' ? dataUpdate(current.data) : dataUpdate;
     const next = { ...current, data: { ...current.data, ...update } } as NodeType;
     this.store.triggerNodeChanges([{ id, type: 'replace', item: next }]);
+  }
+
+  /**
+   * Move many nodes at once from a position map (e.g. the result of
+   * `layoutNodes`). Unknown ids are skipped. Animation defaults to the flow's
+   * `[animate]` input; pass `opts.animate` (true/false/{duration}) to override
+   * per call. Resolves when positions are applied — after the tween when
+   * animating, immediately otherwise.
+   *
+   * Positions are in `node.position` space (parent-relative for child nodes).
+   */
+  setNodePositions(
+    positions: Record<string, { x: number; y: number }>,
+    opts?: { animate?: boolean | { duration?: number } },
+  ): Promise<void> {
+    const valid: Record<string, { x: number; y: number }> = {};
+    for (const [id, pos] of Object.entries(positions)) {
+      if (this.store.nodeLookup.has(id)) valid[id] = pos;
+    }
+    if (Object.keys(valid).length === 0) return Promise.resolve();
+
+    const setting = opts?.animate ?? this.store.animate();
+    const animated = (setting === true || (typeof setting === 'object' && setting !== null)) && !prefersReducedMotion();
+    if (animated) {
+      const duration =
+        typeof setting === 'object' && setting !== null && (setting as { duration?: number }).duration != null
+          ? (setting as { duration?: number }).duration!
+          : this.store.animationDuration();
+      return this.store.tweenNodePositions(valid, duration);
+    }
+
+    const changes = Object.entries(valid).map(([id, position]) => ({
+      id,
+      type: 'position' as const,
+      position,
+    }));
+    this.store.triggerNodeChanges(changes as NodeChange<NodeType>[]);
+    return Promise.resolve();
+  }
+
+  /**
+   * One-call auto-layout: reads the current nodes/edges, runs `layoutFn`
+   * (e.g. `layoutNodes` from `@angflow/angular/layout` — passed in, not
+   * imported, so dagre stays out of bundles that never lay out), and applies
+   * the returned positions via {@link setNodePositions}.
+   *
+   * ```ts
+   * import { layoutNodes } from '@angflow/angular/layout';
+   * flow.applyLayout(layoutNodes, { direction: 'LR' });
+   * ```
+   *
+   * Internal nodes (with `measured` dimensions) are passed to `layoutFn`.
+   * `opts.animate` overrides the flow's `[animate]` input for this call; all
+   * other `opts` keys are forwarded to `layoutFn`.
+   *
+   * Positions are in `node.position` space (parent-relative for child nodes).
+   */
+  async applyLayout(
+    layoutFn: (
+      nodes: InternalNode<NodeType>[],
+      edges: EdgeType[],
+      opts?: Record<string, unknown>,
+    ) => Record<string, { x: number; y: number }> | Promise<Record<string, { x: number; y: number }>>,
+    opts?: Record<string, unknown> & { animate?: boolean | { duration?: number } },
+  ): Promise<void> {
+    const { animate, ...layoutOpts } = opts ?? {};
+    const nodes = this.getNodes().map(
+      (n) => this.getInternalNode(n.id) ?? (n as unknown as InternalNode<NodeType>),
+    );
+    const positions = await layoutFn(nodes, this.getEdges(), layoutOpts);
+    await this.setNodePositions(positions, animate === undefined ? undefined : { animate });
   }
 
   // ── Edge Operations ───────────────────────────────────────────────────
