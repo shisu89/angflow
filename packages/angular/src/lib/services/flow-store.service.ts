@@ -404,6 +404,8 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
     for (const [id, dragItem] of nodeDragItems) {
       // A user drag takes ownership of the node — kill any in-flight tween.
+      // Symmetric with tweenNodePositions skipping dragging nodes: drag cancels
+      // tweens here; tweens skip nodes whose dragging flag is already set.
       if (this.positionTweens.size > 0) this.cancelPositionTween(id);
       const node = this.nodeLookup.get(id);
       const expandParent = !!(node?.expandParent && node?.parentId && dragItem?.position);
@@ -477,6 +479,9 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     for (const [id, to] of Object.entries(positions)) {
       const node = this.nodeLookup.get(id);
       if (!node) continue;
+      // A node mid-drag belongs to the user — don't fight the pointer.
+      // (Symmetric with updateNodePositions cancelling tweens on drag.)
+      if (node.dragging) continue;
       // Tween in node.position space (parent-relative for child nodes): this is
       // the space triggerNodeChanges writes, so from/to/emitted stay coherent.
       const current = node.position;

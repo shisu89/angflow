@@ -293,20 +293,26 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * other `opts` keys are forwarded to `layoutFn`.
    *
    * Positions are in `node.position` space (parent-relative for child nodes).
+   *
+   * Note: flat layout functions like `layoutNodes` emit positions in one
+   * global space; nodes with a `parentId` would be mis-placed because
+   * positions are written parent-relative. Sub-flow layout is not supported —
+   * lay out top-level nodes only, or supply a layout fn that emits
+   * parent-relative coordinates.
    */
-  async applyLayout(
+  async applyLayout<O extends Record<string, unknown>>(
     layoutFn: (
       nodes: InternalNode<NodeType>[],
       edges: EdgeType[],
-      opts?: Record<string, unknown>,
+      opts?: O,
     ) => Record<string, { x: number; y: number }> | Promise<Record<string, { x: number; y: number }>>,
-    opts?: Record<string, unknown> & { animate?: boolean | { duration?: number } },
+    opts?: O & { animate?: boolean | { duration?: number } },
   ): Promise<void> {
-    const { animate, ...layoutOpts } = opts ?? {};
+    const { animate, ...layoutOpts } = opts ?? ({} as O & { animate?: boolean | { duration?: number } });
     const nodes = this.getNodes().map(
       (n) => this.getInternalNode(n.id) ?? (n as unknown as InternalNode<NodeType>),
     );
-    const positions = await layoutFn(nodes, this.getEdges(), layoutOpts);
+    const positions = await layoutFn(nodes, this.getEdges(), layoutOpts as unknown as O);
     await this.setNodePositions(positions, animate === undefined ? undefined : { animate });
   }
 

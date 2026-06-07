@@ -824,6 +824,16 @@ describe('tweenNodePositions', () => {
     frames.shift()?.(now); // simulate a stale frame firing despite cancel
     expect(store.nodeLookup.get('a')!.position.x).toBe(midX);
   });
+
+  it('skips nodes that are mid-drag (drag owns the position)', () => {
+    const store = new FlowStore();
+    store.setNodes([makeNode('a'), makeNode('b')]);
+    store.nodeLookup.get('a')!.dragging = true;
+    store.tweenNodePositions({ a: { x: 100, y: 0 }, b: { x: 0, y: 100 } }, 100);
+    tick(100);
+    expect(store.nodeLookup.get('a')!.position).toEqual({ x: 0, y: 0 }); // untouched
+    expect(store.nodeLookup.get('b')!.position).toEqual({ x: 0, y: 100 });
+  });
 });
 
 describe('animate signal helpers', () => {
