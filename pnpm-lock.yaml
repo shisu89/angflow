@@ -130,8 +130,8 @@ importers:
   packages/angular:
     dependencies:
       '@angflow/system':
-        specifier: '>=0.0.91'
-        version: 0.0.91
+        specifier: '>=0.0.93'
+        version: 0.0.93
       '@angular/common':
         specifier: '>=19.0.0'
         version: 21.2.7(@angular/core@21.2.15(@angular/compiler@21.2.15)(rxjs@7.8.2))(rxjs@7.8.2)
@@ -384,8 +384,8 @@ packages:
       vite:
         optional: true
 
-  '@angflow/system@0.0.91':
-    resolution: {integrity: sha512-NnI7h9LWOL5LkouIqp1Ifn02NwwTGEjBmPmocgR6f/2Am8x0CM2bZPdo11rVbt3q6ueRWMAro/BcVA+72jaaiQ==}
+  '@angflow/system@0.0.93':
+    resolution: {integrity: sha512-gqXiz8H3GBAeQPWDUIzys0Eoq0j9R/yzObsbUtx60KztgkH0crYHif3fwyFZ08/8hYNmXgFet9NiQba4h25buw==}
 
   '@angular-devkit/architect@0.2102.13':
     resolution: {integrity: sha512-fheyi0gPx6b7tT+WQ+ePlzdGqKjPLUK72wg5Z9pkVtQ5+VN/8yB9mlRlmoivngd2FeNG9wMeNynWZGYycnOWVw==}
@@ -5221,7 +5221,7 @@ snapshots:
       - '@emnapi/core'
       - '@emnapi/runtime'
 
-  '@angflow/system@0.0.91':
+  '@angflow/system@0.0.93':
     dependencies:
       '@types/d3-drag': 3.0.7
       '@types/d3-interpolate': 3.0.4
