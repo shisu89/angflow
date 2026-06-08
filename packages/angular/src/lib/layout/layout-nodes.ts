@@ -61,6 +61,14 @@ const DEFAULT_LABEL_HEIGHT = 20;
  * `initialWidth`/`initialHeight` → 150×40. Edges referencing ids not present in `nodes` are ignored in the result. Lives in the
  * `@angflow/angular/layout` subpath so `@dagrejs/dagre` (an optional peer
  * dependency) is only pulled into bundles that import it.
+ *
+ * Prefer `NgFlowService.applyLayout(layoutNodes, …)`: it measures live node
+ * footprints and edge-label boxes from the DOM and passes them in, so layout is
+ * correct even when `measured` is absent/stale (e.g. the controlled-mode
+ * round-trip). Calling `layoutNodes` directly uses only the dimensions on the
+ * objects you pass — supply measured nodes (e.g. internal nodes) for best
+ * results. Edge labels: pass `labelWidth`/`labelHeight` (or a truthy `label` for
+ * a default reservation) to reserve dagre space.
  */
 export function layoutNodes(
   nodes: LayoutNodeInput[],

@@ -212,10 +212,30 @@ flow.applyLayout(layoutNodes, { direction: 'LR' });
 ```
 
 Options: `direction` (`'TB' | 'LR' | 'BT' | 'RL'`, default `'TB'`), `nodeSep`
-(default 50), `rankSep` (default 80). Node dimensions resolve from
-`measured` → `width`/`height` → `initialWidth`/`initialHeight` → 150×40. Any
-function with the same shape plugs
-into `applyLayout` (elk, custom grids, …).
+(default 50), `rankSep` (default 80). Node dimensions resolve from `measured` → `width`/`height` →
+`initialWidth`/`initialHeight` → 150×40, and edge labels reserve dagre space from
+`labelWidth`/`labelHeight` (auto-measured by `applyLayout`) or a default box when an
+edge has a non-empty `label`. Any function with the same shape plugs into
+`applyLayout` (elk, custom grids, …).
+
+### Controlled mode and `measured`
+
+In controlled mode (`[nodes]` bound, re-emitted from `(nodesChange)`), re-emitting
+nodes that don't carry `measured` resets the stored dimensions. `applyLayout` reads
+live DOM sizes so layout stays correct regardless — but floating edges and `fitView`
+read the stored `measured` directly. If your app hand-handles only some changes (e.g.
+keeps `position` authority in a journal), forward dimension changes with
+`applyDimensionChanges` so `measured` stays current:
+
+```ts
+import { applyDimensionChanges } from '@angflow/angular';
+
+onNodesChange(changes: NodeChange[]) {
+  // keep measured flowing back: floating edges, fitView, layout stay correct
+  this.nodes.update((ns) => applyDimensionChanges(changes, ns));
+  // ...your own position/data handling on top...
+}
+```
 
 ## Animations
 
