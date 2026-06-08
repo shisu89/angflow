@@ -83,10 +83,13 @@ export function layoutNodes(
     g.setNode(n.id, { width, height });
   }
   for (const e of edges) {
-    const labelWidth = e.labelWidth ?? (e.label ? DEFAULT_LABEL_WIDTH : undefined);
-    const labelHeight = e.labelHeight ?? (e.label ? DEFAULT_LABEL_HEIGHT : undefined);
-    if (labelWidth != null && labelHeight != null) {
-      g.setEdge(e.source, e.target, { width: labelWidth, height: labelHeight, labelpos: 'c' });
+    const hasExplicitBox = e.labelWidth != null || e.labelHeight != null;
+    if (e.label || hasExplicitBox) {
+      g.setEdge(e.source, e.target, {
+        width: e.labelWidth ?? DEFAULT_LABEL_WIDTH,
+        height: e.labelHeight ?? DEFAULT_LABEL_HEIGHT,
+        labelpos: 'c',
+      });
     } else {
       g.setEdge(e.source, e.target);
     }

@@ -88,4 +88,14 @@ describe('layoutNodes edge labels', () => {
     const b = layoutNodes(nodes, [{ source: 'a', target: 'b', label: '' }], { direction: 'TB' });
     expect(a['b'].y).toBe(b['b'].y);
   });
+
+  it('reserves space when only one explicit label dimension is given (no label)', () => {
+    const withWidthOnly = layoutNodes(
+      nodes,
+      [{ source: 'a', target: 'b', labelWidth: 120 }],
+      { direction: 'TB' },
+    );
+    const without = layoutNodes(nodes, [{ source: 'a', target: 'b' }], { direction: 'TB' });
+    expect(withWidthOnly['b'].y).toBeGreaterThan(without['b'].y);
+  });
 });
