@@ -213,6 +213,7 @@ const builtInEdgeTypes: EdgeTypes = {
           @let ei = getEdgeInputs(edge);
           <div
             class="xy-flow__edge-label"
+            [attr.data-id]="edge.id"
             [style.position]="'absolute'"
             [style.transform]="'translate(-50%, -50%) translate(' + getEdgeCenterX(ei) + 'px, ' + getEdgeCenterY(ei) + 'px)'"
             [style.pointer-events]="'all'"
