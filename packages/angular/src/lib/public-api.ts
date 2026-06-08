@@ -57,7 +57,7 @@ export { NODE_ID, EDGE_ID } from './services/tokens';
 export * from './types';
 
 // Utilities
-export { applyNodeChanges, applyEdgeChanges } from './utils/changes';
+export { applyNodeChanges, applyEdgeChanges, applyDimensionChanges } from './utils/changes';
 
 // Wrapper utility functions for Angular-specific typing
 export { isNode, isEdge } from './utils/type-guards';
