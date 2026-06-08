@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { FlowStore } from './flow-store.service';
 import { NgFlowService } from './ng-flow.service';
+import { layoutNodes } from '../layout/layout-nodes';
 import type { Node, Edge } from '../types';
 
 function makeNode(id: string, overrides: Partial<Node> = {}): Node {
@@ -441,5 +442,34 @@ describe('setNodePositions / applyLayout', () => {
     await service.applyLayout(layoutFn);
     const edgesArg = layoutFn.mock.calls[0][1] as Array<{ labelWidth?: number }>;
     expect(edgesArg[0].labelWidth).toBeUndefined();
+  });
+
+  it('end-to-end: applyLayout(layoutNodes) — live node + edge-label measurements widen spacing', async () => {
+    const seed = () => {
+      store.setNodes([
+        { id: 'a', data: {}, position: { x: 0, y: 0 } },
+        { id: 'b', data: {}, position: { x: 0, y: 0 } },
+      ]);
+      store.setEdges([{ id: 'e', source: 'a', target: 'b', label: 'rel' }]);
+    };
+
+    // Baseline: no DOM → layoutNodes uses the 150×40 fallback and no label box.
+    seed();
+    store.domNode.set(null);
+    await service.applyLayout(layoutNodes, { direction: 'TB' });
+    const unmeasuredGap =
+      store.nodeLookup.get('b')!.position.y - store.nodeLookup.get('a')!.position.y;
+
+    // With live DOM: a is measured tall and the edge label box is measured, so dagre
+    // must reserve more vertical space — node b ends up further below a.
+    seed();
+    store.domNode.set(
+      fakeContainer({ a: { w: 100, h: 300 }, b: { w: 100, h: 40 } }, { e: { w: 120, h: 24 } }),
+    );
+    await service.applyLayout(layoutNodes, { direction: 'TB' });
+    const measuredGap =
+      store.nodeLookup.get('b')!.position.y - store.nodeLookup.get('a')!.position.y;
+
+    expect(measuredGap).toBeGreaterThan(unmeasuredGap);
   });
 });
