@@ -1,7 +1,7 @@
-# Auto-layout robustness: live DOM measurement + controlled-mode `measured` sync
+# Auto-layout robustness: live DOM measurement (nodes + edge labels) and controlled-mode `measured` sync
 
 **Date:** 2026-06-08
-**Source:** angflow feedback #5 (`brainstorm_agentic_app/docs/angflow-feedback.md`), plus #4 bookkeeping.
+**Source:** angflow feedback #5 and #6 (`brainstorm_agentic_app/docs/angflow-feedback.md`), plus #4 bookkeeping.
 
 ## Problem
 
@@ -28,6 +28,18 @@ The first symptom (bad layout) is the loud one. The same wiped/stale `measured` 
 silently degrades other measured-dependent features in controlled mode: floating
 edges (attachment geometry) and `fitView` (bounds).
 
+### Edge labels overlapped (feedback #6)
+
+`layoutNodes` calls `g.setEdge(e.source, e.target)` with **no label box**, so dagre
+reserves zero space for edge labels. A labeled cross-branch edge then routes its label
+mid-edge, potentially on top of a distant node. Bumping `rankSep` does not fix it (the
+label is not in a rank gap). dagre *can* route around labels when given
+`setEdge(v, w, { width, height, labelpos })` — it inserts the label as a dummy node —
+but `layoutNodes` exposes no way to pass label dimensions. This is the edge-label twin
+of the node-measurement problem above: dagre is fed the wrong sizes, this time for
+labels instead of nodes. Today's workaround re-introduces the very
+`tidy-layout.ts` file that feedback #2 had removed.
+
 ## Goals
 
 - `applyLayout` produces correct layouts regardless of the controlled-mode round-trip
@@ -35,6 +47,8 @@ edges (attachment geometry) and `fitView` (bounds).
 - Controlled-mode apps have a supported, low-boilerplate way to keep the store's
   `measured` correct so floating edges and `fitView` also work.
 - `layoutNodes` stays pure (no DOM, no dagre pulled into SSR/non-layout bundles).
+- `applyLayout` reserves space for edge labels so they are not overlapped, reusing the
+  same live-DOM measurement pass — removing the need for an app-side dagre workaround.
 - No changes to system-package reconciliation semantics.
 
 ## Non-goals
@@ -141,6 +155,52 @@ onNodesChange(changes: NodeChange[]) {
 }
 ```
 
+### Part D — edge-label spacing (feedback #6)
+
+Symmetric with Part A, on the edge side.
+
+**`layoutNodes` (pure) — accept a label box per edge.** Widen the edge input shape from
+`{ source; target }` to a `LayoutEdgeInput`:
+
+```ts
+export interface LayoutEdgeInput {
+  source: string;
+  target: string;
+  label?: unknown;        // dagre space is reserved when this is truthy
+  labelWidth?: number;    // measured label box; filled by applyLayout from the DOM
+  labelHeight?: number;
+}
+```
+
+In `layoutNodes`, when an edge supplies `labelWidth`/`labelHeight`, call
+`g.setEdge(e.source, e.target, { width, height, labelpos: 'c' })`. When an edge has a
+truthy `label` but no measured box, reserve a **conservative default box**
+(`DEFAULT_LABEL_WIDTH`/`DEFAULT_LABEL_HEIGHT`, e.g. `60×20`) so direct callers and
+not-yet-rendered labels still get *some* spacing rather than zero. Edges with no label
+and no box fall through to the current `g.setEdge(e.source, e.target)` (no dummy node,
+no behavior change). This keeps `layoutNodes` pure — it only reads fields off the edge
+objects it is handed.
+
+**`applyLayout` — measure label boxes from the DOM.** Extend the live-DOM pass (Part A)
+to also enrich edges: for each edge, look up
+`store.domNode()?.querySelector('.xy-flow__edge-label[data-id="<id>"]')`, read
+`offsetWidth`/`offsetHeight`, and on a shallow clone set `labelWidth`/`labelHeight`
+(and carry `label` through). Absent element or zero size → leave the edge as-is (the
+`layoutNodes` default box, if any, applies). Same single-reflow batched-read discipline
+as nodes; original store edge objects are not mutated.
+
+**Renderer change (enabling).** The label `<div class="xy-flow__edge-label">`
+(`edge-renderer.component.ts:215`) currently carries no id. Add
+`[attr.data-id]="edge.id"` so `applyLayout` can address each label. Purely additive;
+the label only renders when `edge.label` is truthy, so the selector naturally matches
+exactly the labels that need spacing. `offsetWidth`/`offsetHeight` are intrinsic layout
+dims unaffected by the pane's `scale` (the label's own `translate(-50%,-50%)` transform
+does not change them) — no `÷ zoom`.
+
+The private DOM-measurement helper from Part A grows an edge sibling
+(`withLiveEdgeLabels`) following the same shape; `applyLayout` calls both before
+invoking `layoutFn`.
+
 ### Part C — feedback #4 cleanup (bookkeeping only, no code)
 
 `9be04de28` already fixed #4 (minimap color inputs — inline `[style.fill]` instead of
@@ -164,8 +224,19 @@ new `@angflow/angular` version, then adopt in `brainstorm_agentic_app` (the app'
   no-element fallback (node passed through unchanged). Use a fake element/container
   rather than a full render to keep it a fast unit test, mirroring existing service
   specs.
-- **`layoutNodes`** existing spec is unchanged (it stays pure); add nothing unless the
-  docstring example changes break a doctest (none exist).
+- **`layoutNodes` edge labels** (extend `layout-nodes.spec.ts`): an edge with
+  `labelWidth`/`labelHeight` produces more inter-rank space than the same graph without
+  (assert via the resulting positions / dagre graph node count incl. the label dummy);
+  a truthy `label` with no box reserves the default box; an edge with neither behaves
+  exactly as before (no regression). Stays pure — no DOM.
+- **`applyLayout` edge-label measurement** (same service/integration spec as Part A):
+  with stubbed `.xy-flow__edge-label[data-id]` elements reporting known
+  `offsetWidth/Height`, assert `layoutFn` receives edges whose `labelWidth/labelHeight`
+  reflect the DOM and that store edge objects are not mutated; absent element → edge
+  passed through unchanged.
+- **Renderer** (`edge-renderer.component`): a labeled edge's `.xy-flow__edge-label`
+  div exposes `data-id`. Add to the existing edge-renderer spec if present, else a
+  minimal assertion.
 - Regression bar: the zonal example suite (`examples/angular/`) must still pass.
 
 ## Alternatives considered
@@ -187,15 +258,15 @@ new `@angflow/angular` version, then adopt in `brainstorm_agentic_app` (the app'
 
 ## Rollout
 
-1. Implement Part A + B in `@angflow/angular`, with tests.
+1. Implement Parts A + B + D in `@angflow/angular`, with tests.
 2. `npm version patch` `@angflow/system`? — **no**, no system change. Bump
    `@angflow/angular` only.
 3. Build, publish `@angflow/angular`.
-4. Update `angflow-feedback.md`: mark #5 ✅ (link the implementing commit) and #4 ✅
-   (link `9be04de28`).
-5. Adopt in `brainstorm_agentic_app`: simplify `tidy()` (drop the manual per-node
-   footprint estimate now that `applyLayout` measures live), and wire
-   `applyDimensionChanges` into `onNodesChange`. Replace the minimap CSS-hook
+4. Update `angflow-feedback.md`: mark #5 and #6 ✅ (link the implementing commit) and
+   #4 ✅ (link `9be04de28`).
+5. Adopt in `brainstorm_agentic_app`: delete `tidy-layout.ts` again and call
+   `applyLayout` (now that it measures both node footprints and edge-label boxes live),
+   wire `applyDimensionChanges` into `onNodesChange`, and replace the minimap CSS-hook
    workaround with the now-working color inputs.
 
 *Process note: this design touches only the Angular package and docs; the system
