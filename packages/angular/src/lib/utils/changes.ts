@@ -146,17 +146,23 @@ export function applyEdgeChanges<EdgeType extends Edge = Edge>(
  * (e.g. a journal) but still want `measured` to flow back so that layout
  * (`applyLayout`), floating edges, and `fitView` stay correct.
  *
+ * The `setAttributes` and `resizing` fields of a dimensions change are
+ * intentionally NOT applied (unlike `applyNodeChanges`) — this helper only
+ * syncs `measured`; use `applyNodeChanges` if you need the width/height
+ * write-back. If multiple dimension changes target the same node, the last
+ * one wins.
+ *
  * @example
  * ```typescript
  * onNodesChange(changes: NodeChange[]) {
- *   this.nodes.update((ns) => applyDimensionChanges(ns, changes));
+ *   this.nodes.update((ns) => applyDimensionChanges(changes, ns));
  *   // ...your own position/data handling on top...
  * }
  * ```
  */
 export function applyDimensionChanges<NodeType extends Node = Node>(
-  nodes: NodeType[],
   changes: NodeChange<NodeType>[],
+  nodes: NodeType[],
 ): NodeType[] {
   const dims = new Map<string, { width: number; height: number }>();
   for (const change of changes) {

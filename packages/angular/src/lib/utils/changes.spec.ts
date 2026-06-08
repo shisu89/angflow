@@ -229,18 +229,22 @@ describe('getSelectionChanges', () => {
 describe('applyDimensionChanges', () => {
   it('writes measured from a dimensions change', () => {
     const nodes = [makeNode('1')];
-    const result = applyDimensionChanges(nodes, [
-      { id: '1', type: 'dimensions', dimensions: { width: 220, height: 90 } },
-    ]);
+    const result = applyDimensionChanges(
+      [{ id: '1', type: 'dimensions', dimensions: { width: 220, height: 90 } }],
+      nodes,
+    );
     expect(result[0].measured).toEqual({ width: 220, height: 90 });
   });
 
   it('ignores non-dimensions changes', () => {
     const nodes = [makeNode('1', { measured: { width: 10, height: 10 } })];
-    const result = applyDimensionChanges(nodes, [
-      { id: '1', type: 'position', position: { x: 5, y: 5 } },
-      { id: '1', type: 'select', selected: true },
-    ]);
+    const result = applyDimensionChanges(
+      [
+        { id: '1', type: 'position', position: { x: 5, y: 5 } },
+        { id: '1', type: 'select', selected: true },
+      ],
+      nodes,
+    );
     expect(result[0].measured).toEqual({ width: 10, height: 10 });
     expect(result[0].position).toEqual({ x: 0, y: 0 });
     expect(result[0].selected).toBeUndefined();
@@ -248,27 +252,32 @@ describe('applyDimensionChanges', () => {
 
   it('returns the SAME array reference when no dimensions change is present', () => {
     const nodes = [makeNode('1')];
-    const result = applyDimensionChanges(nodes, [
-      { id: '1', type: 'position', position: { x: 1, y: 1 } },
-    ]);
+    const result = applyDimensionChanges(
+      [{ id: '1', type: 'position', position: { x: 1, y: 1 } }],
+      nodes,
+    );
     expect(result).toBe(nodes);
   });
 
   it('skips unknown ids and applies the rest', () => {
     const nodes = [makeNode('1'), makeNode('2')];
-    const result = applyDimensionChanges(nodes, [
-      { id: 'ghost', type: 'dimensions', dimensions: { width: 1, height: 1 } },
-      { id: '2', type: 'dimensions', dimensions: { width: 50, height: 30 } },
-    ]);
+    const result = applyDimensionChanges(
+      [
+        { id: 'ghost', type: 'dimensions', dimensions: { width: 1, height: 1 } },
+        { id: '2', type: 'dimensions', dimensions: { width: 50, height: 30 } },
+      ],
+      nodes,
+    );
     expect(result[0].measured).toBeUndefined();
     expect(result[1].measured).toEqual({ width: 50, height: 30 });
   });
 
   it('does not mutate the input nodes', () => {
     const nodes = [makeNode('1')];
-    applyDimensionChanges(nodes, [
-      { id: '1', type: 'dimensions', dimensions: { width: 7, height: 7 } },
-    ]);
+    applyDimensionChanges(
+      [{ id: '1', type: 'dimensions', dimensions: { width: 7, height: 7 } }],
+      nodes,
+    );
     expect(nodes[0].measured).toBeUndefined();
   });
 });
