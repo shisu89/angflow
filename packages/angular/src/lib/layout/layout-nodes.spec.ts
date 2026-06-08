@@ -55,3 +55,37 @@ describe('layoutNodes', () => {
     expect(Number.isFinite(positions['a'].y)).toBe(true);
   });
 });
+
+describe('layoutNodes edge labels', () => {
+  const nodes = [
+    { id: 'a', width: 100, height: 40 },
+    { id: 'b', width: 100, height: 40 },
+  ];
+
+  it('reserves more rank space when an edge has a measured label box', () => {
+    const withLabel = layoutNodes(
+      nodes,
+      [{ source: 'a', target: 'b', label: 'relates to', labelWidth: 120, labelHeight: 24 }],
+      { direction: 'TB' },
+    );
+    const without = layoutNodes(nodes, [{ source: 'a', target: 'b' }], { direction: 'TB' });
+    // dagre inserts the label as a dummy node along the edge, pushing b further down.
+    expect(withLabel['b'].y).toBeGreaterThan(without['b'].y);
+  });
+
+  it('reserves a default box when an edge has a truthy label but no measured size', () => {
+    const withLabel = layoutNodes(
+      nodes,
+      [{ source: 'a', target: 'b', label: 'x' }],
+      { direction: 'TB' },
+    );
+    const without = layoutNodes(nodes, [{ source: 'a', target: 'b' }], { direction: 'TB' });
+    expect(withLabel['b'].y).toBeGreaterThan(without['b'].y);
+  });
+
+  it('an edge with no label behaves exactly as before (no label box)', () => {
+    const a = layoutNodes(nodes, [{ source: 'a', target: 'b' }], { direction: 'TB' });
+    const b = layoutNodes(nodes, [{ source: 'a', target: 'b', label: '' }], { direction: 'TB' });
+    expect(a['b'].y).toBe(b['b'].y);
+  });
+});

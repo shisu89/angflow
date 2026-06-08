@@ -22,9 +22,29 @@ export interface LayoutNodeInput {
   measured?: { width?: number; height?: number };
 }
 
+/**
+ * Minimal structural shape `layoutNodes` reads from each edge. Real angflow
+ * `Edge` / `InternalEdge` objects satisfy it as-is. When `labelWidth`/
+ * `labelHeight` are present, dagre reserves that space for the label;
+ * otherwise a truthy `label` reserves a small default box, and a falsy `label`
+ * reserves nothing (current behavior). `applyLayout` fills the measured box
+ * from the live DOM.
+ */
+export interface LayoutEdgeInput {
+  source: string;
+  target: string;
+  label?: unknown;
+  labelWidth?: number;
+  labelHeight?: number;
+}
+
 // Match the renderer's unmeasured-node fallbacks (edge-renderer.component.ts).
 const DEFAULT_WIDTH = 150;
 const DEFAULT_HEIGHT = 40;
+
+// Conservative reservation for a labeled edge whose label box wasn't measured.
+const DEFAULT_LABEL_WIDTH = 60;
+const DEFAULT_LABEL_HEIGHT = 20;
 
 /**
  * Standalone dagre auto-layout: returns a map of node id → top-left position
@@ -44,7 +64,7 @@ const DEFAULT_HEIGHT = 40;
  */
 export function layoutNodes(
   nodes: LayoutNodeInput[],
-  edges: ReadonlyArray<{ source: string; target: string }>,
+  edges: ReadonlyArray<LayoutEdgeInput>,
   opts: LayoutNodesOptions = {},
 ): Record<string, { x: number; y: number }> {
   const g = new graphlib.Graph();
@@ -63,7 +83,13 @@ export function layoutNodes(
     g.setNode(n.id, { width, height });
   }
   for (const e of edges) {
-    g.setEdge(e.source, e.target);
+    const labelWidth = e.labelWidth ?? (e.label ? DEFAULT_LABEL_WIDTH : undefined);
+    const labelHeight = e.labelHeight ?? (e.label ? DEFAULT_LABEL_HEIGHT : undefined);
+    if (labelWidth != null && labelHeight != null) {
+      g.setEdge(e.source, e.target, { width: labelWidth, height: labelHeight, labelpos: 'c' });
+    } else {
+      g.setEdge(e.source, e.target);
+    }
   }
   layout(g);
 
