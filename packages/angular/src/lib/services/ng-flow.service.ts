@@ -309,11 +309,67 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     opts?: O & { animate?: boolean | { duration?: number } },
   ): Promise<void> {
     const { animate, ...layoutOpts } = opts ?? ({} as O & { animate?: boolean | { duration?: number } });
-    const nodes = this.getNodes().map(
-      (n) => this.getInternalNode(n.id) ?? (n as unknown as InternalNode<NodeType>),
+    const nodes = this.withLiveMeasurements(
+      this.getNodes().map((n) => this.getInternalNode(n.id) ?? (n as unknown as InternalNode<NodeType>)),
     );
-    const positions = await layoutFn(nodes, this.getEdges(), layoutOpts as unknown as O);
+    const edges = this.withLiveEdgeLabels(this.getEdges());
+    const positions = await layoutFn(nodes, edges, layoutOpts as unknown as O);
     await this.setNodePositions(positions, animate === undefined ? undefined : { animate });
+  }
+
+  /**
+   * Override each node's `measured` from its live rendered element
+   * (`.xy-flow__node[data-id]`) when present. `offsetWidth/Height` are intrinsic
+   * layout dims, unaffected by the pane's CSS scale — no zoom math. Reads only;
+   * returns shallow clones so store objects are never mutated. Nodes with no
+   * element (hidden / SSR / not-yet-rendered) or zero size pass through unchanged
+   * so `layoutNodes`' measured→width→initial→default fallback still applies.
+   */
+  private withLiveMeasurements(nodes: InternalNode<NodeType>[]): InternalNode<NodeType>[] {
+    const container = this.store.domNode();
+    if (!container) return nodes;
+    return nodes.map((n) => {
+      const escaped = NgFlowService.cssEscapeId(n.id);
+      const el = container.querySelector(`.xy-flow__node[data-id="${escaped}"]`) as HTMLElement | null;
+      if (!el) return n;
+      const width = el.offsetWidth;
+      const height = el.offsetHeight;
+      if (!width || !height) return n;
+      return { ...n, measured: { width, height } };
+    });
+  }
+
+  /**
+   * Fill each edge's `labelWidth`/`labelHeight` from its live label element
+   * (`.xy-flow__edge-label[data-id]`) when present, so `layoutNodes` can reserve
+   * dagre space for the label. Reads only; returns shallow clones. Edges with no
+   * rendered label pass through unchanged.
+   */
+  private withLiveEdgeLabels(edges: EdgeType[]): EdgeType[] {
+    const container = this.store.domNode();
+    if (!container) return edges;
+    return edges.map((e) => {
+      const escaped = NgFlowService.cssEscapeId(e.id);
+      const el = container.querySelector(`.xy-flow__edge-label[data-id="${escaped}"]`) as HTMLElement | null;
+      if (!el) return e;
+      const labelWidth = el.offsetWidth;
+      const labelHeight = el.offsetHeight;
+      if (!labelWidth || !labelHeight) return e;
+      return { ...e, labelWidth, labelHeight } as EdgeType;
+    });
+  }
+
+  /**
+   * Escape a string for use in a CSS attribute selector value.
+   * Uses the native `CSS.escape` when available (browser), and falls back to a
+   * minimal implementation for SSR / jsdom environments.
+   */
+  private static cssEscapeId(id: string): string {
+    if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+      return CSS.escape(id);
+    }
+    // Minimal fallback: escape characters that are special inside CSS strings/selectors
+    return id.replace(/["\\]/g, '\\$&');
   }
 
   // ── Edge Operations ───────────────────────────────────────────────────

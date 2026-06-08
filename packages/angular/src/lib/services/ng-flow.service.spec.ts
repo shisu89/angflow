@@ -375,4 +375,71 @@ describe('setNodePositions / applyLayout', () => {
     await service.applyLayout(async () => ({ a: { x: 42, y: 42 } }));
     expect(store.nodeLookup.get('a')!.position).toEqual({ x: 42, y: 42 });
   });
+
+  function fakeContainer(
+    nodeDims: Record<string, { w: number; h: number }>,
+    labelDims: Record<string, { w: number; h: number }> = {},
+  ): HTMLDivElement {
+    return {
+      querySelector(selector: string): { offsetWidth: number; offsetHeight: number } | null {
+        const node = selector.match(/^\.xy-flow__node\[data-id="(.+)"\]$/);
+        if (node) {
+          const d = nodeDims[node[1]];
+          return d ? { offsetWidth: d.w, offsetHeight: d.h } : null;
+        }
+        const label = selector.match(/^\.xy-flow__edge-label\[data-id="(.+)"\]$/);
+        if (label) {
+          const d = labelDims[label[1]];
+          return d ? { offsetWidth: d.w, offsetHeight: d.h } : null;
+        }
+        return null;
+      },
+    } as unknown as HTMLDivElement;
+  }
+
+  it('applyLayout overrides node measured from the live DOM (always)', async () => {
+    store.setNodes([{ id: 'a', data: {}, position: { x: 0, y: 0 } }]);
+    store.domNode.set(fakeContainer({ a: { w: 300, h: 120 } }));
+    const layoutFn = vi.fn().mockReturnValue({ a: { x: 0, y: 0 } });
+    await service.applyLayout(layoutFn);
+    const nodesArg = layoutFn.mock.calls[0][0] as Array<{ id: string; measured?: { width?: number; height?: number } }>;
+    expect(nodesArg[0].measured).toEqual({ width: 300, height: 120 });
+    expect(store.nodeLookup.get('a')!.measured).not.toEqual({ width: 300, height: 120 });
+  });
+
+  it('applyLayout leaves a node unchanged when no DOM element exists', async () => {
+    store.setNodes([{ id: 'a', data: {}, position: { x: 0, y: 0 }, measured: { width: 10, height: 10 } }]);
+    store.domNode.set(fakeContainer({}));
+    const layoutFn = vi.fn().mockReturnValue({ a: { x: 0, y: 0 } });
+    await service.applyLayout(layoutFn);
+    const nodesArg = layoutFn.mock.calls[0][0] as Array<{ measured?: { width?: number; height?: number } }>;
+    expect(nodesArg[0].measured).toEqual({ width: 10, height: 10 });
+  });
+
+  it('applyLayout fills edge label dims from the live DOM', async () => {
+    store.setNodes([
+      { id: 'a', data: {}, position: { x: 0, y: 0 } },
+      { id: 'b', data: {}, position: { x: 0, y: 0 } },
+    ]);
+    store.setEdges([{ id: 'e', source: 'a', target: 'b', label: 'rel' }]);
+    store.domNode.set(fakeContainer({}, { e: { w: 140, h: 22 } }));
+    const layoutFn = vi.fn().mockReturnValue({});
+    await service.applyLayout(layoutFn);
+    const edgesArg = layoutFn.mock.calls[0][1] as Array<{ id: string; labelWidth?: number; labelHeight?: number }>;
+    expect(edgesArg[0].labelWidth).toBe(140);
+    expect(edgesArg[0].labelHeight).toBe(22);
+    expect((store.edgeLookup.get('e') as { labelWidth?: number }).labelWidth).toBeUndefined();
+  });
+
+  it('applyLayout passes edges through unchanged when no domNode is set', async () => {
+    store.setNodes([
+      { id: 'a', data: {}, position: { x: 0, y: 0 } },
+      { id: 'b', data: {}, position: { x: 0, y: 0 } },
+    ]);
+    store.setEdges([{ id: 'e', source: 'a', target: 'b', label: 'rel' }]);
+    const layoutFn = vi.fn().mockReturnValue({});
+    await service.applyLayout(layoutFn);
+    const edgesArg = layoutFn.mock.calls[0][1] as Array<{ labelWidth?: number }>;
+    expect(edgesArg[0].labelWidth).toBeUndefined();
+  });
 });
