@@ -133,9 +133,10 @@ New pure helper, exported from `@angflow/angular` (alongside `applyNodeChanges` 
  * (e.g. a journal) but still want `measured` to flow back so floating edges,
  * `fitView`, and `applyLayout`-free measurement work.
  */
+// arg order matches sibling applyNodeChanges(changes, nodes)
 export function applyDimensionChanges<NodeType extends Node>(
-  nodes: NodeType[],
   changes: NodeChange<NodeType>[],
+  nodes: NodeType[],
 ): NodeType[];
 ```
 
@@ -150,7 +151,7 @@ wrong home — README of `packages/angular`) with the copy-paste pattern:
 ```ts
 onNodesChange(changes: NodeChange[]) {
   // keep measured flowing back so layout / floating edges / fitView stay correct
-  this.nodes.update((ns) => applyDimensionChanges(ns, changes));
+  this.nodes.update((ns) => applyDimensionChanges(changes, ns));
   // ...your own position/data handling (journal authority) on top...
 }
 ```
