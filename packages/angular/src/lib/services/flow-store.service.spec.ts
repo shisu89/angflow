@@ -852,3 +852,43 @@ describe('animate signal helpers', () => {
     expect(store.animationDuration()).toBe(200);
   });
 });
+
+describe('collapse computeds', () => {
+  let store: FlowStore;
+
+  beforeEach(() => {
+    store = new FlowStore();
+  });
+
+  it('visibleNodes excludes descendants of a collapsed parent', () => {
+    store.setNodes([
+      { id: 'g', data: {}, position: { x: 0, y: 0 }, collapsed: true },
+      { id: 'a', data: {}, position: { x: 0, y: 0 }, parentId: 'g' },
+      { id: 'x', data: {}, position: { x: 0, y: 0 } },
+    ]);
+    const ids = store.visibleNodes().map((n) => n.id).sort();
+    expect(ids).toEqual(['g', 'x']);
+  });
+
+  it('displayEdges reroutes a crossing edge to the collapsed box', () => {
+    store.setNodes([
+      { id: 'g', data: {}, position: { x: 0, y: 0 }, collapsed: true },
+      { id: 'a', data: {}, position: { x: 0, y: 0 }, parentId: 'g' },
+      { id: 'x', data: {}, position: { x: 0, y: 0 } },
+    ]);
+    store.setEdges([{ id: 'e1', source: 'x', target: 'a' }]);
+    const de = store.displayEdges();
+    expect(de).toHaveLength(1);
+    expect(de[0].target).toBe('g');
+  });
+
+  it('an expanded group hides nothing and leaves edges intact', () => {
+    store.setNodes([
+      { id: 'g', data: {}, position: { x: 0, y: 0 }, collapsed: false },
+      { id: 'a', data: {}, position: { x: 0, y: 0 }, parentId: 'g' },
+    ]);
+    store.setEdges([{ id: 'e1', source: 'a', target: 'a' }]);
+    expect(store.visibleNodes().map((n) => n.id).sort()).toEqual(['a', 'g']);
+    expect(store.displayEdges()).toHaveLength(1);
+  });
+});

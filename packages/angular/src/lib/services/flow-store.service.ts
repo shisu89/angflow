@@ -45,6 +45,7 @@ import type { Node, Edge, InternalNode } from '../types';
 import type { NodeTemplateSpec } from '../types/node-template';
 import { applyNodeChanges, applyEdgeChanges, createSelectionChange, getSelectionChanges } from '../utils/changes';
 import { sampleTween, prefersReducedMotion, type TweenEntry } from '../utils/position-tween';
+import { getCollapsedHiddenIds, rewriteEdgesForCollapse, type DisplayEdge } from '../graph/collapse';
 
 @Injectable()
 export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edge> implements OnDestroy {
@@ -293,15 +294,26 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     this.edges().filter((e) => e.selected)
   );
 
+  readonly collapsedHiddenIds = computed(() => {
+    this.version();
+    return getCollapsedHiddenIds(this.nodeLookup);
+  });
+
   readonly visibleNodes: Signal<InternalNodeBase<NodeType>[]> = computed(() => {
     // Read version to trigger recomputation on any visual change (drag, add, remove)
     this.version();
+    const hidden = this.collapsedHiddenIds();
+    const base = !this.onlyRenderVisibleElements()
+      ? Array.from(this.nodeLookup.values())
+      : getNodesInside(this.nodeLookup, { x: 0, y: 0, width: this.width(), height: this.height() }, this.transform(), true);
+    return hidden.size ? base.filter((n) => !hidden.has(n.id)) : base;
+  });
 
-    if (!this.onlyRenderVisibleElements()) {
-      return Array.from(this.nodeLookup.values());
-    }
-    const t = this.transform();
-    return getNodesInside(this.nodeLookup, { x: 0, y: 0, width: this.width(), height: this.height() }, t, true);
+  readonly displayEdges = computed<DisplayEdge<EdgeType>[]>(() => {
+    this.version();
+    const edges = this.edges();
+    const hidden = this.collapsedHiddenIds();
+    return hidden.size ? rewriteEdgesForCollapse(edges, this.nodeLookup, hidden) : (edges as DisplayEdge<EdgeType>[]);
   });
 
   readonly visibleEdgeIds: Signal<Set<string>> = computed(() => {
