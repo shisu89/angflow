@@ -248,8 +248,10 @@ export class EdgeRendererComponent {
   readonly reconnectEnd = output<{ event: MouseEvent | TouchEvent; edge: Edge; handleType: HandleType; connectionState: FinalConnectionState }>();
 
   readonly visibleEdges = computed(() => {
-    const visibleIds = this.store.visibleEdgeIds();
-    return this.store.edges().filter((e) => visibleIds.has(e.id));
+    const edges = this.store.displayEdges();
+    if (!this.store.onlyRenderVisibleElements()) return edges;
+    const visibleNodeIds = new Set(this.store.visibleNodes().map((n) => n.id));
+    return edges.filter((e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target));
   });
 
   readonly markers = computed(() => {
