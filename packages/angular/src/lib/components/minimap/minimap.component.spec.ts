@@ -113,3 +113,29 @@ describe('MiniMapComponent color inputs', () => {
     expect(path.style.fill).toBe('');
   });
 });
+
+describe('MiniMapComponent excludes collapsed-hidden nodes', () => {
+  let store: FlowStore;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [MiniMapComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    store = TestBed.inject(FlowStore);
+    store.width.set(800);
+    store.height.set(600);
+  });
+
+  it('omits descendants of a collapsed group from minimapNodes', () => {
+    store.setNodes([
+      { id: 'g', position: { x: 0, y: 0 }, data: {}, collapsed: true },
+      { id: 'a', position: { x: 0, y: 0 }, data: {}, parentId: 'g' },
+      { id: 'x', position: { x: 0, y: 0 }, data: {} },
+    ] as never);
+    const fixture = createMinimap();
+    const ids = fixture.componentInstance.minimapNodes().map((n) => n.id).sort();
+    expect(ids).toEqual(['g', 'x']);
+  });
+});

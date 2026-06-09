@@ -183,7 +183,8 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
 
   readonly minimapNodes = computed(() => {
     this.store.version(); // react to node changes
-    const nodes = Array.from(this.store.nodeLookup.values());
+    const hidden = this.store.collapsedHiddenIds();
+    const nodes = Array.from(this.store.nodeLookup.values()).filter((node) => !hidden.has(node.id));
     return nodes.map((node) => ({
       id: node.id,
       x: node.internals?.positionAbsolute?.x ?? 0,
