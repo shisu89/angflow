@@ -504,6 +504,12 @@ describe('collapse writers', () => {
     expect(store.nodeLookup.get('g')!.collapsed).toBe(true);
   });
 
+  it('toggleNodeCollapsed on a node with no collapsed field sets it to true', () => {
+    store.setNodes([{ id: 'g', data: {}, position: { x: 0, y: 0 } }]);
+    service.toggleNodeCollapsed('g');
+    expect(store.nodeLookup.get('g')!.collapsed).toBe(true);
+  });
+
   it('setNodeCollapsed on an unknown id is a no-op', () => {
     store.setNodes([{ id: 'g', data: {}, position: { x: 0, y: 0 } }]);
     expect(() => service.setNodeCollapsed('ghost', true)).not.toThrow();
