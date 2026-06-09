@@ -55,6 +55,7 @@ const builtInNodeTypes: NodeTypes = {
         [class.selectable]="node.selectable !== false && store.elementsSelectable()"
         [class.connectable]="(node.connectable ?? store.nodesConnectable())"
         [class.connection-target]="store.connectionTargetNodeId() === node.id"
+        [class.collapsed]="node.collapsed"
         [ngFlowDrag]="node.id"
         [ngFlowDragDisabled]="node.draggable === false || !store.nodesDraggable()"
         [ngFlowDragSelectable]="node.selectable !== false && store.elementsSelectable()"
@@ -487,6 +488,7 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
       sourcePosition: computed(() => getNode()?.sourcePosition),
       targetPosition: computed(() => getNode()?.targetPosition),
       dragHandle: computed(() => getNode()?.dragHandle),
+      collapsed: computed(() => getNode()?.collapsed ?? false),
     };
   }
 }

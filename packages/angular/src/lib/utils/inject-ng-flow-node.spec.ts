@@ -29,6 +29,7 @@ function makeStubContext(opts: {
     sourcePosition: computed(() => undefined),
     targetPosition: computed(() => undefined),
     dragHandle: computed(() => undefined),
+    collapsed: computed(() => false),
   };
 
   return { context, dataSig, selectedSig };

@@ -206,6 +206,13 @@ svg.xy-flow__connectionline {
   outline: none;
 }
 
+.xy-flow__node.collapsed {
+  /* Folded group: drop the expanded footprint to a header strip. Overrides an
+     inline style.height set in controlled mode; apps may extend this rule. */
+  height: var(--xy-node-collapsed-height, 40px) !important;
+  overflow: hidden;
+}
+
 /* Entry animation — applied by the node renderer when [animate] is enabled.
    Uses the standalone `scale` property so it composes with the inline
    translate() transform instead of overriding it. */

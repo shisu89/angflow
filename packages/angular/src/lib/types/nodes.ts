@@ -110,4 +110,7 @@ export interface NgFlowNodeContext<TData = unknown> {
 
   /** CSS selector for the drag-handle sub-element, if any. */
   readonly dragHandle: Signal<string | undefined>;
+
+  /** True when this node is collapsed (a group folded to its box). */
+  readonly collapsed: Signal<boolean>;
 }
