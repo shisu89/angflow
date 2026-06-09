@@ -240,6 +240,25 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   }
 
   /**
+   * Set a (group/parent) node's `collapsed` state. Emits a `replace` node change
+   * so controlled apps can journal it. angflow derives descendant hiding and
+   * crossing-edge rerouting from this flag.
+   */
+  setNodeCollapsed(id: string, collapsed: boolean): void {
+    const current = this.store.nodes().find((n) => n.id === id);
+    if (!current) return;
+    const next = { ...current, collapsed } as NodeType;
+    this.store.triggerNodeChanges([{ id, type: 'replace', item: next }]);
+  }
+
+  /** Flip a node's `collapsed` state. No-op for unknown ids. */
+  toggleNodeCollapsed(id: string): void {
+    const current = this.store.nodes().find((n) => n.id === id);
+    if (!current) return;
+    this.setNodeCollapsed(id, !current.collapsed);
+  }
+
+  /**
    * Move many nodes at once from a position map (e.g. the result of
    * `layoutNodes`). Unknown ids are skipped. Animation defaults to the flow's
    * `[animate]` input; pass `opts.animate` (true/false/{duration}) to override

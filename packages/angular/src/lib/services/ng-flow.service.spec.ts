@@ -473,3 +473,39 @@ describe('setNodePositions / applyLayout', () => {
     expect(measuredGap).toBeGreaterThan(unmeasuredGap);
   });
 });
+
+describe('collapse writers', () => {
+  let store: FlowStore;
+  let service: NgFlowService;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), FlowStore, NgFlowService],
+    });
+    store = TestBed.inject(FlowStore);
+    service = TestBed.inject(NgFlowService);
+  });
+
+  it('setNodeCollapsed emits a replace change carrying collapsed', () => {
+    store.setNodes([{ id: 'g', data: {}, position: { x: 0, y: 0 } }]);
+    const changes: unknown[] = [];
+    store.onNodesChange = (c) => changes.push(...c);
+    service.setNodeCollapsed('g', true);
+    expect(store.nodeLookup.get('g')!.collapsed).toBe(true);
+    expect(changes).toEqual([{ id: 'g', type: 'replace', item: expect.objectContaining({ id: 'g', collapsed: true }) }]);
+  });
+
+  it('toggleNodeCollapsed flips the current value', () => {
+    store.setNodes([{ id: 'g', data: {}, position: { x: 0, y: 0 }, collapsed: true }]);
+    service.toggleNodeCollapsed('g');
+    expect(store.nodeLookup.get('g')!.collapsed).toBe(false);
+    service.toggleNodeCollapsed('g');
+    expect(store.nodeLookup.get('g')!.collapsed).toBe(true);
+  });
+
+  it('setNodeCollapsed on an unknown id is a no-op', () => {
+    store.setNodes([{ id: 'g', data: {}, position: { x: 0, y: 0 } }]);
+    expect(() => service.setNodeCollapsed('ghost', true)).not.toThrow();
+  });
+});

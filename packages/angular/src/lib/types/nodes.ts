@@ -15,6 +15,8 @@ export type Node<
   focusable?: boolean;
   ariaRole?: string;
   domAttributes?: Record<string, string>;
+  /** When true on a group/parent node, angflow hides its descendants and reroutes crossing edges to the box. */
+  collapsed?: boolean;
 };
 
 /**
