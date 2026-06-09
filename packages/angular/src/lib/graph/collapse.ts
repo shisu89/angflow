@@ -12,14 +12,16 @@ export type DisplayEdge<EdgeType extends Edge = Edge> = EdgeType & { collapsedFr
 
 /**
  * Ids of nodes hidden because an ancestor (via `parentId` chain) is `collapsed`.
- * The collapsed node itself is NOT included. Nesting-correct and O(n) via memoized
- * ancestry walks.
+ * The collapsed node itself is NOT included. Nesting-correct; each node's ancestry
+ * is walked with a cycle guard so a malformed parentId loop can't hang.
  */
 export function getCollapsedHiddenIds(nodeLookup: ReadonlyMap<string, CollapseNode>): Set<string> {
   const hidden = new Set<string>();
   for (const node of nodeLookup.values()) {
+    const seen = new Set<string>();
     let parentId = node.parentId;
-    while (parentId) {
+    while (parentId && !seen.has(parentId)) {
+      seen.add(parentId);
       const parent = nodeLookup.get(parentId);
       if (!parent) break;
       if (parent.collapsed) {
@@ -32,11 +34,13 @@ export function getCollapsedHiddenIds(nodeLookup: ReadonlyMap<string, CollapseNo
   return hidden;
 }
 
-/** The outermost (highest) collapsed ancestor of `id`, or `id` itself if none. */
+/** The outermost (highest) collapsed ancestor of `id`, or `id` itself if none. Cycle-guarded. */
 function outermostCollapsedAncestor(id: string, nodeLookup: ReadonlyMap<string, CollapseNode>): string {
   let result = id;
+  const seen = new Set<string>();
   let parentId = nodeLookup.get(id)?.parentId;
-  while (parentId) {
+  while (parentId && !seen.has(parentId)) {
+    seen.add(parentId);
     const parent = nodeLookup.get(parentId);
     if (!parent) break;
     if (parent.collapsed) result = parent.id;
@@ -50,7 +54,9 @@ function outermostCollapsedAncestor(id: string, nodeLookup: ReadonlyMap<string, 
  *  - map each hidden endpoint to its outermost collapsed ancestor;
  *  - drop edges whose endpoints map to the same node (internal to a collapsed box);
  *  - dedupe parallels created by rewriting, keyed (source,target,sourceHandle,targetHandle).
- * Untouched edges pass through with original identity (no `collapsedFrom`).
+ * Edges unaffected by collapse (neither endpoint rewritten, not merged) pass through with
+ * original identity and no `collapsedFrom`. Rerouted or merged edges carry `collapsedFrom`
+ * (the original edge ids); a merged edge also gets a synthetic `__collapsed:src->tgt` id.
  */
 export function rewriteEdgesForCollapse<EdgeType extends Edge>(
   edges: EdgeType[],
@@ -60,32 +66,30 @@ export function rewriteEdgesForCollapse<EdgeType extends Edge>(
   if (hiddenIds.size === 0) return edges as DisplayEdge<EdgeType>[];
 
   const byKey = new Map<string, { edge: EdgeType; source: string; target: string; from: string[] }>();
-  const order: string[] = [];
 
   for (const edge of edges) {
     const source = hiddenIds.has(edge.source) ? outermostCollapsedAncestor(edge.source, nodeLookup) : edge.source;
     const target = hiddenIds.has(edge.target) ? outermostCollapsedAncestor(edge.target, nodeLookup) : edge.target;
     if (source === target) continue; // internal to one collapsed box
 
-    const key = `${source} ${target} ${edge.sourceHandle ?? ''} ${edge.targetHandle ?? ''}`;
+    const key = `${source}\0${target}\0${edge.sourceHandle ?? ''}\0${edge.targetHandle ?? ''}`;
     const existing = byKey.get(key);
     if (existing) {
       existing.from.push(edge.id);
     } else {
       byKey.set(key, { edge, source, target, from: [edge.id] });
-      order.push(key);
     }
   }
 
-  return order.map((key) => {
-    const { edge, source, target, from } = byKey.get(key)!;
+  return Array.from(byKey.values(), ({ edge, source, target, from }) => {
     const merged = from.length > 1;
+    const rewritten = merged || source !== edge.source || target !== edge.target;
     return {
       ...edge,
       id: merged ? `__collapsed:${source}->${target}` : edge.id,
       source,
       target,
-      collapsedFrom: from,
+      ...(rewritten ? { collapsedFrom: from } : {}),
     } as DisplayEdge<EdgeType>;
   });
 }

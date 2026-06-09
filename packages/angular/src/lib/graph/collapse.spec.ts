@@ -90,4 +90,30 @@ describe('rewriteEdgesForCollapse', () => {
     const out = rewriteEdgesForCollapse([{ id: 'e1', source: 'x', target: 'leaf' }] as E[], nlNest, getCollapsedHiddenIds(nlNest));
     expect(out[0].target).toBe('g');
   });
+
+  it('reroutes a member→outside edge (reverse direction) to the box', () => {
+    const out = rewriteEdgesForCollapse([{ id: 'e1', source: 'a', target: 'x' }] as E[], nl, hidden);
+    expect(out[0].source).toBe('g');
+    expect(out[0].target).toBe('x');
+    expect(out[0].collapsedFrom).toEqual(['e1']);
+  });
+
+  it('leaves a fully-visible edge untouched (no collapsedFrom) even while a group is collapsed', () => {
+    const out = rewriteEdgesForCollapse([{ id: 'e1', source: 'x', target: 'y' }] as E[],
+      lookup([...nodes, { id: 'y' }]), hidden);
+    expect(out).toHaveLength(1);
+    expect(out[0].id).toBe('e1');
+    expect(out[0].collapsedFrom).toBeUndefined();
+  });
+
+  it('reroutes an edge between members of two different collapsed groups', () => {
+    const nl2 = lookup([
+      { id: 'g1', collapsed: true }, { id: 'a', parentId: 'g1' },
+      { id: 'g2', collapsed: true }, { id: 'b', parentId: 'g2' },
+    ]);
+    const out = rewriteEdgesForCollapse([{ id: 'e1', source: 'a', target: 'b' }] as E[], nl2, getCollapsedHiddenIds(nl2));
+    expect(out).toHaveLength(1);
+    expect(out[0].source).toBe('g1');
+    expect(out[0].target).toBe('g2');
+  });
 });
