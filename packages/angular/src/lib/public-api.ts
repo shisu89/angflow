@@ -58,6 +58,7 @@ export * from './types';
 
 // Utilities
 export { applyNodeChanges, applyEdgeChanges, applyDimensionChanges } from './utils/changes';
+export type { DisplayEdge } from './graph/collapse';
 
 // Wrapper utility functions for Angular-specific typing
 export { isNode, isEdge } from './utils/type-guards';

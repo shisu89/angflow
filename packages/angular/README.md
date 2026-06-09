@@ -253,6 +253,24 @@ Animated paths: `setNodePositions`, `applyLayout`, and the agent bridge's
 tween on that node, and everything is disabled under `prefers-reduced-motion`.
 Per-call override: `flow.setNodePositions(positions, { animate: false })`.
 
+## Group Collapse
+
+Set `collapsed: true` on a group/parent node and angflow folds it: descendants stop
+rendering, the box drops to a header strip (`.collapsed` CSS class), and edges crossing
+the boundary reroute onto the box (parallels merge). It is nesting-aware — edges reroute
+to the outermost collapsed ancestor.
+
+```ts
+flow.setNodeCollapsed(groupId, true);   // or toggleNodeCollapsed(groupId)
+```
+
+`collapsed` lives on the node, so in controlled mode it round-trips through
+`(nodesChange)` like any other field. A merged (deduped) display edge is render-only and
+carries its underlying edge ids on `collapsedFrom`; a 1:1 rerouted edge keeps its original
+identity. Rerouted edges attach to the box via the normal edge geometry — cleanest under
+`edgeMode="floating"`. The collapsed box renders at `--xy-node-collapsed-height` (40px
+default); auto-sizing the expanded box to its children is separate.
+
 ## Architecture
 
 - **Signal-based state** — Angular 17+ signals for fine-grained reactivity (no RxJS in the store)
