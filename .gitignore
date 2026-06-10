@@ -17,3 +17,8 @@ openspec
 .claude
 .angular
 .worktrees
+*.tgz
+.env
+.env.*
+!.env.example
+/screenshots/
