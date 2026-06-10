@@ -588,3 +588,35 @@ describe('setNodePositions coordinateSpace', () => {
     expect(tween).toHaveBeenCalledWith({ c: { x: 200, y: 150 } }, 100);
   });
 });
+
+describe('applyLayout coordinateSpace', () => {
+  let store: FlowStore;
+  let service: NgFlowService;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), FlowStore, NgFlowService],
+    });
+    store = TestBed.inject(FlowStore);
+    service = TestBed.inject(NgFlowService);
+  });
+
+  it('forwards coordinateSpace:absolute so a layout fn returning absolute coords lands a parented child correctly', async () => {
+    store.setNodes([
+      { id: 'p', data: {}, position: { x: 100, y: 50 } },
+      { id: 'c', data: {}, position: { x: 0, y: 0 }, parentId: 'p' },
+    ]);
+    const layoutFn = vi.fn().mockReturnValue({ c: { x: 300, y: 200 } }); // absolute
+    await service.applyLayout(layoutFn, { coordinateSpace: 'absolute' });
+    expect(store.nodeLookup.get('c')!.position).toEqual({ x: 200, y: 150 });
+  });
+
+  it('does NOT forward coordinateSpace (or animate) to the layout fn opts', async () => {
+    store.setNodes([{ id: 'n', data: {}, position: { x: 0, y: 0 } }]);
+    const layoutFn = vi.fn().mockReturnValue({ n: { x: 1, y: 1 } });
+    await service.applyLayout(layoutFn, { coordinateSpace: 'absolute', direction: 'LR' } as never);
+    const optsArg = layoutFn.mock.calls[0][2];
+    expect(optsArg).toEqual({ direction: 'LR' });
+  });
+});

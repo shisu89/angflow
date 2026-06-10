@@ -348,11 +348,11 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    *
    * Positions are in `node.position` space (parent-relative for child nodes).
    *
-   * Note: flat layout functions like `layoutNodes` emit positions in one
-   * global space; nodes with a `parentId` would be mis-placed because
-   * positions are written parent-relative. Sub-flow layout is not supported —
-   * lay out top-level nodes only, or supply a layout fn that emits
-   * parent-relative coordinates.
+   * Sub-flow note: `layoutNodes` and other flat layout fns emit positions in one
+   * global (absolute) space. To place parented nodes from such a fn, pass
+   * `opts.coordinateSpace: 'absolute'` — angflow then translates each parented
+   * node into its parent-relative space on apply. (Group-aware *layout* itself —
+   * clustering children within a box — is separate.)
    */
   async applyLayout<O extends Record<string, unknown>>(
     layoutFn: (
@@ -360,15 +360,15 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
       edges: EdgeType[],
       opts?: O,
     ) => Record<string, { x: number; y: number }> | Promise<Record<string, { x: number; y: number }>>,
-    opts?: O & { animate?: boolean | { duration?: number } },
+    opts?: O & { animate?: boolean | { duration?: number }; coordinateSpace?: 'relative' | 'absolute' },
   ): Promise<void> {
-    const { animate, ...layoutOpts } = opts ?? ({} as O & { animate?: boolean | { duration?: number } });
+    const { animate, coordinateSpace, ...layoutOpts } = opts ?? ({} as O & { animate?: boolean | { duration?: number }; coordinateSpace?: 'relative' | 'absolute' });
     const nodes = this.withLiveMeasurements(
       this.getNodes().map((n) => this.getInternalNode(n.id) ?? (n as unknown as InternalNode<NodeType>)),
     );
     const edges = this.withLiveEdgeLabels(this.getEdges());
     const positions = await layoutFn(nodes, edges, layoutOpts as unknown as O);
-    await this.setNodePositions(positions, animate === undefined ? undefined : { animate });
+    await this.setNodePositions(positions, { animate, coordinateSpace });
   }
 
   /**
