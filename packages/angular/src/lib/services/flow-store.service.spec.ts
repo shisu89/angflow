@@ -892,3 +892,25 @@ describe('collapse computeds', () => {
     expect(store.displayEdges()).toHaveLength(1);
   });
 });
+
+describe('position fast-path absolute positions', () => {
+  let store: FlowStore;
+  beforeEach(() => { store = new FlowStore(); });
+
+  it('recomputes positionAbsolute for a parented node on a position change', () => {
+    store.setNodes([
+      { id: 'p', data: {}, position: { x: 100, y: 50 } },
+      { id: 'c', data: {}, position: { x: 10, y: 10 }, parentId: 'p' },
+    ]);
+    store.triggerNodeChanges([{ id: 'c', type: 'position', position: { x: 20, y: 30 } }]);
+    expect(store.nodeLookup.get('c')!.position).toEqual({ x: 20, y: 30 });
+    // absolute = parent.positionAbsolute + position = {100+20, 50+30}
+    expect(store.nodeLookup.get('c')!.internals.positionAbsolute).toEqual({ x: 120, y: 80 });
+  });
+
+  it('leaves a top-level node positionAbsolute === position', () => {
+    store.setNodes([{ id: 'n', data: {}, position: { x: 5, y: 5 } }]);
+    store.triggerNodeChanges([{ id: 'n', type: 'position', position: { x: 9, y: 9 } }]);
+    expect(store.nodeLookup.get('n')!.internals.positionAbsolute).toEqual({ x: 9, y: 9 });
+  });
+});

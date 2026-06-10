@@ -583,6 +583,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       // Update user nodes array with new positions (cheap shallow copy)
       const currentNodes = this.nodes();
       let nodesChanged = false;
+      let touchedParented = false;
 
       for (const change of changes) {
         if (change.type !== 'position') continue;
@@ -597,6 +598,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
           if (internalNode.internals) {
             internalNode.internals.positionAbsolute = change.position;
           }
+          if (internalNode.parentId) touchedParented = true;
           mutated = true;
         }
         if (change.dragging !== undefined) {
@@ -619,6 +621,16 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
         if (mutated) {
           nodesChanged = true;
         }
+      }
+
+      // Parented nodes need positionAbsolute recomputed from their parent chain;
+      // the in-place assignment above is correct only for top-level nodes.
+      if (touchedParented) {
+        updateAbsolutePositions(this.nodeLookup, this.parentLookup, {
+          nodeOrigin: this.nodeOrigin(),
+          nodeExtent: this.nodeExtent(),
+          zIndexMode: this.zIndexMode(),
+        });
       }
 
       if (nodesChanged) {

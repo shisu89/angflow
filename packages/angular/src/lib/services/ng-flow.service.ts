@@ -274,16 +274,6 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     this.updateNode(groupId, { width: bounds.width, height: bounds.height } as Partial<NodeType>);
     await this.setNodePositions({ [groupId]: bounds.position }, { coordinateSpace: 'absolute' });
     await this.setNodePositions(childAbsolute, { coordinateSpace: 'absolute' });
-
-    // The store's position-change fast path sets positionAbsolute = relative position,
-    // which is wrong for parented nodes (no renderer re-derives it in tests/headless use).
-    // Re-apply the captured absolute positions directly so the invariant holds.
-    for (const [id, abs] of Object.entries(childAbsolute)) {
-      const internal = this.store.nodeLookup.get(id);
-      if (internal?.internals) {
-        internal.internals.positionAbsolute = abs;
-      }
-    }
   }
 
   /**
