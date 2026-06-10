@@ -266,13 +266,18 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * animating, immediately otherwise.
    *
    * Positions are in `node.position` space (parent-relative for child nodes).
+   *
+   * Pass `opts.coordinateSpace: 'absolute'` to provide flow-absolute coordinates
+   * instead; parented nodes are translated to their parent-relative space
+   * internally (top-level nodes are unaffected). Default is `'relative'`.
    */
   setNodePositions(
     positions: Record<string, { x: number; y: number }>,
-    opts?: { animate?: boolean | { duration?: number } },
+    opts?: { animate?: boolean | { duration?: number }; coordinateSpace?: 'relative' | 'absolute' },
   ): Promise<void> {
+    const resolved = opts?.coordinateSpace === 'absolute' ? this.toRelativePositions(positions) : positions;
     const valid: Record<string, { x: number; y: number }> = {};
-    for (const [id, pos] of Object.entries(positions)) {
+    for (const [id, pos] of Object.entries(resolved)) {
       if (this.store.nodeLookup.has(id)) valid[id] = pos;
     }
     if (Object.keys(valid).length === 0) return Promise.resolve();
@@ -294,6 +299,36 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     }));
     this.store.triggerNodeChanges(changes as NodeChange<NodeType>[]);
     return Promise.resolve();
+  }
+
+  /**
+   * Convert a flow-absolute position map into the store's `node.position` space
+   * (parent-relative for parented nodes). Inverts the store's child transform
+   * (`updateChildNode` → `getNodePositionWithOrigin`):
+   * `relative = absolute − parent.positionAbsolute + dims·origin`, using the
+   * child's origin (`node.origin ?? store.nodeOrigin`) and resolved dimensions.
+   * Top-level nodes, unknown ids, and nodes whose parent is missing pass through
+   * unchanged. The store re-applies extent clamping on write, so we don't clamp.
+   */
+  private toRelativePositions(
+    positions: Record<string, { x: number; y: number }>,
+  ): Record<string, { x: number; y: number }> {
+    const out: Record<string, { x: number; y: number }> = {};
+    const storeOrigin = this.store.nodeOrigin();
+    for (const [id, abs] of Object.entries(positions)) {
+      const node = this.store.nodeLookup.get(id);
+      const parent = node?.parentId ? this.store.nodeLookup.get(node.parentId) : undefined;
+      if (!node || !parent) {
+        out[id] = abs;
+        continue;
+      }
+      const origin = node.origin ?? storeOrigin;
+      const w = node.measured?.width ?? node.width ?? node.initialWidth ?? 0;
+      const h = node.measured?.height ?? node.height ?? node.initialHeight ?? 0;
+      const pAbs = parent.internals.positionAbsolute;
+      out[id] = { x: abs.x - pAbs.x + w * origin[0], y: abs.y - pAbs.y + h * origin[1] };
+    }
+    return out;
   }
 
   /**

@@ -515,3 +515,76 @@ describe('collapse writers', () => {
     expect(() => service.setNodeCollapsed('ghost', true)).not.toThrow();
   });
 });
+
+describe('setNodePositions coordinateSpace', () => {
+  let store: FlowStore;
+  let service: NgFlowService;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), FlowStore, NgFlowService],
+    });
+    store = TestBed.inject(FlowStore);
+    service = TestBed.inject(NgFlowService);
+  });
+
+  it('absolute: a parented node is translated by the parent absolute position', async () => {
+    store.setNodes([
+      { id: 'p', data: {}, position: { x: 100, y: 50 } },
+      { id: 'c', data: {}, position: { x: 0, y: 0 }, parentId: 'p' },
+    ]);
+    await service.setNodePositions({ c: { x: 300, y: 200 } }, { coordinateSpace: 'absolute' });
+    expect(store.nodeLookup.get('c')!.position).toEqual({ x: 200, y: 150 });
+  });
+
+  it('absolute: a top-level node is an identity', async () => {
+    store.setNodes([{ id: 'n', data: {}, position: { x: 0, y: 0 } }]);
+    await service.setNodePositions({ n: { x: 42, y: 17 } }, { coordinateSpace: 'absolute' });
+    expect(store.nodeLookup.get('n')!.position).toEqual({ x: 42, y: 17 });
+  });
+
+  it('absolute: nested parent uses the immediate parent absolute (incl. grandparent)', async () => {
+    store.setNodes([
+      { id: 'g', data: {}, position: { x: 1000, y: 1000 } },
+      { id: 'p', data: {}, position: { x: 100, y: 100 }, parentId: 'g' },
+      { id: 'c', data: {}, position: { x: 0, y: 0 }, parentId: 'p' },
+    ]);
+    await service.setNodePositions({ c: { x: 1500, y: 1300 } }, { coordinateSpace: 'absolute' });
+    expect(store.nodeLookup.get('c')!.position).toEqual({ x: 400, y: 200 });
+  });
+
+  it('absolute: applies dims*origin for a non-default node origin', async () => {
+    store.setNodes([
+      { id: 'p', data: {}, position: { x: 100, y: 100 } },
+      { id: 'c', data: {}, position: { x: 0, y: 0 }, parentId: 'p', width: 40, height: 20, origin: [1, 1] },
+    ]);
+    await service.setNodePositions({ c: { x: 300, y: 300 } }, { coordinateSpace: 'absolute' });
+    expect(store.nodeLookup.get('c')!.position).toEqual({ x: 240, y: 220 });
+  });
+
+  it('absolute: a parented node whose parent is missing is used as-is (no throw)', async () => {
+    store.setNodes([{ id: 'c', data: {}, position: { x: 0, y: 0 }, parentId: 'ghost' }]);
+    await service.setNodePositions({ c: { x: 5, y: 5 } }, { coordinateSpace: 'absolute' });
+    expect(store.nodeLookup.get('c')!.position).toEqual({ x: 5, y: 5 });
+  });
+
+  it('default (relative): a parented node position is written verbatim', async () => {
+    store.setNodes([
+      { id: 'p', data: {}, position: { x: 100, y: 50 } },
+      { id: 'c', data: {}, position: { x: 0, y: 0 }, parentId: 'p' },
+    ]);
+    await service.setNodePositions({ c: { x: 7, y: 7 } });
+    expect(store.nodeLookup.get('c')!.position).toEqual({ x: 7, y: 7 });
+  });
+
+  it('absolute + animate: the tween targets the converted (relative) position', async () => {
+    store.setNodes([
+      { id: 'p', data: {}, position: { x: 100, y: 50 } },
+      { id: 'c', data: {}, position: { x: 0, y: 0 }, parentId: 'p' },
+    ]);
+    const tween = vi.spyOn(store, 'tweenNodePositions').mockResolvedValue();
+    await service.setNodePositions({ c: { x: 300, y: 200 } }, { coordinateSpace: 'absolute', animate: { duration: 100 } });
+    expect(tween).toHaveBeenCalledWith({ c: { x: 200, y: 150 } }, 100);
+  });
+});
