@@ -59,6 +59,8 @@ export * from './types';
 // Utilities
 export { applyNodeChanges, applyEdgeChanges, applyDimensionChanges } from './utils/changes';
 export type { DisplayEdge } from './graph/collapse';
+export { getGroupBounds } from './graph/group-bounds';
+export type { GroupBounds, GroupBoundsOptions } from './graph/group-bounds';
 
 // Wrapper utility functions for Angular-specific typing
 export { isNode, isEdge } from './utils/type-guards';
