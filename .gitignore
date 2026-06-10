@@ -21,4 +21,6 @@ openspec
 .env
 .env.*
 !.env.example
+!packages/react/.env
+!packages/svelte/.env
 /screenshots/
