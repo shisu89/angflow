@@ -20,6 +20,9 @@ export interface LayoutNodeInput {
   initialWidth?: number;
   initialHeight?: number;
   measured?: { width?: number; height?: number };
+  /** Group/sub-flow parent id. When present (and in the node set), the node is
+   *  clustered within that parent via dagre compound layout. */
+  parentId?: string;
 }
 
 /**
@@ -69,13 +72,24 @@ const DEFAULT_LABEL_HEIGHT = 20;
  * objects you pass — supply measured nodes (e.g. internal nodes) for best
  * results. Edge labels: pass `labelWidth`/`labelHeight` (or a truthy `label` for
  * a default reservation) to reserve dagre space.
+ *
+ * Groups: a node with a `parentId` that is also in the input is clustered within
+ * that parent (dagre compound layout); nesting is supported. Compound output is
+ * in absolute coordinates — apply it with
+ * `applyLayout(layoutNodes, { coordinateSpace: 'absolute' })` so parented nodes
+ * are translated into their parent-relative space. Group boxes are laid out but
+ * NOT resized to wrap their members (size them app-side, or see the auto-size
+ * feature). Edges whose endpoints aren't in the node set are skipped.
  */
 export function layoutNodes(
   nodes: LayoutNodeInput[],
   edges: ReadonlyArray<LayoutEdgeInput>,
   opts: LayoutNodesOptions = {},
 ): Record<string, { x: number; y: number }> {
-  const g = new graphlib.Graph();
+  const ids = new Set(nodes.map((n) => n.id));
+  const compound = nodes.some((n) => n.parentId != null && ids.has(n.parentId));
+
+  const g = new graphlib.Graph(compound ? { compound: true } : undefined);
   g.setGraph({
     rankdir: opts.direction ?? 'TB',
     nodesep: opts.nodeSep ?? 50,
@@ -83,14 +97,24 @@ export function layoutNodes(
   });
   g.setDefaultEdgeLabel(() => ({}));
 
-  const dims = new Map<string, { width: number; height: number }>();
   for (const n of nodes) {
     const width = n.measured?.width ?? n.width ?? n.initialWidth ?? DEFAULT_WIDTH;
     const height = n.measured?.height ?? n.height ?? n.initialHeight ?? DEFAULT_HEIGHT;
-    dims.set(n.id, { width, height });
     g.setNode(n.id, { width, height });
   }
+
+  if (compound) {
+    for (const n of nodes) {
+      if (n.parentId != null && ids.has(n.parentId)) {
+        g.setParent(n.id, n.parentId);
+      }
+    }
+  }
+
   for (const e of edges) {
+    // Skip dangling edges: otherwise dagre auto-creates phantom nodes that
+    // distort layout (especially compound clusters).
+    if (!ids.has(e.source) || !ids.has(e.target)) continue;
     const hasExplicitBox = e.labelWidth != null || e.labelHeight != null;
     if (e.label || hasExplicitBox) {
       g.setEdge(e.source, e.target, {
@@ -102,14 +126,16 @@ export function layoutNodes(
       g.setEdge(e.source, e.target);
     }
   }
+
   layout(g);
 
   const positions: Record<string, { x: number; y: number }> = {};
   for (const n of nodes) {
-    const placed = g.node(n.id) as { x: number; y: number };
-    const d = dims.get(n.id)!;
-    // dagre positions nodes by center; angflow positions by top-left corner.
-    positions[n.id] = { x: placed.x - d.width / 2, y: placed.y - d.height / 2 };
+    const placed = g.node(n.id) as { x: number; y: number; width: number; height: number };
+    // dagre positions by center; angflow by top-left. Use dagre's computed
+    // width/height so cluster (group) nodes convert by their wrapping size
+    // (for leaf nodes this equals the size we set, so flat output is unchanged).
+    positions[n.id] = { x: placed.x - placed.width / 2, y: placed.y - placed.height / 2 };
   }
   return positions;
 }

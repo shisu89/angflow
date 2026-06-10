@@ -99,3 +99,57 @@ describe('layoutNodes edge labels', () => {
     expect(withWidthOnly['b'].y).toBeGreaterThan(without['b'].y);
   });
 });
+
+describe('layoutNodes compound groups', () => {
+  const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    Math.hypot(a.x - b.x, a.y - b.y);
+
+  it('clusters grouped members (interleaved insertion would scatter when flat)', () => {
+    const positions = layoutNodes(
+      [
+        { id: 'gA', width: 10, height: 10 },
+        { id: 'gB', width: 10, height: 10 },
+        { id: 'a1', width: 40, height: 40, parentId: 'gA' },
+        { id: 'b1', width: 40, height: 40, parentId: 'gB' },
+        { id: 'a2', width: 40, height: 40, parentId: 'gA' },
+        { id: 'b2', width: 40, height: 40, parentId: 'gB' },
+      ],
+      [],
+      { direction: 'TB' },
+    );
+    expect(dist(positions['a1'], positions['a2'])).toBeLessThan(dist(positions['a1'], positions['b1']));
+    expect(dist(positions['b1'], positions['b2'])).toBeLessThan(dist(positions['b1'], positions['a1']));
+  });
+
+  it('treats a node whose parentId is not in the set as top-level (no throw, finite)', () => {
+    const positions = layoutNodes([{ id: 'c', width: 40, height: 40, parentId: 'ghost' }], [], { direction: 'TB' });
+    expect(Number.isFinite(positions['c'].x)).toBe(true);
+    expect(Number.isFinite(positions['c'].y)).toBe(true);
+  });
+
+  it('handles nested groups (g → sub → leaf): all finite', () => {
+    const positions = layoutNodes(
+      [
+        { id: 'g', width: 10, height: 10 },
+        { id: 'sub', width: 10, height: 10, parentId: 'g' },
+        { id: 'leaf', width: 40, height: 40, parentId: 'sub' },
+      ],
+      [],
+      { direction: 'TB' },
+    );
+    for (const id of ['g', 'sub', 'leaf']) {
+      expect(Number.isFinite(positions[id].x)).toBe(true);
+      expect(Number.isFinite(positions[id].y)).toBe(true);
+    }
+  });
+
+  it('skips dangling edges (endpoint not in node set) — no phantom-node distortion', () => {
+    const nodes = [
+      { id: 'a', width: 40, height: 40 },
+      { id: 'b', width: 40, height: 40 },
+    ];
+    const withDangling = layoutNodes(nodes, [{ source: 'a', target: 'b' }, { source: 'a', target: 'ghost' }], { direction: 'TB' });
+    const without = layoutNodes(nodes, [{ source: 'a', target: 'b' }], { direction: 'TB' });
+    expect(withDangling).toEqual(without);
+  });
+});
