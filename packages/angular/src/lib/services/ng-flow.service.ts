@@ -272,8 +272,9 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
     const bounds = getGroupBounds(members, opts);
     this.updateNode(groupId, { width: bounds.width, height: bounds.height } as Partial<NodeType>);
-    await this.setNodePositions({ [groupId]: bounds.position }, { coordinateSpace: 'absolute' });
-    await this.setNodePositions(childAbsolute, { coordinateSpace: 'absolute' });
+    // animate:false — this is a synchronous pin; tweening would drift the children mid-flight.
+    await this.setNodePositions({ [groupId]: bounds.position }, { coordinateSpace: 'absolute', animate: false });
+    await this.setNodePositions(childAbsolute, { coordinateSpace: 'absolute', animate: false });
   }
 
   /**

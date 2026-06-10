@@ -672,4 +672,18 @@ describe('sizeGroupToChildren', () => {
     expect(g.width).toBe(60);
     expect(g.height).toBe(30);
   });
+
+  it('pins children immediately even when the flow [animate] is on', async () => {
+    store.animate.set(true);
+    store.setNodes([
+      { id: 'g', data: {}, position: { x: 100, y: 100 } },
+      { id: 'c1', data: {}, position: { x: 10, y: 10 }, parentId: 'g', width: 40, height: 20 },
+      { id: 'c2', data: {}, position: { x: 60, y: 30 }, parentId: 'g', width: 40, height: 20 },
+    ]);
+    await service.sizeGroupToChildren('g', { padding: 10, headerHeight: 20 });
+    // animate:false inside the method → final state is reached synchronously, children pinned
+    expect(store.nodeLookup.get('c1')!.internals.positionAbsolute).toEqual({ x: 110, y: 110 });
+    expect(store.nodeLookup.get('c2')!.internals.positionAbsolute).toEqual({ x: 160, y: 130 });
+    expect(store.nodeLookup.get('g')!.position).toEqual({ x: 100, y: 90 });
+  });
 });

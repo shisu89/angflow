@@ -624,7 +624,9 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       }
 
       // Parented nodes need positionAbsolute recomputed from their parent chain;
-      // the in-place assignment above is correct only for top-level nodes.
+      // the in-place assignment above is correct only for top-level nodes. This
+      // walks the whole lookup, so it's gated to runs where a parented node moved
+      // (top-level-only drags keep the O(1) fast path).
       if (touchedParented) {
         updateAbsolutePositions(this.nodeLookup, this.parentLookup, {
           nodeOrigin: this.nodeOrigin(),
@@ -639,7 +641,9 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
         // Re-emit the nodes signal so any downstream effect (e.g. the agent
         // bridge watcher) that depends on `nodes()` observes the drag. Objects
         // are mutated in place above so identity is preserved for templates;
-        // we only swap the array reference.
+        // parented nodes are the exception (updateAbsolutePositions swaps a fresh
+        // lookup entry), but templates re-read the lookup so that churn is fine.
+        // We only swap the array reference.
         this.nodes.set([...currentNodes]);
       }
     } else {
