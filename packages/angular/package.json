@@ -1,6 +1,6 @@
 {
   "name": "@angflow/angular",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "description": "Angular Flow - A highly customizable Angular library for building node-based editors and interactive flow charts.",
   "keywords": [
