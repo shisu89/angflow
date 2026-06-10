@@ -368,6 +368,9 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     );
     const edges = this.withLiveEdgeLabels(this.getEdges());
     const positions = await layoutFn(nodes, edges, layoutOpts as unknown as O);
+    // Passing undefined animate/coordinateSpace is safe: setNodePositions does
+    // `opts?.animate ?? store.animate()` and `coordinateSpace === 'absolute'`, so
+    // undefined values fall back to the same defaults as omitting opts entirely.
     await this.setNodePositions(positions, { animate, coordinateSpace });
   }
 
