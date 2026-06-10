@@ -26,6 +26,7 @@ import { FlowStore } from './flow-store.service';
 import type { Node, Edge, InternalNode, NgFlowInstance, NgFlowJsonObject, DeleteElementsOptions } from '../types';
 import type { NodeTemplateSpec } from '../types/node-template';
 import { prefersReducedMotion } from '../utils/position-tween';
+import { getGroupBounds, type GroupBoundsOptions } from '../graph/group-bounds';
 
 /** Keep in sync with `builtInNodeTypes` in container/node-renderer/node-renderer.component.ts. */
 const BUILT_IN_NODE_TYPE_NAMES = ['default', 'input', 'output', 'group'] as const;
@@ -237,6 +238,52 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     const update = typeof dataUpdate === 'function' ? dataUpdate(current.data) : dataUpdate;
     const next = { ...current, data: { ...current.data, ...update } } as NodeType;
     this.store.triggerNodeChanges([{ id, type: 'replace', item: next }]);
+  }
+
+  /**
+   * Size and position a group node to wrap its direct children (nodes with
+   * `parentId === groupId`), keeping the children visually fixed. Sets the
+   * group's `width`/`height` and moves its top-left to the wrapping box (with
+   * `opts.padding`/`headerHeight`/`minWidth`/`minHeight`). No-op if the group has
+   * no children. Immediate (not animated).
+   *
+   * Resolves the box-origin ↔ child-coordinate feedback loop by capturing the
+   * children's absolute positions first, moving the box, then re-applying those
+   * absolutes against the moved box so the children's parent-relative positions
+   * shift to keep them pinned.
+   */
+  async sizeGroupToChildren(groupId: string, opts?: GroupBoundsOptions): Promise<void> {
+    const children = this.getNodes()
+      .filter((n) => n.parentId === groupId)
+      .map((n) => this.getInternalNode(n.id))
+      .filter((n): n is InternalNode<NodeType> => n != null);
+    if (children.length === 0) return;
+
+    const members = children.map((c) => ({
+      position: c.internals.positionAbsolute,
+      measured: c.measured,
+      width: c.width,
+      height: c.height,
+    }));
+    const childAbsolute: Record<string, { x: number; y: number }> = {};
+    for (const c of children) {
+      childAbsolute[c.id] = { x: c.internals.positionAbsolute.x, y: c.internals.positionAbsolute.y };
+    }
+
+    const bounds = getGroupBounds(members, opts);
+    this.updateNode(groupId, { width: bounds.width, height: bounds.height } as Partial<NodeType>);
+    await this.setNodePositions({ [groupId]: bounds.position }, { coordinateSpace: 'absolute' });
+    await this.setNodePositions(childAbsolute, { coordinateSpace: 'absolute' });
+
+    // The store's position-change fast path sets positionAbsolute = relative position,
+    // which is wrong for parented nodes (no renderer re-derives it in tests/headless use).
+    // Re-apply the captured absolute positions directly so the invariant holds.
+    for (const [id, abs] of Object.entries(childAbsolute)) {
+      const internal = this.store.nodeLookup.get(id);
+      if (internal?.internals) {
+        internal.internals.positionAbsolute = abs;
+      }
+    }
   }
 
   /**

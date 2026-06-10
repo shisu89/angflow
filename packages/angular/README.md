@@ -271,6 +271,26 @@ identity. Rerouted edges attach to the box via the normal edge geometry — clea
 `edgeMode="floating"`. The collapsed box renders at `--xy-node-collapsed-height` (40px
 default); auto-sizing the expanded box to its children is separate.
 
+## Group Auto-Size
+
+Compute a box that wraps a group's members, or have the service size a group for you:
+
+```ts
+import { getGroupBounds } from '@angflow/angular';
+
+// Pure: bounds in the same coordinate space as the members you pass.
+const box = getGroupBounds(members, { padding: 24, headerHeight: 40 });
+
+// Imperative: size + position a group to wrap its children, keeping them pinned.
+await flow.sizeGroupToChildren(groupId, { padding: 24, headerHeight: 40 });
+```
+
+`getGroupBounds` resolves member sizes `measured → width → 0` and applies an asymmetric top
+(`headerHeight`) vs. other-sides (`padding`) inset. `sizeGroupToChildren` sets the group's
+`width`/`height` and moves its top-left to wrap its `parentId` children, re-basing the children so
+they stay visually fixed (nested groups handled via absolute-coordinate translation). It is a no-op
+for a childless group.
+
 ## Architecture
 
 - **Signal-based state** — Angular 17+ signals for fine-grained reactivity (no RxJS in the store)

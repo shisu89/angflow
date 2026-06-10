@@ -620,3 +620,56 @@ describe('applyLayout coordinateSpace', () => {
     expect(optsArg).toEqual({ direction: 'LR' });
   });
 });
+
+describe('sizeGroupToChildren', () => {
+  let store: FlowStore;
+  let service: NgFlowService;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), FlowStore, NgFlowService],
+    });
+    store = TestBed.inject(FlowStore);
+    service = TestBed.inject(NgFlowService);
+  });
+
+  it('sizes + positions the group to wrap its children, keeping children visually fixed', async () => {
+    store.setNodes([
+      { id: 'g', data: {}, position: { x: 100, y: 100 } },
+      { id: 'c1', data: {}, position: { x: 10, y: 10 }, parentId: 'g', width: 40, height: 20 },
+      { id: 'c2', data: {}, position: { x: 60, y: 30 }, parentId: 'g', width: 40, height: 20 },
+    ]);
+    await service.sizeGroupToChildren('g', { padding: 10, headerHeight: 20 });
+
+    const g = store.nodeLookup.get('g')!;
+    expect(g.width).toBe(110);
+    expect(g.height).toBe(70);
+    expect(g.position).toEqual({ x: 100, y: 90 });
+    expect(store.nodeLookup.get('c1')!.internals.positionAbsolute).toEqual({ x: 110, y: 110 });
+    expect(store.nodeLookup.get('c2')!.internals.positionAbsolute).toEqual({ x: 160, y: 130 });
+  });
+
+  it('is a no-op for a group with no children', async () => {
+    store.setNodes([{ id: 'g', data: {}, position: { x: 5, y: 5 }, width: 80, height: 80 }]);
+    await service.sizeGroupToChildren('g', { padding: 10 });
+    const g = store.nodeLookup.get('g')!;
+    expect(g.position).toEqual({ x: 5, y: 5 });
+    expect(g.width).toBe(80);
+    expect(g.height).toBe(80);
+  });
+
+  it('keeps children fixed even when the group itself is nested', async () => {
+    store.setNodes([
+      { id: 'outer', data: {}, position: { x: 50, y: 40 } },
+      { id: 'g', data: {}, position: { x: 20, y: 20 }, parentId: 'outer' },
+      { id: 'c', data: {}, position: { x: 5, y: 5 }, parentId: 'g', width: 40, height: 20 },
+    ]);
+    expect(store.nodeLookup.get('c')!.internals.positionAbsolute).toEqual({ x: 75, y: 65 });
+    await service.sizeGroupToChildren('g', { padding: 10, headerHeight: 0 });
+    expect(store.nodeLookup.get('c')!.internals.positionAbsolute).toEqual({ x: 75, y: 65 });
+    const g = store.nodeLookup.get('g')!;
+    expect(g.width).toBe(60);
+    expect(g.height).toBe(30);
+  });
+});
