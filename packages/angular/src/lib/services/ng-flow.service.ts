@@ -304,7 +304,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   /**
    * Convert a flow-absolute position map into the store's `node.position` space
    * (parent-relative for parented nodes). Inverts the store's child transform
-   * (`updateChildNode` → `getNodePositionWithOrigin`):
+   * (`updateChildNode` → `calculateChildXYZ` → `getNodePositionWithOrigin`):
    * `relative = absolute − parent.positionAbsolute + dims·origin`, using the
    * child's origin (`node.origin ?? store.nodeOrigin`) and resolved dimensions.
    * Top-level nodes, unknown ids, and nodes whose parent is missing pass through
