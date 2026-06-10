@@ -130,8 +130,8 @@ importers:
   packages/angular:
     dependencies:
       '@angflow/system':
-        specifier: '>=0.0.93'
-        version: 0.0.93
+        specifier: workspace:^
+        version: link:../system
       '@angular/common':
         specifier: '>=19.0.0'
         version: 21.2.7(@angular/core@21.2.15(@angular/compiler@21.2.15)(rxjs@7.8.2))(rxjs@7.8.2)
@@ -383,9 +383,6 @@ packages:
         optional: true
       vite:
         optional: true
-
-  '@angflow/system@0.0.93':
-    resolution: {integrity: sha512-gqXiz8H3GBAeQPWDUIzys0Eoq0j9R/yzObsbUtx60KztgkH0crYHif3fwyFZ08/8hYNmXgFet9NiQba4h25buw==}
 
   '@angular-devkit/architect@0.2102.13':
     resolution: {integrity: sha512-fheyi0gPx6b7tT+WQ+ePlzdGqKjPLUK72wg5Z9pkVtQ5+VN/8yB9mlRlmoivngd2FeNG9wMeNynWZGYycnOWVw==}
@@ -5220,18 +5217,6 @@ snapshots:
     transitivePeerDependencies:
       - '@emnapi/core'
       - '@emnapi/runtime'
-
-  '@angflow/system@0.0.93':
-    dependencies:
-      '@types/d3-drag': 3.0.7
-      '@types/d3-interpolate': 3.0.4
-      '@types/d3-selection': 3.0.11
-      '@types/d3-transition': 3.0.9
-      '@types/d3-zoom': 3.0.8
-      d3-drag: 3.0.0
-      d3-interpolate: 3.0.1
-      d3-selection: 3.0.0
-      d3-zoom: 3.0.0
 
   '@angular-devkit/architect@0.2102.13(chokidar@5.0.0)':
     dependencies:
