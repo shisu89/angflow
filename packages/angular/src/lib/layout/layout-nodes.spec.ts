@@ -119,6 +119,12 @@ describe('layoutNodes compound groups', () => {
     );
     expect(dist(positions['a1'], positions['a2'])).toBeLessThan(dist(positions['a1'], positions['b1']));
     expect(dist(positions['b1'], positions['b2'])).toBeLessThan(dist(positions['b1'], positions['a1']));
+    // Structural: the two clusters don't interleave on x — every member of one
+    // group is entirely to one side of the other group.
+    const aXs = [positions['a1'].x, positions['a2'].x];
+    const bXs = [positions['b1'].x, positions['b2'].x];
+    const groupsSeparated = Math.max(...aXs) < Math.min(...bXs) || Math.max(...bXs) < Math.min(...aXs);
+    expect(groupsSeparated).toBe(true);
   });
 
   it('treats a node whose parentId is not in the set as top-level (no throw, finite)', () => {
@@ -151,5 +157,26 @@ describe('layoutNodes compound groups', () => {
     const withDangling = layoutNodes(nodes, [{ source: 'a', target: 'b' }, { source: 'a', target: 'ghost' }], { direction: 'TB' });
     const without = layoutNodes(nodes, [{ source: 'a', target: 'b' }], { direction: 'TB' });
     expect(withDangling).toEqual(without);
+  });
+
+  it('skips dangling edges in compound mode without throwing', () => {
+    const nodes = [
+      { id: 'g', width: 10, height: 10 },
+      { id: 'a', width: 40, height: 40, parentId: 'g' },
+      { id: 'b', width: 40, height: 40, parentId: 'g' },
+    ];
+    const withDangling = layoutNodes(
+      nodes,
+      [{ source: 'a', target: 'b' }, { source: 'a', target: 'ghost' }],
+      { direction: 'TB' },
+    );
+    const without = layoutNodes(nodes, [{ source: 'a', target: 'b' }], { direction: 'TB' });
+    expect(withDangling).toEqual(without);
+  });
+
+  it('treats a self-parent (parentId === id) as top-level without throwing', () => {
+    const positions = layoutNodes([{ id: 's', width: 40, height: 40, parentId: 's' }], [], { direction: 'TB' });
+    expect(Number.isFinite(positions['s'].x)).toBe(true);
+    expect(Number.isFinite(positions['s'].y)).toBe(true);
   });
 });

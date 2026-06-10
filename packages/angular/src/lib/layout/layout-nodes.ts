@@ -87,7 +87,7 @@ export function layoutNodes(
   opts: LayoutNodesOptions = {},
 ): Record<string, { x: number; y: number }> {
   const ids = new Set(nodes.map((n) => n.id));
-  const compound = nodes.some((n) => n.parentId != null && ids.has(n.parentId));
+  const compound = nodes.some((n) => n.parentId != null && n.parentId !== n.id && ids.has(n.parentId));
 
   const g = new graphlib.Graph(compound ? { compound: true } : undefined);
   g.setGraph({
@@ -105,7 +105,7 @@ export function layoutNodes(
 
   if (compound) {
     for (const n of nodes) {
-      if (n.parentId != null && ids.has(n.parentId)) {
+      if (n.parentId != null && n.parentId !== n.id && ids.has(n.parentId)) {
         g.setParent(n.id, n.parentId);
       }
     }
