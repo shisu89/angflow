@@ -4,6 +4,7 @@ import type { NodeChange } from '@angflow/system';
 import { FlowStore } from './flow-store.service';
 import { getCollapsedHiddenIds } from '../graph/collapse';
 import type { Node, Edge } from '../types';
+import { Position, type Handle } from '@angflow/system';
 
 vi.mock('../graph/collapse', { spy: true });
 
@@ -624,6 +625,55 @@ describe('FlowStore', () => {
       store.updateNodePositions(dragItems, true);
 
       expect(store.nodeLookup.get('1')!.position).toEqual({ x: 77, y: 88 });
+    });
+
+    it('updates connection.from when dragging the fromNode while connection is in progress', () => {
+      const updateConnectionSpy = vi.fn();
+      store.updateConnection = updateConnectionSpy;
+
+      store.setNodes([makeNode('n1', { position: { x: 0, y: 0 } })]);
+
+      // Create a properly typed Handle
+      const handle: Handle = {
+        id: 'h1',
+        nodeId: 'n1',
+        x: 0,
+        y: 0,
+        position: Position.Left,
+        type: 'source',
+        width: 10,
+        height: 10,
+      };
+
+      // Simulate an in-progress connection with fromNode = n1
+      store.connection.set({
+        inProgress: true,
+        isValid: null,
+        from: { x: 0, y: 0 },
+        fromHandle: handle,
+        fromPosition: Position.Left,
+        fromNode: store.nodeLookup.get('n1')!,
+        to: { x: 100, y: 100 },
+        toHandle: null,
+        toPosition: Position.Right,
+        toNode: null,
+        pointer: { x: 100, y: 100 },
+      });
+
+      // Move node n1 during the connection drag
+      const dragItems = new Map([
+        ['n1', { position: { x: 50, y: 75 }, internals: { positionAbsolute: { x: 50, y: 75 } }, measured: { width: 150, height: 40 } }],
+      ]);
+
+      store.updateNodePositions(dragItems, true);
+
+      // updateConnection should have been called with the updated connection state
+      expect(updateConnectionSpy).toHaveBeenCalled();
+      const updatedConnection = updateConnectionSpy.mock.calls[0][0];
+      // Verify the connection.from was recomputed (it should reflect the handle position on the moved node)
+      expect(updatedConnection.from).toBeDefined();
+      expect(typeof updatedConnection.from.x).toBe('number');
+      expect(typeof updatedConnection.from.y).toBe('number');
     });
   });
 

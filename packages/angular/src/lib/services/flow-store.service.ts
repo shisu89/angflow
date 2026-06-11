@@ -457,8 +457,8 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
         dragging,
       };
 
-      if (node && conn.inProgress && (conn as any).fromNode?.id === node.id) {
-        const updatedFrom = getHandlePosition(node, (conn as any).fromHandle, Position.Left, true);
+      if (node && conn.inProgress && conn.fromNode?.id === node.id) {
+        const updatedFrom = getHandlePosition(node, conn.fromHandle, Position.Left, true);
         this.updateConnection({ ...conn, from: updatedFrom });
       }
 
