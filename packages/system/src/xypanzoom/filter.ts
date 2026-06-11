@@ -2,7 +2,7 @@
 import { isWrappedWithClass } from './utils';
 
 export type FilterParams = {
-  zoomActivationKeyPressed: boolean;
+  zoomActivationKeyPressed?: boolean;
   zoomOnScroll: boolean;
   zoomOnPinch: boolean;
   panOnDrag: boolean | number[];
@@ -12,7 +12,7 @@ export type FilterParams = {
   noWheelClassName: string;
   noPanClassName: string;
   lib: string;
-  connectionInProgress: boolean;
+  connectionInProgress?: boolean;
 };
 
 export function createFilter({

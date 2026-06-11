@@ -38,10 +38,10 @@ export type PanZoomUpdateOptions = {
   zoomOnPinch: boolean;
   zoomOnScroll: boolean;
   zoomOnDoubleClick: boolean;
-  zoomActivationKeyPressed: boolean;
+  zoomActivationKeyPressed?: boolean;
   lib: string;
   onTransformChange: OnTransformChange;
-  connectionInProgress: boolean;
+  connectionInProgress?: boolean;
   paneClickDistance: number;
   selectionOnDrag?: boolean;
 };

@@ -1042,6 +1042,6 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
         this.store.transform.set(transform);
       },
       paneClickDistance: this.paneClickDistance(),
-    } as any);
+    });
   }
 }
