@@ -80,6 +80,10 @@ const DEFAULT_LABEL_HEIGHT = 20;
  * are translated into their parent-relative space. Group boxes are laid out but
  * NOT resized to wrap their members (size them app-side, or see the auto-size
  * feature). Edges whose endpoints aren't in the node set are skipped.
+ * Edges whose source or target is a compound parent are also skipped (dagre
+ * cannot rank cluster-touching edges). parentId cycles (of any length) are
+ * treated as top-level (matching collapse semantics) — cycle members are
+ * detached from each other and laid out as ordinary nodes.
  */
 export function layoutNodes(
   nodes: LayoutNodeInput[],
@@ -87,7 +91,47 @@ export function layoutNodes(
   opts: LayoutNodesOptions = {},
 ): Record<string, { x: number; y: number }> {
   const ids = new Set(nodes.map((n) => n.id));
-  const compound = nodes.some((n) => n.parentId != null && n.parentId !== n.id && ids.has(n.parentId));
+
+  // Build the valid parent-child map: entries where the parent exists in the
+  // input set and is not the node itself (self-parent guard).
+  const parentOf = new Map<string, string>();
+  for (const n of nodes) {
+    if (n.parentId != null && n.parentId !== n.id && ids.has(n.parentId)) {
+      parentOf.set(n.id, n.parentId);
+    }
+  }
+
+  // Cycle detection: walk each node's parent chain; if the walk revisits a
+  // node already seen in this walk, a cycle exists — collect its members and
+  // remove them from parentOf so graphlib never sees a cycle.
+  // Only actual cycle members are removed; nodes that point INTO a cycle but
+  // are not on it (e.g. d→a where a∈cycle) keep their parentOf entry intact
+  // (the parent was just demoted to top-level, which is a valid parent).
+  const inCycle = new Set<string>();
+  for (const start of parentOf.keys()) {
+    if (inCycle.has(start)) continue; // already processed as part of a known cycle
+    const seen = new Set<string>();
+    let cur: string | undefined = start;
+    while (cur !== undefined && parentOf.has(cur)) {
+      if (seen.has(cur)) {
+        // cur is the entry point of the cycle — trace from cur back to cur
+        // to collect exactly the cycle members.
+        let walker = cur;
+        do {
+          inCycle.add(walker);
+          walker = parentOf.get(walker)!;
+        } while (walker !== cur);
+        break;
+      }
+      seen.add(cur);
+      cur = parentOf.get(cur);
+    }
+  }
+  for (const id of inCycle) {
+    parentOf.delete(id);
+  }
+
+  const compound = parentOf.size > 0;
 
   const g = new graphlib.Graph(compound ? { compound: true } : undefined);
   g.setGraph({
@@ -105,11 +149,9 @@ export function layoutNodes(
 
   const compoundParentIds = new Set<string>();
   if (compound) {
-    for (const n of nodes) {
-      if (n.parentId != null && n.parentId !== n.id && ids.has(n.parentId)) {
-        g.setParent(n.id, n.parentId);
-        compoundParentIds.add(n.parentId);
-      }
+    for (const [child, parent] of parentOf) {
+      g.setParent(child, parent);
+      compoundParentIds.add(parent);
     }
   }
 

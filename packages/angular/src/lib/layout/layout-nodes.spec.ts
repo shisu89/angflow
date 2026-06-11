@@ -220,4 +220,37 @@ describe('layoutNodes compound groups', () => {
     expect(layoutNodes(nodes, edges, { direction: 'TB' }))
       .toEqual(layoutNodes(nodes, edges, { direction: 'TB' }));
   });
+
+  it('treats a 2-cycle (A→B→A) as top-level without throwing', () => {
+    const positions = layoutNodes(
+      [
+        { id: 'a', width: 40, height: 40, parentId: 'b' },
+        { id: 'b', width: 40, height: 40, parentId: 'a' },
+      ],
+      [],
+      { direction: 'TB' },
+    );
+    for (const id of ['a', 'b']) {
+      expect(Number.isFinite(positions[id].x)).toBe(true);
+      expect(Number.isFinite(positions[id].y)).toBe(true);
+    }
+  });
+
+  it('treats a 3-cycle (A→B→C→A) as top-level, keeping unrelated valid groups intact', () => {
+    const positions = layoutNodes(
+      [
+        { id: 'a', width: 40, height: 40, parentId: 'b' },
+        { id: 'b', width: 40, height: 40, parentId: 'c' },
+        { id: 'c', width: 40, height: 40, parentId: 'a' },
+        { id: 'g', width: 10, height: 10 },
+        { id: 'm', width: 40, height: 40, parentId: 'g' },
+      ],
+      [],
+      { direction: 'TB' },
+    );
+    for (const id of ['a', 'b', 'c', 'g', 'm']) {
+      expect(Number.isFinite(positions[id].x)).toBe(true);
+      expect(Number.isFinite(positions[id].y)).toBe(true);
+    }
+  });
 });
