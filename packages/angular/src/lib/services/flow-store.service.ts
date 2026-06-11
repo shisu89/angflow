@@ -125,6 +125,14 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   readonly nodesSelectionActive = signal(false);
   readonly userSelectionActive = signal(false);
 
+  /**
+   * Transient flag set by PaneComponent.onMouseUp after a completed marquee
+   * drag. Consumed (and reset to false) by NgFlowComponent.onPaneClick so the
+   * click synthesised from the same mouseup does not clear the selection box.
+   * Ported from React's `selectionInProgress` ref in Pane/index.tsx.
+   */
+  readonly selectionInProgress = signal(false);
+
   /** Id of the node currently showing Stage 2 floating-drop feedback during a connection drag.
    *  Null when no candidate is active or when Stage 1 owns the drop target. */
   readonly connectionTargetNodeId = signal<string | null>(null);

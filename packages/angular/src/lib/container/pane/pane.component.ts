@@ -146,8 +146,12 @@ export class PaneComponent implements OnDestroy {
 
     this.store.userSelectionActive.set(false);
     this.store.userSelectionRect.set(null);
-    // Mark nodes selection as active if nodes were selected
+    // Mark nodes selection as active if nodes were selected.
+    // Also set selectionInProgress so the click event synthesised from this
+    // same mouseup (React parity: selectionInProgress ref in Pane/index.tsx)
+    // is absorbed by onPaneClick without clearing nodesSelectionActive.
     if (this.store.selectedNodes().length > 0) {
+      this.store.selectionInProgress.set(true);
       this.store.nodesSelectionActive.set(true);
     }
     this.selectionEnd.emit(event);

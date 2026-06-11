@@ -959,8 +959,14 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     }
 
     // Don't deselect right after a selection drag ended (the click fires from mouseup).
-    // Clear the flag so the NEXT pane click can deselect normally — otherwise every
-    // subsequent click would also be swallowed.
+    // Consume the selectionInProgress flag so only THIS synthesised click is swallowed;
+    // the next genuine pane click will proceed normally.
+    // Ported from React's selectionInProgress ref (Pane/index.tsx).
+    if (this.store.selectionInProgress()) {
+      this.store.selectionInProgress.set(false);
+      return;
+    }
+
     if (this.store.nodesSelectionActive()) {
       this.store.nodesSelectionActive.set(false);
       return;
