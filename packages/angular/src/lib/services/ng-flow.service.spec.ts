@@ -602,6 +602,19 @@ describe('setNodePositions coordinateSpace', () => {
     expect(store.nodeLookup.get('c')!.internals.positionAbsolute).toEqual({ x: 250, y: 160 });
   });
 
+  it("absolute: combines the parent's NEW position with the child's dims*origin term", async () => {
+    store.setNodes([
+      { id: 'p', data: {}, position: { x: 0, y: 0 } },
+      { id: 'c', data: {}, position: { x: 0, y: 0 }, parentId: 'p', width: 100, height: 40, origin: [1, 1] },
+    ]);
+    await service.setNodePositions(
+      { p: { x: 500, y: 500 }, c: { x: 600, y: 580 } },
+      { coordinateSpace: 'absolute' },
+    );
+    // relative = childAbs - parentNewAbs + dims*origin = (600-500+100, 580-500+40)
+    expect(store.nodeLookup.get('c')!.position).toEqual({ x: 200, y: 120 });
+  });
+
   it("absolute: nested groups moved together resolve each child against its own parent's NEW position", async () => {
     store.setNodes([
       { id: 'g', data: {}, position: { x: 0, y: 0 } },
