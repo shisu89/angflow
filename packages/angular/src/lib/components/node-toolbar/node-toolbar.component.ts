@@ -75,6 +75,7 @@ export class NodeToolbarComponent {
   });
 
   readonly toolbarTransform = computed(() => {
+    this.store.version(); // react to measure/resize — nodeLookup is mutated in place
     const ids = this.resolvedNodeIds();
     if (ids.length === 0) return '';
 
