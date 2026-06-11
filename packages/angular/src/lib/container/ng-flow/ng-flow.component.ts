@@ -841,29 +841,22 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     };
 
     // Wire node drag callbacks so XYDrag can fire them for multi-node dragging
-    // (store drag-callback boundary mirrors xyflow's untyped signature)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.store.onNodeDragStart = (event: MouseEvent, node: any, nodes: any[]) => {
+    this.store.onNodeDragStart = (event: MouseEvent, node: NodeType, nodes: NodeType[]) => {
       this.nodeDragStart.emit({ event, node, nodes });
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.store.onNodeDrag = (event: MouseEvent, node: any, nodes: any[]) => {
+    this.store.onNodeDrag = (event: MouseEvent, node: NodeType, nodes: NodeType[]) => {
       this.nodeDrag.emit({ event, node, nodes });
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.store.onNodeDragStop = (event: MouseEvent, node: any, nodes: any[]) => {
+    this.store.onNodeDragStop = (event: MouseEvent, node: NodeType, nodes: NodeType[]) => {
       this.nodeDragStop.emit({ event, node, nodes });
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.store.onSelectionDragStart = (event: MouseEvent, nodes: any[]) => {
+    this.store.onSelectionDragStart = (event: MouseEvent, nodes: NodeType[]) => {
       this.selectionDragStart.emit({ event, nodes });
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.store.onSelectionDrag = (event: MouseEvent, nodes: any[]) => {
+    this.store.onSelectionDrag = (event: MouseEvent, nodes: NodeType[]) => {
       this.selectionDrag.emit({ event, nodes });
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.store.onSelectionDragStop = (event: MouseEvent, nodes: any[]) => {
+    this.store.onSelectionDragStop = (event: MouseEvent, nodes: NodeType[]) => {
       this.selectionDragStop.emit({ event, nodes });
     };
   }
