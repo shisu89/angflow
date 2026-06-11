@@ -24,6 +24,7 @@ import {
 
 import { FlowStore } from './flow-store.service';
 import { elementToRemoveChange } from '../utils/changes';
+import { injectFlowStore } from '../utils/inject-flow-store';
 import type { Node, Edge, InternalNode, DeleteElementsOptions } from '../types';
 import type { NodeTemplateSpec } from '../types/node-template';
 import { prefersReducedMotion } from '../utils/position-tween';
@@ -50,7 +51,7 @@ const BUILT_IN_EDGE_TYPE_NAMES = ['default', 'bezier', 'straight', 'step', 'smoo
  */
 @Injectable()
 export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge = Edge> {
-  private store = inject(FlowStore) as unknown as FlowStore<NodeType, EdgeType>;
+  private store = injectFlowStore<NodeType, EdgeType>();
   private destroyRef = inject(DestroyRef);
   private readonly doc = inject(DOCUMENT, { optional: true });
 

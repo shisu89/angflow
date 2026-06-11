@@ -48,6 +48,7 @@ import {
 
 import { FlowStore } from '../../services/flow-store.service';
 import { NgFlowService } from '../../services/ng-flow.service';
+import { injectFlowStore, injectNgFlowService } from '../../utils/inject-flow-store';
 import { NodeRendererComponent } from '../node-renderer/node-renderer.component';
 import { EdgeRendererComponent } from '../edge-renderer/edge-renderer.component';
 import { ViewportComponent } from '../viewport/viewport.component';
@@ -237,8 +238,8 @@ function viewportsEqual(a: Viewport, b: Viewport): boolean {
 export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge = Edge>
   implements OnInit, AfterViewInit, OnDestroy
 {
-  readonly store = inject(FlowStore) as unknown as FlowStore<NodeType, EdgeType>;
-  readonly service = inject(NgFlowService) as unknown as NgFlowService<NodeType, EdgeType>;
+  readonly store = injectFlowStore<NodeType, EdgeType>();
+  readonly service = injectNgFlowService<NodeType, EdgeType>();
   private readonly containerRef = viewChild<ElementRef<HTMLDivElement>>('container');
   private readonly paneRef = viewChild(PaneComponent);
 
