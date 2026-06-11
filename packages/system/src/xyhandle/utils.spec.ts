@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getFloatingDropTarget } from './utils';
+import { getFloatingDropTarget, getClosestHandle } from './utils';
 import { Position } from '../types/utils';
 import type { NodeLookup } from '../types/nodes';
 
@@ -186,5 +186,43 @@ describe('getFloatingDropTarget', () => {
       { nodeId: 'B', type: 'source', id: null },
     );
     expect(result?.nodeId).toBe('V');
+  });
+});
+
+describe('getClosestHandle hidden-node guard', () => {
+  it('never returns a handle on a hidden node', () => {
+    // makeNode's handles have width/height 0, so getHandlePosition(center=true)
+    // resolves the handle's absolute position to the node's positionAbsolute
+    // (100,100). The node itself needs non-zero measured dims so it survives
+    // getNodesWithinDistance's getOverlappingArea(>0) gate. Pointer sits on the
+    // handle → distance 0 < connectionRadius → it is the only candidate.
+    const hidden = makeNode('H', {
+      x: 100, y: 100, width: 10, height: 10,
+      fixedHandles: [{ id: 'h', type: 'target', position: Position.Left }],
+    });
+    hidden.hidden = true;
+
+    const result = getClosestHandle(
+      { x: 100, y: 100 },
+      50, // connectionRadius
+      makeLookup(hidden),
+      { nodeId: 'B', type: 'source', id: null },
+    );
+    expect(result).toBeNull();
+  });
+
+  it('still returns a handle on a visible node at the same position', () => {
+    const visible = makeNode('V', {
+      x: 100, y: 100, width: 10, height: 10,
+      fixedHandles: [{ id: 'v', type: 'target', position: Position.Left }],
+    });
+    const result = getClosestHandle(
+      { x: 100, y: 100 },
+      50,
+      makeLookup(visible),
+      { nodeId: 'B', type: 'source', id: null },
+    );
+    expect(result?.nodeId).toBe('V');
+    expect(result?.id).toBe('v');
   });
 });

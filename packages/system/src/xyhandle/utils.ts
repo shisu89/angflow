@@ -12,6 +12,9 @@ function getNodesWithinDistance(position: XYPosition, nodeLookup: NodeLookup, di
   };
 
   for (const node of nodeLookup.values()) {
+    // Hidden nodes remain in nodeLookup (visibility filtering is render-level);
+    // an invisible node must not capture connection snapping or highlights.
+    if (node.hidden) continue;
     if (getOverlappingArea(rect, nodeToRect(node)) > 0) {
       nodes.push(node);
     }
