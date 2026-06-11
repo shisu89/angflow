@@ -276,10 +276,10 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   // ── Data (controlled-mode inputs; pair with the *Change outputs) ──────
 
   /** Nodes to render. Re-bind from `(nodesChange)` after running deltas through `applyNodeChanges` to stay in sync. */
-  readonly nodesModel = input<NodeType[]>([] as unknown as NodeType[], { alias: 'nodes' });
+  readonly nodesModel = input<NodeType[]>([] as NodeType[], { alias: 'nodes' });
 
   /** Edges to render. Re-bind from `(edgesChange)` after running deltas through `applyEdgeChanges` to stay in sync. */
-  readonly edgesModel = input<EdgeType[]>([] as unknown as EdgeType[], { alias: 'edges' });
+  readonly edgesModel = input<EdgeType[]>([] as EdgeType[], { alias: 'edges' });
 
   /** Controlled viewport ({ x, y, zoom }). Re-bind from (viewportChange) to keep it in sync; equal values are not re-applied. */
   readonly viewportModel = input<Viewport | undefined>(undefined, { alias: 'viewport' });

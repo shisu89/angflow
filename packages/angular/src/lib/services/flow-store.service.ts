@@ -649,7 +649,9 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
         // Mirror the mutation onto the user-facing node reference so that
         // external consumers observing `nodes()` see consistent state.
-        const userNode = internalNode.internals?.userNode as any;
+        const userNode = internalNode.internals?.userNode as
+          | Pick<NodeType, 'position' | 'dragging'>
+          | undefined;
         if (userNode) {
           if (change.position) {
             userNode.position = change.position;
