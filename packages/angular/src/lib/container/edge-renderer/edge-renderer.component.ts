@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   inject,
   computed,
+  effect,
   output,
   input,
   signal,
@@ -32,7 +33,7 @@ import { StraightEdgeComponent } from '../../components/edges/straight-edge.comp
 import { StepEdgeComponent } from '../../components/edges/step-edge.component';
 import { SmoothStepEdgeComponent } from '../../components/edges/smooth-step-edge.component';
 import { SimpleBezierEdgeComponent } from '../../components/edges/simple-bezier-edge.component';
-import type { Edge, EdgeTypes } from '../../types';
+import type { Edge, EdgeTypes, InternalNode } from '../../types';
 
 const builtInEdgeTypes: EdgeTypes = {
   default: BezierEdgeComponent,
@@ -42,6 +43,64 @@ const builtInEdgeTypes: EdgeTypes = {
   smoothstep: SmoothStepEdgeComponent,
   simplebezier: SimpleBezierEdgeComponent,
 };
+
+/**
+ * Pure, identity-free fingerprint of everything that affects an edge's
+ * geometry: endpoint absolute positions, node sizes, and the global edge
+ * mode (plus the flow id, which feeds marker URLs). Used as the memo key so
+ * a dragged node (position change) or a remeasure (size change) invalidates
+ * the cached inputs while an unchanged frame stays a cheap string-equal hit.
+ */
+export function computeEdgeGeometryKey(
+  edge: Edge,
+  sourceNode: InternalNode | undefined,
+  targetNode: InternalNode | undefined,
+  edgeMode: 'handles' | 'floating',
+  rfId = '',
+): string {
+  const sp = sourceNode?.internals?.positionAbsolute ?? sourceNode?.position;
+  const tp = targetNode?.internals?.positionAbsolute ?? targetNode?.position;
+  return [
+    edgeMode,
+    rfId,
+    sp?.x ?? 0, sp?.y ?? 0,
+    sourceNode?.measured?.width ?? sourceNode?.width ?? 150,
+    sourceNode?.measured?.height ?? sourceNode?.height ?? 40,
+    tp?.x ?? 0, tp?.y ?? 0,
+    targetNode?.measured?.width ?? targetNode?.width ?? 150,
+    targetNode?.measured?.height ?? targetNode?.height ?? 40,
+  ].join(':');
+}
+
+/**
+ * Computes an edge's SVG path string from a built inputs object. Byte-for-byte
+ * equivalent to the inline switch the template used to call per binding —
+ * extracted so the memo can compute it exactly once per inputs build.
+ */
+export function computeEdgePathFromInputs(ei: Record<string, unknown>): string {
+  const type = ei['type'] || 'default';
+  const params = {
+    sourceX: ei['sourceX'] as number,
+    sourceY: ei['sourceY'] as number,
+    targetX: ei['targetX'] as number,
+    targetY: ei['targetY'] as number,
+    sourcePosition: (ei['sourcePosition'] ?? Position.Bottom) as Position,
+    targetPosition: (ei['targetPosition'] ?? Position.Top) as Position,
+  };
+
+  switch (type) {
+    case 'straight':
+      return getStraightPath(params)[0];
+    case 'step':
+      return getSmoothStepPath({ ...params, borderRadius: 0 })[0];
+    case 'smoothstep':
+      return getSmoothStepPath(params)[0];
+    case 'default':
+    case 'bezier':
+    default:
+      return getBezierPath(params)[0];
+  }
+}
 
 @Component({
   selector: 'ng-flow-edge-renderer',
@@ -297,28 +356,11 @@ export class EdgeRendererComponent {
   }
 
   getEdgePath(ei: Record<string, unknown>): string {
-    const type = ei['type'] || 'default';
-    const params = {
-      sourceX: ei['sourceX'] as number,
-      sourceY: ei['sourceY'] as number,
-      targetX: ei['targetX'] as number,
-      targetY: ei['targetY'] as number,
-      sourcePosition: (ei['sourcePosition'] ?? Position.Bottom) as Position,
-      targetPosition: (ei['targetPosition'] ?? Position.Top) as Position,
-    };
-
-    switch (type) {
-      case 'straight':
-        return getStraightPath(params)[0];
-      case 'step':
-        return getSmoothStepPath({ ...params, borderRadius: 0 })[0];
-      case 'smoothstep':
-        return getSmoothStepPath(params)[0];
-      case 'default':
-      case 'bezier':
-      default:
-        return getBezierPath(params)[0];
-    }
+    // Fast path: the inputs object is the exact one we memoized, so its path
+    // was already computed. Identity match guarantees same geometry.
+    const entry = this.edgeMemo.get(ei['id'] as string);
+    if (entry && entry.inputs === ei) return entry.path;
+    return computeEdgePathFromInputs(ei);
   }
 
   getEdgeComponent(type?: string): Type<unknown> {
@@ -350,7 +392,7 @@ export class EdgeRendererComponent {
     return set;
   }
 
-  getEdgeInputs(edge: Edge): Record<string, any> {
+  private buildEdgeInputs(edge: Edge): Record<string, any> {
     const sourceNode = this.store.nodeLookup.get(edge.source);
     const targetNode = this.store.nodeLookup.get(edge.target);
 
@@ -456,6 +498,76 @@ export class EdgeRendererComponent {
       sourceHandle: enrichedSourceHandle,
       targetHandle: enrichedTargetHandle,
     };
+  }
+
+  /**
+   * Per-edge memo of the built inputs object and its computed path. The
+   * template calls getEdgeInputs(edge) up to 3x per edge (main SVG, custom-edge
+   * overlay, label) and getEdgePath() twice; without this each call rebuilt the
+   * inputs and recomputed the path. Cached on edge id, validated against a
+   * geometry fingerprint plus reference identities for the inputs that don't
+   * appear in the key (edge object, handle-data map, handle bounds).
+   */
+  private readonly edgeMemo = new Map<string, {
+    key: string;
+    edge: Edge;
+    handleData: ReadonlyMap<string, unknown>;
+    sourceHandleBounds: unknown;
+    targetHandleBounds: unknown;
+    inputs: Record<string, any>;
+    path: string;
+  }>();
+
+  getEdgeInputs(edge: Edge): Record<string, any> {
+    const sourceNode = this.store.nodeLookup.get(edge.source);
+    const targetNode = this.store.nodeLookup.get(edge.target);
+    // These signal reads happen on hit AND miss so the template stays
+    // subscribed to handle-data / edge-mode / flow-id changes (zoneless
+    // reactivity: a hit that skipped a read would drop the subscription).
+    const handleData = this.store.handleDataRegistry();
+    const key = computeEdgeGeometryKey(
+      edge,
+      sourceNode,
+      targetNode,
+      this.store.edgeMode(),
+      this.store.rfId(),
+    );
+
+    const cached = this.edgeMemo.get(edge.id);
+    if (
+      cached &&
+      cached.key === key &&
+      cached.edge === edge &&
+      cached.handleData === handleData &&
+      cached.sourceHandleBounds === sourceNode?.internals?.handleBounds &&
+      cached.targetHandleBounds === targetNode?.internals?.handleBounds
+    ) {
+      return cached.inputs;
+    }
+
+    const inputs = this.buildEdgeInputs(edge);
+    this.edgeMemo.set(edge.id, {
+      key,
+      edge,
+      handleData,
+      sourceHandleBounds: sourceNode?.internals?.handleBounds,
+      targetHandleBounds: targetNode?.internals?.handleBounds,
+      inputs,
+      path: computeEdgePathFromInputs(inputs),
+    });
+    return inputs;
+  }
+
+  constructor() {
+    // Drop memo entries for edges that no longer exist (unbounded-growth
+    // guard). Keyed off edges() — the source list — NOT displayEdges(), so it
+    // doesn't re-run on every render frame.
+    effect(() => {
+      const ids = new Set<string>(this.store.edges().map((e) => e.id));
+      for (const id of this.edgeMemo.keys()) {
+        if (!ids.has(id)) this.edgeMemo.delete(id);
+      }
+    });
   }
 
   onEdgeEvent(event: MouseEvent, edge: Edge, eventType: string): void {
