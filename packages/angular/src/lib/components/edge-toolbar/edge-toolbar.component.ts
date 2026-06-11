@@ -50,16 +50,24 @@ export class EdgeToolbarComponent {
   /** Override visibility. Defaults to showing when the edge is selected. */
   readonly isVisible = input<boolean | undefined>(undefined);
 
+  /**
+   * O(1) edge resolution via the store's edgeLookup. Reads version() so the
+   * computed re-fires when setEdges repopulates the lookup and bumps the
+   * version (e.g. on selection) — edgeLookup is a plain Map, not a signal.
+   */
+  readonly resolvedEdge = computed(() => {
+    this.store.version();
+    return this.store.edgeLookup.get(this.edgeId());
+  });
+
   readonly shouldShow = computed(() => {
     const vis = this.isVisible();
     if (vis !== undefined) return vis;
-    const edge = this.store.edges().find(e => e.id === this.edgeId());
-    return edge?.selected ?? false;
+    return this.resolvedEdge()?.selected ?? false;
   });
 
   readonly zIndex = computed(() => {
-    const edge = this.store.edges().find(e => e.id === this.edgeId());
-    return ((edge as any)?.zIndex ?? 0) + 1;
+    return (this.resolvedEdge()?.zIndex ?? 0) + 1;
   });
 
   readonly toolbarTransform = computed(() => {
