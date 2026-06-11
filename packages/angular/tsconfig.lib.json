@@ -7,7 +7,7 @@
     "outDir": "./dist/esm",
     "rootDir": "./src",
     "declaration": true,
-    "declarationMap": true,
+    "declarationMap": false,
     "noImplicitReturns": false,
     "paths": {
       "@angflow/system": ["../system/dist/esm/index.d.ts"]

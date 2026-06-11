@@ -2,7 +2,7 @@
   "name": "@angflow/monorepo",
   "version": "0.0.0",
   "description": "A highly customizable Angular library for building node-based editors and interactive flow charts",
-  "repository": "git@github.com:angflow/angflow.git",
+  "repository": "git+https://github.com/shisu89/angflow.git",
   "license": "MIT",
   "private": true,
   "scripts": {

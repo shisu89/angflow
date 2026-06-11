@@ -39,7 +39,7 @@ const defineEsmConfig = (format) =>
         includeDependencies: true,
       }),
       ...defaultPlugins,
-      typescript(),
+      typescript({ declarationMap: false }),
     ],
   });
 
@@ -70,7 +70,7 @@ const umdConfig = defineConfig({
   plugins: [
     peerDepsExternal(),
     ...defaultPlugins,
-    typescript(),
+    typescript({ declarationMap: false }),
     replace({
       preventAssignment: true,
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),

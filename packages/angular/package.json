@@ -14,7 +14,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/angflow/angflow.git",
+    "url": "git+https://github.com/shisu89/angflow.git",
     "directory": "packages/angular"
   },
   "files": [
@@ -40,6 +40,9 @@
     "*.css"
   ],
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "publishConfig": {
     "access": "public"
   },

@@ -28,6 +28,7 @@
         "import": "./dist/esm/index.mjs"
       },
       "browser": {
+        "types": "./dist/esm/index.d.ts",
         "import": "./dist/esm/index.js",
         "require": "./dist/umd/index.js"
       },
@@ -36,12 +37,15 @@
   },
   "sideEffects": false,
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/angflow/angflow.git",
+    "url": "git+https://github.com/shisu89/angflow.git",
     "directory": "packages/system"
   },
   "scripts": {

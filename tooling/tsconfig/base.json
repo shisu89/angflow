@@ -5,7 +5,7 @@
     "allowSyntheticDefaultImports": true,
     "composite": false,
     "declaration": true,
-    "declarationMap": true,
+    "declarationMap": false,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "inlineSources": false,
