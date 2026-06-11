@@ -22,15 +22,19 @@ interface EmojiData { icon: string; title: string; subtitle: string }
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HandleComponent],
   template: `
-    <ng-flow-handle type="target" [position]="Position.Top" />
-    <div class="emoji-inject-node" [class.selected]="node.selected()">
+    <ng-flow-handle type="target" [position]="Position.Top" [isConnectable]="node.isConnectable()" />
+    <div
+      class="emoji-inject-node"
+      [class.selected]="node.selected()"
+      [class.not-connectable]="!node.isConnectable()"
+    >
       <div class="emoji-inject-node__icon">{{ node.data()?.icon ?? '*' }}</div>
       <div class="emoji-inject-node__text">
         <div class="emoji-inject-node__title">{{ node.data()?.title ?? 'Untitled' }}</div>
         <div class="emoji-inject-node__subtitle">{{ node.data()?.subtitle ?? '' }}</div>
       </div>
     </div>
-    <ng-flow-handle type="source" [position]="Position.Bottom" />
+    <ng-flow-handle type="source" [position]="Position.Bottom" [isConnectable]="node.isConnectable()" />
   `,
   styles: [`
     .emoji-inject-node {
@@ -49,6 +53,10 @@ interface EmojiData { icon: string; title: string; subtitle: string }
     .emoji-inject-node.selected {
       box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35);
       transform: translateY(-1px);
+    }
+    .emoji-inject-node.not-connectable {
+      border-style: dashed;
+      opacity: 0.85;
     }
     .emoji-inject-node__icon {
       font-size: 22px;
@@ -86,7 +94,7 @@ export class EmojiInjectNodeComponent {
   template: `
     <app-example-card
       title="Custom node (inject)"
-      description="Same shape as the Custom node example but using the injectNgFlowNode() API — the recommended pattern for new code. The class body shrinks from ~13 input declarations to one injection call. See Custom node for the input-based alternative."
+      description="Custom node built with the injectNgFlowNode() API — the recommended pattern for new code. Reads node.data() (icon/title/subtitle), node.selected() (lift on selection), and node.isConnectable() (the 'Locked' node sets connectable: false, dimming its dashed handles). The class body is one injection call instead of ~13 input declarations."
     >
       <ng-flow
         [nodes]="nodes"
@@ -113,6 +121,7 @@ export class CustomNodeInjectExampleComponent {
     { id: '1', type: 'emojiInject', position: { x: 80, y: 80 }, data: { icon: 'A', title: 'Read data', subtitle: 'from source' } },
     { id: '2', type: 'emojiInject', position: { x: 340, y: 220 }, data: { icon: 'T', title: 'Transform', subtitle: 'map + filter' } },
     { id: '3', type: 'emojiInject', position: { x: 600, y: 100 }, data: { icon: 'W', title: 'Write', subtitle: 'to destination' } },
+    { id: '4', type: 'emojiInject', position: { x: 340, y: 380 }, connectable: false, data: { icon: 'L', title: 'Locked', subtitle: 'connectable: false' } },
   ];
 
   edges: Edge[] = [
