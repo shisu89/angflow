@@ -12,7 +12,10 @@ import { NgFlowService } from '../../services/ng-flow.service';
  * `skipSelf`), so any sibling that injects `NgFlowService` (e.g. a sidebar
  * calling `fitView` or `setNodes`) observes and mutates the same state the
  * flow renders. The provider owns the store's lifetime: unmounting the inner
- * `<ng-flow>` does not destroy the shared store.
+ * `<ng-flow>` does NOT clear the shared store's graph state (nodes, edges,
+ * etc.) — surviving siblings keep observing it, matching ReactFlow's provider
+ * semantics. Only the panZoom instance is cleared on inner unmount, because
+ * that DOM-bound object is destroyed along with the component.
  *
  * @example
  * ```html

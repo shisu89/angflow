@@ -122,10 +122,13 @@ function viewportsEqual(a: Viewport, b: Viewport): boolean {
     AttributionComponent,
   ],
   providers: [
-    // Reuse a FlowStore/NgFlowService provided by an enclosing
-    // <ng-flow-provider>; otherwise create our own. Factories run in an
-    // injection context, so `new NgFlowService()` resolves its inject(FlowStore)
-    // against THIS injector — i.e. the shared-or-fresh store below.
+    // Reuse a FlowStore/NgFlowService provided by an enclosing provider;
+    // otherwise create our own. Reuse triggers for ANY ancestor that provides
+    // FlowStore: <ng-flow-provider> is the supported pattern, but a root-level
+    // FlowStore or a <ng-flow> rendered inside another flow's subtree would also
+    // be reused. Factories run in an injection context, so `new NgFlowService()`
+    // resolves its inject(FlowStore) against THIS injector — i.e. the
+    // shared-or-fresh store below.
     {
       provide: FlowStore,
       useFactory: () => {
@@ -133,18 +136,22 @@ function viewportsEqual(a: Viewport, b: Viewport): boolean {
         if (parentStore) return parentStore;
         const store = new FlowStore();
         // Node-injector useFactory providers don't get ngOnDestroy called
-        // automatically — wire the tween/rAF cleanup explicitly. Deliberately
-        // NOT registered for the parent-reuse branch above, so unmounting an
-        // inner <ng-flow> can never destroy the provider's shared store.
-        inject(DestroyRef).onDestroy(() => store.ngOnDestroy());
+        // automatically — wire the tween/rAF cleanup and graph-state reset
+        // explicitly. Only registered for the fresh branch: unmounting an inner
+        // <ng-flow> in a provider context must NOT reset the shared store.
+        inject(DestroyRef).onDestroy(() => {
+          store.reset();
+          store.ngOnDestroy();
+        });
         return store;
       },
     },
     {
       // NgFlowService has no ngOnDestroy; its only cleanup self-registers via
-      // the injected DestroyRef (keyPressed listeners), which already resolves
-      // to this component's injector regardless of which branch runs — so no
-      // extra destroy wiring is needed here.
+      // the injected DestroyRef (keyPressed listeners). In the fresh branch that
+      // DestroyRef belongs to this component's injector; in the reuse branch it
+      // belongs to the provider's injector (which outlives this component).
+      // Either way the cleanup fires at the right time — no extra wiring needed.
       provide: NgFlowService,
       useFactory: () =>
         inject(NgFlowService, { optional: true, skipSelf: true }) ?? new NgFlowService(),
@@ -916,15 +923,17 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   ngOnDestroy(): void {
     this.resizeObserver?.disconnect();
     this.panZoomInstance?.destroy();
-    // Clear the now-dead panZoom reference so a store shared via
-    // <ng-flow-provider> never points at a destroyed instance. With a provider
-    // the store instance survives this reset() (it is owned by the provider's
-    // injector, not this component), so its consumers keep working.
+    // panZoom is cleared for both branches (fresh-store and provider-reuse):
+    // the XYPanZoom instance is owned by this component and is destroyed above,
+    // so whatever store is in use must no longer reference it.
+    // Graph state (nodes/edges/etc.) is reset only when this component owns the
+    // store (fresh branch) — that is handled via the factory's DestroyRef
+    // callback above. An enclosing provider's store keeps its graph state across
+    // inner <ng-flow> unmounts, matching ReactFlow's provider semantics.
     this.store.panZoom.set(null);
     if (this.colorSchemeQuery && this.colorSchemeHandler) {
       this.colorSchemeQuery.removeEventListener('change', this.colorSchemeHandler);
     }
-    this.store.reset();
   }
 
   private panePointerDownPos: { x: number; y: number } | null = null;

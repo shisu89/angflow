@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { Component, inject, provideZonelessChangeDetection } from '@angular/core';
+import { Component, inject, provideZonelessChangeDetection, signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { NgFlowProviderComponent } from './ng-flow-provider.component';
 import { NgFlowComponent } from '../../container/ng-flow/ng-flow.component';
@@ -94,5 +94,41 @@ describe('NgFlowProviderComponent state sharing', () => {
     expect(a.store).not.toBe(b.store);
     a.store.setNodes([{ id: 'x', position: { x: 0, y: 0 }, data: {} } as Node]);
     expect(b.store.nodes()).toHaveLength(0);
+  });
+
+  it('unmounting the inner <ng-flow> keeps the shared store state', () => {
+    @Component({
+      standalone: true,
+      imports: [NgFlowProviderComponent, NgFlowComponent],
+      template: `
+        <ng-flow-provider>
+          @if (showFlow()) {
+            <ng-flow />
+          }
+        </ng-flow-provider>
+      `,
+    })
+    class ToggleHostComponent {
+      readonly showFlow = signal(true);
+    }
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [ToggleHostComponent],
+      providers: [provideZonelessChangeDetection()],
+    });
+    const fixture = TestBed.createComponent(ToggleHostComponent);
+    fixture.detectChanges();
+
+    const providerInjector = fixture.debugElement.query(By.directive(NgFlowProviderComponent)).injector;
+    const store = providerInjector.get(FlowStore);
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {} } as Node]);
+    fixture.detectChanges();
+
+    fixture.componentInstance.showFlow.set(false);
+    fixture.detectChanges();
+
+    expect(store.nodes().map((n) => n.id)).toEqual(['n1']); // state survives inner unmount
+    expect(store.panZoom()).toBeNull(); // but the dead panZoom was cleared
   });
 });
