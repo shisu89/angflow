@@ -1,11 +1,33 @@
 import { describe, it, expect } from 'vitest';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
-import { provideZonelessChangeDetection } from '@angular/core';
+import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { FlowStore } from '../../services/flow-store.service';
 import { NgFlowService } from '../../services/ng-flow.service';
-import { NODE_ID } from '../../services/tokens';
+import { NODE_ID, NG_FLOW_NODE_CONTEXT } from '../../services/tokens';
 import { TemplateNodeComponent } from './template-node.component';
 import type { NodeTemplateSpec } from '../../types/node-template';
+import type { NgFlowNodeContext } from '../../types';
+import { Position } from '@angflow/system';
+
+function makeContext(
+  data: Record<string, unknown>,
+  type: string,
+): NgFlowNodeContext<Record<string, unknown>> {
+  return {
+    id: signal('n1'),
+    data: signal<Record<string, unknown> | undefined>(data),
+    type: signal<string | undefined>(type),
+    selected: signal(false),
+    dragging: signal(false),
+    zIndex: signal(0),
+    isConnectable: signal(true),
+    position: signal({ x: 0, y: 0 }),
+    sourcePosition: signal<Position | undefined>(undefined),
+    targetPosition: signal<Position | undefined>(undefined),
+    dragHandle: signal<string | undefined>(undefined),
+    collapsed: signal(false),
+  };
+}
 
 function mount(
   spec: NodeTemplateSpec,
@@ -18,14 +40,12 @@ function mount(
       FlowStore,
       NgFlowService,
       { provide: NODE_ID, useValue: 'n1' },
+      { provide: NG_FLOW_NODE_CONTEXT, useValue: makeContext(data, 'service') },
     ],
   });
   const store = TestBed.inject(FlowStore);
   store.nodeTemplates.set(new Map([['service', spec]]));
   const fixture = TestBed.createComponent(TemplateNodeComponent);
-  fixture.componentRef.setInput('id', 'n1');
-  fixture.componentRef.setInput('type', 'service');
-  fixture.componentRef.setInput('data', data);
   fixture.detectChanges();
   return { fixture, el: fixture.nativeElement as HTMLElement, store };
 }
@@ -142,17 +162,48 @@ describe('TemplateNodeComponent', () => {
     expect(el.querySelector('.ng-flow__template-node__body')?.textContent).toBe('runs api');
   });
 
-  it('toggles the selected class from the selected input', () => {
-    const { fixture, el } = mount({ title: 't' }, {});
+  it('toggles the selected class from the selected context signal', () => {
+    const ctx = makeContext({}, 'service');
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        FlowStore,
+        NgFlowService,
+        { provide: NODE_ID, useValue: 'n1' },
+        { provide: NG_FLOW_NODE_CONTEXT, useValue: ctx },
+      ],
+    });
+    const store = TestBed.inject(FlowStore);
+    store.nodeTemplates.set(new Map([['service', { title: 't' }]]));
+    const fixture = TestBed.createComponent(TemplateNodeComponent);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('.ng-flow__template-node--selected')).toBeNull();
-    fixture.componentRef.setInput('selected', true);
+    (ctx.selected as ReturnType<typeof signal<boolean>>).set(true);
     fixture.detectChanges();
     expect(el.querySelector('.ng-flow__template-node--selected')).not.toBeNull();
   });
 
-  it('re-interpolates when node data changes', () => {
-    const { fixture, el } = mount({ title: '{{data.name}}' }, { name: 'v1' });
-    fixture.componentRef.setInput('data', { name: 'v2' });
+  it('re-interpolates when node data changes via context signal', () => {
+    const ctx = makeContext({ name: 'v1' }, 'service');
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        FlowStore,
+        NgFlowService,
+        { provide: NODE_ID, useValue: 'n1' },
+        { provide: NG_FLOW_NODE_CONTEXT, useValue: ctx },
+      ],
+    });
+    const store = TestBed.inject(FlowStore);
+    store.nodeTemplates.set(new Map([['service', { title: '{{data.name}}' }]]));
+    const fixture = TestBed.createComponent(TemplateNodeComponent);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.ng-flow__template-node__title')?.textContent).toBe('v1');
+    (ctx.data as ReturnType<typeof signal<Record<string, unknown> | undefined>>).set({ name: 'v2' });
     fixture.detectChanges();
     expect(el.querySelector('.ng-flow__template-node__title')?.textContent).toBe('v2');
   });

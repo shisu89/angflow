@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { Position } from '@angflow/system';
 import { HandleComponent } from '../handle/handle.component';
 import { FlowStore } from '../../services/flow-store.service';
@@ -7,6 +7,7 @@ import {
   interpolateTemplateString,
   isTemplateConditionTrue,
 } from '../../utils/template-interpolation';
+import { injectNgFlowNode } from '../../utils/inject-ng-flow-node';
 
 const POSITION_MAP: Record<string, Position> = {
   top: Position.Top,
@@ -54,7 +55,7 @@ const ICONS: Record<string, string> = {
       <div
         class="ng-flow__template-node"
         [class.ng-flow__template-node--compact]="(s.variant ?? 'detailed') === 'compact'"
-        [class.ng-flow__template-node--selected]="selected()"
+        [class.ng-flow__template-node--selected]="node.selected()"
         [style.borderLeftColor]="s.accent ?? null"
       >
         <div class="ng-flow__template-node__header" [style.color]="s.accent ?? null">
@@ -104,7 +105,7 @@ const ICONS: Record<string, string> = {
             [type]="h.type"
             [id]="h.id ?? null"
             [position]="h.position"
-            [isConnectable]="isConnectable()"
+            [isConnectable]="node.isConnectable()"
           />
         }
       </div>
@@ -183,25 +184,12 @@ const ICONS: Record<string, string> = {
 })
 export class TemplateNodeComponent {
   private readonly store = inject(FlowStore);
+  readonly node = injectNgFlowNode<Record<string, unknown>>();
 
-  readonly id = input.required<string>();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly data = input<any>(); // untyped built-in node data
-  readonly type = input<string>();
-  readonly selected = input(false);
-  readonly dragging = input(false);
-  readonly zIndex = input(0);
-  readonly isConnectable = input(true);
-  readonly positionAbsoluteX = input(0);
-  readonly positionAbsoluteY = input(0);
-  readonly sourcePosition = input<Position>();
-  readonly targetPosition = input<Position>();
-  readonly dragHandle = input<string>();
-
-  readonly spec = computed(() => this.store.nodeTemplates().get(this.type() ?? ''));
+  readonly spec = computed(() => this.store.nodeTemplates().get(this.node.type() ?? ''));
 
   readonly title = computed(() =>
-    interpolateTemplateString(this.spec()?.title ?? '', this.data()),
+    interpolateTemplateString(this.spec()?.title ?? '', this.node.data()),
   );
 
   readonly iconPath = computed(() => {
@@ -211,21 +199,21 @@ export class TemplateNodeComponent {
 
   readonly badges = computed(() =>
     (this.spec()?.badges ?? [])
-      .filter((b) => isTemplateConditionTrue(b.showIf, this.data()))
+      .filter((b) => isTemplateConditionTrue(b.showIf, this.node.data()))
       .map((b) => ({
-        text: interpolateTemplateString(b.text, this.data()),
+        text: interpolateTemplateString(b.text, this.node.data()),
         color: BADGE_COLORS.has(b.color as NodeTemplateBadgeColor) ? b.color! : 'slate',
       })),
   );
 
   readonly fields = computed(() =>
     (this.spec()?.fields ?? [])
-      .filter((f) => isTemplateConditionTrue(f.showIf, this.data()))
-      .map((f) => ({ label: f.label, value: interpolateTemplateString(f.value, this.data()) })),
+      .filter((f) => isTemplateConditionTrue(f.showIf, this.node.data()))
+      .map((f) => ({ label: f.label, value: interpolateTemplateString(f.value, this.node.data()) })),
   );
 
   readonly bodyText = computed(() =>
-    interpolateTemplateString(this.spec()?.body ?? '', this.data()),
+    interpolateTemplateString(this.spec()?.body ?? '', this.node.data()),
   );
 
   readonly handles = computed(() => {
