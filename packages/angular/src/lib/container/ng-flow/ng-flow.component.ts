@@ -24,7 +24,6 @@ import {
   SelectionMode,
   infiniteExtent,
   XYPanZoom,
-  getViewportForBounds,
   type Viewport,
   type CoordinateExtent,
   type NodeOrigin,
@@ -811,7 +810,10 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       this.error.emit({ id, message });
     });
 
-    // Queue fit view if requested
+    // Queue fit view if requested. The store consumes the flag once nodes are
+    // measured (setNodes / updateNodeInternals). With zero nodes it stays
+    // queued: the default viewport is kept, and the first non-empty measured
+    // setNodes still gets the initial fit.
     if (this.fitView()) {
       this.store.fitViewQueued.set(true);
       this.store.fitViewOptions.set(this.fitViewOptions());
@@ -849,13 +851,6 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     // Initialize box selection listener (must be after panZoom so capture fires first)
     this.paneRef()?.initSelectionListener();
 
-    // Perform fitView after a short delay to allow dimensions to settle
-    if (this.fitView()) {
-      setTimeout(() => {
-        this.doFitView();
-      }, 50);
-    }
-
     // Emit init event
     this.init.emit(this.service);
   }
@@ -867,38 +862,6 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       this.colorSchemeQuery.removeEventListener('change', this.colorSchemeHandler);
     }
     this.store.reset();
-  }
-
-  private doFitView(): void {
-    const nodes = this.store.nodes();
-    if (nodes.length === 0) return;
-
-    // Compute bounds from node positions (since nodes may not be measured yet)
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const node of nodes) {
-      const x = node.position.x;
-      const y = node.position.y;
-      const w = node.width ?? 150;
-      const h = node.height ?? 40;
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x + w);
-      maxY = Math.max(maxY, y + h);
-    }
-
-    const bounds = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-    const padding = this.fitViewOptions()?.padding ?? 0.1;
-    const vp = getViewportForBounds(
-      bounds,
-      this.store.width(),
-      this.store.height(),
-      this.minZoom(),
-      this.maxZoom(),
-      padding
-    );
-
-    this.panZoomInstance?.setViewport(vp, { duration: 0 });
-    this.store.transform.set([vp.x, vp.y, vp.zoom]);
   }
 
   private panePointerDownPos: { x: number; y: number } | null = null;

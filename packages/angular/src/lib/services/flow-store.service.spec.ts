@@ -876,6 +876,35 @@ describe('FlowStore', () => {
       expect(vi.mocked(getCollapsedHiddenIds).mock.calls.length).toBe(before + 1);
     });
   });
+
+  describe('queued fitView', () => {
+    it('stays queued for an empty graph (default viewport is kept)', () => {
+      const setViewport = vi.fn().mockResolvedValue(undefined);
+      store.panZoom.set({ setViewport } as never);
+      store.fitViewQueued.set(true);
+
+      store.setNodes([]);
+
+      expect(store.fitViewQueued()).toBe(true);
+      expect(setViewport).not.toHaveBeenCalled();
+    });
+
+    it('resolves once nodes arrive with dimensions', () => {
+      const setViewport = vi.fn().mockResolvedValue(undefined);
+      store.panZoom.set({ setViewport } as never);
+      store.width.set(800);
+      store.height.set(600);
+      store.fitViewQueued.set(true);
+
+      store.setNodes([]); // empty mount first — flag must survive
+      store.setNodes([
+        { id: 'a', position: { x: 0, y: 0 }, data: {}, measured: { width: 100, height: 50 } },
+      ] as never);
+
+      expect(store.fitViewQueued()).toBe(false);
+      expect(setViewport).toHaveBeenCalledTimes(1);
+    });
+  });
 });
 
 describe('tweenNodePositions', () => {
