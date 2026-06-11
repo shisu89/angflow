@@ -535,3 +535,47 @@ describe('built-in node renders + live-updates through the per-node injector', (
     expect(wrapper?.classList.contains('selected')).toBe(true);
   });
 });
+
+describe('getNodeInputs short-circuit (zero-input components)', () => {
+  let store: FlowStore;
+  let component: NodeRendererComponent;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NodeRendererComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    store = TestBed.inject(FlowStore);
+    component = TestBed.createComponent(NodeRendererComponent).componentInstance;
+  });
+
+  it('returns a frozen empty object for a built-in (zero declared inputs)', () => {
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'default' }]);
+    const inputs = component.getNodeInputs(store.nodeLookup.get('n1')!);
+    expect(Object.keys(inputs)).toHaveLength(0);
+    expect(Object.isFrozen(inputs)).toBe(true);
+  });
+
+  it('returns the SAME shared object across a key-changing recompute (identity-stable)', () => {
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'default' }]);
+    const before = component.getNodeInputs(store.nodeLookup.get('n1')!);
+    // A position change bumps the cache key -> recompute path, but the
+    // short-circuit returns the shared frozen object, so identity is stable.
+    store.triggerNodeChanges([
+      { id: 'n1', type: 'position', position: { x: 30, y: 40 }, dragging: true },
+    ] as never);
+    const after = component.getNodeInputs(store.nodeLookup.get('n1')!);
+    expect(after).toBe(before);
+  });
+
+  it('shares one object across two different built-in nodes', () => {
+    store.setNodes([
+      { id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'default' },
+      { id: 'n2', position: { x: 100, y: 0 }, data: {}, type: 'input' },
+    ]);
+    const a = component.getNodeInputs(store.nodeLookup.get('n1')!);
+    const b = component.getNodeInputs(store.nodeLookup.get('n2')!);
+    expect(a).toBe(b);
+  });
+});
