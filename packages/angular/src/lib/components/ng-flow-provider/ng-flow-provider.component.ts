@@ -4,15 +4,21 @@ import { NgFlowService } from '../../services/ng-flow.service';
 
 /**
  * Provides a `FlowStore` and `NgFlowService` to its descendants without
- * rendering a flow. Useful when you need to call `NgFlowService` methods
- * (e.g. `fitView`) from a component that sits as a sibling of `<ng-flow>`
- * rather than a child.
+ * rendering a flow, so flow state can be shared across siblings of a
+ * `<ng-flow>` rather than only its children.
+ *
+ * A descendant `<ng-flow>` reuses this provider's `FlowStore` and
+ * `NgFlowService` instead of creating its own (it resolves them with
+ * `skipSelf`), so any sibling that injects `NgFlowService` (e.g. a sidebar
+ * calling `fitView` or `setNodes`) observes and mutates the same state the
+ * flow renders. The provider owns the store's lifetime: unmounting the inner
+ * `<ng-flow>` does not destroy the shared store.
  *
  * @example
  * ```html
  * <ng-flow-provider>
  *   <ng-flow [nodes]="nodes" [edges]="edges" />
- *   <my-sidebar />  <!-- can inject NgFlowService -->
+ *   <my-sidebar />  <!-- inject NgFlowService; sees the same store -->
  * </ng-flow-provider>
  * ```
  */

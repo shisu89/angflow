@@ -13,6 +13,7 @@ import {
   AfterViewInit,
   Type,
   inject,
+  DestroyRef,
   signal,
   computed,
   TemplateRef,
@@ -120,7 +121,35 @@ function viewportsEqual(a: Viewport, b: Viewport): boolean {
     A11yDescriptionsComponent,
     AttributionComponent,
   ],
-  providers: [FlowStore, NgFlowService],
+  providers: [
+    // Reuse a FlowStore/NgFlowService provided by an enclosing
+    // <ng-flow-provider>; otherwise create our own. Factories run in an
+    // injection context, so `new NgFlowService()` resolves its inject(FlowStore)
+    // against THIS injector — i.e. the shared-or-fresh store below.
+    {
+      provide: FlowStore,
+      useFactory: () => {
+        const parentStore = inject(FlowStore, { optional: true, skipSelf: true });
+        if (parentStore) return parentStore;
+        const store = new FlowStore();
+        // Node-injector useFactory providers don't get ngOnDestroy called
+        // automatically — wire the tween/rAF cleanup explicitly. Deliberately
+        // NOT registered for the parent-reuse branch above, so unmounting an
+        // inner <ng-flow> can never destroy the provider's shared store.
+        inject(DestroyRef).onDestroy(() => store.ngOnDestroy());
+        return store;
+      },
+    },
+    {
+      // NgFlowService has no ngOnDestroy; its only cleanup self-registers via
+      // the injected DestroyRef (keyPressed listeners), which already resolves
+      // to this component's injector regardless of which branch runs — so no
+      // extra destroy wiring is needed here.
+      provide: NgFlowService,
+      useFactory: () =>
+        inject(NgFlowService, { optional: true, skipSelf: true }) ?? new NgFlowService(),
+    },
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     'class': 'ng-flow xy-flow',
@@ -887,6 +916,11 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   ngOnDestroy(): void {
     this.resizeObserver?.disconnect();
     this.panZoomInstance?.destroy();
+    // Clear the now-dead panZoom reference so a store shared via
+    // <ng-flow-provider> never points at a destroyed instance. With a provider
+    // the store instance survives this reset() (it is owned by the provider's
+    // injector, not this component), so its consumers keep working.
+    this.store.panZoom.set(null);
     if (this.colorSchemeQuery && this.colorSchemeHandler) {
       this.colorSchemeQuery.removeEventListener('change', this.colorSchemeHandler);
     }
