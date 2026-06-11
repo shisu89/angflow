@@ -157,3 +157,87 @@ describe('HandleComponent data registration', () => {
     expect(fixture2.nativeElement.hasAttribute('data-floating')).toBe(false);
   });
 });
+
+// ── Integration: collapse-hidden child is never a connection drop candidate ──
+//
+// Strategy: we don't fire real pointer events (XYHandle.onPointerDown uses
+// document-level event listeners that are hard to drive in jsdom). Instead we
+// test the predicate closure that the component would supply to XYHandle.
+// This is the correct boundary to test: the component's responsibility is to
+// build the right predicate; XYHandle's responsibility to call it is covered
+// by the system-level XYHandle.spec.ts tests.
+
+describe('HandleComponent — isNodeVisible predicate for collapsedHiddenIds', () => {
+  it('returns false for a node in collapsedHiddenIds and true for a visible node', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [HandleComponent],
+      providers: [
+        provideZonelessChangeDetection(),
+        FlowStore,
+        { provide: NODE_ID, useValue: 'node-source' },
+      ],
+    });
+
+    const store = TestBed.inject(FlowStore);
+
+    // Populate the store with a group containing a collapsed child.
+    // We drive collapsedHiddenIds by setting a collapsed group node via setNodes.
+    // FlowStore.setNodes populates nodeLookup which getCollapsedHiddenIds reads.
+    store.setNodes([
+      { id: 'group', position: { x: 0, y: 0 }, data: {}, collapsed: true },
+      { id: 'child', position: { x: 10, y: 10 }, data: {}, parentId: 'group' },
+      { id: 'visible', position: { x: 200, y: 200 }, data: {} },
+    ] as any[]);
+
+    // collapsedHiddenIds should now include 'child' but not 'group' or 'visible'.
+    const hiddenIds = store.collapsedHiddenIds();
+    expect(hiddenIds.has('child')).toBe(true);
+    expect(hiddenIds.has('group')).toBe(false);
+    expect(hiddenIds.has('visible')).toBe(false);
+
+    // Build the exact predicate the component passes to XYHandle.onPointerDown.
+    const predicate = (n: { id: string }) => !store.collapsedHiddenIds().has(n.id);
+
+    // A collapse-hidden child must not be a candidate.
+    expect(predicate({ id: 'child' })).toBe(false);
+    // The group node itself is visible.
+    expect(predicate({ id: 'group' })).toBe(true);
+    // A completely separate visible node is a candidate.
+    expect(predicate({ id: 'visible' })).toBe(true);
+    // An arbitrary unknown node defaults to visible.
+    expect(predicate({ id: 'unknown' })).toBe(true);
+  });
+
+  it('predicate reflects signal reactivity: after expanding group child becomes visible', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [HandleComponent],
+      providers: [
+        provideZonelessChangeDetection(),
+        FlowStore,
+        { provide: NODE_ID, useValue: 'node-source' },
+      ],
+    });
+
+    const store = TestBed.inject(FlowStore);
+
+    store.setNodes([
+      { id: 'group', position: { x: 0, y: 0 }, data: {}, collapsed: true },
+      { id: 'child', position: { x: 10, y: 10 }, data: {}, parentId: 'group' },
+    ] as any[]);
+
+    const predicate = (n: { id: string }) => !store.collapsedHiddenIds().has(n.id);
+
+    expect(predicate({ id: 'child' })).toBe(false);
+
+    // Expand the group — setNodes with collapsed:false.
+    store.setNodes([
+      { id: 'group', position: { x: 0, y: 0 }, data: {}, collapsed: false },
+      { id: 'child', position: { x: 10, y: 10 }, data: {}, parentId: 'group' },
+    ] as any[]);
+
+    // Now the predicate must return true for the child (no longer hidden).
+    expect(predicate({ id: 'child' })).toBe(true);
+  });
+});

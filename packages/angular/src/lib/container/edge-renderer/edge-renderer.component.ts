@@ -710,6 +710,7 @@ export class EdgeRendererComponent {
       onConnectionTargetChange: (nodeId: string | null) => {
         store.connectionTargetNodeId.set(nodeId);
       },
+      isNodeVisible: (n: { id: string }) => !store.collapsedHiddenIds().has(n.id),
     } as any);
   }
 

@@ -171,6 +171,7 @@ export class HandleComponent implements OnInit, OnDestroy {
       dragThreshold: 0,
       handleDomNode: this.el.nativeElement,
       isValidConnection: validationFn,
+      isNodeVisible: (n: { id: string }) => !store.collapsedHiddenIds().has(n.id),
     } as any);
   }
 
