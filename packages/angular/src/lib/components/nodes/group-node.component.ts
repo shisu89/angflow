@@ -1,10 +1,12 @@
-import { Component, ChangeDetectionStrategy, input } from '@angular/core';
-import { Position } from '@angflow/system';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
+import { injectNgFlowNode } from '../../utils/inject-ng-flow-node';
 
 /**
  * Built-in container node used for sub-flows. No handles and no label —
  * other nodes parent to it via `parentId` and optionally constrain movement
- * with `extent: 'parent'`.
+ * with `extent: 'parent'`. Reads per-node state through `injectNgFlowNode()`
+ * (no `@Input()`s); the renderer applies width/height/transform on the host
+ * wrapper, so the group body itself just fills its box.
  */
 @Component({
   selector: 'ng-flow-group-node',
@@ -16,17 +18,5 @@ import { Position } from '@angflow/system';
   template: ``,
 })
 export class GroupNodeComponent {
-  readonly id = input.required<string>();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly data = input<any>(); // untyped built-in node data
-  readonly type = input<string>();
-  readonly selected = input(false);
-  readonly dragging = input(false);
-  readonly zIndex = input(0);
-  readonly isConnectable = input(true);
-  readonly positionAbsoluteX = input(0);
-  readonly positionAbsoluteY = input(0);
-  readonly sourcePosition = input<Position>();
-  readonly targetPosition = input<Position>();
-  readonly dragHandle = input<string>();
+  readonly node = injectNgFlowNode();
 }
