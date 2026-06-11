@@ -15,8 +15,24 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection, ɵSIGNAL } from '@angular/core';
+import { XYMinimap, type PanZoomInstance } from '@angflow/system';
 import { MiniMapComponent } from './minimap.component';
 import { FlowStore } from '../../services/flow-store.service';
+
+// Spy handle the factory closes over, so each test can read the latest instance.
+const minimapSpy = {
+  update: vi.fn(),
+  destroy: vi.fn(),
+  pointer: vi.fn(() => [123, 456] as [number, number]),
+};
+
+vi.mock('@angflow/system', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@angflow/system')>();
+  return {
+    ...actual,
+    XYMinimap: vi.fn(() => minimapSpy),
+  };
+});
 
 /** Set an input() signal's value directly without going through the template. */
 function setSignalInput<T>(instance: unknown, inputName: string, value: T): void {
@@ -140,7 +156,7 @@ describe('MiniMapComponent excludes collapsed-hidden nodes', () => {
   });
 });
 
-describe('MiniMapComponent pan/zoom interactions do not bump the store version', () => {
+describe('MiniMapComponent viewport indicator reacts to transform writes', () => {
   let store: FlowStore;
 
   beforeEach(() => {
@@ -155,82 +171,194 @@ describe('MiniMapComponent pan/zoom interactions do not bump the store version',
     store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {} }] as never);
   });
 
-  it('wheel zoom updates the transform without bumping version', () => {
-    const fixture = createMinimap();
-    setSignalInput(fixture.componentInstance, 'zoomable', true);
-    fixture.detectChanges();
-
-    const v0 = store.version();
-    const t0 = store.transform();
-    fixture.componentInstance.onMinimapWheel(new WheelEvent('wheel', { deltaY: -100, cancelable: true }));
-
-    expect(store.transform()).not.toEqual(t0);
-    expect(store.version()).toBe(v0);
-  });
-
-  it('drag pan updates the transform without bumping version', () => {
-    const fixture = createMinimap();
-    setSignalInput(fixture.componentInstance, 'pannable', true);
-    fixture.detectChanges();
-
-    const v0 = store.version();
-    fixture.componentInstance.onMinimapMouseDown(new MouseEvent('mousedown'));
-    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 120, clientY: 90 }));
-    document.dispatchEvent(new MouseEvent('mouseup'));
-
-    expect(store.transform()).not.toEqual([0, 0, 1]);
-    expect(store.version()).toBe(v0);
-  });
-
-  it('click-pan animation frames update the transform without bumping version', () => {
-    const frames: FrameRequestCallback[] = [];
-    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { frames.push(cb); return frames.length; });
-    vi.stubGlobal('cancelAnimationFrame', () => {});
-    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
-    const fixture = createMinimap();
-    // Attach to the live DOM so the #minimapContainer viewChild resolves and
-    // the click handler actually schedules the pan animation (otherwise it
-    // returns early at the container guard and never reaches the rAF closure).
-    document.body.appendChild(fixture.nativeElement);
-    try {
-      setSignalInput(fixture.componentInstance, 'pannable', true);
-      fixture.detectChanges();
-      // Move the viewport off-origin so the pan target differs and the frame
-      // produces an observable transform change.
-      store.transform.set([10, 10, 1]);
-
-      // Drain any rAF callbacks the framework scheduled before the click so the
-      // next frame we run is unambiguously the pan animation closure.
-      frames.length = 0;
-
-      const v0 = store.version();
-      fixture.componentInstance.onMinimapClick(new MouseEvent('click', { clientX: 100, clientY: 75 }));
-      // The animation must actually have been scheduled — otherwise the frame
-      // closure (which is what we're asserting doesn't bump) never runs and the
-      // version assertion below would pass vacuously.
-      expect(frames.length).toBeGreaterThan(0);
-      nowSpy.mockReturnValue(50);
-      frames.shift()!(50); // run one animation frame: writes transform, must not bump
-
-      expect(store.version()).toBe(v0);
-    } finally {
-      fixture.nativeElement.remove();
-      vi.unstubAllGlobals();
-      vi.restoreAllMocks();
-    }
-  });
-
   it('REGRESSION: viewport indicator still reacts to pure transform writes', () => {
     const fixture = createMinimap();
     fixture.detectChanges();
-    const v0 = store.version();
     const viewBoxBefore = fixture.componentInstance.viewBox();
     const maskBefore = fixture.componentInstance.maskPath();
 
     store.transform.set([-250, -180, 1.6]); // no bump involved
 
-    expect(store.version()).toBe(v0);
     expect(fixture.componentInstance.viewBox()).not.toBe(viewBoxBefore);
     expect(fixture.componentInstance.maskPath()).not.toBe(maskBefore);
+  });
+});
+
+/** Minimal panZoom stub: only the members XYMinimap/MiniMap touch. */
+function fakePanZoom(): PanZoomInstance {
+  return {
+    setViewportConstrained: vi.fn(),
+    scaleTo: vi.fn(),
+    setViewport: vi.fn(),
+    syncViewport: vi.fn(),
+    setScaleExtent: vi.fn(),
+    setTranslateExtent: vi.fn(),
+    update: vi.fn(),
+    destroy: vi.fn(),
+    getViewport: vi.fn(() => ({ x: 0, y: 0, zoom: 1 })),
+  } as unknown as PanZoomInstance;
+}
+
+describe('MiniMapComponent adopts XYMinimap', () => {
+  let store: FlowStore;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [MiniMapComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    store = TestBed.inject(FlowStore);
+    store.width.set(800);
+    store.height.set(600);
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {} }] as never);
+  });
+
+  it('does NOT create the XYMinimap instance until panZoom exists', async () => {
+    const fixture = createMinimap();
+    document.body.appendChild(fixture.nativeElement);
+    try {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      // panZoom() is still null → guard effect waits → factory not called.
+      expect(XYMinimap).not.toHaveBeenCalled();
+    } finally {
+      fixture.nativeElement.remove();
+    }
+  });
+
+  it('creates the XYMinimap instance once panZoom is set, and calls update()', async () => {
+    const fixture = createMinimap();
+    document.body.appendChild(fixture.nativeElement);
+    try {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      store.panZoom.set(fakePanZoom());
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(XYMinimap).toHaveBeenCalledTimes(1);
+      const params = (XYMinimap as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(params.domNode).toBeInstanceOf(SVGSVGElement);
+      expect(typeof params.getTransform).toBe('function');
+      expect(typeof params.getViewScale).toBe('function');
+      // getTransform returns the live store transform.
+      store.transform.set([3, 4, 1.5]);
+      expect(params.getTransform()).toEqual([3, 4, 1.5]);
+
+      expect(minimapSpy.update).toHaveBeenCalled();
+    } finally {
+      fixture.nativeElement.remove();
+    }
+  });
+
+  it('forwards the exact update params (defaults: pannable/zoomable false, zoomStep 1)', async () => {
+    const fixture = createMinimap();
+    document.body.appendChild(fixture.nativeElement);
+    try {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      store.setTranslateExtent([[-100, -200], [300, 400]]);
+      store.panZoom.set(fakePanZoom());
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const lastArgs = minimapSpy.update.mock.calls.at(-1)![0];
+      expect(lastArgs).toEqual({
+        translateExtent: [[-100, -200], [300, 400]],
+        width: 800,
+        height: 600,
+        inversePan: false,
+        zoomStep: 1,
+        pannable: false,
+        zoomable: false,
+      });
+    } finally {
+      fixture.nativeElement.remove();
+    }
+  });
+
+  it('re-invokes update() with the new value when an input changes (extent clamp / inversePan / pannable / zoomable / zoomStep)', async () => {
+    const fixture = createMinimap();
+    document.body.appendChild(fixture.nativeElement);
+    try {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      store.panZoom.set(fakePanZoom());
+      fixture.detectChanges();
+      await fixture.whenStable();
+      minimapSpy.update.mockClear();
+
+      setSignalInput(fixture.componentInstance, 'pannable', true);
+      setSignalInput(fixture.componentInstance, 'zoomable', true);
+      setSignalInput(fixture.componentInstance, 'inversePan', true);
+      setSignalInput(fixture.componentInstance, 'zoomStep', 25);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const lastArgs = minimapSpy.update.mock.calls.at(-1)![0];
+      expect(lastArgs.pannable).toBe(true);
+      expect(lastArgs.zoomable).toBe(true);
+      expect(lastArgs.inversePan).toBe(true);
+      expect(lastArgs.zoomStep).toBe(25);
+    } finally {
+      fixture.nativeElement.remove();
+    }
+  });
+
+  it('re-invokes update() when the store translateExtent changes (extent clamp wiring)', async () => {
+    const fixture = createMinimap();
+    document.body.appendChild(fixture.nativeElement);
+    try {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      store.panZoom.set(fakePanZoom());
+      fixture.detectChanges();
+      await fixture.whenStable();
+      minimapSpy.update.mockClear();
+
+      store.setTranslateExtent([[0, 0], [500, 500]]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const lastArgs = minimapSpy.update.mock.calls.at(-1)![0];
+      expect(lastArgs.translateExtent).toEqual([[0, 0], [500, 500]]);
+    } finally {
+      fixture.nativeElement.remove();
+    }
+  });
+
+  it('tolerates a zero-size minimap (display:none) — update() still called, no throw', async () => {
+    const fixture = createMinimap();
+    document.body.appendChild(fixture.nativeElement);
+    try {
+      // Force the container to zero box.
+      fixture.nativeElement.querySelector('.ng-flow__minimap')!.setAttribute('style', 'display:none');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      store.panZoom.set(fakePanZoom());
+      expect(() => {
+        fixture.detectChanges();
+      }).not.toThrow();
+      await fixture.whenStable();
+      expect(minimapSpy.update).toHaveBeenCalled();
+    } finally {
+      fixture.nativeElement.remove();
+    }
+  });
+
+  it('calls destroy() on teardown', async () => {
+    const fixture = createMinimap();
+    document.body.appendChild(fixture.nativeElement);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    store.panZoom.set(fakePanZoom());
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    fixture.destroy();
+    fixture.nativeElement.remove();
+    expect(minimapSpy.destroy).toHaveBeenCalledTimes(1);
   });
 });

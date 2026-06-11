@@ -5,14 +5,16 @@ import {
   output,
   inject,
   computed,
+  effect,
   ElementRef,
   viewChild,
-  AfterViewInit,
-  OnDestroy,
+  DestroyRef,
   Type,
 } from '@angular/core';
 import {
   getBoundsOfRects,
+  XYMinimap,
+  type XYMinimapInstance,
   type PanelPosition,
   type Rect,
 } from '@angflow/system';
@@ -50,10 +52,9 @@ export type GetMiniMapNodeAttribute<NodeType extends Node = Node> = (node: NodeT
         [style.height.px]="mmHeight()"
         style="border-radius: 4px; overflow: hidden; border: 1px solid #ddd; box-shadow: 0 1px 4px rgba(0,0,0,0.1); cursor: pointer;"
         (click)="onMinimapClick($event)"
-        (mousedown)="onMinimapMouseDown($event)"
-        (wheel)="onMinimapWheel($event)"
       >
         <svg
+          #minimapSvg
           class="xy-flow__minimap-svg"
           [attr.width]="mmWidth()"
           [attr.height]="mmHeight()"
@@ -109,9 +110,10 @@ export type GetMiniMapNodeAttribute<NodeType extends Node = Node> = (node: NodeT
     </ng-flow-panel>
   `,
 })
-export class MiniMapComponent implements AfterViewInit, OnDestroy {
+export class MiniMapComponent {
   readonly store = inject(FlowStore);
   private minimapContainerRef = viewChild<ElementRef>('minimapContainer');
+  private minimapSvgRef = viewChild<ElementRef<SVGSVGElement>>('minimapSvg');
 
   /** Where the minimap panel is anchored. */
   readonly position = input<PanelPosition>('bottom-right');
@@ -124,7 +126,7 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
   /** Allow scroll-wheel on the minimap to zoom the main viewport. */
   readonly zoomable = input(false);
   /** Zoom step applied per wheel tick when `zoomable`. */
-  readonly zoomStep = input(10);
+  readonly zoomStep = input(1);
   /** Invert the pan direction when dragging on the minimap. */
   readonly inversePan = input(false);
 
@@ -169,14 +171,64 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
   /** Fires when a node rendered in the minimap is clicked. */
   readonly minimapNodeClick = output<{ event: MouseEvent; node: Node }>();
 
-  private animationFrameId: number | null = null;
-  private isDragging = false;
-  // Tracks whether the mouse actually moved between mousedown and mouseup.
-  // Used to suppress the synthetic click event that fires after a drag, which
-  // would otherwise trigger a second pan animation on top of the drag.
-  private dragMoved = false;
-  private boundOnMouseMove = this.onMinimapMouseMove.bind(this);
-  private boundOnMouseUp = this.onMinimapMouseUp.bind(this);
+  private minimap: XYMinimapInstance | null = null;
+
+  constructor() {
+    const destroyRef = inject(DestroyRef);
+
+    // Defer creation until the view exists (SVG ref) AND panZoom is ready.
+    // A plain constructor effect re-runs when either the `minimapSvg` viewChild
+    // signal resolves (undefined → element on first render) or store.panZoom()
+    // becomes non-null, mirroring how the main pane defers its own d3-zoom
+    // wiring in ng-flow.component.ts. The `!this.minimap` guard makes it
+    // idempotent so creation happens exactly once.
+    effect(() => {
+      const panZoom = this.store.panZoom();
+      const svgEl = this.minimapSvgRef()?.nativeElement;
+      if (!panZoom || !svgEl || this.minimap) return;
+
+      this.minimap = XYMinimap({
+        domNode: svgEl,
+        panZoom,
+        getTransform: () => this.store.transform(),
+        getViewScale: () => this.viewBoxData().viewScale,
+      });
+
+      // Push the first update immediately so the d3-zoom handlers are bound
+      // with the current inputs without waiting for the next change.
+      this.pushMinimapUpdate();
+    });
+
+    // Keep XYMinimap in sync with the React-parity inputs + the store extent.
+    // The d3 callbacks XYMinimap installs write via panZoom → the transform
+    // signal the template reads (zoneless rule 2 satisfied), and those writes
+    // flow through the same panZoom path as the main pane, so the C1 contract
+    // (no bumpVersion on transform writes) holds.
+    effect(() => {
+      // Read every dependency first (unconditionally) so the effect tracks the
+      // inputs + store extent even before the minimap instance is created — an
+      // early `if (!this.minimap) return` would track nothing and never re-run.
+      this.pushMinimapUpdate();
+    });
+
+    destroyRef.onDestroy(() => {
+      this.minimap?.destroy();
+      this.minimap = null;
+    });
+  }
+
+  private pushMinimapUpdate(): void {
+    const params = {
+      translateExtent: this.store.translateExtent(),
+      width: this.store.width(),
+      height: this.store.height(),
+      inversePan: this.inversePan(),
+      zoomStep: this.zoomStep(),
+      pannable: this.pannable(),
+      zoomable: this.zoomable(),
+    };
+    this.minimap?.update(params);
+  }
 
   readonly minimapNodes = computed(() => {
     this.store.version(); // react to node changes
@@ -297,148 +349,18 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
     return typeof className === 'string' ? className : '';
   }
 
-  ngAfterViewInit(): void {}
-
   onMinimapClick(event: MouseEvent): void {
-    // Browsers fire `click` after `mouseup` when both land on the same element,
-    // regardless of drag distance. If the user was panning the minimap, swallow
-    // this trailing click so we don't start a second pan animation on top.
-    if (this.dragMoved) {
-      this.dragMoved = false;
-      return;
-    }
+    // minimap.pointer maps the click to flow coordinates using the SVG's
+    // current viewBox (d3-selection pointer against the bound SVG element).
+    const [x, y] = this.minimap ? this.minimap.pointer(event) : [0, 0];
 
-    const container = this.minimapContainerRef()?.nativeElement;
-    if (!container) return;
-
-    const svgEl = container.querySelector('svg');
-    if (!svgEl) return;
-
-    // Get click position relative to the minimap SVG
-    const rect = svgEl.getBoundingClientRect();
-    const clickX = event.clientX - rect.left;
-    const clickY = event.clientY - rect.top;
-
-    // Convert from SVG pixel coords to flow coords using the current viewBox.
-    const v = this.viewBoxData();
-    const flowX = v.x + (clickX / this.mmWidth()) * v.width;
-    const flowY = v.y + (clickY / this.mmHeight()) * v.height;
-
-    // Emit click event
-    this.minimapClick.emit({ event, position: { x: flowX, y: flowY } });
+    this.minimapClick.emit({ event, position: { x, y } });
 
     if (!this.pannable()) return;
 
-    // Pan viewport to center on the clicked flow position
-    const zoom = this.store.transform()[2];
-    const newX = this.store.width() / 2 - flowX * zoom;
-    const newY = this.store.height() / 2 - flowY * zoom;
-
-    // Cancel any in-flight animation before starting a new one
-    if (this.animationFrameId !== null) {
-      cancelAnimationFrame(this.animationFrameId);
-      this.animationFrameId = null;
-    }
-
-    // Animate the viewport pan over ~300ms using requestAnimationFrame
-    const startX = this.store.transform()[0];
-    const startY = this.store.transform()[1];
-    const startTime = performance.now();
-    const duration = 300;
-
-    const animate = (now: number) => {
-      const elapsed = now - startTime;
-      const t = Math.min(elapsed / duration, 1);
-      // Ease-out cubic
-      const ease = 1 - Math.pow(1 - t, 3);
-
-      const currentX = startX + (newX - startX) * ease;
-      const currentY = startY + (newY - startY) * ease;
-
-      this.store.transform.set([currentX, currentY, zoom]);
-
-      if (t < 1) {
-        this.animationFrameId = requestAnimationFrame(animate);
-      } else {
-        this.animationFrameId = null;
-        // Sync d3-zoom internal state without transition
-        try {
-          this.store.panZoom()?.syncViewport({ x: newX, y: newY, zoom });
-        } catch {
-          // d3-transition may not be available; the transform signal
-          // is the source of truth and d3 will re-sync on next interaction
-        }
-      }
-    };
-
-    this.animationFrameId = requestAnimationFrame(animate);
-  }
-
-  onMinimapMouseDown(_event: MouseEvent): void {
-    if (!this.pannable()) return;
-    this.isDragging = true;
-    this.dragMoved = false;
-    document.addEventListener('mousemove', this.boundOnMouseMove);
-    document.addEventListener('mouseup', this.boundOnMouseUp);
-  }
-
-  private onMinimapMouseMove(event: MouseEvent): void {
-    if (!this.isDragging) return;
-    this.dragMoved = true;
-
-    const container = this.minimapContainerRef()?.nativeElement;
-    if (!container) return;
-
-    const svgEl = container.querySelector('svg');
-    if (!svgEl) return;
-
-    const rect = svgEl.getBoundingClientRect();
-    const clickX = event.clientX - rect.left;
-    const clickY = event.clientY - rect.top;
-
-    const v = this.viewBoxData();
-    const flowX = v.x + (clickX / this.mmWidth()) * v.width;
-    const flowY = v.y + (clickY / this.mmHeight()) * v.height;
-
-    const zoom = this.store.transform()[2];
-    const newX = this.store.width() / 2 - flowX * zoom;
-    const newY = this.store.height() / 2 - flowY * zoom;
-
-    this.store.transform.set([newX, newY, zoom]);
-    try {
-      this.store.panZoom()?.syncViewport({ x: newX, y: newY, zoom });
-    } catch { /* noop */ }
-  }
-
-  private onMinimapMouseUp(): void {
-    this.isDragging = false;
-    document.removeEventListener('mousemove', this.boundOnMouseMove);
-    document.removeEventListener('mouseup', this.boundOnMouseUp);
-  }
-
-  onMinimapWheel(event: WheelEvent): void {
-    if (!this.zoomable()) return;
-    event.preventDefault();
-
-    const currentZoom = this.store.transform()[2];
-    const delta = -event.deltaY * (this.zoomStep() / 1000);
-    const nextZoom = Math.min(
-      this.store.maxZoom(),
-      Math.max(this.store.minZoom(), currentZoom + delta)
-    );
-
-    const [x, y] = this.store.transform();
-    // Zoom toward the center of the viewport
-    const cx = this.store.width() / 2;
-    const cy = this.store.height() / 2;
-    const scale = nextZoom / currentZoom;
-    const newX = cx - (cx - x) * scale;
-    const newY = cy - (cy - y) * scale;
-
-    this.store.transform.set([newX, newY, nextZoom]);
-    try {
-      this.store.panZoom()?.syncViewport({ x: newX, y: newY, zoom: nextZoom });
-    } catch { /* noop */ }
+    // setCenter (flow-store) honors interpolate/duration after Cluster 1; we
+    // only depend on passing duration here.
+    void this.store.setCenter(x, y, { zoom: this.store.transform()[2], duration: 300 });
   }
 
   onMinimapNodeClick(event: MouseEvent, node: { _userNode?: Node }): void {
@@ -446,14 +368,6 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
     if (node._userNode) {
       this.minimapNodeClick.emit({ event, node: node._userNode });
     }
-  }
-
-  ngOnDestroy(): void {
-    if (this.animationFrameId !== null) {
-      cancelAnimationFrame(this.animationFrameId);
-    }
-    document.removeEventListener('mousemove', this.boundOnMouseMove);
-    document.removeEventListener('mouseup', this.boundOnMouseUp);
   }
 
 }
