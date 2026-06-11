@@ -25,32 +25,93 @@ describe('SelectionBoxComponent — selection drag', () => {
   });
 
   it('fires onSelectionDrag* in order and moves both selected nodes', () => {
+    // Set up two selected nodes before the component is created.
     store.setNodes([makeNode('a', 0, 0, true), makeNode('b', 100, 0, true)]);
     store.nodesSelectionActive.set(true);
 
+    // Wire real ordered-event callbacks on the store BEFORE detectChanges so
+    // that getStoreItems() (captured below) returns these exact references.
     const order: string[] = [];
-    store.onSelectionDragStart = () => order.push('start');
-    store.onSelectionDrag = () => order.push('drag');
-    store.onSelectionDragStop = () => order.push('stop');
+    store.onSelectionDragStart = (_evt: MouseEvent, _nodes: unknown[]) => order.push('start');
+    store.onSelectionDrag    = (_evt: MouseEvent, _nodes: unknown[]) => order.push('drag');
+    store.onSelectionDragStop = (_evt: MouseEvent, _nodes: unknown[]) => order.push('stop');
 
-    fixture.detectChanges(); // renders the box → XYDrag effect binds it
+    // Spy on XYDrag to capture the params the component actually passes.
+    // Crucially: if the FP1 effect that creates XYDrag is removed, this spy
+    // is never called and the assertions below will all fail.
+    let capturedGetStoreItems: (() => ReturnType<typeof store.getStoreItems>) | undefined;
+    let capturedUpdateParams: Parameters<ReturnType<typeof system.XYDrag>['update']>[0] | undefined;
 
-    // Drive the same store path XYDrag drives on a selection drag: shift both
-    // selected nodes by (+30, +40) and emit the lifecycle callbacks in order.
+    const realXYDrag = system.XYDrag;
+    const spy = vi.spyOn(system, 'XYDrag').mockImplementation((params) => {
+      capturedGetStoreItems = params.getStoreItems as typeof capturedGetStoreItems;
+      const inst = realXYDrag(params);
+      // Wrap update() to capture the DragUpdateParams the component passes.
+      const origUpdate = inst.update.bind(inst);
+      return {
+        update(updateParams) {
+          capturedUpdateParams = updateParams;
+          origUpdate(updateParams);
+        },
+        destroy: inst.destroy.bind(inst),
+      };
+    });
+
+    fixture.detectChanges(); // FP1 effect runs → XYDrag constructed + update()
+
+    // ── Gate 1: FP1 effect must have run (deleting it breaks everything below) ──
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(capturedGetStoreItems).toBeDefined();
+    expect(capturedUpdateParams).toBeDefined();
+
+    // ── Gate 2: selection-drag path — nodeId must be absent/undefined ──
+    expect(capturedUpdateParams!.nodeId).toBeUndefined();
+
+    // ── Gate 3: getStoreItems() returns the store's live emitters by reference ──
+    const items = capturedGetStoreItems!();
+    expect(items.onSelectionDragStart).toBe(store.onSelectionDragStart);
+    expect(items.onSelectionDrag).toBe(store.onSelectionDrag);
+    expect(items.onSelectionDragStop).toBe(store.onSelectionDragStop);
+
+    // ── Gesture simulation ──
+    // Build NodeDragItem-shaped entries for both selected nodes — identical to
+    // what getDragItems() would produce — then drive the gesture through the
+    // CAPTURED updateNodePositions and onSelectionDrag* callbacks.
     const evt = new MouseEvent('mousemove');
-    const items = new Map<string, unknown>([
-      ['a', { id: 'a', position: { x: 30, y: 40 } }],
-      ['b', { id: 'b', position: { x: 130, y: 40 } }],
-    ]);
-    store.onSelectionDragStart?.(evt, store.selectedNodes() as never);
-    store.updateNodePositions(items as Map<string, never>, true);
-    store.onSelectionDrag?.(evt, store.selectedNodes() as never);
-    store.updateNodePositions(items as Map<string, never>, false);
-    store.onSelectionDragStop?.(evt, store.selectedNodes() as never);
+    const nodeA = store.nodeLookup.get('a')!;
+    const nodeB = store.nodeLookup.get('b')!;
 
+    const dragItems = new Map([
+      ['a', {
+        id: 'a',
+        position: { x: 30, y: 40 },
+        distance: { x: 0, y: 0 },
+        internals: { positionAbsolute: { x: 30, y: 40 } },
+        measured: { width: nodeA.measured?.width ?? 150, height: nodeA.measured?.height ?? 40 },
+      }],
+      ['b', {
+        id: 'b',
+        position: { x: 130, y: 40 },
+        distance: { x: 0, y: 0 },
+        internals: { positionAbsolute: { x: 130, y: 40 } },
+        measured: { width: nodeB.measured?.width ?? 150, height: nodeB.measured?.height ?? 40 },
+      }],
+    ]);
+
+    // Invoke the captured store callbacks in the same order XYDrag does:
+    // startDrag → updateNodes (dragging=true) → updateNodes (dragging=false) → end
+    items.onSelectionDragStart!(evt, store.selectedNodes() as never);
+    items.updateNodePositions(dragItems as Map<string, never>, true);
+    items.onSelectionDrag!(evt, store.selectedNodes() as never);
+    items.updateNodePositions(dragItems as Map<string, never>, false);
+    items.onSelectionDragStop!(evt, store.selectedNodes() as never);
+
+    // ── Assertions ──
     expect(store.nodeLookup.get('a')!.position).toEqual({ x: 30, y: 40 });
     expect(store.nodeLookup.get('b')!.position).toEqual({ x: 130, y: 40 });
     expect(order).toEqual(['start', 'drag', 'stop']);
+
+    spy.mockRestore();
   });
 
   it('destroys the XYDrag binding when the box leaves the DOM (no leak)', () => {
