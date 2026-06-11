@@ -65,7 +65,7 @@ After this, the browser devtools console can do `await angflow.callTool('add_nod
 
 Every tool takes an optional `flowId` (omit when only one flow is registered; required otherwise). All payloads use the `Node` / `Edge` types from `@angflow/angular`.
 
-**Payload validation.** `add_node`, `add_nodes`, `set_nodes`, and the corresponding `add_node` / `add_nodes` ops inside `apply_changes` require each node to have a non-empty string `id` and a `position: { x: number, y: number }`. The edge variants require non-empty string `id`, `source`, and `target`. Malformed payloads fail with `-32602` *before* reaching `NgFlowService`.
+**Payload validation.** `add_node`, `add_nodes`, `set_nodes`, and the corresponding `add_node` / `add_nodes` ops inside `apply_changes` require each node to have a non-empty string `id` and a `position: { x: number, y: number }`. The edge variants require non-empty string `id`, `source`, and `target`. Malformed payloads fail with `-32602` *before* reaching `NgFlowService`. Additionally, `style` (when present) must be a plain object whose values are strings or numbers, string values must not contain `url(` or `expression(` (CSS-redressing guard), and `className` (when present) must be a string — violations fail with `-32602`. Inside `apply_changes`, the same violations surface as the batch's `-32603` rollback error with `data.failedIndex`. Note: `update_node` / `update_edge` *patches* are not currently subject to the style/className checks (the checks guard the add/replace paths).
 
 ### Discovery / read
 

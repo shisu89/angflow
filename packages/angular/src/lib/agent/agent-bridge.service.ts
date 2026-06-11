@@ -1284,6 +1284,43 @@ function validateTemplateSpec(value: unknown, ctx: string): NodeTemplateSpec {
   return value as NodeTemplateSpec;
 }
 
+/**
+ * CSS values that can fetch remote resources (`url(`) or execute in legacy
+ * engines (`expression(`). Angular's style sanitization already blocks
+ * script execution, so this is a narrow redressing/beaconing guard rather
+ * than a full CSS allowlist.
+ */
+const CSS_VALUE_BLOCKLIST = /url\s*\(|expression\s*\(/i;
+
+/** Shared style/className validation for agent-supplied nodes and edges. */
+function validateStyleAndClassName(
+  o: Record<string, unknown>,
+  ctx: string,
+  kind: 'node' | 'edge',
+): void {
+  const style = o['style'];
+  if (style !== undefined) {
+    if (!style || typeof style !== 'object' || Array.isArray(style)) {
+      throw new InvalidParamsError(
+        `${ctx}: ${kind}.style must be a plain object of CSS property/value pairs.`,
+      );
+    }
+    for (const [prop, raw] of Object.entries(style as Record<string, unknown>)) {
+      if (typeof raw !== 'string' && typeof raw !== 'number') {
+        throw new InvalidParamsError(`${ctx}: ${kind}.style["${prop}"] must be a string or number.`);
+      }
+      if (typeof raw === 'string' && CSS_VALUE_BLOCKLIST.test(raw)) {
+        throw new InvalidParamsError(
+          `${ctx}: ${kind}.style["${prop}"] must not contain "url(" or "expression(".`,
+        );
+      }
+    }
+  }
+  if (o['className'] !== undefined && typeof o['className'] !== 'string') {
+    throw new InvalidParamsError(`${ctx}: ${kind}.className must be a string.`);
+  }
+}
+
 /** Validate that `value` is a structurally valid Node payload for add_*. */
 function validateNodeShape(value: unknown, ctx: string): Node {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -1304,6 +1341,7 @@ function validateNodeShape(value: unknown, ctx: string): Node {
   if (!Number.isFinite(p['x'] as number) || !Number.isFinite(p['y'] as number)) {
     throw new InvalidParamsError(`${ctx}: node.position.{x,y} must be finite (no NaN/Infinity).`);
   }
+  validateStyleAndClassName(n, ctx, 'node');
   return value as Node;
 }
 
@@ -1322,5 +1360,6 @@ function validateEdgeShape(value: unknown, ctx: string): Edge {
   if (typeof e['target'] !== 'string' || e['target'].length === 0) {
     throw new InvalidParamsError(`${ctx}: edge.target must be a non-empty string.`);
   }
+  validateStyleAndClassName(e, ctx, 'edge');
   return value as Edge;
 }

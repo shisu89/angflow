@@ -1664,3 +1664,92 @@ describe('WindowTransport', () => {
     unsub();
   });
 });
+
+describe('AngflowAgentBridge — style/className validation', () => {
+  let bridge: AngflowAgentBridge;
+  let transport: CapturingTransport;
+  let newFlow: () => NgFlowService;
+
+  beforeEach(() => {
+    transport = new CapturingTransport();
+    ({ bridge, newFlow } = setup([transport]));
+  });
+
+  describe('style/className validation', () => {
+    it('rejects add_node style containing url() with -32602 and mutates nothing', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const res = await transport.call('add_node', {
+        node: {
+          id: 'n1',
+          position: { x: 0, y: 0 },
+          data: {},
+          style: { background: 'url(https://evil.example/x.png)' },
+        },
+      });
+      expect('error' in res && res.error.code).toBe(-32602);
+      expect('error' in res && res.error.message).toContain('style');
+      expect(flow.getNode('n1')).toBeUndefined();
+    });
+
+    it('rejects expression() and non-plain-object style values', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+
+      const expr = await transport.call('add_node', {
+        node: { id: 'n1', position: { x: 0, y: 0 }, data: {}, style: { width: 'expression(alert(1))' } },
+      });
+      expect('error' in expr && expr.error.code).toBe(-32602);
+
+      const arrayStyle = await transport.call('add_node', {
+        node: { id: 'n2', position: { x: 0, y: 0 }, data: {}, style: ['red'] },
+      });
+      expect('error' in arrayStyle && arrayStyle.error.code).toBe(-32602);
+
+      const stringStyle = await transport.call('add_node', {
+        node: { id: 'n3', position: { x: 0, y: 0 }, data: {}, style: 'background: red' },
+      });
+      expect('error' in stringStyle && stringStyle.error.code).toBe(-32602);
+    });
+
+    it('rejects non-string className on nodes and edges', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const node = await transport.call('add_node', {
+        node: { id: 'n1', position: { x: 0, y: 0 }, data: {}, className: { evil: true } },
+      });
+      expect('error' in node && node.error.code).toBe(-32602);
+
+      flow.setNodes([makeNode('a'), makeNode('b')]);
+      const edge = await transport.call('add_edge', {
+        edge: { id: 'e1', source: 'a', target: 'b', className: 42 },
+      });
+      expect('error' in edge && edge.error.code).toBe(-32602);
+    });
+
+    it('rejects edge style containing url() in bulk set_edges', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const res = await transport.call('set_edges', {
+        edges: [{ id: 'e1', source: 'a', target: 'b', style: { stroke: 'URL( javascript:x )' } }],
+      });
+      expect('error' in res && res.error.code).toBe(-32602);
+    });
+
+    it('accepts benign style objects (numbers and plain CSS strings)', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const res = await transport.call('add_node', {
+        node: {
+          id: 'n1',
+          position: { x: 0, y: 0 },
+          data: {},
+          style: { background: '#fff', opacity: 0.5, border: '1px solid red' },
+          className: 'my-node',
+        },
+      });
+      expect('result' in res).toBe(true);
+      expect(flow.getNode('n1')?.style).toEqual({ background: '#fff', opacity: 0.5, border: '1px solid red' });
+    });
+  });
+});
