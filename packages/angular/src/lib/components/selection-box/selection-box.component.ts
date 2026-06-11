@@ -1,4 +1,15 @@
-import { Component, ChangeDetectionStrategy, inject, computed, output } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  inject,
+  computed,
+  output,
+  viewChild,
+  effect,
+  ElementRef,
+  DestroyRef,
+} from '@angular/core';
+import { XYDrag, type XYDragInstance } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 
 @Component({
@@ -22,6 +33,7 @@ import { FlowStore } from '../../services/flow-store.service';
     }
     @if (store.nodesSelectionActive()) {
       <div
+        #nodesSelectionBox
         class="ng-flow__selection ng-flow__nodesselection xy-flow__selection xy-flow__nodesselection"
         style="position: absolute; pointer-events: all; z-index: 10; transform-origin: left top;"
         [style.transform]="nodesSelectionTransform()"
@@ -36,6 +48,43 @@ export class SelectionBoxComponent {
   readonly store = inject(FlowStore);
 
   readonly contextMenu = output<MouseEvent>();
+
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly nodesSelectionBox = viewChild<ElementRef<HTMLDivElement>>('nodesSelectionBox');
+  private dragInstance: XYDragInstance | null = null;
+
+  constructor() {
+    // Bind/unbind XYDrag to the nodes-selection box as it enters/leaves the
+    // DOM (@if on nodesSelectionActive). No nodeId is passed: XYDrag's
+    // undefined-nodeId path collects all selected nodes and routes through the
+    // onSelectionDrag* store callbacks (already wired on <ng-flow>), mirroring
+    // React's useDrag({ nodeRef }) with no nodeId.
+    effect(() => {
+      const box = this.nodesSelectionBox();
+
+      if (!box) {
+        // Box left the DOM (selection cleared) — drop the d3-drag binding.
+        this.dragInstance?.destroy();
+        return;
+      }
+
+      if (!this.dragInstance) {
+        this.dragInstance = XYDrag({
+          getStoreItems: () => this.store.getStoreItems(),
+        });
+      }
+
+      this.dragInstance.update({
+        domNode: box.nativeElement,
+        // nodeId intentionally omitted → selection-drag path.
+        noDragClassName: this.store.noDragClassName(),
+      });
+    });
+
+    // Safety net: if the component is destroyed while the box is still bound
+    // (e.g. <ng-flow> torn down mid-drag), release the d3 listeners.
+    this.destroyRef.onDestroy(() => this.dragInstance?.destroy());
+  }
 
   readonly isVisible = computed(() => this.store.userSelectionActive() && this.store.userSelectionRect() !== null);
   readonly rect = computed(() => this.store.userSelectionRect());
