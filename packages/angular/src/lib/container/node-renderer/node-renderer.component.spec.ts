@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TestBed, ComponentFixture } from '@angular/core/testing';
-import { provideZonelessChangeDetection } from '@angular/core';
+import { Component, input, provideZonelessChangeDetection } from '@angular/core';
 import { NodeRendererComponent, computeNodeInputsKey } from './node-renderer.component';
 import { FlowStore } from '../../services/flow-store.service';
 import { NG_FLOW_NODE_CONTEXT } from '../../services/tokens';
@@ -17,6 +17,20 @@ import { TemplateNodeComponent } from '../../components/nodes/template-node.comp
 import { DefaultNodeComponent } from '../../components/nodes/default-node.component';
 import { InputNodeComponent } from '../../components/nodes/input-node.component';
 import type { Node, InternalNode } from '../../types';
+
+// A user component on the legacy @Input() path — the back-compat pin. It still
+// receives flat inputs from getNodeInputs (declared set is non-empty), so the
+// short-circuit must NOT apply to it.
+@Component({
+  selector: 'app-legacy-input-node',
+  standalone: true,
+  template: `{{ data()?.label }}`,
+})
+class LegacyInputNodeComponent {
+  readonly id = input.required<string>();
+  readonly data = input<any>();
+  readonly isConnectable = input(true);
+}
 
 describe('NodeRendererComponent.getNodeInjector', () => {
   let store: FlowStore;
@@ -105,26 +119,31 @@ describe('NodeRendererComponent.getNodeInputs / context isConnectable', () => {
     component = fixture.componentInstance;
   });
 
-  it('getNodeInputs.isConnectable reflects store.nodesConnectable when node.connectable is unset', () => {
-    const node: Node = { id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'default' };
-    store.setNodes([node]);
+  it('LEGACY @Input() node still receives isConnectable from store.nodesConnectable', () => {
+    const fixture = TestBed.createComponent(NodeRendererComponent);
+    const comp = fixture.componentInstance;
+    fixture.componentRef.setInput('customNodeTypes', { legacy: LegacyInputNodeComponent });
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'legacy' } as Node]);
     const internal = store.nodeLookup.get('n1')!;
 
     store.nodesConnectable.set(true);
-    expect(component.getNodeInputs(internal)['isConnectable']).toBe(true);
+    expect(comp.getNodeInputs(internal)['isConnectable']).toBe(true);
 
     store.nodesConnectable.set(false);
-    expect(component.getNodeInputs(internal)['isConnectable']).toBe(false);
+    expect(comp.getNodeInputs(internal)['isConnectable']).toBe(false);
   });
 
-  it('getNodeInputs.isConnectable honors per-node connectable override', () => {
+  it('LEGACY @Input() node honors per-node connectable override', () => {
+    const fixture = TestBed.createComponent(NodeRendererComponent);
+    const comp = fixture.componentInstance;
+    fixture.componentRef.setInput('customNodeTypes', { legacy: LegacyInputNodeComponent });
     store.setNodes([
-      { id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'default', connectable: false } as Node,
+      { id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'legacy', connectable: false } as Node,
     ]);
     const internal = store.nodeLookup.get('n1')!;
 
     store.nodesConnectable.set(true);
-    expect(component.getNodeInputs(internal)['isConnectable']).toBe(false);
+    expect(comp.getNodeInputs(internal)['isConnectable']).toBe(false);
   });
 
   it('context.isConnectable is reactive to store.nodesConnectable', () => {
