@@ -46,12 +46,10 @@ export type GetMiniMapNodeAttribute<NodeType extends Node = Node> = (node: NodeT
     <ng-flow-panel [position]="position()">
       <div
         class="ng-flow__minimap xy-flow__minimap"
-        #minimapContainer
         [attr.aria-label]="ariaLabel()"
         [style.width.px]="mmWidth()"
         [style.height.px]="mmHeight()"
         style="border-radius: 4px; overflow: hidden; border: 1px solid #ddd; box-shadow: 0 1px 4px rgba(0,0,0,0.1); cursor: pointer;"
-        (click)="onMinimapClick($event)"
       >
         <svg
           #minimapSvg
@@ -59,6 +57,7 @@ export type GetMiniMapNodeAttribute<NodeType extends Node = Node> = (node: NodeT
           [attr.width]="mmWidth()"
           [attr.height]="mmHeight()"
           [attr.viewBox]="viewBox()"
+          (click)="onMinimapClick($event)"
         >
           <!-- Background -->
           <rect x="-10000" y="-10000" width="20000" height="20000" [attr.fill]="bgColor() ?? '#f0f0f0'" />
@@ -112,7 +111,6 @@ export type GetMiniMapNodeAttribute<NodeType extends Node = Node> = (node: NodeT
 })
 export class MiniMapComponent {
   readonly store = inject(FlowStore);
-  private minimapContainerRef = viewChild<ElementRef>('minimapContainer');
   private minimapSvgRef = viewChild<ElementRef<SVGSVGElement>>('minimapSvg');
 
   /** Where the minimap panel is anchored. */
@@ -350,9 +348,14 @@ export class MiniMapComponent {
   }
 
   onMinimapClick(event: MouseEvent): void {
-    // minimap.pointer maps the click to flow coordinates using the SVG's
-    // current viewBox (d3-selection pointer against the bound SVG element).
-    const [x, y] = this.minimap ? this.minimap.pointer(event) : [0, 0];
+    // Pass the SVG node explicitly so d3's pointer() maps through the SVG's
+    // CTM/viewBox → flow coordinates. Without the node arg, d3 falls back to
+    // event.currentTarget which in some environments doesn't yield the SVG CTM
+    // (e.g. when the listener was attached to an ancestor). React parity: React
+    // puts onClick on the <svg> and calls pointer(event) with no node; here we
+    // keep the binding on the SVG too but pass the node explicitly for safety.
+    const svgEl = this.minimapSvgRef()?.nativeElement ?? null;
+    const [x, y] = this.minimap && svgEl ? this.minimap.pointer(event, svgEl) : [0, 0];
 
     this.minimapClick.emit({ event, position: { x, y } });
 

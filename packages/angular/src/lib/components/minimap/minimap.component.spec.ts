@@ -361,4 +361,45 @@ describe('MiniMapComponent adopts XYMinimap', () => {
     fixture.nativeElement.remove();
     expect(minimapSpy.destroy).toHaveBeenCalledTimes(1);
   });
+
+  it('click-to-center: pointer() is called with the SVG node and forwards returned flow coordinates to setCenter', async () => {
+    // PINS THE CONTRACT: pointer() must receive the SVG element (not the outer
+    // div) so d3 maps through the SVG viewBox → flow coordinates. The mock
+    // returns [123, 456]; setCenter must be called with those exact values at
+    // the current zoom and the 300 ms duration.
+    const fixture = createMinimap();
+    document.body.appendChild(fixture.nativeElement);
+    try {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      store.panZoom.set(fakePanZoom());
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      minimapSpy.pointer.mockClear();
+      const setCenterSpy = vi.spyOn(store, 'setCenter').mockResolvedValue(undefined as never);
+
+      // Enable pannable so onMinimapClick actually calls setCenter.
+      setSignalInput(fixture.componentInstance, 'pannable', true);
+      fixture.detectChanges();
+
+      // Dispatch a synthetic click on the SVG element (not the outer div).
+      const svgEl = fixture.nativeElement.querySelector('svg.xy-flow__minimap-svg') as SVGSVGElement;
+      expect(svgEl).toBeTruthy();
+      const clickEvent = new MouseEvent('click', { bubbles: true });
+      svgEl.dispatchEvent(clickEvent);
+
+      // pointer() must have been called with (event, svgNode) so that jsdom
+      // and real browsers both yield viewBox = flow coordinates.
+      expect(minimapSpy.pointer).toHaveBeenCalledTimes(1);
+      const pointerCall = minimapSpy.pointer.mock.calls[0] as unknown as [MouseEvent, SVGSVGElement];
+      expect(pointerCall[0]).toBe(clickEvent);
+      expect(pointerCall[1]).toBe(svgEl);
+
+      // The mock returns [123, 456]; setCenter must receive those coordinates.
+      expect(setCenterSpy).toHaveBeenCalledWith(123, 456, { zoom: store.transform()[2], duration: 300 });
+    } finally {
+      fixture.nativeElement.remove();
+    }
+  });
 });
