@@ -62,6 +62,14 @@ const builtInNodeTypes: NodeTypes = {
   group: GroupNodeComponent,
 };
 
+/**
+ * Shared inputs object for components that declare zero @Input()s (every
+ * built-in after the injectNgFlowNode migration). Returning one frozen instance
+ * keeps ngComponentOutlet's inputs reference stable across recomputes — no
+ * per-render object churn, no cache thrash — and provides nothing to set.
+ */
+const EMPTY_INPUTS: Readonly<Record<string, unknown>> = Object.freeze({});
+
 @Component({
   selector: 'ng-flow-node-renderer',
   standalone: true,
@@ -465,6 +473,17 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
       return cached.inputs;
     }
 
+    // Short-circuit: components that declare no @Input()s (all built-ins use
+    // injectNgFlowNode()) get the shared frozen empty object — skip building
+    // and filtering allInputs entirely. We still seed the cache entry so the
+    // key/data reference-compare fast-path holds; inputs is the shared object,
+    // so the returned reference is identity-stable across recomputes (no thrash).
+    const declared = this.getDeclaredInputs(this.getNodeComponent(node.type));
+    if (declared && declared.size === 0) {
+      this.nodeInputsCache.set(node.id, { key, data: node.data, inputs: EMPTY_INPUTS as Record<string, unknown> });
+      return EMPTY_INPUTS as Record<string, unknown>;
+    }
+
     const allInputs: Record<string, unknown> = {
       id: node.id,
       data: node.data,
@@ -481,10 +500,7 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
     };
 
     // Only push keys the target component actually declares as inputs.
-    // Components that use injectNgFlowNode() (the DI-based API) omit input()
-    // declarations entirely; pushing unknown keys via ngComponentOutlet would
-    // throw NG0303 on every render.
-    const declared = this.getDeclaredInputs(this.getNodeComponent(node.type));
+    // declared === null means reflection failed (defensive) — pass everything.
     const inputs: Record<string, unknown> = declared
       ? Object.fromEntries(Object.entries(allInputs).filter(([k]) => declared.has(k)))
       : allInputs;

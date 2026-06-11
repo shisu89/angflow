@@ -202,9 +202,17 @@ describe('node template resolution', () => {
   });
 
   it('busts the inputs cache when a template is registered for an existing type', () => {
+    // Use a legacy @Input() type so the "before" object is non-empty. When a
+    // template is then registered for the same type name AND the custom type is
+    // removed, the resolved component switches to TemplateNodeComponent (zero
+    // inputs → EMPTY_INPUTS). The key changes (isTemplate flag), so the cache
+    // entry from the old class must not be reused.
+    fixture.componentRef.setInput('customNodeTypes', { service: LegacyInputNodeComponent });
     store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'service' } as Node]);
     const internal = store.nodeLookup.get('n1')!;
     const before = component.getNodeInputs(internal);
+    // Remove the custom type; register a template — resolver now returns TemplateNodeComponent.
+    fixture.componentRef.setInput('customNodeTypes', {});
     store.nodeTemplates.set(new Map([['service', { title: 't' }]]));
     const after = component.getNodeInputs(internal);
     // A registry change switches the resolved component class, so cached inputs
@@ -317,11 +325,13 @@ describe('getNodeInputs cache keying (per-node, not global version)', () => {
       providers: [provideZonelessChangeDetection(), FlowStore],
     });
     store = TestBed.inject(FlowStore);
-    component = TestBed.createComponent(NodeRendererComponent).componentInstance;
+    const fixture = TestBed.createComponent(NodeRendererComponent);
+    fixture.componentRef.setInput('customNodeTypes', { legacy: LegacyInputNodeComponent });
+    component = fixture.componentInstance;
   });
 
   it('PERF: a version bump alone does not rebuild a node inputs object', () => {
-    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'default' }]);
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'legacy' }]);
     const before = component.getNodeInputs(store.nodeLookup.get('n1')!);
     store.bumpVersion();
     expect(component.getNodeInputs(store.nodeLookup.get('n1')!)).toBe(before);
@@ -329,8 +339,8 @@ describe('getNodeInputs cache keying (per-node, not global version)', () => {
 
   it('PERF: dragging one node does not rebuild other nodes inputs (O(1) invalidation)', () => {
     store.setNodes([
-      { id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'default' },
-      { id: 'n2', position: { x: 100, y: 0 }, data: {}, type: 'default' },
+      { id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'legacy' },
+      { id: 'n2', position: { x: 100, y: 0 }, data: {}, type: 'legacy' },
     ]);
     const before = component.getNodeInputs(store.nodeLookup.get('n1')!);
     store.triggerNodeChanges([
@@ -340,7 +350,7 @@ describe('getNodeInputs cache keying (per-node, not global version)', () => {
   });
 
   it('REGRESSION: moving the node itself rebuilds its inputs', () => {
-    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'default' }]);
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'legacy' }]);
     const before = component.getNodeInputs(store.nodeLookup.get('n1')!);
     store.triggerNodeChanges([
       { id: 'n1', type: 'position', position: { x: 30, y: 40 }, dragging: true },
@@ -349,16 +359,16 @@ describe('getNodeInputs cache keying (per-node, not global version)', () => {
   });
 
   it('REGRESSION: selection change rebuilds inputs', () => {
-    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'default' }]);
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'legacy' }]);
     const before = component.getNodeInputs(store.nodeLookup.get('n1')!);
     store.addSelectedNodes(['n1']);
     expect(component.getNodeInputs(store.nodeLookup.get('n1')!)).not.toBe(before);
   });
 
   it('REGRESSION: data identity change rebuilds inputs', () => {
-    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: { v: 1 }, type: 'default' }]);
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: { v: 1 }, type: 'legacy' }]);
     const before = component.getNodeInputs(store.nodeLookup.get('n1')!);
-    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: { v: 2 }, type: 'default' }]);
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: { v: 2 }, type: 'legacy' }]);
     expect(component.getNodeInputs(store.nodeLookup.get('n1')!)).not.toBe(before);
   });
 });
