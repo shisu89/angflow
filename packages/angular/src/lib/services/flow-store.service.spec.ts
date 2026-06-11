@@ -194,6 +194,31 @@ describe('FlowStore', () => {
       ]);
       expect(store.nodeLookup.get('c')!.internals!.positionAbsolute).toEqual({ x: 125, y: 125 });
     });
+
+    it('a node with a per-node origin override gets an origin-adjusted positionAbsolute', () => {
+      // store origin stays [0,0]; the node overrides it
+      store.setNodes([
+        makeNode('n', { position: { x: 0, y: 0 }, width: 100, height: 40, origin: [0.5, 0.5] }),
+      ]);
+      store.triggerNodeChanges([
+        { id: 'n', type: 'position', position: { x: 100, y: 100 } },
+      ]);
+      expect(store.nodeLookup.get('n')!.internals!.positionAbsolute).toEqual({ x: 50, y: 80 });
+    });
+
+    it('moving a group that itself has a parent updates both its own and its children\'s absolutes', () => {
+      store.setNodes([
+        makeNode('outer', { position: { x: 1000, y: 1000 } }),
+        makeNode('g', { position: { x: 100, y: 100 }, parentId: 'outer' }),
+        makeNode('c', { position: { x: 10, y: 10 }, parentId: 'g' }),
+      ]);
+      // g's new RELATIVE position within outer
+      store.triggerNodeChanges([
+        { id: 'g', type: 'position', position: { x: 200, y: 200 } },
+      ]);
+      expect(store.nodeLookup.get('g')!.internals!.positionAbsolute).toEqual({ x: 1200, y: 1200 });
+      expect(store.nodeLookup.get('c')!.internals!.positionAbsolute).toEqual({ x: 1210, y: 1210 });
+    });
   });
 
   // ── Middleware pipeline ────────────────────────────────────────────────
