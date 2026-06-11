@@ -192,7 +192,7 @@ describe('AgentChatService — tool loop', () => {
   it('a later send clears the previous error', async () => {
     const responses = [textTurn('ok now')];
     let failFirst = true;
-    const flaky: CompleteFn = async (req) => {
+    const flaky: CompleteFn = async (_req) => {
       if (failFirst) {
         failFirst = false;
         throw new Error('boom');

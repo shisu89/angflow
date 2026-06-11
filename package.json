@@ -11,7 +11,7 @@
     "build:system": "pnpm --filter @angflow/system run build",
     "build:angular": "pnpm --filter @angflow/angular run build",
     "build:mcp": "pnpm --filter @angflow/mcp run build",
-    "lint": "pnpm --filter @angflow/system run lint && pnpm --filter @angflow/angular run lint",
+    "lint": "pnpm --filter @angflow/system run lint && pnpm --filter @angflow/angular run lint && pnpm --filter @angflow/mcp run lint",
     "typecheck": "pnpm --filter @angflow/system run typecheck && pnpm --filter @angflow/angular run typecheck && pnpm --filter @angflow/mcp run typecheck",
     "test": "pnpm --filter @angflow/system run test && pnpm --filter @angflow/angular run test && pnpm --filter @angflow/mcp run test",
     "clean": "pnpm -r --parallel exec rimraf dist node_modules",

@@ -1073,6 +1073,7 @@ describe('AngflowAgentBridge', () => {
     });
 
     it('skips nodes deleted while an async layout fn runs (no phantom history)', async () => {
+      // eslint-disable-next-line prefer-const
       let flowRef: NgFlowService;
       const slowLayout: AgentLayoutFn = async (nodes) => {
         // Simulate a human deleting node "b" while layout computes.
@@ -1096,6 +1097,7 @@ describe('AngflowAgentBridge', () => {
     });
 
     it('captures no history when ALL target nodes vanish during the layout await', async () => {
+      // eslint-disable-next-line prefer-const
       let flowRef: NgFlowService;
       const slowLayout: AgentLayoutFn = async (nodes) => {
         flowRef.setNodes([]);

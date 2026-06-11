@@ -97,7 +97,7 @@ export function getFloatingDropTarget(
 ): Handle | null {
   const oppositeType: HandleType = fromHandle.type === 'source' ? 'target' : 'source';
 
-  let bestNode: any = null;
+  let bestNode: InternalNodeBase | null = null;
   let bestZ = -Infinity;
 
   for (const node of nodeLookup.values()) {
@@ -111,6 +111,7 @@ export function getFloatingDropTarget(
     if (position.x < nx || position.x > nx + nw) continue;
     if (position.y < ny || position.y > ny + nh) continue;
 
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     const oppositeList = (node.internals?.handleBounds?.[oppositeType] ?? []) as Handle[];
     const hasFloating = oppositeList.some((h) => h.floating === true);
     if (!hasFloating) continue;
@@ -124,6 +125,7 @@ export function getFloatingDropTarget(
 
   if (!bestNode) return null;
 
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
   const candidates = ((bestNode.internals?.handleBounds?.[oppositeType] ?? []) as Handle[])
     .filter((h) => h.floating === true);
 

@@ -47,7 +47,7 @@
     "build": "ngc -p tsconfig.lib.json && node scripts/bundle-css.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint --ext .ts src",
+    "lint": "eslint src",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -71,8 +71,10 @@
     "@angular/platform-browser": "^21.2.15",
     "@angular/platform-browser-dynamic": "^21.2.7",
     "@dagrejs/dagre": "^3.0.0",
+    "eslint": "^9.29.0",
     "jsdom": "^29.0.1",
     "typescript": "5.9.3",
+    "typescript-eslint": "8.34.0",
     "vitest": "^4.1.2"
   }
 }
