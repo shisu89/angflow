@@ -65,7 +65,7 @@ After this, the browser devtools console can do `await angflow.callTool('add_nod
 
 Every tool takes an optional `flowId` (omit when only one flow is registered; required otherwise). All payloads use the `Node` / `Edge` types from `@angflow/angular`.
 
-**Payload validation.** `add_node`, `add_nodes`, `set_nodes`, and the corresponding `add_node` / `add_nodes` ops inside `apply_changes` require each node to have a non-empty string `id` and a `position: { x: number, y: number }`. The edge variants require non-empty string `id`, `source`, and `target`. Malformed payloads fail with `-32602` *before* reaching `NgFlowService`. Additionally, `style` (when present) must be a plain object whose values are strings or numbers, string values must not contain `url(` or `expression(` (CSS-redressing guard), and `className` (when present) must be a string — violations fail with `-32602`. Inside `apply_changes`, the same violations surface as the batch's `-32603` rollback error with `data.failedIndex`. Note: `update_node` / `update_edge` *patches* are not currently subject to the style/className checks (the checks guard the add/replace paths). Bulk array parameters (`add_nodes`, `add_edges`, `set_nodes`, `set_edges`, and `apply_changes`' `ops`) are capped at 5000 elements per call; larger payloads fail with `-32602` before any mutation.
+**Payload validation.** `add_node`, `add_nodes`, `set_nodes`, and the corresponding `add_node` / `add_nodes` ops inside `apply_changes` require each node to have a non-empty string `id` and a `position: { x: number, y: number }`. The edge variants require non-empty string `id`, `source`, and `target`. Malformed payloads fail with `-32602` *before* reaching `NgFlowService`. Additionally, `style` (when present) must be a plain object whose values are strings or numbers, string values must not contain `url(` or `expression(` (CSS-redressing guard), and `className` (when present) must be a string — violations fail with `-32602`. Inside `apply_changes`, the same violations surface as the batch's `-32603` rollback error with `data.failedIndex`. Note: `update_node` / `update_edge` *patches* are not currently subject to the style/className checks (the checks guard the add/replace paths). Bulk array parameters (`add_nodes`, `add_edges`, `set_nodes`, `set_edges`, and `apply_changes`' `ops`) are capped at 5000 elements per call; larger payloads fail with `-32602` before any mutation. Id-array parameters (`delete_elements` nodeIds/edgeIds, `select_nodes` nodeIds, `select_edges` edgeIds, `get_connected_edges` nodeIds, `layout_nodes` nodeIds) are similarly capped at 5000 elements.
 
 ### Discovery / read
 
@@ -486,7 +486,11 @@ environment flag) unless every script in your page is trusted.
 **WebSocket transport.** The `@angflow/mcp` server validates browser `Origin` headers
 against an allowlist and supports token auth (see the MCP server section above and
 `packages/mcp/README.md#security`). The canvas-side `WebSocketTransport` trusts
-whatever is on the other end of `url` — point it only at servers you control.
+whatever is on the other end of `url` — point it only at servers you control. See
+`packages/mcp/README.md#security` for the localhost-origin residual risk: in default
+ephemeral-token mode, any page served from an allowlisted origin can connect without
+a token — for example, any local dev server on `http://localhost:<port>` has the same
+access as your canvas.
 
 ## Adding a new tool
 

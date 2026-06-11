@@ -1214,6 +1214,11 @@ function optionalStringArray(params: Record<string, unknown>, key: string): stri
   if (!Array.isArray(value) || value.some((v) => typeof v !== 'string')) {
     throw new InvalidParamsError(`Param "${key}" must be an array of strings.`);
   }
+  if (value.length > MAX_BULK_ELEMENTS) {
+    throw new InvalidParamsError(
+      `Param "${key}" exceeds the maximum of ${MAX_BULK_ELEMENTS} elements per call (got ${value.length}).`,
+    );
+  }
   return value as string[];
 }
 

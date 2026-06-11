@@ -1803,5 +1803,122 @@ describe('AngflowAgentBridge — bulk payload caps', () => {
       expect('error' in res).toBe(false);
       expect(flow.getNodes()).toHaveLength(5000);
     });
+
+    it('rejects select_nodes with more than 5000 nodeIds with -32602', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const bigIds = Array.from({ length: 5001 }, (_, i) => `n${i}`);
+      const res = await transport.call('select_nodes', { nodeIds: bigIds });
+      expect('error' in res && res.error.code).toBe(-32602);
+      expect('error' in res && res.error.message).toContain('5000');
+    });
+
+    it('accepts select_nodes at the 5000-element boundary for nodeIds', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const bigIds = Array.from({ length: 5000 }, (_, i) => `n${i}`);
+      const res = await transport.call('select_nodes', { nodeIds: bigIds });
+      expect('error' in res).toBe(false);
+    });
+
+    it('rejects select_edges with more than 5000 edgeIds with -32602', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const bigIds = Array.from({ length: 5001 }, (_, i) => `e${i}`);
+      const res = await transport.call('select_edges', { edgeIds: bigIds });
+      expect('error' in res && res.error.code).toBe(-32602);
+      expect('error' in res && res.error.message).toContain('5000');
+    });
+
+    it('accepts select_edges at the 5000-element boundary for edgeIds', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const bigIds = Array.from({ length: 5000 }, (_, i) => `e${i}`);
+      const res = await transport.call('select_edges', { edgeIds: bigIds });
+      expect('error' in res).toBe(false);
+    });
+
+    it('rejects delete_elements with more than 5000 nodeIds with -32602', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const bigIds = Array.from({ length: 5001 }, (_, i) => `n${i}`);
+      const res = await transport.call('delete_elements', { nodeIds: bigIds });
+      expect('error' in res && res.error.code).toBe(-32602);
+      expect('error' in res && res.error.message).toContain('5000');
+    });
+
+    it('rejects delete_elements with more than 5000 edgeIds with -32602', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const bigIds = Array.from({ length: 5001 }, (_, i) => `e${i}`);
+      const res = await transport.call('delete_elements', { edgeIds: bigIds });
+      expect('error' in res && res.error.code).toBe(-32602);
+      expect('error' in res && res.error.message).toContain('5000');
+    });
+
+    it('accepts delete_elements at the 5000-element boundary for nodeIds', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const bigIds = Array.from({ length: 5000 }, (_, i) => `n${i}`);
+      const res = await transport.call('delete_elements', { nodeIds: bigIds });
+      expect('error' in res).toBe(false);
+    });
+
+    it('rejects get_connected_edges with more than 5000 nodeIds with -32602', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const bigIds = Array.from({ length: 5001 }, (_, i) => `n${i}`);
+      const res = await transport.call('get_connected_edges', { nodeIds: bigIds });
+      expect('error' in res && res.error.code).toBe(-32602);
+      expect('error' in res && res.error.message).toContain('5000');
+    });
+
+    it('accepts get_connected_edges at the 5000-element boundary for nodeIds', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const bigIds = Array.from({ length: 5000 }, (_, i) => `n${i}`);
+      const res = await transport.call('get_connected_edges', { nodeIds: bigIds });
+      expect('error' in res).toBe(false);
+    });
+  });
+
+  describe('layout_nodes id-array cap (requires layout fn)', () => {
+    let bridgeWithLayout: AngflowAgentBridge;
+    let transportWithLayout: CapturingTransport;
+    let newFlowWithLayout: () => NgFlowService;
+
+    beforeEach(() => {
+      transportWithLayout = new CapturingTransport();
+      const fakeLayout: AgentLayoutFn = (nodes) => {
+        const positions: Record<string, { x: number; y: number }> = {};
+        nodes.forEach((n, i) => (positions[n.id] = { x: i * 100, y: 0 }));
+        return positions;
+      };
+      ({ bridge: bridgeWithLayout, newFlow: newFlowWithLayout } = setupWithLayout(
+        fakeLayout,
+        [transportWithLayout],
+      ));
+    });
+
+    it('rejects layout_nodes with more than 5000 nodeIds with -32602', async () => {
+      const flow = newFlowWithLayout();
+      bridgeWithLayout.register('main', flow);
+      const bigIds = Array.from({ length: 5001 }, (_, i) => `n${i}`);
+      const res = await transportWithLayout.call('layout_nodes', { nodeIds: bigIds });
+      expect('error' in res && res.error.code).toBe(-32602);
+      expect('error' in res && res.error.message).toContain('5000');
+    });
+
+    it('accepts layout_nodes at the 5000-element boundary for nodeIds (cap check passes; may fail on other validation)', async () => {
+      const flow = newFlowWithLayout();
+      bridgeWithLayout.register('main', flow);
+      const bigIds = Array.from({ length: 5000 }, (_, i) => `n${i}`);
+      const res = await transportWithLayout.call('layout_nodes', { nodeIds: bigIds });
+      // The cap check should pass (5000 is the boundary); it may fail on existence check,
+      // but it should not fail with the cap error.
+      if ('error' in res) {
+        expect(res.error.message).not.toContain('exceeds the maximum');
+      }
+    });
   });
 });
