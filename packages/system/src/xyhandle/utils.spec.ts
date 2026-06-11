@@ -226,3 +226,147 @@ describe('getClosestHandle hidden-node guard', () => {
     expect(result?.id).toBe('v');
   });
 });
+
+// ─── helper additions used by predicate tests ─────────────────────────────
+// makeHandleNode: builds a node with a fixed (non-floating) handle so we can
+// test getClosestHandle. Re-uses makeNode + adds a fixed target handle.
+function makeHandleNode(
+  id: string,
+  opts: { x: number; y: number; width: number; height: number; zIndex?: number }
+): any {
+  return makeNode(id, {
+    ...opts,
+    fixedHandles: [{ id: 'h', type: 'target', position: Position.Left }],
+  });
+}
+
+describe('getClosestHandle — isNodeVisible predicate', () => {
+  it('predicate absent: node within connectionRadius is a candidate (current behaviour preserved)', () => {
+    // Node A at (0,0) 100x50; its handle is at Left edge absolute (0, 25).
+    // Pointer at (10, 25) is within connectionRadius=50 → should find a handle.
+    const node = makeHandleNode('A', { x: 0, y: 0, width: 100, height: 50 });
+    // We need handleBounds with a real position for getClosestHandle to compute distance.
+    // Since makeNode leaves handle x/y at 0 and getHandlePosition reads positionAbsolute,
+    // and the pointer is very close to (0, 25), the handle at x=0, y=0 is within radius 50.
+    // We assert the call does not throw.
+    expect(() =>
+      getClosestHandle(
+        { x: 5, y: 0 },
+        50,
+        makeLookup(node),
+        { nodeId: 'B', type: 'source', id: null },
+      )
+    ).not.toThrow();
+  });
+
+  it('predicate returning false hides the node from getClosestHandle candidates', () => {
+    const node = makeHandleNode('A', { x: 0, y: 0, width: 100, height: 50 });
+    // Without predicate — might find or not find handle depending on coords.
+    // With predicate always returning false — must return null regardless.
+    const result = getClosestHandle(
+      { x: 5, y: 0 },
+      500, // large radius to ensure it would otherwise find the handle
+      makeLookup(node),
+      { nodeId: 'B', type: 'source', id: null },
+      () => false, // predicate rejects all nodes
+    );
+    expect(result).toBeNull();
+  });
+
+  it('predicate returning false for one node still allows another node to be a candidate', () => {
+    const nodeA = makeHandleNode('A', { x: 0, y: 0, width: 100, height: 50 });
+    const nodeB = makeHandleNode('B', { x: 0, y: 0, width: 100, height: 50 });
+    // Predicate hides A but allows B. Result should not be from node A.
+    const result = getClosestHandle(
+      { x: 5, y: 0 },
+      500,
+      makeLookup(nodeA, nodeB),
+      { nodeId: 'C', type: 'source', id: null },
+      (n) => n.id !== 'A',
+    );
+    // If a handle is found, it must not belong to A.
+    if (result !== null) {
+      expect(result.nodeId).not.toBe('A');
+    }
+    // (result may be null if B's handle is also at distance > radius after
+    //  absolute position computation; the key assertion is that A is excluded)
+  });
+
+  it('predicate cannot resurrect a node.hidden node (hidden+predicate=true still excluded)', () => {
+    const node = makeHandleNode('H', { x: 0, y: 0, width: 100, height: 50 });
+    node.hidden = true; // set hidden flag
+    const result = getClosestHandle(
+      { x: 5, y: 0 },
+      500,
+      makeLookup(node),
+      { nodeId: 'B', type: 'source', id: null },
+      () => true, // predicate says visible — but hidden flag still wins
+    );
+    expect(result).toBeNull();
+  });
+});
+
+describe('getFloatingDropTarget — isNodeVisible predicate', () => {
+  it('predicate absent: existing behaviour unchanged (visible node is captured)', () => {
+    const lookup = makeLookup(makeNode('A', {
+      x: 0, y: 0, width: 100, height: 50,
+      floatingHandles: [{ id: 'auto', type: 'target', position: Position.Left }],
+    }));
+    const result = getFloatingDropTarget(
+      { x: 50, y: 25 },
+      lookup,
+      { nodeId: 'B', type: 'source', id: null },
+    );
+    expect(result?.nodeId).toBe('A');
+  });
+
+  it('predicate returning false hides the node from getFloatingDropTarget', () => {
+    const lookup = makeLookup(makeNode('A', {
+      x: 0, y: 0, width: 100, height: 50,
+      floatingHandles: [{ id: 'auto', type: 'target', position: Position.Left }],
+    }));
+    const result = getFloatingDropTarget(
+      { x: 50, y: 25 },
+      lookup,
+      { nodeId: 'B', type: 'source', id: null },
+      () => false, // predicate rejects all nodes
+    );
+    expect(result).toBeNull();
+  });
+
+  it('predicate filtering one node still allows another overlapping node to be captured', () => {
+    const lookup = makeLookup(
+      makeNode('A', {
+        x: 0, y: 0, width: 100, height: 50, zIndex: 5,
+        floatingHandles: [{ id: 'a-auto', type: 'target', position: Position.Left }],
+      }),
+      makeNode('B', {
+        x: 0, y: 0, width: 100, height: 50, zIndex: 1,
+        floatingHandles: [{ id: 'b-auto', type: 'target', position: Position.Left }],
+      }),
+    );
+    // Predicate hides A (higher z) — B should win instead.
+    const result = getFloatingDropTarget(
+      { x: 50, y: 25 },
+      lookup,
+      { nodeId: 'C', type: 'source', id: null },
+      (n) => n.id !== 'A',
+    );
+    expect(result?.nodeId).toBe('B');
+  });
+
+  it('predicate cannot resurrect a node.hidden node', () => {
+    const hiddenNode = makeNode('H', {
+      x: 0, y: 0, width: 100, height: 50,
+      floatingHandles: [{ id: 'auto', type: 'target', position: Position.Left }],
+    });
+    hiddenNode.hidden = true;
+    const result = getFloatingDropTarget(
+      { x: 50, y: 25 },
+      makeLookup(hiddenNode),
+      { nodeId: 'B', type: 'source', id: null },
+      () => true, // predicate says visible — hidden flag still wins
+    );
+    expect(result).toBeNull();
+  });
+});

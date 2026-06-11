@@ -10,6 +10,7 @@ import {
   type OnConnectEnd,
   type UpdateConnection,
   type IsValidConnection,
+  type InternalNodeBase,
   NodeLookup,
   FinalConnectionState,
 } from '../types';
@@ -40,6 +41,10 @@ export type OnPointerDownParams = {
   autoPanSpeed?: number;
   dragThreshold?: number;
   handleDomNode: Element;
+  /** Optional extra visibility check. Called only for nodes that already pass
+   *  the `!node.hidden` guard. Return `false` to exclude a node from snap and
+   *  drop-target search (e.g. collapse-hidden children). */
+  isNodeVisible?: (node: InternalNodeBase) => boolean;
 };
 
 export type IsValidParams = {

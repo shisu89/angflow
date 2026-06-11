@@ -2,7 +2,12 @@ import { getHandlePosition, getOverlappingArea, nodeToRect } from '../utils';
 import type { HandleType, XYPosition, Handle, InternalNodeBase, NodeLookup, ConnectionMode } from '../types';
 import { Position } from '../types';
 
-function getNodesWithinDistance(position: XYPosition, nodeLookup: NodeLookup, distance: number): InternalNodeBase[] {
+function getNodesWithinDistance(
+  position: XYPosition,
+  nodeLookup: NodeLookup,
+  distance: number,
+  isNodeVisible?: (node: InternalNodeBase) => boolean,
+): InternalNodeBase[] {
   const nodes: InternalNodeBase[] = [];
   const rect = {
     x: position.x - distance,
@@ -13,8 +18,11 @@ function getNodesWithinDistance(position: XYPosition, nodeLookup: NodeLookup, di
 
   for (const node of nodeLookup.values()) {
     // Hidden nodes remain in nodeLookup (visibility filtering is render-level);
-    // an invisible node must not capture connection snapping or highlights.
+    // an invisible node must not be a snap candidate.
     if (node.hidden) continue;
+    // Optional caller-supplied predicate (e.g. collapse-hidden children).
+    // Composes with the hidden guard — predicate can only further exclude.
+    if (isNodeVisible !== undefined && !isNodeVisible(node)) continue;
     if (getOverlappingArea(rect, nodeToRect(node)) > 0) {
       nodes.push(node);
     }
@@ -33,12 +41,13 @@ export function getClosestHandle(
   position: XYPosition,
   connectionRadius: number,
   nodeLookup: NodeLookup,
-  fromHandle: { nodeId: string; type: HandleType; id?: string | null }
+  fromHandle: { nodeId: string; type: HandleType; id?: string | null },
+  isNodeVisible?: (node: InternalNodeBase) => boolean,
 ): Handle | null {
   let closestHandles: Handle[] = [];
   let minDistance = Infinity;
 
-  const closeNodes = getNodesWithinDistance(position, nodeLookup, connectionRadius + ADDITIONAL_DISTANCE);
+  const closeNodes = getNodesWithinDistance(position, nodeLookup, connectionRadius + ADDITIONAL_DISTANCE, isNodeVisible);
 
   for (const node of closeNodes) {
     const allHandles = [...(node.internals.handleBounds?.source ?? []), ...(node.internals.handleBounds?.target ?? [])];
@@ -96,7 +105,8 @@ export function getClosestHandle(
 export function getFloatingDropTarget(
   position: XYPosition,
   nodeLookup: NodeLookup,
-  fromHandle: { nodeId: string; type: HandleType; id?: string | null }
+  fromHandle: { nodeId: string; type: HandleType; id?: string | null },
+  isNodeVisible?: (node: InternalNodeBase) => boolean,
 ): Handle | null {
   const oppositeType: HandleType = fromHandle.type === 'source' ? 'target' : 'source';
 
@@ -108,6 +118,9 @@ export function getFloatingDropTarget(
     // Hidden nodes remain in nodeLookup (visibility filtering is render-level);
     // an invisible node must not capture connection drops or highlights.
     if (node.hidden) continue;
+    // Optional caller-supplied predicate (e.g. collapse-hidden children).
+    // Composes with the hidden guard — predicate can only further exclude.
+    if (isNodeVisible !== undefined && !isNodeVisible(node)) continue;
 
     const nx = node.internals?.positionAbsolute?.x ?? node.position?.x ?? 0;
     const ny = node.internals?.positionAbsolute?.y ?? node.position?.y ?? 0;
