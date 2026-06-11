@@ -55,8 +55,11 @@ export function inferSide(intersection: Point, nodeRect: NodeRect): Position {
   // Normalize by half-extents so the comparison identifies the border segment
   // the point actually lies on (matches getFloatingEndpoint's crossing-axis
   // choice); raw deltas misclassify top/bottom points on non-square nodes.
-  const nx = (intersection.x - cx) / (nodeRect.width / 2);
-  const ny = (intersection.y - cy) / (nodeRect.height / 2);
+  // A half-extent of 0 (unmeasured/zero-size rect) would divide to NaN/Infinity
+  // and fall through to Top — treat it as 1 so classification degrades to a
+  // raw-delta comparison instead.
+  const nx = (intersection.x - cx) / (nodeRect.width / 2 || 1);
+  const ny = (intersection.y - cy) / (nodeRect.height / 2 || 1);
 
   return Math.abs(nx) > Math.abs(ny)
     ? (nx > 0 ? Position.Right : Position.Left)

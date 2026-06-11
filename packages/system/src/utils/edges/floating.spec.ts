@@ -105,4 +105,17 @@ describe('inferSide', () => {
     const wide = { x: 0, y: 0, width: 100, height: 50 };
     expect(inferSide({ x: 100, y: 50 }, wide)).toBe(Position.Bottom);
   });
+
+  it('classifies points beside a zero-size rect without NaN fallout', () => {
+    const degenerate = { x: 10, y: 10, width: 0, height: 0 };
+    expect(inferSide({ x: 15, y: 10 }, degenerate)).toBe(Position.Right);
+    expect(inferSide({ x: 5, y: 10 }, degenerate)).toBe(Position.Left);
+    expect(inferSide({ x: 10, y: 15 }, degenerate)).toBe(Position.Bottom);
+    expect(inferSide({ x: 10, y: 5 }, degenerate)).toBe(Position.Top);
+  });
+
+  it('classifies a point beside a zero-width rect (tall line) — regression guard', () => {
+    const line = { x: 10, y: 0, width: 0, height: 100 };
+    expect(inferSide({ x: 20, y: 60 }, line)).toBe(Position.Right);
+  });
 });
