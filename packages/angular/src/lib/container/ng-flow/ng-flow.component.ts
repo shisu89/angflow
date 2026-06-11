@@ -671,14 +671,6 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   /** Fires when the store reports an internal validation or consistency error. */
   readonly error = output<{ id: string; message: string }>({ alias: 'error' });
 
-  // Auto-pan events (declared for API completeness; not yet wired because
-  // auto-pan detection happens inside XYDrag's internal requestAnimationFrame
-  // loop, which does not currently expose start/end callbacks)
-  /** Reserved — fires when auto-pan begins. Not yet wired. */
-  readonly autoPanStart = output<void>({ alias: 'autoPanStart' });
-  /** Reserved — fires when auto-pan ends. Not yet wired. */
-  readonly autoPanEnd = output<void>({ alias: 'autoPanEnd' });
-
   private lastNodesRef: NodeType[] | null = null;
   private lastEdgesRef: EdgeType[] | null = null;
 
