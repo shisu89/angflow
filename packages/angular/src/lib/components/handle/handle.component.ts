@@ -170,9 +170,11 @@ export class HandleComponent implements OnInit, OnDestroy {
       autoPanSpeed: store.autoPanSpeed(),
       dragThreshold: 0,
       handleDomNode: this.el.nativeElement,
-      isValidConnection: validationFn,
+      // Variance-forced: validator is declared (NodeType|Connection)=>boolean but the
+      // system only ever calls it with a Connection; contravariance blocks a direct assign.
+      isValidConnection: validationFn as unknown as IsValidConnection,
       isNodeVisible: (n: { id: string }) => !store.collapsedHiddenIds().has(n.id),
-    } as any);
+    });
   }
 
   onClick(event: MouseEvent): void {

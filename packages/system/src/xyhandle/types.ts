@@ -15,7 +15,7 @@ import {
   FinalConnectionState,
 } from '../types';
 
-export type OnPointerDownParams = {
+export type OnPointerDownParams<NodeType extends InternalNodeBase = InternalNodeBase> = {
   autoPanOnConnect: boolean;
   connectionMode: ConnectionMode;
   connectionRadius: number;
@@ -23,7 +23,7 @@ export type OnPointerDownParams = {
   handleId: string | null;
   nodeId: string;
   isTarget: boolean;
-  nodeLookup: NodeLookup;
+  nodeLookup: NodeLookup<NodeType>;
   lib: string;
   flowId: string | null;
   edgeUpdaterType?: HandleType;
@@ -61,7 +61,10 @@ export type IsValidParams = {
 };
 
 export type XYHandleInstance = {
-  onPointerDown: (event: MouseEvent | TouchEvent, params: OnPointerDownParams) => void;
+  onPointerDown: <NodeType extends InternalNodeBase = InternalNodeBase>(
+    event: MouseEvent | TouchEvent,
+    params: OnPointerDownParams<NodeType>
+  ) => void;
   isValid: (event: MouseEvent | TouchEvent, params: IsValidParams) => Result;
 };
 

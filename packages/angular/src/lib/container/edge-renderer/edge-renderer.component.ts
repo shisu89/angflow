@@ -26,6 +26,7 @@ import {
   type Connection,
   type ConnectionState,
   type FinalConnectionState,
+  type IsValidConnection,
 } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 import { BezierEdgeComponent } from '../../components/edges/bezier-edge.component';
@@ -698,7 +699,9 @@ export class EdgeRendererComponent {
       autoPanSpeed: store.autoPanSpeed(),
       dragThreshold: store.connectionDragThreshold(),
       handleDomNode: event.currentTarget as Element,
-      isValidConnection: store.isValidConnection(),
+      // Variance-forced: validator is declared (EdgeType|Connection)=>boolean but the
+      // system only ever calls it with a Connection; contravariance blocks a direct assign.
+      isValidConnection: store.isValidConnection() as unknown as IsValidConnection,
       onConnect: (connection: Connection) => {
         this.reconnect.emit({ edge, connection });
       },
@@ -711,7 +714,7 @@ export class EdgeRendererComponent {
         store.connectionTargetNodeId.set(nodeId);
       },
       isNodeVisible: (n: { id: string }) => !store.collapsedHiddenIds().has(n.id),
-    } as any);
+    });
   }
 
   private addMarker(map: Map<string, Record<string, unknown>>, marker: EdgeMarker | undefined): void {
