@@ -5,6 +5,8 @@ import {
   output,
   inject,
   computed,
+  effect,
+  Injector,
   ElementRef,
   AfterViewInit,
   OnDestroy,
@@ -29,6 +31,12 @@ import {
 } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 import { NODE_ID } from '../../services/tokens';
+
+/** Control positions, in the same order as the template elements (4 corners, then 4 lines). */
+const CONTROL_POSITIONS: ControlPosition[] = [
+  'top-left', 'top-right', 'bottom-left', 'bottom-right',
+  'top', 'right', 'bottom', 'left',
+];
 
 /**
  * Adds draggable resize handles and edges to a node. Place inside a node
@@ -116,6 +124,7 @@ import { NODE_ID } from '../../services/tokens';
 export class NodeResizerComponent implements AfterViewInit, OnDestroy {
   private store = inject(FlowStore);
   private el = inject(ElementRef<HTMLElement>);
+  private injector = inject(Injector);
 
   /** Node to resize. Defaults to the host node when placed inside a node template. Aliased as `nodeId`. */
   readonly nodeIdInput = input<string | undefined>(undefined, { alias: 'nodeId' });
@@ -188,16 +197,12 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     const resolvedNodeId = this.nodeIdInput() ?? this.nodeId;
-    // Template order: 4 corners, then 4 lines. Must match `positions` below.
+    // Template order: 4 corners, then 4 lines. Must match CONTROL_POSITIONS.
     const handles: HTMLDivElement[] = Array.from(
       (this.el.nativeElement as HTMLElement).querySelectorAll(':scope > .xy-flow__resize-control')
     ) as HTMLDivElement[];
-    const positions: ControlPosition[] = [
-      'top-left', 'top-right', 'bottom-left', 'bottom-right',
-      'top', 'right', 'bottom', 'left',
-    ];
 
-    handles.forEach((handle, index) => {
+    handles.forEach((handle) => {
       const resizer = XYResizer({
         domNode: handle as HTMLDivElement,
         nodeId: resolvedNodeId,
@@ -258,28 +263,45 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
         },
       });
 
-      resizer.update({
-        controlPosition: positions[index],
-        boundaries: {
-          minWidth: this.minWidth(),
-          minHeight: this.minHeight(),
-          maxWidth: this.maxWidth(),
-          maxHeight: this.maxHeight(),
-        },
-        keepAspectRatio: this.keepAspectRatio(),
-        onResizeStart: this.onResizeStartCb() ?? ((event: ResizeDragEvent, params: ResizeParams) => {
-          this.resizeStart.emit({ event, ...params });
-        }),
-        onResize: this.onResizeCb() ?? ((event: ResizeDragEvent, params: ResizeParams) => {
-          this.resize.emit({ event, ...params });
-        }),
-        onResizeEnd: this.onResizeEndCb() ?? ((event: ResizeDragEvent, params: ResizeParams) => {
-          this.resizeEnd.emit({ event, ...params });
-        }),
-        shouldResize: this.shouldResize(),
-      });
-
       this.resizerInstances.push(resizer);
+    });
+
+    // Apply config now, then re-apply reactively whenever any config input
+    // changes. XYResizer.update() is idempotent, so the effect's first run
+    // re-applying the same config is harmless.
+    this.applyResizerConfig();
+    effect(() => this.applyResizerConfig(), { injector: this.injector });
+  }
+
+  private applyResizerConfig(): void {
+    const boundaries = {
+      minWidth: this.minWidth(),
+      minHeight: this.minHeight(),
+      maxWidth: this.maxWidth(),
+      maxHeight: this.maxHeight(),
+    };
+    const keepAspectRatio = this.keepAspectRatio();
+    const shouldResize = this.shouldResize();
+    const onResizeStart = this.onResizeStartCb() ?? ((event: ResizeDragEvent, params: ResizeParams) => {
+      this.resizeStart.emit({ event, ...params });
+    });
+    const onResize = this.onResizeCb() ?? ((event: ResizeDragEvent, params: ResizeParams) => {
+      this.resize.emit({ event, ...params });
+    });
+    const onResizeEnd = this.onResizeEndCb() ?? ((event: ResizeDragEvent, params: ResizeParams) => {
+      this.resizeEnd.emit({ event, ...params });
+    });
+
+    this.resizerInstances.forEach((resizer, index) => {
+      resizer.update({
+        controlPosition: CONTROL_POSITIONS[index],
+        boundaries,
+        keepAspectRatio,
+        onResizeStart,
+        onResize,
+        onResizeEnd,
+        shouldResize,
+      });
     });
   }
 
