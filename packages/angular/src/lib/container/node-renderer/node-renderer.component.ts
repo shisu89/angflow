@@ -26,6 +26,34 @@ import { GroupNodeComponent } from '../../components/nodes/group-node.component'
 import { TemplateNodeComponent } from '../../components/nodes/template-node.component';
 import type { Node, InternalNode, NodeTypes, NgFlowNodeContext } from '../../types';
 
+/**
+ * Cache key for a node's NgComponentOutlet inputs object. Enumerates every
+ * field `getNodeInputs` feeds into the inputs object (data is compared by
+ * reference in the cache entry instead — object identity can't live in a
+ * string key). Exported for tests.
+ */
+export function computeNodeInputsKey(
+  node: InternalNode,
+  nodesConnectable: boolean,
+  isTemplate: boolean,
+): string {
+  const x = node.internals?.positionAbsolute?.x ?? node.position.x;
+  const y = node.internals?.positionAbsolute?.y ?? node.position.y;
+  return [
+    node.type ?? 'default',
+    isTemplate ? 1 : 0,
+    node.selected ? 1 : 0,
+    node.dragging ? 1 : 0,
+    node.internals?.z ?? 0,
+    (node.connectable ?? nodesConnectable) ? 1 : 0,
+    x,
+    y,
+    node.sourcePosition ?? '',
+    node.targetPosition ?? '',
+    node.dragHandle ?? '',
+  ].join(':');
+}
+
 // Keep the key set in sync with BUILT_IN_NODE_TYPE_NAMES in services/ng-flow.service.ts.
 const builtInNodeTypes: NodeTypes = {
   default: DefaultNodeComponent,
@@ -164,7 +192,7 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
 
   private nodeInjectorCache = new Map<string, Injector>();
   private nodeContextCache = new Map<string, NgFlowNodeContext<unknown>>();
-  private nodeInputsCache = new Map<string, { key: string; inputs: Record<string, unknown> }>();
+  private nodeInputsCache = new Map<string, { key: string; data: unknown; inputs: Record<string, unknown> }>();
   private declaredInputsCache = new WeakMap<Type<unknown>, Set<string> | null>();
   private resizeObserver: ResizeObserver | null = null;
 
@@ -413,12 +441,14 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
   }
 
   getNodeInputs(node: InternalNode): Record<string, unknown> {
-    const version = this.store.version();
     const nodesConnectable = this.store.nodesConnectable();
-    const isTemplate = this.store.nodeTemplates().has(node.type ?? 'default') ? 1 : 0;
-    const key = `${version}:${nodesConnectable ? 1 : 0}:${node.type ?? 'default'}:${isTemplate}`;
+    const isTemplate = this.store.nodeTemplates().has(node.type ?? 'default');
+    // Per-node key: a global version bump (every drag frame) must not
+    // invalidate all N nodes' inputs — only fields this node's inputs
+    // actually read. The template stays version-reactive via visibleNodes().
+    const key = computeNodeInputsKey(node, nodesConnectable, isTemplate);
     const cached = this.nodeInputsCache.get(node.id);
-    if (cached && cached.key === key) {
+    if (cached && cached.key === key && cached.data === node.data) {
       return cached.inputs;
     }
 
@@ -446,7 +476,7 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
       ? Object.fromEntries(Object.entries(allInputs).filter(([k]) => declared.has(k)))
       : allInputs;
 
-    this.nodeInputsCache.set(node.id, { key, inputs });
+    this.nodeInputsCache.set(node.id, { key, data: node.data, inputs });
     return inputs;
   }
 

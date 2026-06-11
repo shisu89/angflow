@@ -10,13 +10,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
-import { NodeRendererComponent } from './node-renderer.component';
+import { NodeRendererComponent, computeNodeInputsKey } from './node-renderer.component';
 import { FlowStore } from '../../services/flow-store.service';
 import { NG_FLOW_NODE_CONTEXT } from '../../services/tokens';
 import { TemplateNodeComponent } from '../../components/nodes/template-node.component';
 import { DefaultNodeComponent } from '../../components/nodes/default-node.component';
 import { InputNodeComponent } from '../../components/nodes/input-node.component';
-import type { Node } from '../../types';
+import type { Node, InternalNode } from '../../types';
 
 describe('NodeRendererComponent.getNodeInjector', () => {
   let store: FlowStore;
@@ -284,5 +284,93 @@ describe('entry animation tracking', () => {
     expect(component.enteringNodeIds().has('c')).toBe(true);
     expect(component.enteringNodeIds().has('b')).toBe(false);
     expect(component.enteringNodeIds().has('a')).toBe(false);
+  });
+});
+
+describe('getNodeInputs cache keying (per-node, not global version)', () => {
+  let store: FlowStore;
+  let component: NodeRendererComponent;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NodeRendererComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    store = TestBed.inject(FlowStore);
+    component = TestBed.createComponent(NodeRendererComponent).componentInstance;
+  });
+
+  it('PERF: a version bump alone does not rebuild a node inputs object', () => {
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'default' }]);
+    const before = component.getNodeInputs(store.nodeLookup.get('n1')!);
+    store.bumpVersion();
+    expect(component.getNodeInputs(store.nodeLookup.get('n1')!)).toBe(before);
+  });
+
+  it('PERF: dragging one node does not rebuild other nodes inputs (O(1) invalidation)', () => {
+    store.setNodes([
+      { id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'default' },
+      { id: 'n2', position: { x: 100, y: 0 }, data: {}, type: 'default' },
+    ]);
+    const before = component.getNodeInputs(store.nodeLookup.get('n1')!);
+    store.triggerNodeChanges([
+      { id: 'n2', type: 'position', position: { x: 150, y: 50 }, dragging: true },
+    ] as never);
+    expect(component.getNodeInputs(store.nodeLookup.get('n1')!)).toBe(before);
+  });
+
+  it('REGRESSION: moving the node itself rebuilds its inputs', () => {
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'default' }]);
+    const before = component.getNodeInputs(store.nodeLookup.get('n1')!);
+    store.triggerNodeChanges([
+      { id: 'n1', type: 'position', position: { x: 30, y: 40 }, dragging: true },
+    ] as never);
+    expect(component.getNodeInputs(store.nodeLookup.get('n1')!)).not.toBe(before);
+  });
+
+  it('REGRESSION: selection change rebuilds inputs', () => {
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {}, type: 'default' }]);
+    const before = component.getNodeInputs(store.nodeLookup.get('n1')!);
+    store.addSelectedNodes(['n1']);
+    expect(component.getNodeInputs(store.nodeLookup.get('n1')!)).not.toBe(before);
+  });
+
+  it('REGRESSION: data identity change rebuilds inputs', () => {
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: { v: 1 }, type: 'default' }]);
+    const before = component.getNodeInputs(store.nodeLookup.get('n1')!);
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: { v: 2 }, type: 'default' }]);
+    expect(component.getNodeInputs(store.nodeLookup.get('n1')!)).not.toBe(before);
+  });
+});
+
+describe('computeNodeInputsKey (pure)', () => {
+  const internal = (overrides: Record<string, unknown> = {}) =>
+    ({
+      id: 'n',
+      type: 'default',
+      position: { x: 0, y: 0 },
+      data: {},
+      internals: { positionAbsolute: { x: 0, y: 0 }, z: 0 },
+      ...overrides,
+    }) as unknown as InternalNode;
+
+  it('changes for every field that feeds the inputs object', () => {
+    const base = computeNodeInputsKey(internal(), true, false);
+    expect(computeNodeInputsKey(internal({ internals: { positionAbsolute: { x: 1, y: 0 }, z: 0 } }), true, false)).not.toBe(base);
+    expect(computeNodeInputsKey(internal({ internals: { positionAbsolute: { x: 0, y: 0 }, z: 5 } }), true, false)).not.toBe(base);
+    expect(computeNodeInputsKey(internal({ selected: true }), true, false)).not.toBe(base);
+    expect(computeNodeInputsKey(internal({ dragging: true }), true, false)).not.toBe(base);
+    expect(computeNodeInputsKey(internal({ type: 'custom' }), true, false)).not.toBe(base);
+    expect(computeNodeInputsKey(internal({ connectable: false }), true, false)).not.toBe(base);
+    expect(computeNodeInputsKey(internal(), false, false)).not.toBe(base); // nodesConnectable
+    expect(computeNodeInputsKey(internal(), true, true)).not.toBe(base);   // template registered
+    expect(computeNodeInputsKey(internal({ sourcePosition: 'left' }), true, false)).not.toBe(base);
+    expect(computeNodeInputsKey(internal({ targetPosition: 'right' }), true, false)).not.toBe(base);
+    expect(computeNodeInputsKey(internal({ dragHandle: '.h' }), true, false)).not.toBe(base);
+  });
+
+  it('is stable for identical state', () => {
+    expect(computeNodeInputsKey(internal(), true, false)).toBe(computeNodeInputsKey(internal(), true, false));
   });
 });
