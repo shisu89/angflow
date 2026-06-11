@@ -102,6 +102,9 @@ export function getFloatingDropTarget(
 
   for (const node of nodeLookup.values()) {
     if (node.id === fromHandle.nodeId) continue;
+    // Hidden nodes remain in nodeLookup (visibility filtering is render-level);
+    // an invisible node must not capture connection drops or highlights.
+    if (node.hidden) continue;
 
     const nx = node.internals?.positionAbsolute?.x ?? node.position?.x ?? 0;
     const ny = node.internals?.positionAbsolute?.y ?? node.position?.y ?? 0;

@@ -155,4 +155,36 @@ describe('getFloatingDropTarget', () => {
     );
     expect(result?.nodeId).toBe('B');
   });
+
+  it('skips hidden nodes even when the pointer is inside them', () => {
+    const hiddenNode = makeNode('H', {
+      x: 0, y: 0, width: 100, height: 50,
+      floatingHandles: [{ id: 'auto', type: 'target', position: Position.Left }],
+    });
+    hiddenNode.hidden = true;
+    const result = getFloatingDropTarget(
+      { x: 50, y: 25 },
+      makeLookup(hiddenNode),
+      { nodeId: 'B', type: 'source', id: null },
+    );
+    expect(result).toBeNull();
+  });
+
+  it('prefers a visible node over an overlapping hidden node with higher z', () => {
+    const hiddenNode = makeNode('H', {
+      x: 0, y: 0, width: 100, height: 50, zIndex: 10,
+      floatingHandles: [{ id: 'h', type: 'target', position: Position.Left }],
+    });
+    hiddenNode.hidden = true;
+    const visibleNode = makeNode('V', {
+      x: 0, y: 0, width: 100, height: 50, zIndex: 1,
+      floatingHandles: [{ id: 'v', type: 'target', position: Position.Left }],
+    });
+    const result = getFloatingDropTarget(
+      { x: 50, y: 25 },
+      makeLookup(hiddenNode, visibleNode),
+      { nodeId: 'B', type: 'source', id: null },
+    );
+    expect(result?.nodeId).toBe('V');
+  });
 });
