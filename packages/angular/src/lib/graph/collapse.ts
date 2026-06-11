@@ -73,7 +73,7 @@ export function rewriteEdgesForCollapse<EdgeType extends Edge>(
   if (hiddenIds.size === 0) return edges as DisplayEdge<EdgeType>[];
 
   const untouched: DisplayEdge<EdgeType>[] = [];
-  const byKey = new Map<string, { edge: EdgeType; source: string; target: string; from: string[] }>();
+  const byKey = new Map<string, { edge: EdgeType; source: string; target: string; sourceHandle: string | null; targetHandle: string | null; from: string[] }>();
 
   for (const edge of edges) {
     const sourceHidden = hiddenIds.has(edge.source);
@@ -89,22 +89,30 @@ export function rewriteEdgesForCollapse<EdgeType extends Edge>(
     const target = targetHidden ? outermostCollapsedAncestor(edge.target, nodeLookup) : edge.target;
     if (source === target) continue; // internal to one collapsed box
 
-    const key = `${source}\0${target}\0${edge.sourceHandle ?? ''}\0${edge.targetHandle ?? ''}`;
+    // The rewritten endpoint's handle belongs to the hidden child — the collapsed box has no such
+    // handle; null it so anchoring falls back to the box and the dedupe key isn't split by stale
+    // handle ids. The kept endpoint's handle is preserved verbatim.
+    const sourceHandle = sourceHidden ? null : edge.sourceHandle ?? null;
+    const targetHandle = targetHidden ? null : edge.targetHandle ?? null;
+
+    const key = `${source}\0${target}\0${sourceHandle ?? ''}\0${targetHandle ?? ''}`;
     const existing = byKey.get(key);
     if (existing) {
       existing.from.push(edge.id);
     } else {
-      byKey.set(key, { edge, source, target, from: [edge.id] });
+      byKey.set(key, { edge, source, target, sourceHandle, targetHandle, from: [edge.id] });
     }
   }
 
-  const rewritten = Array.from(byKey.values(), ({ edge, source, target, from }) => {
+  const rewritten = Array.from(byKey.values(), ({ edge, source, target, sourceHandle, targetHandle, from }) => {
     const merged = from.length > 1;
     return {
       ...edge,
       id: merged ? `__collapsed:${source}->${target}` : edge.id,
       source,
       target,
+      sourceHandle,
+      targetHandle,
       collapsedFrom: from,
     } as DisplayEdge<EdgeType>;
   });

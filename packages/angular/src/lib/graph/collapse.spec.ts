@@ -117,6 +117,32 @@ describe('rewriteEdgesForCollapse', () => {
     expect(out[0].target).toBe('g2');
   });
 
+  it('nulls the handle on a rewritten endpoint but keeps the kept endpoint\'s handle', () => {
+    const out = rewriteEdgesForCollapse(
+      [{ id: 'e1', source: 'x', sourceHandle: 'out', target: 'a', targetHandle: 'in' }] as E[],
+      nl,
+      hidden,
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].sourceHandle).toBe('out');
+    expect(out[0].targetHandle).toBeNull();
+  });
+
+  it('dedupes rerouted edges whose stale child handles differ', () => {
+    const out = rewriteEdgesForCollapse(
+      [
+        { id: 'e1', source: 'x', target: 'a', targetHandle: 'ta' },
+        { id: 'e2', source: 'x', target: 'b', targetHandle: 'tb' },
+      ] as E[],
+      nl,
+      hidden,
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].id).toBe('__collapsed:x->g');
+    expect(out[0].collapsedFrom).toEqual(['e1', 'e2']);
+    expect(out[0].targetHandle).toBeNull();
+  });
+
   it('does NOT merge unrelated parallel edges when some other group is collapsed', () => {
     const nl2 = lookup([
       { id: 'g', collapsed: true },
