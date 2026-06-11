@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { provideZonelessChangeDetection } from '@angular/core';
+import { provideZonelessChangeDetection, DOCUMENT } from '@angular/core';
 import { FlowStore } from './flow-store.service';
 import { NgFlowService } from './ng-flow.service';
 import { layoutNodes } from '../layout/layout-nodes';
@@ -762,5 +762,59 @@ describe('sizeGroupToChildren', () => {
     expect(store.nodeLookup.get('c1')!.internals.positionAbsolute).toEqual({ x: 110, y: 110 });
     expect(store.nodeLookup.get('c2')!.internals.positionAbsolute).toEqual({ x: 160, y: 130 });
     expect(store.nodeLookup.get('g')!.position).toEqual({ x: 100, y: 90 });
+  });
+
+  describe('selectKeyPressed', () => {
+    it('caches the signal per key set and registers document listeners once', () => {
+      const addSpy = vi.spyOn(document, 'addEventListener');
+      const first = service.selectKeyPressed('Shift');
+      const second = service.selectKeyPressed('Shift');
+
+      expect(second).toBe(first);
+      const keydownRegistrations = addSpy.mock.calls.filter(([type]) => type === 'keydown');
+      expect(keydownRegistrations).toHaveLength(1);
+      addSpy.mockRestore();
+    });
+
+    it('tracks key state through the cached signal', () => {
+      const pressed = service.selectKeyPressed('Shift');
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Shift' }));
+      expect(pressed()).toBe(true);
+      document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Shift' }));
+      expect(pressed()).toBe(false);
+    });
+
+    it('returns an inert signal when document is unavailable (SSR)', () => {
+      // vi.stubGlobal('document', undefined) cannot override jsdom's non-configurable
+      // document property. Instead we test the SSR path by providing DOCUMENT=null
+      // via Angular's DI — the same guard the implementation uses.
+      //
+      // We use a sub-TestBed environment so the main beforeEach fixture isn't affected.
+      // A minimal stub satisfies Angular's DOM test renderer teardown while being
+      // falsy enough to trigger the SSR guard (DOCUMENT token resolved as null).
+      TestBed.resetTestingModule();
+      // Provide a minimal doc stub so Angular's DOMTestComponentRenderer doesn't
+      // crash during teardown, while still being a distinct (non-real-document)
+      // value that we can test separately.
+      const docStub = {
+        querySelectorAll: () => [],
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        body: { removeChild: () => {} },
+      };
+      TestBed.configureTestingModule({
+        providers: [
+          provideZonelessChangeDetection(),
+          FlowStore,
+          NgFlowService,
+          { provide: DOCUMENT, useValue: docStub },
+        ],
+      });
+      // Override the private doc field to null to simulate SSR (no document available)
+      const ssrService = TestBed.inject(NgFlowService) as any;
+      (ssrService as any)['doc'] = null;
+      const pressed = ssrService.selectKeyPressed('Meta');
+      expect(pressed()).toBe(false);
+    });
   });
 });

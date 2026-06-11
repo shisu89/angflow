@@ -1,4 +1,4 @@
-import { Injectable, inject, computed, signal, DestroyRef, type Signal } from '@angular/core';
+import { Injectable, inject, computed, signal, DestroyRef, DOCUMENT, type Signal } from '@angular/core';
 import {
   pointToRendererPoint,
   rendererPointToPoint,
@@ -52,6 +52,7 @@ const BUILT_IN_EDGE_TYPE_NAMES = ['default', 'bezier', 'straight', 'step', 'smoo
 export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge = Edge> {
   private store = inject(FlowStore) as unknown as FlowStore<NodeType, EdgeType>;
   private destroyRef = inject(DestroyRef);
+  private readonly doc = inject(DOCUMENT, { optional: true });
 
   // ── Reactive signal properties ────────────────────────────────────────
   // Read-only signals for reactive state access in templates and computed signals.
@@ -857,15 +858,28 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     }));
   }
 
+  private readonly keyPressedSignals = new Map<string, Signal<boolean>>();
+
   /**
    * Returns a signal that tracks whether a specific key (or any key in an array) is currently pressed.
-   * Equivalent to React's `useKeyPress()`.
+   * Equivalent to React's `useKeyPress()`. Signals are cached per key set, so
+   * repeated calls don't stack document listeners. SSR-safe: returns an inert
+   * `false` signal when `document` is unavailable.
    * Automatically cleaned up when the service is destroyed.
    */
   selectKeyPressed(keyCode: string | string[]): Signal<boolean> {
-    const pressed = signal(false);
     const keys = Array.isArray(keyCode) ? keyCode : [keyCode];
+    const cacheKey = keys.join(' ');
+    const cached = this.keyPressedSignals.get(cacheKey);
+    if (cached) return cached;
 
+    if (!this.doc) {
+      const inert = signal(false).asReadonly();
+      this.keyPressedSignals.set(cacheKey, inert);
+      return inert;
+    }
+
+    const pressed = signal(false);
     const onKeyDown = (e: KeyboardEvent) => {
       if (keys.includes(e.key)) pressed.set(true);
     };
@@ -873,15 +887,17 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
       if (keys.includes(e.key)) pressed.set(false);
     };
 
-    document.addEventListener('keydown', onKeyDown);
-    document.addEventListener('keyup', onKeyUp);
+    this.doc.addEventListener('keydown', onKeyDown);
+    this.doc.addEventListener('keyup', onKeyUp);
 
     this.destroyRef.onDestroy(() => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.removeEventListener('keyup', onKeyUp);
+      this.doc!.removeEventListener('keydown', onKeyDown);
+      this.doc!.removeEventListener('keyup', onKeyUp);
     });
 
-    return pressed.asReadonly();
+    const readonlySignal = pressed.asReadonly();
+    this.keyPressedSignals.set(cacheKey, readonlySignal);
+    return readonlySignal;
   }
 
   // ── State queries ─────────────────────────────────────────────────────
