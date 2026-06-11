@@ -928,6 +928,31 @@ describe('FlowStore', () => {
       expect(store.fitViewQueued()).toBe(false);
     });
   });
+
+  describe('setCenter interpolate forwarding', () => {
+    it('forwards options.interpolate to panZoom.setViewport', async () => {
+      const setViewport = vi.fn().mockResolvedValue(undefined);
+      store.panZoom.set({ setViewport } as never);
+      store.width.set(800);
+      store.height.set(600);
+
+      await store.setCenter(100, 200, { zoom: 2, interpolate: 'linear' });
+
+      expect(setViewport).toHaveBeenCalledTimes(1);
+      const [, options] = setViewport.mock.calls[0];
+      expect(options).toMatchObject({ interpolate: 'linear' });
+    });
+
+    it('omits interpolate when not provided (default smooth behavior preserved)', async () => {
+      const setViewport = vi.fn().mockResolvedValue(undefined);
+      store.panZoom.set({ setViewport } as never);
+
+      await store.setCenter(0, 0, { zoom: 1 });
+
+      const [, options] = setViewport.mock.calls[0];
+      expect(options.interpolate).toBeUndefined();
+    });
+  });
 });
 
 describe('tweenNodePositions', () => {

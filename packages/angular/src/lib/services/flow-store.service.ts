@@ -812,7 +812,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     }
   }
 
-  async setCenter(x: number, y: number, options?: { zoom?: number; duration?: number; ease?: (t: number) => number; interpolate?: string }): Promise<boolean> {
+  async setCenter(x: number, y: number, options?: { zoom?: number; duration?: number; ease?: (t: number) => number; interpolate?: 'smooth' | 'linear' }): Promise<boolean> {
     const pz = this.panZoom();
     if (!pz) return false;
 
@@ -824,7 +824,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
         y: this.height() / 2 - y * nextZoom,
         zoom: nextZoom,
       },
-      { duration: options?.duration, ease: options?.ease }
+      { duration: options?.duration, ease: options?.ease, interpolate: options?.interpolate }
     );
 
     return true;
