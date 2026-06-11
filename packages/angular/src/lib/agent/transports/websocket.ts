@@ -8,6 +8,13 @@ import type {
 export interface WebSocketTransportOptions {
   /** WS URL to dial. */
   url: string;
+  /**
+   * Auth token for an `@angflow/mcp` server. Sent as the
+   * `angflow.token.<token>` WebSocket subprotocol alongside `angflow.bridge`
+   * — preferred over `?token=` in the URL, which leaks into server logs.
+   * Not needed for local dev: the MCP server allowlists localhost origins.
+   */
+  token?: string;
   /** Reconnect with exponential backoff on close. Defaults to `true`. */
   reconnect?: boolean;
   /** Initial reconnect delay in ms. Defaults to `1000`. */
@@ -32,6 +39,7 @@ export class WebSocketTransport implements AgentTransport {
   private reconnectAttempts = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly url: string;
+  private readonly token: string | undefined;
   private readonly reconnect: boolean;
   private readonly initialDelay: number;
   private readonly maxDelay: number;
@@ -39,6 +47,7 @@ export class WebSocketTransport implements AgentTransport {
 
   constructor(options: WebSocketTransportOptions) {
     this.url = options.url;
+    this.token = options.token;
     this.reconnect = options.reconnect ?? true;
     this.initialDelay = options.initialReconnectDelayMs ?? 1000;
     this.maxDelay = options.maxReconnectDelayMs ?? 30000;
@@ -78,7 +87,9 @@ export class WebSocketTransport implements AgentTransport {
 
     let sock: WebSocket;
     try {
-      sock = new WebSocket(this.url);
+      sock = this.token
+        ? new WebSocket(this.url, ['angflow.bridge', `angflow.token.${this.token}`])
+        : new WebSocket(this.url);
     } catch (err) {
       this.onError(err);
       this.scheduleReconnect();

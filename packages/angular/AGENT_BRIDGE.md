@@ -418,6 +418,13 @@ server-local `canvas_status` tool. Tool schemas are snapshotted from
 rebuild/republish `@angflow/mcp` (its drift test fails until regenerated).
 See [`packages/mcp/README.md`](../mcp/README.md) for setup.
 
+**Auth.** The MCP server validates browser `Origin` headers against an allowlist
+(localhost dev origins by default; `--allow-origin` to extend) and, unless started
+with `--no-token`, enforces a token on non-browser connections (ephemeral and
+printed to stderr when `--token` is omitted). Pass the token to the transport as
+`new WebSocketTransport({ url, token })` — it is sent as the
+`angflow.token.<token>` subprotocol, never in the URL.
+
 ## In-browser chat harness
 
 `provideAgentChat({ complete })` + `<ng-flow-agent-chat>` (in

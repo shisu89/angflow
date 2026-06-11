@@ -12,7 +12,10 @@ export const appConfig: ApplicationConfig = {
       transports: [
         new WindowTransport(),
         // Dials the @angflow/mcp server when one is running; silently retries
-        // with backoff otherwise, so `ng serve` works fine without it.
+        // with backoff otherwise, so `ng serve` works fine without it. Localhost
+        // origins are allowlisted by the server, so no token is needed in dev.
+        // When the server runs with an explicit --token, pass it here:
+        //   new WebSocketTransport({ url: 'ws://localhost:8765', token: 'mysecret' })
         new WebSocketTransport({ url: 'ws://localhost:8765', onError: () => {} }),
       ],
       layout: dagreLayout,
