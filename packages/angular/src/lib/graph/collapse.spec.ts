@@ -116,4 +116,26 @@ describe('rewriteEdgesForCollapse', () => {
     expect(out[0].source).toBe('g1');
     expect(out[0].target).toBe('g2');
   });
+
+  it('does NOT merge unrelated parallel edges when some other group is collapsed', () => {
+    const nl2 = lookup([
+      { id: 'g', collapsed: true },
+      { id: 'a', parentId: 'g' },
+      { id: 'x' },
+      { id: 'y' },
+    ]);
+    const hidden2 = getCollapsedHiddenIds(nl2);
+    const out = rewriteEdgesForCollapse(
+      [
+        { id: 'p1', source: 'x', target: 'y' },
+        { id: 'p2', source: 'x', target: 'y' },
+        { id: 'e1', source: 'x', target: 'a' },
+      ] as E[],
+      nl2,
+      hidden2,
+    );
+    expect(out.map((e) => e.id).sort()).toEqual(['e1', 'p1', 'p2']);
+    expect(out.find((e) => e.id === 'p1')!.collapsedFrom).toBeUndefined();
+    expect(out.find((e) => e.id === 'e1')!.target).toBe('g');
+  });
 });

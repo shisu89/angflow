@@ -53,10 +53,17 @@ function outermostCollapsedAncestor(id: string, nodeLookup: ReadonlyMap<string, 
  * Rewrite edges for the current collapsed state:
  *  - map each hidden endpoint to its outermost collapsed ancestor;
  *  - drop edges whose endpoints map to the same node (internal to a collapsed box);
- *  - dedupe parallels created by rewriting, keyed (source,target,sourceHandle,targetHandle).
- * Edges unaffected by collapse (neither endpoint rewritten, not merged) pass through with
- * original identity and no `collapsedFrom`. Rerouted or merged edges carry `collapsedFrom`
- * (the original edge ids); a merged edge also gets a synthetic `__collapsed:src->tgt` id.
+ *  - dedupe parallels CREATED BY REWRITING, keyed (source,target,sourceHandle,targetHandle).
+ *
+ * Edges whose NEITHER endpoint is hidden pass through verbatim (original identity, no
+ * `collapsedFrom`), so unrelated parallel edges are never merged. Only edges with at least
+ * one rewritten endpoint enter the dedupe map.
+ *
+ * Rerouted or merged edges carry `collapsedFrom` (the original edge ids); a merged edge also
+ * gets a synthetic `__collapsed:src->tgt` id.
+ *
+ * Accepted trade-off: a pre-existing real `x→g` edge no longer absorbs an `x→a` edge
+ * rerouted to `x→g`; they render as parallels.
  */
 export function rewriteEdgesForCollapse<EdgeType extends Edge>(
   edges: EdgeType[],
@@ -65,11 +72,21 @@ export function rewriteEdgesForCollapse<EdgeType extends Edge>(
 ): DisplayEdge<EdgeType>[] {
   if (hiddenIds.size === 0) return edges as DisplayEdge<EdgeType>[];
 
+  const untouched: DisplayEdge<EdgeType>[] = [];
   const byKey = new Map<string, { edge: EdgeType; source: string; target: string; from: string[] }>();
 
   for (const edge of edges) {
-    const source = hiddenIds.has(edge.source) ? outermostCollapsedAncestor(edge.source, nodeLookup) : edge.source;
-    const target = hiddenIds.has(edge.target) ? outermostCollapsedAncestor(edge.target, nodeLookup) : edge.target;
+    const sourceHidden = hiddenIds.has(edge.source);
+    const targetHidden = hiddenIds.has(edge.target);
+
+    if (!sourceHidden && !targetHidden) {
+      // Neither endpoint is hidden — pass through verbatim, no dedupe
+      untouched.push(edge as DisplayEdge<EdgeType>);
+      continue;
+    }
+
+    const source = sourceHidden ? outermostCollapsedAncestor(edge.source, nodeLookup) : edge.source;
+    const target = targetHidden ? outermostCollapsedAncestor(edge.target, nodeLookup) : edge.target;
     if (source === target) continue; // internal to one collapsed box
 
     const key = `${source}\0${target}\0${edge.sourceHandle ?? ''}\0${edge.targetHandle ?? ''}`;
@@ -81,15 +98,16 @@ export function rewriteEdgesForCollapse<EdgeType extends Edge>(
     }
   }
 
-  return Array.from(byKey.values(), ({ edge, source, target, from }) => {
+  const rewritten = Array.from(byKey.values(), ({ edge, source, target, from }) => {
     const merged = from.length > 1;
-    const rewritten = merged || source !== edge.source || target !== edge.target;
     return {
       ...edge,
       id: merged ? `__collapsed:${source}->${target}` : edge.id,
       source,
       target,
-      ...(rewritten ? { collapsedFrom: from } : {}),
+      collapsedFrom: from,
     } as DisplayEdge<EdgeType>;
   });
+
+  return [...untouched, ...rewritten];
 }
