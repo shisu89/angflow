@@ -48,6 +48,7 @@ function onPointerDown(
     autoPanSpeed,
     dragThreshold = 1,
     handleDomNode,
+    isNodeVisible,
   }: OnPointerDownParams
 ) {
   // when xyflow is used inside a shadow root we can't use document
@@ -149,10 +150,11 @@ function onPointerDown(
       pointerInRenderer,
       connectionRadius,
       nodeLookup,
-      fromHandle
+      fromHandle,
+      isNodeVisible,
     );
     if (!closestHandle) {
-      closestHandle = getFloatingDropTarget(pointerInRenderer, nodeLookup, fromHandle);
+      closestHandle = getFloatingDropTarget(pointerInRenderer, nodeLookup, fromHandle, isNodeVisible);
     }
 
     // Notify consumer which node is the Stage 2 floating drop candidate (null if Stage 1 handles it)
