@@ -12,7 +12,6 @@ import {
   Type,
 } from '@angular/core';
 import {
-  XYMinimap,
   getBoundsOfRects,
   type PanelPosition,
   type Rect,
@@ -170,7 +169,6 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
   /** Fires when a node rendered in the minimap is clicked. */
   readonly minimapNodeClick = output<{ event: MouseEvent; node: Node }>();
 
-  private xyMinimap: ReturnType<typeof XYMinimap> | null = null;
   private animationFrameId: number | null = null;
   private isDragging = false;
   // Tracks whether the mouse actually moved between mousedown and mouseup.
@@ -456,7 +454,6 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
     }
     document.removeEventListener('mousemove', this.boundOnMouseMove);
     document.removeEventListener('mouseup', this.boundOnMouseUp);
-    this.xyMinimap?.destroy();
   }
 
 }
