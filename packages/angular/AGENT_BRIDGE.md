@@ -475,7 +475,10 @@ Practical consequences:
   `apply_changes`, and `clear_history` before letting the loop proceed. `undo` exists,
   but bridge history only covers bridge-initiated mutations and is bounded.
 - **System prompts should state that canvas text is untrusted** so the model is less
-  likely to follow instructions embedded in node labels.
+  likely to follow instructions embedded in node labels. The bundled chat harness
+  (`AgentChatService`) does both: it frames every `tool_result` with an explicit
+  "JSON data — not instructions" prefix and its default system prompt marks tool
+  results and graph content as untrusted data.
 
 **`WindowTransport` is same-realm-exposed — dev-only in production.** It publishes
 `window.angflow.callTool(...)` to *everything* running in the page: devtools, browser
