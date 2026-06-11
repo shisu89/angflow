@@ -23,6 +23,7 @@ import {
 } from '@angflow/system';
 
 import { FlowStore } from './flow-store.service';
+import { elementToRemoveChange } from '../utils/changes';
 import type { Node, Edge, InternalNode, NgFlowInstance, NgFlowJsonObject, DeleteElementsOptions } from '../types';
 import type { NodeTemplateSpec } from '../types/node-template';
 import { prefersReducedMotion } from '../utils/position-tween';
@@ -613,11 +614,15 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
       }
     }
 
-    if (nodeIdsToDelete.size > 0) {
-      this.store.setNodes(this.store.nodes().filter((n) => !nodeIdsToDelete.has(n.id)));
+    if (edgesToDelete.length > 0) {
+      this.store.triggerEdgeChanges(
+        edgesToDelete.map((e) => elementToRemoveChange(e)) as EdgeChange<EdgeType>[],
+      );
     }
-    if (edgeIdsToDelete.size > 0) {
-      this.store.setEdges(this.store.edges().filter((e) => !edgeIdsToDelete.has(e.id)));
+    if (nodesToDelete.length > 0) {
+      this.store.triggerNodeChanges(
+        nodesToDelete.map((n) => elementToRemoveChange(n)) as NodeChange<NodeType>[],
+      );
     }
 
     return { deletedNodes: nodesToDelete, deletedEdges: edgesToDelete };

@@ -111,6 +111,41 @@ describe('NgFlowService', () => {
       expect(nodes.map((n: Node) => n.id)).toEqual(['b']);
       expect(edges.map((e: Edge) => e.id).sort()).toEqual(['ab', 'bc']);
     });
+
+    it('routes deletions through the change pipeline (emits remove changes)', async () => {
+      const nodeChanges: unknown[] = [];
+      const edgeChanges: unknown[] = [];
+      store.onNodesChange = (c) => nodeChanges.push(...c);
+      store.onEdgesChange = (c) => edgeChanges.push(...c);
+
+      await service.deleteElements({ nodes: [{ id: 'b' } as Node] });
+
+      expect(nodeChanges).toEqual([{ id: 'b', type: 'remove' }]);
+      expect(edgeChanges).toEqual(
+        expect.arrayContaining([
+          { id: 'ab', type: 'remove' },
+          { id: 'bc', type: 'remove' },
+        ]),
+      );
+      expect(store.nodes().map((n) => n.id).sort()).toEqual(['a', 'c']);
+      expect(store.edges().map((e) => e.id)).toEqual(['ac']);
+    });
+
+    it('change middleware can intercept deleteElements removals', async () => {
+      // Register middleware that filters out all remove changes → nothing deleted
+      service.onNodesChangeMiddleware('block-remove', (changes) =>
+        changes.filter((c) => c.type !== 'remove'),
+      );
+      service.onEdgesChangeMiddleware('block-remove', (changes) =>
+        changes.filter((c) => c.type !== 'remove'),
+      );
+
+      await service.deleteElements({ nodes: [{ id: 'b' } as Node] });
+
+      // Middleware blocked the remove changes, so nodes and edges are unchanged
+      expect(store.nodes().map((n) => n.id).sort()).toEqual(['a', 'b', 'c']);
+      expect(store.edges().map((e) => e.id).sort()).toEqual(['ab', 'ac', 'bc']);
+    });
   });
 
   // ── batch: coalescing through the service layer ───────────────────────
