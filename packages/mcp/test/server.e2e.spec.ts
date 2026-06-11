@@ -97,6 +97,28 @@ describe('angflow MCP server e2e (in-process)', () => {
     expect(textOf(result)).toContain('No canvas connected');
   });
 
+  it('passes auth options through to the canvas socket', async () => {
+    running = createAngflowMcpServer({
+      port: 0,
+      host: '127.0.0.1',
+      token: 'sekret',
+      tokenOptionalForAllowedOrigins: true,
+      allowedOrigins: ['https://app.example.com'],
+      timeoutMs: 1000,
+      logLevel: 'silent',
+    });
+    await running.start();
+
+    const noToken = new FakeCanvas();
+    await noToken.connect(running.wsUrl);
+    expect(await noToken.waitForClose()).toBe(4401);
+
+    const trustedOrigin = new FakeCanvas({ handlers: { list_flows: () => [] } });
+    await trustedOrigin.connect(running.wsUrl, { origin: 'https://app.example.com' });
+    canvas = trustedOrigin;
+    await expect.poll(() => trustedOrigin.received.length).toBeGreaterThan(0);
+  });
+
   it('clears flows from canvas_status after the canvas disconnects', async () => {
     const client = await startAll();
     canvas = new FakeCanvas();

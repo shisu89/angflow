@@ -3,8 +3,10 @@
  * CLI entry point: parse flags/env, start the WS listener, attach the stdio
  * MCP transport. All logging goes to stderr (stdout is the protocol).
  */
+import { randomBytes } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { DEFAULT_ALLOWED_ORIGINS } from './canvas-socket.js';
 import { createAngflowMcpServer, SCHEMAS_FROM, VERSION } from './server.js';
 import type { LogLevel } from './log.js';
 
@@ -17,6 +19,8 @@ const { values } = parseArgs({
     port: { type: 'string', default: envOr('ANGFLOW_MCP_PORT', '8765') },
     host: { type: 'string', default: envOr('ANGFLOW_MCP_HOST', '127.0.0.1') },
     token: { type: 'string', default: process.env['ANGFLOW_MCP_TOKEN'] },
+    'no-token': { type: 'boolean', default: false },
+    'allow-origin': { type: 'string', default: envOr('ANGFLOW_MCP_ALLOW_ORIGIN', '') },
     timeout: { type: 'string', default: envOr('ANGFLOW_MCP_TIMEOUT', '30000') },
     'log-level': { type: 'string', default: envOr('ANGFLOW_MCP_LOG_LEVEL', 'info') },
     version: { type: 'boolean', default: false },
@@ -32,7 +36,13 @@ Usage: npx @angflow/mcp [options]
 Options:
   --port <n>        WebSocket port the canvas dials (default 8765, env ANGFLOW_MCP_PORT)
   --host <addr>     Bind address (default 127.0.0.1, env ANGFLOW_MCP_HOST)
-  --token <secret>  Require ?token=<secret> on canvas connections (env ANGFLOW_MCP_TOKEN)
+  --token <secret>     Require this token on canvas connections (env ANGFLOW_MCP_TOKEN).
+                       Omitted: an ephemeral token is generated and printed to stderr;
+                       browser canvases from allowlisted origins may omit it.
+  --no-token           Disable token auth entirely (explicit opt-out)
+  --allow-origin <csv> Comma-separated Origin allowlist for browser connections;
+                       supports a trailing :* port wildcard. Default: localhost dev
+                       origins (env ANGFLOW_MCP_ALLOW_ORIGIN)
   --timeout <ms>    Per-request canvas timeout (default 30000, env ANGFLOW_MCP_TIMEOUT)
   --log-level <l>   debug | info | silent (default info, env ANGFLOW_MCP_LOG_LEVEL)
   --version         Print version info and exit
@@ -61,10 +71,34 @@ if (!['debug', 'info', 'silent'].includes(logLevel)) {
   process.exit(1);
 }
 
+if (values['no-token'] && values.token) {
+  console.error('[angflow-mcp] --token and --no-token are mutually exclusive');
+  process.exit(1);
+}
+
+let token: string | undefined = values.token;
+let ephemeralToken = false;
+if (values['no-token']) {
+  token = undefined;
+} else if (!token) {
+  token = randomBytes(16).toString('hex');
+  ephemeralToken = true;
+}
+
+const allowedOrigins =
+  String(values['allow-origin']).trim() === ''
+    ? DEFAULT_ALLOWED_ORIGINS
+    : String(values['allow-origin'])
+        .split(',')
+        .map((o) => o.trim())
+        .filter((o) => o.length > 0);
+
 const server = createAngflowMcpServer({
   port,
   host: values.host!,
-  token: values.token,
+  token,
+  tokenOptionalForAllowedOrigins: ephemeralToken,
+  allowedOrigins,
   timeoutMs,
   logLevel,
 });
@@ -77,4 +111,12 @@ process.on('SIGINT', () => void shutdown());
 process.on('SIGTERM', () => void shutdown());
 
 await server.start();
+if (ephemeralToken && logLevel !== 'silent') {
+  console.error(
+    `[angflow-mcp] no --token provided — generated an ephemeral canvas token: ${token}\n` +
+      `[angflow-mcp] browser canvases from allowlisted origins (${allowedOrigins.join(', ')}) connect without it.\n` +
+      `[angflow-mcp] non-browser clients must present it (subprotocol "angflow.token.<token>" or ?token=<token>).\n` +
+      `[angflow-mcp] pass --token <secret> to pin a token, or --no-token to disable token auth.`,
+  );
+}
 await server.mcpServer.connect(new StdioServerTransport());

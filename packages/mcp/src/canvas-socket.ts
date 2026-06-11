@@ -6,9 +6,67 @@
  * one (close 4000). Optional shared-token auth (bad token → close 4401).
  * Knows nothing about MCP; exposes call()/status and event callbacks.
  */
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { IncomingMessage } from 'node:http';
 import WebSocket, { WebSocketServer } from 'ws';
 import type { Logger } from './log.js';
+
+/** Origins admitted by default: local dev servers on any port. */
+export const DEFAULT_ALLOWED_ORIGINS = [
+  'http://localhost:*',
+  'http://127.0.0.1:*',
+  'https://localhost:*',
+  'https://127.0.0.1:*',
+];
+
+/** Subprotocol carrying the auth token: `angflow.token.<secret>`. */
+export const TOKEN_SUBPROTOCOL_PREFIX = 'angflow.token.';
+const BRIDGE_SUBPROTOCOL = 'angflow.bridge';
+
+/**
+ * Match an Origin header value against allowlist patterns. A pattern is an
+ * exact origin, `*`, or `scheme://host:*` (any — or no — port).
+ */
+export function originAllowed(origin: string, patterns: readonly string[]): boolean {
+  for (const pattern of patterns) {
+    if (pattern === '*') return true;
+    if (pattern.endsWith(':*')) {
+      const base = pattern.slice(0, -2);
+      if (origin === base || origin.startsWith(`${base}:`)) return true;
+    } else if (origin === pattern) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Constant-time token comparison. Hashing both sides first equalizes the
+ * lengths, so `timingSafeEqual` never throws on a length mismatch and the
+ * comparison leaks nothing about where the strings diverge.
+ */
+function tokensMatch(presented: string, expected: string): boolean {
+  const a = createHash('sha256').update(presented).digest();
+  const b = createHash('sha256').update(expected).digest();
+  return timingSafeEqual(a, b);
+}
+
+/**
+ * Token extraction. Preferred: the `angflow.token.<secret>` subprotocol
+ * (never appears in URLs/logs). Fallback: legacy `?token=` query parameter,
+ * kept for backward compatibility with existing canvases.
+ */
+function extractToken(req: IncomingMessage): string | null {
+  const header = req.headers['sec-websocket-protocol'];
+  if (typeof header === 'string') {
+    for (const offered of header.split(',').map((p) => p.trim())) {
+      if (offered.startsWith(TOKEN_SUBPROTOCOL_PREFIX)) {
+        return offered.slice(TOKEN_SUBPROTOCOL_PREFIX.length);
+      }
+    }
+  }
+  return new URL(req.url ?? '/', 'ws://placeholder').searchParams.get('token');
+}
 
 /** A JSON-RPC-style error returned by the bridge for a tool call. */
 export class BridgeToolError extends Error {
@@ -46,8 +104,23 @@ export interface CanvasSocketOptions {
   /** Port to listen on; 0 picks an ephemeral port (tests). */
   port: number;
   host: string;
-  /** When set, connections must present ?token=<value> or are closed (4401). */
+  /** When set, connections must present this token (subprotocol or ?token=) or are closed (4401). */
   token?: string;
+  /**
+   * Ephemeral-token mode: connections whose Origin passed the allowlist may
+   * omit the token (the browser's unforgeable Origin is their credential);
+   * no-Origin (non-browser) connections must still present it. Leave false
+   * for explicit `--token` deployments, where the token binds everyone.
+   */
+  tokenOptionalForAllowedOrigins?: boolean;
+  /**
+   * Origin allowlist for browser connections (exact origin, `*`, or
+   * `scheme://host:*`). Connections with an Origin header matching none of
+   * these are closed (4403). Defaults to DEFAULT_ALLOWED_ORIGINS.
+   */
+  allowedOrigins?: string[];
+  /** Max inbound WebSocket frame size in bytes. Defaults to 5 MiB. */
+  maxPayloadBytes?: number;
   /** Per-request timeout in ms. */
   timeoutMs: number;
   log: Logger;
@@ -98,7 +171,18 @@ export class CanvasSocket {
 
   start(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const wss = new WebSocketServer({ host: this.options.host, port: this.options.port });
+      const wss = new WebSocketServer({
+        host: this.options.host,
+        port: this.options.port,
+        maxPayload: this.options.maxPayloadBytes ?? 5 * 1024 * 1024,
+        // Browsers fail the connection unless the server selects one of the
+        // offered subprotocols. Prefer the bridge protocol; otherwise echo the
+        // first offer (a token-only non-browser client).
+        handleProtocols: (protocols) =>
+          protocols.has(BRIDGE_SUBPROTOCOL)
+            ? BRIDGE_SUBPROTOCOL
+            : (protocols.values().next().value ?? false),
+      });
       this.wss = wss;
       wss.on('listening', () => {
         const addr = wss.address();
@@ -149,12 +233,28 @@ export class CanvasSocket {
   }
 
   private onConnection(socket: WebSocket, req: IncomingMessage): void {
-    if (this.options.token) {
-      const url = new URL(req.url ?? '/', 'ws://placeholder');
-      if (url.searchParams.get('token') !== this.options.token) {
-        this.options.log.warn('rejected canvas connection: bad or missing token');
-        socket.close(4401, 'invalid token');
+    const origin = typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
+    if (origin !== undefined) {
+      const allowed = this.options.allowedOrigins ?? DEFAULT_ALLOWED_ORIGINS;
+      if (!originAllowed(origin, allowed)) {
+        this.options.log.warn(
+          `rejected canvas connection: origin "${origin}" is not in the allowlist (--allow-origin)`,
+        );
+        socket.close(4403, 'origin not allowed');
         return;
+      }
+    }
+
+    if (this.options.token) {
+      const originVouches =
+        origin !== undefined && this.options.tokenOptionalForAllowedOrigins === true;
+      if (!originVouches) {
+        const presented = extractToken(req);
+        if (presented === null || !tokensMatch(presented, this.options.token)) {
+          this.options.log.warn('rejected canvas connection: bad or missing token');
+          socket.close(4401, 'invalid token');
+          return;
+        }
       }
     }
 

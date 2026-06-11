@@ -25,9 +25,13 @@ export class FakeCanvas {
     this.mode = options.mode ?? 'normal';
   }
 
-  connect(url: string): Promise<void> {
+  connect(url: string, opts: { protocols?: string[]; origin?: string } = {}): Promise<void> {
     return new Promise((resolve, reject) => {
-      const sock = new WebSocket(url);
+      const sock = new WebSocket(
+        url,
+        opts.protocols,
+        opts.origin !== undefined ? { origin: opts.origin } : undefined,
+      );
       this.socket = sock;
       sock.on('open', () => resolve());
       sock.on('error', (err) => reject(err));

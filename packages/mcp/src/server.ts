@@ -18,6 +18,10 @@ export interface AngflowMcpServerOptions {
   port: number;
   host: string;
   token?: string;
+  /** See CanvasSocketOptions.tokenOptionalForAllowedOrigins. */
+  tokenOptionalForAllowedOrigins?: boolean;
+  /** See CanvasSocketOptions.allowedOrigins. */
+  allowedOrigins?: string[];
   timeoutMs: number;
   logLevel: LogLevel;
 }
@@ -40,6 +44,8 @@ export function createAngflowMcpServer(options: AngflowMcpServerOptions): Angflo
     port: options.port,
     host: options.host,
     token: options.token,
+    tokenOptionalForAllowedOrigins: options.tokenOptionalForAllowedOrigins,
+    allowedOrigins: options.allowedOrigins,
     timeoutMs: options.timeoutMs,
     log,
     onEvent: (event, params) => {
