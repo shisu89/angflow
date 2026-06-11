@@ -59,6 +59,9 @@ const MUTATING_TOOLS = new Set<string>([
 ]);
 // apply_changes is treated specially — see dispatch logic.
 
+/** Max flow.state emission rate while any node drag is in progress. */
+const DRAG_STATE_EMIT_INTERVAL_MS = 100;
+
 type RegisteredFlow = {
   service: NgFlowService;
   /** Tears down the watcher and prevents any in-flight microtask from emitting. */
@@ -371,6 +374,35 @@ export class AngflowAgentBridge {
     let pending = false;
     let destroyed = false;
     let lastSignature = '';
+    let lastEmitTime = Number.NEGATIVE_INFINITY;
+    let trailingTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const emitState = (isDrag: boolean) => {
+      // Re-read at emit time so coalesced/throttled bursts see the latest state.
+      const params = {
+        flowId: id,
+        nodes: flow.getNodes(),
+        edges: flow.getEdges(),
+        viewport: flow.getViewport(),
+        selection: {
+          nodeIds: flow.selectedNodes().map((n: Node) => n.id),
+          edgeIds: flow.selectedEdges().map((e: Edge) => e.id),
+        },
+      };
+      const sig = signatureOf(params);
+      if (sig === lastSignature) return;
+      lastSignature = sig;
+      // Only record the drag-emission timestamp when actually in a drag — so a
+      // non-drag emission (register, mutation tool) does not push back the next
+      // drag frame's throttle window.
+      if (isDrag) {
+        lastEmitTime = Date.now();
+      } else {
+        lastEmitTime = Number.NEGATIVE_INFINITY;
+      }
+      this.emit({ event: 'flow.state', params });
+    };
+
     const ref = runInInjectionContext(this.injector, () =>
       effect(() => {
         // Touch every signal we want to broadcast so the effect re-runs on change.
@@ -388,29 +420,39 @@ export class AngflowAgentBridge {
           // effect run and microtask drain). Drop late emissions so we never
           // push state for a flowId that's no longer registered.
           if (destroyed) return;
-          // Re-read on flush so coalesced bursts see the latest state.
-          const params = {
-            flowId: id,
-            nodes: flow.getNodes(),
-            edges: flow.getEdges(),
-            viewport: flow.getViewport(),
-            selection: {
-              nodeIds: flow.selectedNodes().map((n: Node) => n.id),
-              edgeIds: flow.selectedEdges().map((e: Edge) => e.id),
-            },
-          };
-          // Suppress duplicate emissions when controlled-mode round-trips bounce
-          // identical state through the store twice. See signatureOf for the
-          // field set; it must cover anything a mutating tool can change.
-          const sig = signatureOf(params);
-          if (sig === lastSignature) return;
-          lastSignature = sig;
-          this.emit({ event: 'flow.state', params });
+          // While a drag is in flight the store re-emits nodes per pointer
+          // frame; serializing the whole graph at that rate floods every
+          // transport. Throttle to one emission per interval with a trailing
+          // emit so the final drag state is never lost. The timer only
+          // schedules the emission — no view state is written here.
+          const dragging = flow.getNodes().some((n: Node) => n.dragging === true);
+          if (dragging) {
+            const elapsed = Date.now() - lastEmitTime;
+            if (elapsed < DRAG_STATE_EMIT_INTERVAL_MS) {
+              if (trailingTimer === null) {
+                trailingTimer = setTimeout(() => {
+                  trailingTimer = null;
+                  if (destroyed) return;
+                  emitState(true);
+                }, DRAG_STATE_EMIT_INTERVAL_MS - elapsed);
+              }
+              return;
+            }
+          }
+          if (trailingTimer !== null) {
+            clearTimeout(trailingTimer);
+            trailingTimer = null;
+          }
+          emitState(dragging);
         });
       }),
     );
     return () => {
       destroyed = true;
+      if (trailingTimer !== null) {
+        clearTimeout(trailingTimer);
+        trailingTimer = null;
+      }
       ref.destroy();
     };
   }

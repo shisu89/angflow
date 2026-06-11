@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Injector, provideZonelessChangeDetection } from '@angular/core';
 import { FlowStore } from '../services/flow-store.service';
@@ -1181,6 +1181,119 @@ describe('AngflowAgentBridge', () => {
       expect(flow.getNode('g')?.position).toEqual({ x: 100, y: 100 });
       // c is absolute {130,140}; relative to g's new absolute {100,100} → {30,40}.
       expect(flow.getNode('c')?.position).toEqual({ x: 30, y: 40 });
+    });
+  });
+
+  describe('flow.state throttling during drag', () => {
+    async function flushEffects(): Promise<void> {
+      TestBed.tick();
+      await new Promise<void>((r) => queueMicrotask(r));
+    }
+
+    function dragFrame(flow: NgFlowService, x: number, dragging = true): void {
+      const store = (flow as unknown as { store: { triggerNodeChanges: (c: unknown[]) => void } }).store;
+      store.triggerNodeChanges([{ id: 'a', type: 'position', position: { x, y: 0 }, dragging }]);
+    }
+
+    function stateEvents() {
+      return transport.events.filter(
+        (e): e is { event: string; params: { nodes: Node[] } } =>
+          'event' in e && e.event === 'flow.state',
+      );
+    }
+
+    beforeEach(() => {
+      // Keep queueMicrotask real (the watcher coalesces on it); fake only
+      // the throttle's clock and timer.
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+      vi.setSystemTime(10_000);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    async function setupDraggingFlow(): Promise<NgFlowService> {
+      const flow = newFlow();
+      flow.setNodes([makeNode('a')]);
+      bridge.register('f', flow);
+      await flushEffects();          // initial flow.state emission
+      vi.advanceTimersByTime(200);   // move past the throttle window
+      transport.events.length = 0;
+      return flow;
+    }
+
+    it('emits at most one flow.state per 100ms while dragging, with a trailing emit', async () => {
+      const flow = await setupDraggingFlow();
+
+      dragFrame(flow, 10);
+      await flushEffects();
+      expect(stateEvents().length).toBe(1); // interval elapsed -> immediate
+
+      dragFrame(flow, 20);
+      await flushEffects();
+      dragFrame(flow, 30);
+      await flushEffects();
+      expect(stateEvents().length).toBe(1); // throttled
+
+      vi.advanceTimersByTime(100);
+      await flushEffects();
+      const events = stateEvents();
+      expect(events.length).toBe(2); // trailing emit fired
+      expect(events.at(-1)!.params.nodes[0].position).toEqual({ x: 30, y: 0 }); // latest state
+    });
+
+    it('drag end emits the final state immediately', async () => {
+      const flow = await setupDraggingFlow();
+
+      dragFrame(flow, 10);
+      await flushEffects();
+      dragFrame(flow, 20);
+      await flushEffects();
+      expect(stateEvents().length).toBe(1);
+
+      dragFrame(flow, 25, false); // drag end
+      await flushEffects();
+      const events = stateEvents();
+      expect(events.length).toBe(2);
+      expect(events.at(-1)!.params.nodes[0].position).toEqual({ x: 25, y: 0 });
+
+      vi.advanceTimersByTime(500); // stale trailing timer must not double-emit
+      await flushEffects();
+      expect(stateEvents().length).toBe(2);
+    });
+
+    it('non-drag mutations are not throttled', async () => {
+      const flow = newFlow();
+      bridge.register('f', flow);
+      await flushEffects();
+      transport.events.length = 0;
+
+      flow.setNodes([makeNode('a')]);
+      await flushEffects();
+      flow.setNodes([makeNode('a'), makeNode('b')]);
+      await flushEffects();
+      expect(stateEvents().length).toBe(2);
+    });
+
+    it('a pending trailing emit is dropped on unregister', async () => {
+      const flow = newFlow();
+      flow.setNodes([makeNode('a')]);
+      const unreg = bridge.register('f', flow);
+      await flushEffects();
+      vi.advanceTimersByTime(200);
+      transport.events.length = 0;
+
+      dragFrame(flow, 10);
+      await flushEffects();
+      dragFrame(flow, 20);
+      await flushEffects();
+      expect(stateEvents().length).toBe(1); // x=20 pending in the trailing timer
+
+      unreg();
+      vi.advanceTimersByTime(500);
+      await flushEffects();
+      expect(stateEvents().length).toBe(1);
     });
   });
 

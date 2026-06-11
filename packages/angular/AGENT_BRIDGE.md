@@ -190,9 +190,9 @@ Subscribers (`angflow.subscribe(h)`) receive:
 - `flow.registered` — `{ flowId }`
 - `flow.unregistered` — `{ flowId }`
 - `flow.history` — `{ flowId, canUndo, canRedo, pastDepth, futureDepth }`. Emitted **synchronously inside `dispatch`** immediately after a history-capturing mutation completes (or after `undo`/`redo`/`clear_history`).
-- `flow.state` — `{ flowId, nodes, edges, viewport, selection: { nodeIds, edgeIds } }`. Coalesced per microtask; duplicates suppressed via a cheap signature. Emitted in the **next microtask** via the `watchFlow` effect.
+- `flow.state` — `{ flowId, nodes, edges, viewport, selection: { nodeIds, edgeIds } }`. Coalesced per microtask; duplicates suppressed via a cheap signature. Emitted in the **next microtask** via the `watchFlow` effect. While any node is mid-drag (`dragging: true`), emissions are additionally throttled to at most one per 100ms, with a trailing emission that guarantees the latest drag state is always delivered; drag end emits promptly.
 
-**Ordering note:** When a mutating tool fires, consumers receive `flow.history` first (synchronously), then `flow.state` (next microtask). This ordering is reliable — useful when a consumer wants to update UI affordances before rendering the new graph state.
+**Ordering note:** When a mutating tool fires, consumers receive `flow.history` first (synchronously), then `flow.state` (next microtask). This ordering is reliable — useful when a consumer wants to update UI affordances before rendering the new graph state. During an active node drag, the throttle may delay flow.state past the next microtask (up to ~100ms); the synchronous flow.history ordering is unaffected.
 
 ## Transactional batch
 
