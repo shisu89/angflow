@@ -118,38 +118,55 @@ The app ships three sections:
 
 ## Custom Nodes
 
-Create any Angular component and register it as a node type. Use the `nodrag` CSS class on interactive elements (inputs, dropdowns) to prevent drag interference.
+Create any Angular component and register it as a node type. The preferred way to read per-node state is `injectNgFlowNode<TData>()`, which returns reactive read-only signals for every property the library tracks (`id`, `data`, `selected`, `dragging`, `zIndex`, `isConnectable`, `position`, `sourcePosition`, `targetPosition`, `dragHandle`, `type`, `collapsed`). Use the `nodrag` CSS class on interactive elements (inputs, dropdowns) to prevent drag interference.
 
 ```typescript
+import { Component, ChangeDetectionStrategy, inject } from '@angular/core';
+import {
+  HandleComponent,
+  Position,
+  NgFlowService,
+  injectNgFlowNode,
+} from '@angflow/angular';
+
+interface FormData { title: string; name: string; type: string }
+
 @Component({
   selector: 'app-form-node',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HandleComponent],
   template: `
-    <ng-flow-handle type="target" [position]="Position.Top" />
-    <div class="my-node">
-      <h3>{{ data()?.title }}</h3>
+    <ng-flow-handle type="target" [position]="Position.Top" [isConnectable]="node.isConnectable()" />
+    <div class="my-node" [class.selected]="node.selected()">
+      <h3>{{ node.data()?.title }}</h3>
       <div class="nodrag">
-        <input [value]="data()?.name" (input)="onNameChange($event)" />
-        <select [value]="data()?.type" (change)="onTypeChange($event)">
+        <input [value]="node.data()?.name" (input)="onNameChange($event)" />
+        <select [value]="node.data()?.type" (change)="onTypeChange($event)">
           <option value="string">String</option>
           <option value="number">Number</option>
         </select>
       </div>
     </div>
-    <ng-flow-handle type="source" [position]="Position.Bottom" />
+    <ng-flow-handle type="source" [position]="Position.Bottom" [isConnectable]="node.isConnectable()" />
   `,
 })
 export class FormNodeComponent {
   readonly Position = Position;
-  readonly id = input.required<string>();
-  readonly data = input<any>();
-  // ... other standard inputs: type, selected, dragging, zIndex, etc.
+  readonly node = injectNgFlowNode<FormData>();
 
   private flowService = inject(NgFlowService);
 
   onNameChange(event: Event) {
-    this.flowService.updateNodeData(this.id(), { name: (event.target as HTMLInputElement).value });
+    this.flowService.updateNodeData(this.node.id(), {
+      name: (event.target as HTMLInputElement).value,
+    });
+  }
+
+  onTypeChange(event: Event) {
+    this.flowService.updateNodeData(this.node.id(), {
+      type: (event.target as HTMLSelectElement).value,
+    });
   }
 }
 ```
@@ -163,6 +180,24 @@ nodeTypes = { formNode: FormNodeComponent };
 ```html
 <ng-flow [nodes]="nodes" [edges]="edges" [nodeTypes]="nodeTypes" ...>
 ```
+
+#### Legacy: flat `@Input()`s
+
+The original API — declaring one `@Input()` per tracked property — is still fully supported, so existing custom nodes keep working without changes:
+
+```typescript
+export class FormNodeComponent {
+  readonly Position = Position;
+  readonly id = input.required<string>();
+  readonly data = input<FormData>();
+  readonly selected = input(false);
+  readonly isConnectable = input(true);
+  // ...plus type, dragging, zIndex, positionAbsoluteX/Y,
+  //    sourcePosition, targetPosition, dragHandle as needed
+}
+```
+
+Prefer `injectNgFlowNode()` for new code: one injection call replaces ~13 input declarations, the signals are reactive in the same way, and you only pull the fields you actually use.
 
 ## Programmatic API
 
