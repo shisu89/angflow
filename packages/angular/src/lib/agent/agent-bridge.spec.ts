@@ -1295,6 +1295,34 @@ describe('AngflowAgentBridge', () => {
       await flushEffects();
       expect(stateEvents().length).toBe(1);
     });
+
+    it('throttle re-engages in the window after a trailing emit (sustained drag)', async () => {
+      const flow = await setupDraggingFlow();
+
+      dragFrame(flow, 10);
+      await flushEffects();
+      expect(stateEvents().length).toBe(1); // immediate (window open)
+
+      dragFrame(flow, 20);
+      await flushEffects();
+      vi.advanceTimersByTime(100);
+      await flushEffects();
+      expect(stateEvents().length).toBe(2); // trailing emit at t+100
+
+      // Frames right after the trailing emit must be throttled again,
+      // not emitted immediately (pins emitState(true) in the trailing timer).
+      dragFrame(flow, 30);
+      await flushEffects();
+      dragFrame(flow, 40);
+      await flushEffects();
+      expect(stateEvents().length).toBe(2); // still throttled in the new window
+
+      vi.advanceTimersByTime(100);
+      await flushEffects();
+      const events = stateEvents();
+      expect(events.length).toBe(3); // second trailing emit
+      expect(events.at(-1)!.params.nodes[0].position).toEqual({ x: 40, y: 0 });
+    });
   });
 
   describe('history (undo/redo)', () => {
