@@ -513,6 +513,28 @@ describe('setNodePositions / applyLayout', () => {
 
     expect(measuredGap).toBeGreaterThan(unmeasuredGap);
   });
+
+  describe('updateNodeInternals selector escaping', () => {
+    it('escapes hostile node ids before querySelector', () => {
+      const selectors: string[] = [];
+      store.domNode.set({
+        querySelector(selector: string): null {
+          selectors.push(selector);
+          return null;
+        },
+      } as unknown as HTMLDivElement);
+
+      const hostileId = 'a"]';
+      service.updateNodeInternals(hostileId);
+
+      // Mirror cssEscapeId: CSS.escape in the browser/jsdom, minimal fallback otherwise.
+      const escaped =
+        typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+          ? CSS.escape(hostileId)
+          : hostileId.replace(/["\\]/g, '\\$&');
+      expect(selectors).toEqual([`[data-id="${escaped}"]`]);
+    });
+  });
 });
 
 describe('collapse writers', () => {

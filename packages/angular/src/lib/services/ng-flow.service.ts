@@ -828,7 +828,9 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
     const updates = new Map<string, InternalNodeUpdate>();
     for (const id of ids) {
-      const nodeEl = domNode.querySelector(`[data-id="${id}"]`) as HTMLDivElement | null;
+      const nodeEl = domNode.querySelector(
+        `[data-id="${NgFlowService.cssEscapeId(id)}"]`,
+      ) as HTMLDivElement | null;
       if (nodeEl) {
         updates.set(id, { id, nodeElement: nodeEl, force: true });
       }
