@@ -463,3 +463,75 @@ describe('computeNodeInputsKey (pure)', () => {
     expect(computeNodeInputsKey(internal(), true, false)).toBe(computeNodeInputsKey(internal(), true, false));
   });
 });
+
+describe('built-in node renders + live-updates through the per-node injector', () => {
+  let store: FlowStore;
+  let fixture: ComponentFixture<NodeRendererComponent>;
+
+  beforeEach(() => {
+    if (typeof (globalThis as any).ResizeObserver === 'undefined') {
+      (globalThis as any).ResizeObserver = class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      };
+    }
+    if (typeof (globalThis as any).MutationObserver === 'undefined') {
+      (globalThis as any).MutationObserver = class {
+        observe() {}
+        disconnect() {}
+      };
+    }
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NodeRendererComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    store = TestBed.inject(FlowStore);
+    fixture = TestBed.createComponent(NodeRendererComponent);
+  });
+
+  it('renders the default node label from context data', async () => {
+    store.setNodes([
+      { id: 'n1', position: { x: 0, y: 0 }, data: { label: 'Alpha' }, type: 'default' },
+    ]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Alpha');
+  });
+
+  it('live-updates the label when data changes (no input rebind)', async () => {
+    store.setNodes([
+      { id: 'n1', position: { x: 0, y: 0 }, data: { label: 'Alpha' }, type: 'default' },
+    ]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    store.setNodes([
+      { id: 'n1', position: { x: 0, y: 0 }, data: { label: 'Beta' }, type: 'default' },
+    ]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Beta');
+    expect(el.textContent).not.toContain('Alpha');
+  });
+
+  it('reflects selected state on the node wrapper through the store', async () => {
+    store.elementsSelectable.set(true);
+    store.setNodes([
+      { id: 'n1', position: { x: 0, y: 0 }, data: { label: 'Alpha' }, type: 'default' },
+    ]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    store.addSelectedNodes(['n1']);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const wrapper = (fixture.nativeElement as HTMLElement).querySelector('.xy-flow__node');
+    expect(wrapper?.classList.contains('selected')).toBe(true);
+  });
+});
