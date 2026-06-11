@@ -54,8 +54,8 @@
     "@angflow/system": "workspace:^"
   },
   "peerDependencies": {
-    "@angular/common": ">=19.0.0",
-    "@angular/core": ">=19.0.0",
+    "@angular/common": ">=21.0.0",
+    "@angular/core": ">=21.0.0",
     "@dagrejs/dagre": ">=3.0.0",
     "rxjs": ">=7.0.0"
   },
