@@ -253,4 +253,20 @@ describe('layoutNodes compound groups', () => {
       expect(Number.isFinite(positions[id].y)).toBe(true);
     }
   });
+
+  it('chain-into-cycle (d→a where a→b→a): d keeps its parent, all finite', () => {
+    const positions = layoutNodes(
+      [
+        { id: 'a', width: 40, height: 40, parentId: 'b' },
+        { id: 'b', width: 40, height: 40, parentId: 'a' },
+        { id: 'd', width: 40, height: 40, parentId: 'a' },
+      ],
+      [],
+      { direction: 'TB' },
+    );
+    for (const id of ['a', 'b', 'd']) {
+      expect(Number.isFinite(positions[id].x)).toBe(true);
+      expect(Number.isFinite(positions[id].y)).toBe(true);
+    }
+  });
 });
