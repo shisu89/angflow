@@ -422,9 +422,13 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   ): Promise<void> {
     const { animate, coordinateSpace, ...layoutOpts } = opts ?? ({} as O & { animate?: boolean | { duration?: number }; coordinateSpace?: 'relative' | 'absolute' });
     const nodes = this.withLiveMeasurements(
+      // Fallback for not-yet-measured nodes: a user NodeType lacks `internals`/`measured`,
+      // so it cannot be proven an InternalNode<NodeType>; layout reads only position/id.
       this.getNodes().map((n) => this.getInternalNode(n.id) ?? (n as unknown as InternalNode<NodeType>)),
     );
     const edges = this.withLiveEdgeLabels(this.getEdges());
+    // Omit<O & {animate,coordinateSpace}, 'animate'|'coordinateSpace'> is structurally O but
+    // TS can't prove it; the stripped keys are exactly the two we destructured out.
     const positions = await layoutFn(nodes, edges, layoutOpts as unknown as O);
     // Passing undefined animate/coordinateSpace is safe: setNodePositions does
     // `opts?.animate ?? store.animate()` and `coordinateSpace === 'absolute'`, so
@@ -711,9 +715,9 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   /** Return all edges that are incident to any of the given node ids (either end). */
   getConnectedEdges(nodeIds: string | string[]): EdgeType[] {
     const ids = Array.isArray(nodeIds) ? nodeIds : [nodeIds];
-    // getConnectedEdges expects node objects, but we pass IDs and edges
+    // getConnectedEdges only reads `.id`; pass id-only stubs as NodeBase.
     const nodeObjects = ids.map(id => ({ id })) as NodeBase[];
-    return getConnectedEdgesSystem(nodeObjects, this.store.edges() as EdgeBase[]) as unknown as EdgeType[];
+    return getConnectedEdgesSystem<NodeBase, EdgeType>(nodeObjects, this.store.edges());
   }
 
   /** Return all `HandleConnection`s currently attached to a specific handle. */
@@ -941,7 +945,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
       const edges = this.store.edges();
       const node = nodes.find(n => n.id === nodeId);
       if (!node) return [];
-      return getOutgoersSystem(node, nodes, edges as EdgeBase[]) as unknown as NodeType[];
+      return getOutgoersSystem<NodeType, EdgeType>(node, nodes, edges);
     });
   }
 
@@ -955,7 +959,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
       const edges = this.store.edges();
       const node = nodes.find(n => n.id === nodeId);
       if (!node) return [];
-      return getIncomersSystem(node, nodes, edges as EdgeBase[]) as unknown as NodeType[];
+      return getIncomersSystem<NodeType, EdgeType>(node, nodes, edges);
     });
   }
 
@@ -965,10 +969,10 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   selectConnectedEdges(nodeId: string): Signal<EdgeType[]> {
     return computed(() => {
       this.store.version();
-      return getConnectedEdgesSystem(
+      return getConnectedEdgesSystem<NodeBase, EdgeType>(
         [{ id: nodeId }] as NodeBase[],
-        this.store.edges() as EdgeBase[]
-      ) as unknown as EdgeType[];
+        this.store.edges()
+      );
     });
   }
 
