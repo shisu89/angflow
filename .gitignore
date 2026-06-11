@@ -24,3 +24,5 @@ openspec
 !packages/react/.env
 !packages/svelte/.env
 /screenshots/
+# agent-session verification screenshots land in the repo root
+/*.png
