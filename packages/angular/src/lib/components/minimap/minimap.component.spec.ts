@@ -14,10 +14,36 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { provideZonelessChangeDetection, ɵSIGNAL } from '@angular/core';
+import { provideZonelessChangeDetection, ɵSIGNAL, Component as NgComponent, input as ngInput } from '@angular/core';
 import { XYMinimap, type PanZoomInstance } from '@angflow/system';
 import { MiniMapComponent } from './minimap.component';
 import { FlowStore } from '../../services/flow-store.service';
+
+// ── Stub custom minimap-node component (top-level in the spec file) ──
+@NgComponent({
+  selector: 'test-mm-node',
+  standalone: true,
+  template: `<rect class="test-mm-node" [attr.x]="x()" [attr.y]="y()"
+    [attr.width]="width()" [attr.height]="height()" [attr.rx]="borderRadius()"
+    [attr.data-id]="id()" [attr.data-selected]="selected()"
+    [attr.data-color]="color()" [attr.data-stroke]="strokeColor()"
+    [attr.data-stroke-width]="strokeWidth()" [attr.data-class]="className()"
+    [attr.shape-rendering]="shapeRendering()" />`,
+})
+class TestMiniMapNode {
+  readonly id = ngInput<string>('');
+  readonly x = ngInput<number>(0);
+  readonly y = ngInput<number>(0);
+  readonly width = ngInput<number>(0);
+  readonly height = ngInput<number>(0);
+  readonly selected = ngInput<boolean>(false);
+  readonly color = ngInput<string | undefined>(undefined);
+  readonly strokeColor = ngInput<string | undefined>(undefined);
+  readonly strokeWidth = ngInput<number | undefined>(undefined);
+  readonly borderRadius = ngInput<number>(5);
+  readonly shapeRendering = ngInput<string>('');
+  readonly className = ngInput<string>('');
+}
 
 // Spy handle the factory closes over, so each test can read the latest instance.
 const minimapSpy = {
@@ -401,5 +427,74 @@ describe('MiniMapComponent adopts XYMinimap', () => {
     } finally {
       fixture.nativeElement.remove();
     }
+  });
+});
+
+// ── Appended describe block ──
+describe('MiniMapComponent nodeComponent wiring', () => {
+  let store: FlowStore;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [MiniMapComponent, TestMiniMapNode],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    store = TestBed.inject(FlowStore);
+    store.width.set(800);
+    store.height.set(600);
+    store.setNodes([
+      { id: 'n1', type: 'orchestrator', position: { x: 10, y: 20 }, data: {}, selected: true },
+    ] as never);
+  });
+
+  it('renders the default <rect> (no custom component) when nodeComponent is unset', () => {
+    const fixture = createMinimap();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('rect.xy-flow__minimap-node')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('rect.test-mm-node')).toBeNull();
+  });
+
+  it('renders the custom nodeComponent with the React MiniMapNode prop set', () => {
+    const fixture = createMinimap();
+    setSignalInput(fixture.componentInstance, 'nodeComponent', TestMiniMapNode);
+    setSignalInput(fixture.componentInstance, 'nodeColor', '#abcdef');
+    setSignalInput(fixture.componentInstance, 'nodeStrokeColor', '#112233');
+    setSignalInput(fixture.componentInstance, 'nodeStrokeWidth', 3);
+    setSignalInput(fixture.componentInstance, 'nodeBorderRadius', 7);
+    setSignalInput(fixture.componentInstance, 'nodeClassName', 'my-node');
+    fixture.detectChanges();
+
+    const rect = fixture.nativeElement.querySelector('rect.test-mm-node') as SVGRectElement;
+    expect(rect).toBeTruthy();
+    // Default <rect> path must NOT also render.
+    expect(fixture.nativeElement.querySelector('rect.xy-flow__minimap-node')).toBeNull();
+
+    expect(rect.getAttribute('data-id')).toBe('n1');
+    expect(rect.getAttribute('x')).toBe('10');
+    expect(rect.getAttribute('y')).toBe('20');
+    expect(rect.getAttribute('data-selected')).toBe('true');
+    expect(rect.getAttribute('data-color')).toBe('#abcdef');
+    expect(rect.getAttribute('data-stroke')).toBe('#112233');
+    expect(rect.getAttribute('data-stroke-width')).toBe('3');
+    expect(rect.getAttribute('rx')).toBe('7');
+    expect(rect.getAttribute('data-class')).toBe('my-node');
+    expect(rect.getAttribute('shape-rendering')).toBeTruthy();
+  });
+
+  it('excludes collapsed-hidden nodes from the custom-component path too', () => {
+    store.setNodes([
+      { id: 'g', position: { x: 0, y: 0 }, data: {}, collapsed: true },
+      { id: 'a', position: { x: 0, y: 0 }, data: {}, parentId: 'g' },
+      { id: 'x', position: { x: 0, y: 0 }, data: {} },
+    ] as never);
+    const fixture = createMinimap();
+    setSignalInput(fixture.componentInstance, 'nodeComponent', TestMiniMapNode);
+    fixture.detectChanges();
+
+    const ids = Array.from(fixture.nativeElement.querySelectorAll('rect.test-mm-node'))
+      .map((r) => (r as Element).getAttribute('data-id'))
+      .sort();
+    expect(ids).toEqual(['g', 'x']);
   });
 });

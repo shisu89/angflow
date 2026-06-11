@@ -18,6 +18,7 @@ import {
   type PanelPosition,
   type Rect,
 } from '@angflow/system';
+import { NgComponentOutlet } from '@angular/common';
 import { FlowStore } from '../../services/flow-store.service';
 import { PanelComponent } from '../panel/panel.component';
 import type { Node } from '../../types';
@@ -40,7 +41,7 @@ export type GetMiniMapNodeAttribute<NodeType extends Node = Node> = (node: NodeT
 @Component({
   selector: 'ng-flow-minimap',
   standalone: true,
-  imports: [PanelComponent],
+  imports: [PanelComponent, NgComponentOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <ng-flow-panel [position]="position()">
@@ -71,19 +72,27 @@ export type GetMiniMapNodeAttribute<NodeType extends Node = Node> = (node: NodeT
             deferring to the stylesheet's CSS-variable theming (incl. dark mode).
           -->
           @for (node of minimapNodes(); track node.id) {
-            <rect
-              class="xy-flow__minimap-node"
-              [class]="getNodeClassName(node)"
-              [attr.x]="node.x"
-              [attr.y]="node.y"
-              [attr.width]="node.width"
-              [attr.height]="node.height"
-              [attr.rx]="nodeBorderRadius()"
-              [style.fill]="getNodeColor(node)"
-              [style.stroke]="getNodeStrokeColor(node)"
-              [style.stroke-width]="nodeStrokeWidth()"
-              (click)="onMinimapNodeClick($event, node)"
-            />
+            @if (nodeComponent(); as nc) {
+              <g (click)="onMinimapNodeClick($event, node)">
+                <ng-container
+                  *ngComponentOutlet="nc; inputs: getNodeComponentInputs(node)"
+                />
+              </g>
+            } @else {
+              <rect
+                class="xy-flow__minimap-node"
+                [class]="getNodeClassName(node)"
+                [attr.x]="node.x"
+                [attr.y]="node.y"
+                [attr.width]="node.width"
+                [attr.height]="node.height"
+                [attr.rx]="nodeBorderRadius()"
+                [style.fill]="getNodeColor(node)"
+                [style.stroke]="getNodeStrokeColor(node)"
+                [style.stroke-width]="nodeStrokeWidth()"
+                (click)="onMinimapNodeClick($event, node)"
+              />
+            }
           }
           <!-- Mask overlay: dim area outside viewport via evenodd path -->
           <path
@@ -144,7 +153,7 @@ export class MiniMapComponent {
   readonly nodeBorderRadius = input(5);
   /** Stroke width for node rects. */
   readonly nodeStrokeWidth = input(2);
-  /** Reserved — custom Angular component to render each minimap node. Not yet wired. */
+  /** Custom Angular component to render each minimap node (mirrors React's MiniMapNode). When unset, a default <rect> is rendered. */
   readonly nodeComponent = input<Type<unknown> | null>(null);
 
   /** Background fill behind the nodes. Defaults to `#f0f0f0`. */
@@ -238,6 +247,7 @@ export class MiniMapComponent {
       y: node.internals?.positionAbsolute?.y ?? 0,
       width: node.measured?.width ?? node.width ?? 150,
       height: node.measured?.height ?? node.height ?? 40,
+      selected: !!node.selected,
       _userNode: node.internals?.userNode,
     }));
   });
@@ -345,6 +355,40 @@ export class MiniMapComponent {
       return className(node._userNode);
     }
     return typeof className === 'string' ? className : '';
+  }
+
+  // React uses 'crispEdges' under Chrome/SSR, 'geometricPrecision' otherwise
+  // (MiniMapNodes.tsx:36). Browsers always have window; default to
+  // geometricPrecision, matching React's non-Chrome branch.
+  private readonly shapeRendering =
+    typeof window === 'undefined' || !!(window as { chrome?: unknown }).chrome
+      ? 'crispEdges'
+      : 'geometricPrecision';
+
+  /** Inputs object passed to a custom nodeComponent via NgComponentOutlet. */
+  getNodeComponentInputs(node: {
+    id: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    selected: boolean;
+    _userNode?: Node;
+  }): Record<string, unknown> {
+    return {
+      id: node.id,
+      x: node.x,
+      y: node.y,
+      width: node.width,
+      height: node.height,
+      selected: node.selected,
+      color: this.getNodeColor(node),
+      strokeColor: this.getNodeStrokeColor(node),
+      strokeWidth: this.nodeStrokeWidth(),
+      borderRadius: this.nodeBorderRadius(),
+      shapeRendering: this.shapeRendering,
+      className: this.getNodeClassName(node),
+    };
   }
 
   onMinimapClick(event: MouseEvent): void {
