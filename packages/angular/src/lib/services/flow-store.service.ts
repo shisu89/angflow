@@ -15,8 +15,6 @@ import {
   defaultAriaLabelConfig,
   Position,
   getNodesInside,
-  getInternalNodesBounds,
-  getViewportForBounds,
   type NodeChange,
   type EdgeChange,
   type EdgeSelectionChange,
@@ -41,7 +39,7 @@ import {
   type HandleType,
 } from '@angflow/system';
 
-import type { Node, Edge, InternalNode } from '../types';
+import type { Node, Edge } from '../types';
 import type { NodeTemplateSpec } from '../types/node-template';
 import { applyNodeChanges, applyEdgeChanges, createSelectionChange, getSelectionChanges } from '../utils/changes';
 import { sampleTween, prefersReducedMotion, type TweenEntry } from '../utils/position-tween';

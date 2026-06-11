@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, computed } from '@angular/core';
-import { getStraightPath, Position, type Handle } from '@angflow/system';
+import { getStraightPath, type Handle } from '@angflow/system';
 import { BaseEdgeComponent } from './base-edge.component';
 
 /** Edge rendered as a straight line between source and target. */

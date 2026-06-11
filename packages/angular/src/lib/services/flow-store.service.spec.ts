@@ -363,7 +363,7 @@ describe('FlowStore', () => {
         const changes = spy.mock.calls[0][0];
         for (const change of changes) {
           if (change.type === 'select') {
-            const node = store.nodeLookup.get(change.id);
+            const _node = store.nodeLookup.get(change.id);
             // The change should reflect the desired state
             expect(typeof change.selected).toBe('boolean');
           }

@@ -88,7 +88,6 @@ export class NodeToolbarComponent {
     const off = this.offset();
     const alignVal = this.align();
 
-    let alignTranslate: string;
     switch (pos) {
       case Position.Top:
       case Position.Bottom: {

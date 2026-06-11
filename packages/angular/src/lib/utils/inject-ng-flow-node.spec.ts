@@ -3,7 +3,6 @@ import { Injector, runInInjectionContext, signal, computed } from '@angular/core
 import { injectNgFlowNode } from './inject-ng-flow-node';
 import { NG_FLOW_NODE_CONTEXT } from '../services/tokens';
 import type { NgFlowNodeContext } from '../types';
-import { Position } from '@angflow/system';
 
 /**
  * Build a minimal NgFlowNodeContext backed by writable signals so tests can

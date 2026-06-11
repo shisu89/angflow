@@ -13,7 +13,6 @@ import {
 import { CommonModule, NgComponentOutlet } from '@angular/common';
 import {
   getMarkerId,
-  MarkerType,
   Position,
   XYHandle,
   getBezierPath,
@@ -34,9 +33,6 @@ import { StepEdgeComponent } from '../../components/edges/step-edge.component';
 import { SmoothStepEdgeComponent } from '../../components/edges/smooth-step-edge.component';
 import { SimpleBezierEdgeComponent } from '../../components/edges/simple-bezier-edge.component';
 import type { Edge, EdgeTypes } from '../../types';
-
-// Keep the key set in sync with BUILT_IN_EDGE_TYPE_NAMES in services/ng-flow.service.ts.
-const builtInEdgeTypeNames = new Set(['default', 'bezier', 'straight', 'step', 'smoothstep', 'simplebezier']);
 
 const builtInEdgeTypes: EdgeTypes = {
   default: BezierEdgeComponent,

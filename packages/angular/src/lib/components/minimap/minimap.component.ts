@@ -13,14 +13,13 @@ import {
 } from '@angular/core';
 import {
   XYMinimap,
-  getInternalNodesBounds,
   getBoundsOfRects,
   type PanelPosition,
   type Rect,
 } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 import { PanelComponent } from '../panel/panel.component';
-import type { Node, InternalNode } from '../../types';
+import type { Node } from '../../types';
 
 /**
  * Function form of a per-node minimap attribute (color, class, stroke color);
@@ -378,7 +377,7 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
     this.animationFrameId = requestAnimationFrame(animate);
   }
 
-  onMinimapMouseDown(event: MouseEvent): void {
+  onMinimapMouseDown(_event: MouseEvent): void {
     if (!this.pannable()) return;
     this.isDragging = true;
     this.dragMoved = false;

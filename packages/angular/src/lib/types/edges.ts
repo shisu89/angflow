@@ -10,7 +10,6 @@ import type {
   ConnectionLineType,
   Handle,
   Position,
-  FinalConnectionState,
   XYPosition,
 } from '@angflow/system';
 

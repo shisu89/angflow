@@ -15,14 +15,11 @@ import type {
   SnapGrid,
   Rect,
   Viewport,
-  HandleType,
   HandleConnection,
   NodeConnection,
-  FinalConnectionState,
-  OnConnectStartParams,
 } from '@angflow/system';
 
-import type { Node, Edge, InternalNode, NodeTypes, EdgeTypes } from '.';
+import type { Node, Edge, InternalNode } from '.';
 
 /**
  * Permissive CSS style record used by `Node.style`, `Edge.style`, `labelStyle`,

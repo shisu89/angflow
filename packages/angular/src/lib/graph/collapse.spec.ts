@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getCollapsedHiddenIds, rewriteEdgesForCollapse, type DisplayEdge } from './collapse';
+import { getCollapsedHiddenIds, rewriteEdgesForCollapse } from './collapse';
 
 type N = { id: string; parentId?: string; collapsed?: boolean };
 type E = { id: string; source: string; target: string; sourceHandle?: string | null; targetHandle?: string | null };

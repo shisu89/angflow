@@ -50,7 +50,6 @@ export class WindowTransport implements AgentTransport {
     if (winRec[this.namespace] !== undefined) {
       // Surface the collision so a second WindowTransport (or a host that
       // already owns the namespace) doesn't silently lose its API.
-      // eslint-disable-next-line no-console
       console.warn(
         `[angflow] WindowTransport: window.${this.namespace} is already set and will be overwritten. ` +
           `Pass { namespace: '…' } to disambiguate.`,

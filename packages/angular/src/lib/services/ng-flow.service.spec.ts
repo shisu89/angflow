@@ -202,7 +202,7 @@ describe('NgFlowService', () => {
 
     it('updateNode on nonexistent ID is a no-op', () => {
       service.setNodes([makeNode('1')]);
-      const before = store.nodes();
+      const _before = store.nodes();
 
       service.updateNode('nonexistent', { data: { x: 1 } });
 

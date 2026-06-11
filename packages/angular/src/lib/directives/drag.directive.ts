@@ -56,7 +56,7 @@ export class DragDirective implements OnInit, OnChanges, OnDestroy {
     this.updateDrag();
   }
 
-  ngOnChanges(changes: SimpleChanges): void {
+  ngOnChanges(_changes: SimpleChanges): void {
     if (this.dragInstance) {
       this.updateDrag();
     }

@@ -1,5 +1,5 @@
 import type { Type, Signal } from '@angular/core';
-import type { NodeBase, InternalNodeBase, NodeProps as NodePropsBase, CoordinateExtent, OnError, Position } from '@angflow/system';
+import type { NodeBase, InternalNodeBase, NodeProps as NodePropsBase, Position } from '@angflow/system';
 import type { CSSProperties } from './general';
 
 /**

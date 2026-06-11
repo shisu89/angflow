@@ -24,7 +24,7 @@ import {
 
 import { FlowStore } from './flow-store.service';
 import { elementToRemoveChange } from '../utils/changes';
-import type { Node, Edge, InternalNode, NgFlowInstance, NgFlowJsonObject, DeleteElementsOptions } from '../types';
+import type { Node, Edge, InternalNode, DeleteElementsOptions } from '../types';
 import type { NodeTemplateSpec } from '../types/node-template';
 import { prefersReducedMotion } from '../utils/position-tween';
 import { getGroupBounds, type GroupBoundsOptions } from '../graph/group-bounds';

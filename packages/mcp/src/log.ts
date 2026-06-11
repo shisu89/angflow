@@ -18,7 +18,6 @@ export function createLogger(level: LogLevel): Logger {
   const rank = LEVEL_RANK[level];
   const emit = (label: string, labelRank: number, args: unknown[]): void => {
     if (labelRank < rank || rank === 99) return;
-    // eslint-disable-next-line no-console
     console.error('[angflow-mcp]', `${label}:`, ...args);
   };
   return {

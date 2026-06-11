@@ -702,7 +702,6 @@ export class AngflowAgentBridge {
         const hasDelete = ops.some((o) => o['op'] === 'delete_elements');
         if (hasDelete) {
           this.warnedOnBeforeDeleteBypass = true;
-          // eslint-disable-next-line no-console
           console.warn(
             '[angflow] apply_changes/delete_elements bypasses onBeforeDelete. ' +
               'Call the standalone `delete_elements` tool if you need the veto hook.',
@@ -910,7 +909,6 @@ export class AngflowAgentBridge {
         applied[id] = { x: pos.x, y: pos.y };
       }
       if (unknownIds.length > 0) {
-        // eslint-disable-next-line no-console
         console.warn(
           `[angflow] layout_nodes: layout function returned positions for unknown node ids ` +
             `(ignored): ${unknownIds.join(', ')}`,

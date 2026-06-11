@@ -25,7 +25,6 @@ const { values } = parseArgs({
 });
 
 if (values.help) {
-  // eslint-disable-next-line no-console
   console.error(`angflow-mcp — MCP server for a live angflow canvas
 
 Usage: npx @angflow/mcp [options]
@@ -42,7 +41,6 @@ Options:
 }
 
 if (values.version) {
-  // eslint-disable-next-line no-console
   console.error(`@angflow/mcp ${VERSION} (tool schemas from @angflow/angular@${SCHEMAS_FROM})`);
   process.exit(0);
 }
@@ -51,17 +49,14 @@ const port = Number(values.port);
 const timeoutMs = Number(values.timeout);
 const logLevel = values['log-level'] as LogLevel;
 if (String(values.port).trim() === '' || !Number.isInteger(port) || port < 0 || port > 65535) {
-  // eslint-disable-next-line no-console
   console.error(`[angflow-mcp] invalid --port: ${values.port}`);
   process.exit(1);
 }
 if (String(values.timeout).trim() === '' || !Number.isFinite(timeoutMs) || timeoutMs <= 0) {
-  // eslint-disable-next-line no-console
   console.error(`[angflow-mcp] invalid --timeout: ${values.timeout}`);
   process.exit(1);
 }
 if (!['debug', 'info', 'silent'].includes(logLevel)) {
-  // eslint-disable-next-line no-console
   console.error(`[angflow-mcp] invalid --log-level: ${String(values['log-level'])}`);
   process.exit(1);
 }
