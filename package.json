@@ -6,7 +6,7 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "preinstall": "npx only-allow pnpm",
+    "preinstall": "npx only-allow@1 pnpm",
     "build": "pnpm --filter @angflow/system run build && pnpm --filter @angflow/angular run build && pnpm --filter @angflow/mcp run build",
     "build:system": "pnpm --filter @angflow/system run build",
     "build:angular": "pnpm --filter @angflow/angular run build",
