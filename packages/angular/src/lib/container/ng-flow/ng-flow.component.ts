@@ -4,6 +4,7 @@ import {
   input,
   output,
   effect,
+  untracked,
   viewChild,
   contentChildren,
   ElementRef,
@@ -65,6 +66,16 @@ import type {
   FitViewOptions,
   IsValidConnection,
 } from '../../types';
+
+const VIEWPORT_EPSILON = 1e-4;
+
+function viewportsEqual(a: Viewport, b: Viewport): boolean {
+  return (
+    Math.abs(a.x - b.x) < VIEWPORT_EPSILON &&
+    Math.abs(a.y - b.y) < VIEWPORT_EPSILON &&
+    Math.abs(a.zoom - b.zoom) < VIEWPORT_EPSILON
+  );
+}
 
 /**
  * Root component for an Angular Flow canvas. Renders nodes, edges, handles,
@@ -233,7 +244,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   /** Edges to render. Re-bind from `(edgesChange)` after running deltas through `applyEdgeChanges` to stay in sync. */
   readonly edgesModel = input<EdgeType[]>([] as unknown as EdgeType[], { alias: 'edges' });
 
-  /** Current viewport (`{ x, y, zoom }`). Fires `(viewportChange)` on pan/zoom. */
+  /** Controlled viewport ({ x, y, zoom }). Re-bind from (viewportChange) to keep it in sync; equal values are not re-applied. */
   readonly viewportModel = input<Viewport | undefined>(undefined, { alias: 'viewport' });
 
   // ── Data (input-only for uncontrolled mode) ───────────────────────────
@@ -653,6 +664,24 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       }
     });
 
+    // Controlled viewport: apply [viewport] input changes to the store.
+    // `untracked` keys this effect to the input only — tracking the store read
+    // would re-run it on every user pan and fight the pointer. syncViewport
+    // updates d3's internal transform without dispatching a zoom event, so
+    // applying the input never re-emits (viewportChange); together with the
+    // epsilon guard this prevents controlled-mode feedback loops.
+    // NOTE: transform-only write — deliberately NO bumpVersion() (transform
+    // consumers read transform() directly; see the version signal's contract).
+    effect(() => {
+      const vp = this.viewportModel();
+      if (!vp) return;
+      untracked(() => {
+        if (viewportsEqual(vp, this.store.viewport())) return;
+        this.store.transform.set([vp.x, vp.y, vp.zoom]);
+        this.store.panZoom()?.syncViewport(vp);
+      });
+    });
+
     // Sync configuration inputs → store
     effect(() => {
       this.store.nodesDraggable.set(this.nodesDraggable());
@@ -907,11 +936,13 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     const paneElement = domNode.querySelector('.xy-flow__pane') as Element;
     if (!paneElement) return;
 
+    const initialViewport = this.viewportModel() ?? this.defaultViewport();
+
     const panZoom = XYPanZoom({
       domNode: paneElement,
       minZoom: this.minZoom(),
       maxZoom: this.maxZoom(),
-      viewport: this.defaultViewport(),
+      viewport: initialViewport,
       translateExtent: this.translateExtent(),
       onDraggingChange: (dragging: boolean) => {
         this.store.paneDragging.set(dragging);
@@ -937,9 +968,8 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     this.panZoomInstance = panZoom;
     this.store.panZoom.set(panZoom);
 
-    // Set initial transform from default viewport
-    const dv = this.defaultViewport();
-    this.store.transform.set([dv.x, dv.y, dv.zoom]);
+    // Set initial transform from the resolved initial viewport
+    this.store.transform.set([initialViewport.x, initialViewport.y, initialViewport.zoom]);
 
     // Apply initial pan/zoom options
     this.updatePanZoomOptions();
