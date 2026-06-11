@@ -809,6 +809,10 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       this.noPanClassName();
       this.noWheelClassName();
       this.paneClickDistance();
+      // userSelectionActive is consumed inside updatePanZoomOptions(); read it
+      // here explicitly — the method body short-circuits while panZoomInstance
+      // is null on first run, so the inner read never registers a dependency.
+      this.store.userSelectionActive();
       this.updatePanZoomOptions();
     });
 
