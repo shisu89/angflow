@@ -19,7 +19,7 @@
 ```
 
 - **Bridge** — root-scoped service. Holds a registry of `flowId → NgFlowService`, routes inbound tool calls to the right service, and emits `flow.state` events when any registered flow's signals change (coalesced via microtask). Each flow also carries a per-flow node-template registry (see `register_node_template`) and supports an optional host-pluggable layout function (see `layout_nodes`).
-- **Transport** — anything implementing `AgentTransport`. Bundled: `WindowTransport` (exposes `window.angflow`), `WebSocketTransport`. Add custom ones for postMessage, CDP, MCP servers, etc. The bridge calls `stop()` on every transport when its injector is destroyed (e.g. `ApplicationRef.destroy()`), so `stop()` must be idempotent and must cancel any reconnect timers.
+- **Transport** — anything implementing `AgentTransport`. Bundled: `WindowTransport` (exposes `window.angflow`), `WebSocketTransport`. Add custom ones for postMessage, CDP, MCP servers, etc. The bridge calls `stop()` on every transport when its injector is destroyed (e.g. `ApplicationRef.destroy()`), so `stop()` must be idempotent and must cancel any reconnect timers. `WebSocketTransport` reconnects with exponential backoff on most close codes (including `1006` network drops and `1009` frame-too-big), but treats close codes `4401` (bad token) and `4403` (origin rejected) as terminal — it logs a `console.error` and does not retry, since retrying would never succeed without a configuration change.
 - **Tool schemas** — `AGENT_TOOL_SCHEMAS` is a JSON-Schema array suitable for direct use as Anthropic/OpenAI `tools`.
 
 ## Wiring

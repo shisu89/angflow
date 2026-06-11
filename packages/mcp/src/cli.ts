@@ -71,9 +71,17 @@ if (!['debug', 'info', 'silent'].includes(logLevel)) {
   process.exit(1);
 }
 
+// Only treat --token + --no-token as a conflict when --token was explicitly passed
+// on the command line. If the token value came only from ANGFLOW_MCP_TOKEN and the
+// user passed --no-token, let --no-token win (clear the env token silently).
+const tokenOnCli = process.argv.includes('--token');
 if (values['no-token'] && values.token) {
-  console.error('[angflow-mcp] --token and --no-token are mutually exclusive');
-  process.exit(1);
+  if (tokenOnCli) {
+    console.error('[angflow-mcp] --token and --no-token are mutually exclusive');
+    process.exit(1);
+  }
+  // Env-only token: --no-token takes precedence; clear it so the block below doesn't use it.
+  values.token = undefined;
 }
 
 let token: string | undefined = values.token;

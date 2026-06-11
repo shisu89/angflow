@@ -26,6 +26,11 @@ const BRIDGE_SUBPROTOCOL = 'angflow.bridge';
 /**
  * Match an Origin header value against allowlist patterns. A pattern is an
  * exact origin, `*`, or `scheme://host:*` (any — or no — port).
+ *
+ * Assumes `origin` is a well-formed browser Origin (scheme://host[:port], no
+ * userinfo). Browsers never send userinfo in the Origin header, so a crafted
+ * value like `http://localhost:4200@evil.com` cannot arrive from a real browser
+ * and the startsWith check below is safe for this use case.
  */
 export function originAllowed(origin: string, patterns: readonly string[]): boolean {
   for (const pattern of patterns) {

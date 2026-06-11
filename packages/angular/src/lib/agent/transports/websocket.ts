@@ -116,8 +116,21 @@ export class WebSocketTransport implements AgentTransport {
 
     sock.addEventListener('error', (ev) => this.onError(ev));
 
-    sock.addEventListener('close', () => {
+    sock.addEventListener('close', (ev) => {
       this.socket = null;
+      const code = (ev as CloseEvent).code;
+      if (code === 4401) {
+        console.error(
+          'angflow WebSocketTransport: connection rejected (4401 invalid token) — not retrying',
+        );
+        return;
+      }
+      if (code === 4403) {
+        console.error(
+          'angflow WebSocketTransport: connection rejected (4403 origin not allowed) — not retrying',
+        );
+        return;
+      }
       this.scheduleReconnect();
     });
   }

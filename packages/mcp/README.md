@@ -119,6 +119,18 @@ new WebSocketTransport({ url: 'ws://localhost:8765', token: 'mysecret' })
 
 Frames larger than 5 MB are rejected at the WebSocket layer (close code `1009`).
 
+**Localhost-origin residual risk.** In default (ephemeral-token) mode, _any_ page served from
+an allowlisted origin — that is, any local dev server or app on `http://localhost:<any port>` or
+`http://127.0.0.1:<any port>` — can connect to the WebSocket **without a token**. On a machine
+running multiple local apps simultaneously, localhost is a trust boundary you are collapsing: a
+page at `http://localhost:3000` has the same access as your canvas at `http://localhost:4200`.
+
+To harden: pass an explicit `--token <secret>` — with an explicit token, all connections
+(including allowlisted-origin browsers) must also present it, unlike ephemeral mode where the
+browser Origin alone is sufficient. Alternatively (or additionally) narrow `--allow-origin` to
+your app's exact origin, e.g. `--allow-origin http://localhost:4200`, so other local apps are
+blocked at the origin check.
+
 Using `--host 0.0.0.0` or a non-loopback address exposes the WebSocket port to the network.
 This is not recommended and is entirely at your own risk. There is no TLS on the WebSocket
 listener.
