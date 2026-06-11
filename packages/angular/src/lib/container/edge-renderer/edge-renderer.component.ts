@@ -393,7 +393,8 @@ export class EdgeRendererComponent {
     return set;
   }
 
-  private buildEdgeInputs(edge: Edge): Record<string, any> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private buildEdgeInputs(edge: Edge): Record<string, any> { // dynamic component input bag
     const sourceNode = this.store.nodeLookup.get(edge.source);
     const targetNode = this.store.nodeLookup.get(edge.target);
 
@@ -515,11 +516,13 @@ export class EdgeRendererComponent {
     handleData: ReadonlyMap<string, unknown>;
     sourceHandleBounds: unknown;
     targetHandleBounds: unknown;
-    inputs: Record<string, any>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    inputs: Record<string, any>; // dynamic component input bag
     path: string;
   }>();
 
-  getEdgeInputs(edge: Edge): Record<string, any> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getEdgeInputs(edge: Edge): Record<string, any> { // dynamic component input bag
     const sourceNode = this.store.nodeLookup.get(edge.source);
     const targetNode = this.store.nodeLookup.get(edge.target);
     // These signal reads happen on hit AND miss so the template stays

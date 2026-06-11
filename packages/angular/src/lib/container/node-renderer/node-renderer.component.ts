@@ -132,7 +132,8 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
   private el = inject(ElementRef<HTMLElement>);
 
   readonly customNodeTypes = input<NodeTypes>({});
-  readonly nodeTemplateMap = input<Map<string, TemplateRef<any>>>(new Map());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  readonly nodeTemplateMap = input<Map<string, TemplateRef<any>>>(new Map()); // heterogeneous node templates
 
   // Node events that bubble up to NgFlowComponent
   readonly nodeClick = output<{ event: MouseEvent; node: Node }>();
@@ -379,7 +380,8 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
     this.store.panBy({ x: targetX - currentX, y: targetY - currentY });
   }
 
-  getNodeTemplate(type?: string): TemplateRef<any> | null {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getNodeTemplate(type?: string): TemplateRef<any> | null { // heterogeneous node templates
     const resolvedType = type || 'default';
     return this.nodeTemplateMap().get(resolvedType) ?? null;
   }

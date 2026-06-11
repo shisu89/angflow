@@ -23,7 +23,8 @@ export class StraightEdgeComponent {
   readonly sourceY = input(0);
   readonly targetX = input(0);
   readonly targetY = input(0);
-  readonly data = input<any>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  readonly data = input<any>(); // untyped built-in edge data
   readonly selected = input(false);
   readonly markerStart = input<string>();
   readonly markerEnd = input<string>();

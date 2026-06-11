@@ -49,7 +49,8 @@ export type NodeProps<NodeType extends Node = Node> = NodePropsBase<NodeType>;
 /**
  * Map of node type names to Angular component types.
  */
-export type NodeTypes = Record<string, Type<any>>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type NodeTypes = Record<string, Type<any>>; // heterogeneous component registry
 
 /**
  * Input contract for custom node components rendered via NgComponentOutlet.

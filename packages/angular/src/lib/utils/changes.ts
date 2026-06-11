@@ -8,9 +8,13 @@ import type {
 } from '@angflow/system';
 import type { Node, Edge } from '../types';
 
-function applyChanges(changes: any[], elements: any[]): any[] {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyChanges(changes: any[], elements: any[]): any[] { // change-applier mirrors xyflow's untyped element diffing
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updatedElements: any[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const changesMap = new Map<any, any[]>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const addItemChanges: any[] = [];
 
   for (const change of changes) {
@@ -66,7 +70,8 @@ function applyChanges(changes: any[], elements: any[]): any[] {
   return updatedElements;
 }
 
-function applyChange(change: any, element: any): void {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyChange(change: any, element: any): void { // change-applier mirrors xyflow's untyped element diffing
   switch (change.type) {
     case 'select': {
       element.selected = change.selected;
@@ -187,10 +192,12 @@ export function createSelectionChange(id: string, selected: boolean): NodeSelect
 }
 
 export function getSelectionChanges(
-  items: Map<string, any>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  items: Map<string, any>, // change-applier mirrors xyflow's untyped element diffing
   selectedIds: Set<string> = new Set(),
   mutateItem = false
 ): NodeSelectionChange[] | EdgeSelectionChange[] {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const changes: any[] = [];
 
   for (const [id, item] of items) {
@@ -206,8 +213,11 @@ export function getSelectionChanges(
   return changes;
 }
 
-export function getElementsDiffChanges({ items = [], lookup }: { items: any[] | undefined; lookup: Map<string, any> }): any[] {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getElementsDiffChanges({ items = [], lookup }: { items: any[] | undefined; lookup: Map<string, any> }): any[] { // change-applier mirrors xyflow's untyped element diffing
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const changes: any[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const itemsLookup = new Map<string, any>(items.map((item) => [item.id, item]));
 
   for (const [index, item] of items.entries()) {

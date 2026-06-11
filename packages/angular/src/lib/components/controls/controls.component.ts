@@ -92,7 +92,8 @@ export class ControlsComponent {
   /** Render the lock-interactivity button. */
   readonly showInteractive = input(true);
   /** Options passed to `fitView` when the button is pressed. */
-  readonly fitViewOptions = input<FitViewOptionsBase<any>>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  readonly fitViewOptions = input<FitViewOptionsBase<any>>(); // node-type-agnostic fitView options
   /** Custom handler invoked instead of `fitView` when the fit button is pressed. */
   readonly fitViewFn = input<(() => void) | undefined>(undefined);
   /** Lay buttons out horizontally or vertically. */

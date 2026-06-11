@@ -400,7 +400,8 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     }
   }
 
-  updateNodeInternals(updates: Map<string, any>): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  updateNodeInternals(updates: Map<string, any>): void { // store drag-callback boundary mirrors xyflow's untyped signature
     const { changes, updatedInternals } = updateNodeInternalsSystem(
       updates,
       this.nodeLookup,
@@ -435,7 +436,8 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     }
   }
 
-  updateNodePositions(nodeDragItems: Map<string, any>, dragging = false): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  updateNodePositions(nodeDragItems: Map<string, any>, dragging = false): void { // store drag-callback boundary mirrors xyflow's untyped signature
     const parentExpandChildren: ParentExpandChild[] = [];
     const changes: NodeChange[] = [];
     const conn = this.connection();
@@ -1016,8 +1018,10 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
       // Store-bound callbacks for system subsystems
       panBy: (delta: { x: number; y: number }) => this.panBy(delta),
-      updateNodePositions: (items: Map<string, any>, dragging?: boolean) => this.updateNodePositions(items, dragging),
-      unselectNodesAndEdges: (params?: any) => this.unselectNodesAndEdges(params),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      updateNodePositions: (items: Map<string, any>, dragging?: boolean) => this.updateNodePositions(items, dragging), // store API boundary
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      unselectNodesAndEdges: (params?: any) => this.unselectNodesAndEdges(params), // store API boundary
       addSelectedNodes: (ids: string[]) => this.addSelectedNodes(ids),
       addSelectedEdges: (ids: string[]) => this.addSelectedEdges(ids),
       updateConnection: (conn: ConnectionState) => this.updateConnection(conn),

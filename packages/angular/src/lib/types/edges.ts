@@ -83,7 +83,8 @@ export type EdgeProps<EdgeType extends Edge = Edge> = Pick<
 /**
  * Map of edge type names to Angular component types.
  */
-export type EdgeTypes = Record<string, Type<any>>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type EdgeTypes = Record<string, Type<any>>; // heterogeneous component registry
 
 /**
  * Input contract for custom edge components rendered via NgComponentOutlet.

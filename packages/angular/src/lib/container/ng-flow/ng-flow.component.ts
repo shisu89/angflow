@@ -248,7 +248,8 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
   /** Map of type name → TemplateRef built from content-projected templates */
   readonly nodeTemplateMap = computed(() => {
-    const map = new Map<string, TemplateRef<any>>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const map = new Map<string, TemplateRef<any>>(); // heterogeneous node templates
     for (const dir of this.nodeTypeDirectives()) {
       map.set(dir.type, dir.template);
     }
@@ -840,21 +841,28 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     };
 
     // Wire node drag callbacks so XYDrag can fire them for multi-node dragging
+    // (store drag-callback boundary mirrors xyflow's untyped signature)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.store.onNodeDragStart = (event: MouseEvent, node: any, nodes: any[]) => {
       this.nodeDragStart.emit({ event, node, nodes });
     };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.store.onNodeDrag = (event: MouseEvent, node: any, nodes: any[]) => {
       this.nodeDrag.emit({ event, node, nodes });
     };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.store.onNodeDragStop = (event: MouseEvent, node: any, nodes: any[]) => {
       this.nodeDragStop.emit({ event, node, nodes });
     };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.store.onSelectionDragStart = (event: MouseEvent, nodes: any[]) => {
       this.selectionDragStart.emit({ event, nodes });
     };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.store.onSelectionDrag = (event: MouseEvent, nodes: any[]) => {
       this.selectionDrag.emit({ event, nodes });
     };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.store.onSelectionDragStop = (event: MouseEvent, nodes: any[]) => {
       this.selectionDragStop.emit({ event, nodes });
     };

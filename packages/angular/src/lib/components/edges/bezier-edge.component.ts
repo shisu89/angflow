@@ -28,7 +28,8 @@ export class BezierEdgeComponent {
   readonly type = input<string>();
   readonly animated = input(false);
   readonly selected = input(false);
-  readonly data = input<any>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  readonly data = input<any>(); // untyped built-in edge data
   readonly label = input<string>();
   readonly sourceX = input(0);
   readonly sourceY = input(0);

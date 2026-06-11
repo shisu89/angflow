@@ -185,7 +185,8 @@ export class TemplateNodeComponent {
   private readonly store = inject(FlowStore);
 
   readonly id = input.required<string>();
-  readonly data = input<any>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  readonly data = input<any>(); // untyped built-in node data
   readonly type = input<string>();
   readonly selected = input(false);
   readonly dragging = input(false);

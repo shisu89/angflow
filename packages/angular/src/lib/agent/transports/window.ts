@@ -46,6 +46,7 @@ export class WindowTransport implements AgentTransport {
     this.requestHandler = handler;
     if (typeof window === 'undefined') return;
 
+    // attach/detach the bridge namespace key on window without widening its global type.
     const winRec = window as unknown as Record<string, unknown>;
     if (winRec[this.namespace] !== undefined) {
       // Surface the collision so a second WindowTransport (or a host that
@@ -85,6 +86,7 @@ export class WindowTransport implements AgentTransport {
     this.requestHandler = null;
     this.subscribers.clear();
     if (typeof window !== 'undefined') {
+      // attach/detach the bridge namespace key on window without widening its global type.
       delete (window as unknown as Record<string, unknown>)[this.namespace];
     }
   }

@@ -15,14 +15,12 @@ import {
   type HandleConnection,
   type ConnectionState,
   type NodeBase,
-  type EdgeBase,
   type InternalNodeUpdate,
   type HandleType,
   type NodeChange,
   type EdgeChange,
 } from '@angflow/system';
 
-import { FlowStore } from './flow-store.service';
 import { elementToRemoveChange } from '../utils/changes';
 import { injectFlowStore } from '../utils/inject-flow-store';
 import type { Node, Edge, InternalNode, DeleteElementsOptions } from '../types';

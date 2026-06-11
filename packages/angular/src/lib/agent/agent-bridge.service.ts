@@ -257,6 +257,7 @@ export class AngflowAgentBridge {
     try {
       const params = req.params ?? {};
       if (req.method === 'list_flows') {
+        // list_flows ignores the service arg; null stub avoids resolving a flow.
         const result = await handler(null as unknown as NgFlowService, params);
         return { id: req.id, result };
       }

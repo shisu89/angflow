@@ -36,7 +36,8 @@ export interface FlowStoreState<NodeType extends Node = Node, EdgeType extends E
   nodeLookup: NodeLookup<InternalNodeBase<NodeType>>;
   parentLookup: ParentLookup<InternalNodeBase<NodeType>>;
   edgeLookup: EdgeLookup<EdgeType>;
-  connectionLookup: Map<string, Map<string, any>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  connectionLookup: Map<string, Map<string, any>>; // store interface mirrors xyflow boundary types
 
   onNodesChange: ((changes: NodeChange<NodeType>[]) => void) | null;
   onEdgesChange: ((changes: EdgeChange<EdgeType>[]) => void) | null;
@@ -81,19 +82,22 @@ export interface FlowStoreState<NodeType extends Node = Node, EdgeType extends E
 
   connectionMode: ConnectionMode;
   connection: ConnectionState;
-  connectionClickStartHandle: any | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  connectionClickStartHandle: any | null; // store interface mirrors xyflow boundary types
   connectOnClick: boolean;
   connectionRadius: number;
 
   fitViewQueued: boolean;
-  fitViewOptions: any | undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  fitViewOptions: any | undefined; // store interface mirrors xyflow boundary types
 
   autoPanOnConnect: boolean;
   autoPanOnNodeDrag: boolean;
   autoPanOnNodeFocus: boolean;
   autoPanSpeed: number;
 
-  isValidConnection: ((connection: any) => boolean) | undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  isValidConnection: ((connection: any) => boolean) | undefined; // store interface mirrors xyflow boundary types
   onError: OnError;
 
   lib: string;

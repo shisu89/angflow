@@ -25,7 +25,8 @@ export class StepEdgeComponent {
   readonly targetY = input(0);
   readonly sourcePosition = input<Position>(Position.Bottom);
   readonly targetPosition = input<Position>(Position.Top);
-  readonly data = input<any>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  readonly data = input<any>(); // untyped built-in edge data
   readonly selected = input(false);
   readonly markerStart = input<string>();
   readonly markerEnd = input<string>();

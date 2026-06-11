@@ -22,7 +22,8 @@ export class PaneComponent implements OnDestroy {
 
   readonly panOnDrag = input<boolean | number[]>(true);
   readonly selectionOnDrag = input(false);
-  readonly selectionKeyCode = input<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  readonly selectionKeyCode = input<any>(null); // KeyCode union accepts string|string[]|null
   readonly selectionMode = input<SelectionMode>(SelectionMode.Full);
 
   readonly selectionStart = output<MouseEvent>();
