@@ -4,17 +4,26 @@
  * Angular's JIT compiler (used in Vitest) does not populate ɵcmp.inputs from
  * signal-based input() declarations — that requires the AOT transform.  We
  * therefore bypass template-binding and drive signal inputs directly via the
- * internal ɵSIGNAL node, which is a stable (if private) Angular API exposed as
- * an official export alias.  All runtime behaviour (effect, ngOnDestroy, store
+ * internal ɵSIGNAL node, which is a stable (if private) Angular API exported
+ * as an official alias.  All runtime behaviour (effect, ngOnDestroy, store
  * writes) is fully exercised.
+ *
+ * vi.mock with { spy: true } wraps every @angflow/system export in a spy but
+ * keeps real implementations, so the data-registration tests are unaffected.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection, ɵSIGNAL } from '@angular/core';
+import * as system from '@angflow/system';
 import { HandleComponent } from './handle.component';
 import { FlowStore } from '../../services/flow-store.service';
 import { NODE_ID } from '../../services/tokens';
 import type { HandleType } from '@angflow/system';
+
+// Wrap every @angflow/system export in a vi.spy (real implementations kept).
+// This lets tests call vi.spyOn(system.XYHandle, 'onPointerDown') to intercept
+// the call from HandleComponent.onPointerDown without mocking its logic.
+vi.mock('@angflow/system', { spy: true });
 
 /** Set an input() signal's value directly without going through the template. */
 function setSignalInput<T>(instance: unknown, inputName: string, value: T): void {
@@ -158,17 +167,23 @@ describe('HandleComponent data registration', () => {
   });
 });
 
-// ── Integration: collapse-hidden child is never a connection drop candidate ──
+// ── Integration: isNodeVisible wiring at the XYHandle.onPointerDown call site ──
 //
-// Strategy: we don't fire real pointer events (XYHandle.onPointerDown uses
-// document-level event listeners that are hard to drive in jsdom). Instead we
-// test the predicate closure that the component would supply to XYHandle.
-// This is the correct boundary to test: the component's responsibility is to
-// build the right predicate; XYHandle's responsibility to call it is covered
-// by the system-level XYHandle.spec.ts tests.
+// Strategy: spy on XYHandle.onPointerDown (vi.mock with { spy: true } keeps the
+// real implementation but makes every method spyable). Call the component's
+// onPointerDown directly — bypassing DOM events so jsdom's missing pointer-event
+// infrastructure doesn't interfere — then capture the params object and assert:
+//   1. isNodeVisible is a function (the wiring exists).
+//   2. The function returns false for a collapse-hidden child id.
+//   3. The function returns true for a visible node id.
+// This pins the REAL production wiring: deleting the isNodeVisible line in
+// handle.component.ts makes these tests fail.
 
-describe('HandleComponent — isNodeVisible predicate for collapsedHiddenIds', () => {
-  it('returns false for a node in collapsedHiddenIds and true for a visible node', () => {
+describe('HandleComponent — isNodeVisible wiring to XYHandle.onPointerDown', () => {
+  let store: FlowStore;
+  let component: HandleComponent;
+
+  beforeEach(() => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [HandleComponent],
@@ -178,66 +193,73 @@ describe('HandleComponent — isNodeVisible predicate for collapsedHiddenIds', (
         { provide: NODE_ID, useValue: 'node-source' },
       ],
     });
+    store = TestBed.inject(FlowStore);
+    const fixture = TestBed.createComponent(HandleComponent);
+    component = fixture.componentInstance;
+    setSignalInput(component, 'type', 'source' as HandleType);
+    setSignalInput(component, 'handleId', 'h1');
+    fixture.detectChanges();
+  });
 
-    const store = TestBed.inject(FlowStore);
-
-    // Populate the store with a group containing a collapsed child.
-    // We drive collapsedHiddenIds by setting a collapsed group node via setNodes.
-    // FlowStore.setNodes populates nodeLookup which getCollapsedHiddenIds reads.
+  function seedCollapsedGroup(): void {
     store.setNodes([
       { id: 'group', position: { x: 0, y: 0 }, data: {}, collapsed: true },
       { id: 'child', position: { x: 10, y: 10 }, data: {}, parentId: 'group' },
       { id: 'visible', position: { x: 200, y: 200 }, data: {} },
     ] as any[]);
+  }
 
-    // collapsedHiddenIds should now include 'child' but not 'group' or 'visible'.
-    const hiddenIds = store.collapsedHiddenIds();
-    expect(hiddenIds.has('child')).toBe(true);
-    expect(hiddenIds.has('group')).toBe(false);
-    expect(hiddenIds.has('visible')).toBe(false);
+  it('passes isNodeVisible to XYHandle.onPointerDown and it returns false for a collapse-hidden child', () => {
+    seedCollapsedGroup();
 
-    // Build the exact predicate the component passes to XYHandle.onPointerDown.
-    const predicate = (n: { id: string }) => !store.collapsedHiddenIds().has(n.id);
+    const spy = vi.spyOn(system.XYHandle, 'onPointerDown').mockImplementation(() => {});
+    try {
+      component.onPointerDown(new MouseEvent('mousedown', { button: 0, bubbles: true }));
 
-    // A collapse-hidden child must not be a candidate.
-    expect(predicate({ id: 'child' })).toBe(false);
-    // The group node itself is visible.
-    expect(predicate({ id: 'group' })).toBe(true);
-    // A completely separate visible node is a candidate.
-    expect(predicate({ id: 'visible' })).toBe(true);
-    // An arbitrary unknown node defaults to visible.
-    expect(predicate({ id: 'unknown' })).toBe(true);
+      expect(spy).toHaveBeenCalledOnce();
+      const params = spy.mock.calls[0][1] as Record<string, unknown>;
+
+      expect(typeof params['isNodeVisible']).toBe('function');
+      const isNodeVisible = params['isNodeVisible'] as (n: { id: string }) => boolean;
+
+      // Collapse-hidden child must be excluded.
+      expect(isNodeVisible({ id: 'child' })).toBe(false);
+      // Visible nodes must be included.
+      expect(isNodeVisible({ id: 'group' })).toBe(true);
+      expect(isNodeVisible({ id: 'visible' })).toBe(true);
+      expect(isNodeVisible({ id: 'unknown' })).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
-  it('predicate reflects signal reactivity: after expanding group child becomes visible', () => {
-    TestBed.resetTestingModule();
-    TestBed.configureTestingModule({
-      imports: [HandleComponent],
-      providers: [
-        provideZonelessChangeDetection(),
-        FlowStore,
-        { provide: NODE_ID, useValue: 'node-source' },
-      ],
-    });
-
-    const store = TestBed.inject(FlowStore);
-
+  it('isNodeVisible predicate reflects signal reactivity: expanding a group makes its child visible', () => {
+    // Start with a collapsed group so child is hidden.
     store.setNodes([
       { id: 'group', position: { x: 0, y: 0 }, data: {}, collapsed: true },
       { id: 'child', position: { x: 10, y: 10 }, data: {}, parentId: 'group' },
     ] as any[]);
 
-    const predicate = (n: { id: string }) => !store.collapsedHiddenIds().has(n.id);
+    const spy = vi.spyOn(system.XYHandle, 'onPointerDown').mockImplementation(() => {});
+    try {
+      component.onPointerDown(new MouseEvent('mousedown', { button: 0, bubbles: true }));
 
-    expect(predicate({ id: 'child' })).toBe(false);
+      const params = spy.mock.calls[0][1] as Record<string, unknown>;
+      const isNodeVisible = params['isNodeVisible'] as (n: { id: string }) => boolean;
 
-    // Expand the group — setNodes with collapsed:false.
-    store.setNodes([
-      { id: 'group', position: { x: 0, y: 0 }, data: {}, collapsed: false },
-      { id: 'child', position: { x: 10, y: 10 }, data: {}, parentId: 'group' },
-    ] as any[]);
+      // Child is hidden while group is collapsed.
+      expect(isNodeVisible({ id: 'child' })).toBe(false);
 
-    // Now the predicate must return true for the child (no longer hidden).
-    expect(predicate({ id: 'child' })).toBe(true);
+      // Expand the group — predicate closure reads the live store signal.
+      store.setNodes([
+        { id: 'group', position: { x: 0, y: 0 }, data: {}, collapsed: false },
+        { id: 'child', position: { x: 10, y: 10 }, data: {}, parentId: 'group' },
+      ] as any[]);
+
+      // The same captured predicate now returns true because the signal updated.
+      expect(isNodeVisible({ id: 'child' })).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
