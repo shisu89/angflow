@@ -81,6 +81,7 @@ export class SelectionBoxComponent {
       if (!box) {
         // Box left the DOM (selection cleared) — drop the d3-drag binding.
         this.dragInstance?.destroy();
+        this.dragInstance = null;
         return;
       }
 
