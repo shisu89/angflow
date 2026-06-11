@@ -95,13 +95,22 @@ export class HandleComponent implements OnInit, OnDestroy {
   readonly dataId = computed(() => `${this.store.rfId()}-${this.nodeId}-${this.handleId()}-${this.type()}`);
 
   private isRegistered = false;
+  private prevKey: { nodeId: string; handleId: string | null; type: HandleType } | null = null;
 
   constructor(@Optional() @Inject(NODE_ID) nodeId: string | null) {
     this.nodeId = nodeId ?? '';
 
     effect(() => {
       const d = this.data();
-      this.store.registerHandleData(this.nodeId, this.handleId(), this.type(), d);
+      const handleId = this.handleId();
+      const type = this.type();
+      // Re-keying (id/type changed): drop the stale entry first, otherwise it
+      // lingers in the store registry forever.
+      if (this.prevKey && (this.prevKey.handleId !== handleId || this.prevKey.type !== type)) {
+        this.store.unregisterHandleData(this.prevKey.nodeId, this.prevKey.handleId, this.prevKey.type);
+      }
+      this.store.registerHandleData(this.nodeId, handleId, type, d);
+      this.prevKey = { nodeId: this.nodeId, handleId, type };
       this.isRegistered = true;
     });
   }

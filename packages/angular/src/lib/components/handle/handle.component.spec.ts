@@ -108,6 +108,37 @@ describe('HandleComponent data registration', () => {
     expect(store.getHandleData('node-A', null, 'target')).toBeUndefined();
   });
 
+  it('unregisters the previous key when handleId changes', () => {
+    const fixture = TestBed.createComponent(HandleComponent);
+    const inst = fixture.componentInstance;
+    setSignalInput(inst, 'type', 'source' as HandleType);
+    setSignalInput(inst, 'handleId', 'h1');
+    setSignalInput(inst, 'data', 'payload');
+    fixture.detectChanges();
+    expect(store.getHandleData('node-A', 'h1', 'source')).toBe('payload');
+
+    setSignalInput(inst, 'handleId', 'h2');
+    fixture.detectChanges();
+
+    expect(store.getHandleData('node-A', 'h2', 'source')).toBe('payload');
+    expect(store.getHandleData('node-A', 'h1', 'source')).toBeUndefined();
+  });
+
+  it('unregisters the previous key when type changes', () => {
+    const fixture = TestBed.createComponent(HandleComponent);
+    const inst = fixture.componentInstance;
+    setSignalInput(inst, 'type', 'source' as HandleType);
+    setSignalInput(inst, 'handleId', 'h1');
+    setSignalInput(inst, 'data', 'payload');
+    fixture.detectChanges();
+
+    setSignalInput(inst, 'type', 'target' as HandleType);
+    fixture.detectChanges();
+
+    expect(store.getHandleData('node-A', 'h1', 'target')).toBe('payload');
+    expect(store.getHandleData('node-A', 'h1', 'source')).toBeUndefined();
+  });
+
   it('sets the data-floating attribute when the floating input is true', () => {
     // Case 1: floating=true
     const fixture1 = TestBed.createComponent(HandleComponent);
