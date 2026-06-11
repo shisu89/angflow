@@ -342,6 +342,12 @@ describe('NgFlowService', () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }));
       expect(pressed()).toBe(false);
     });
+
+    it('does not collide cache keys for space-containing key names', () => {
+      const combo = service.selectKeyPressed(['a', 'b']);
+      const spaced = service.selectKeyPressed('a b');
+      expect(spaced).not.toBe(combo);
+    });
   });
 });
 

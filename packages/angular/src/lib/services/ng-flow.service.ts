@@ -869,7 +869,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    */
   selectKeyPressed(keyCode: string | string[]): Signal<boolean> {
     const keys = Array.isArray(keyCode) ? keyCode : [keyCode];
-    const cacheKey = keys.join(' ');
+    const cacheKey = keys.join('\0');
     const cached = this.keyPressedSignals.get(cacheKey);
     if (cached) return cached;
 
