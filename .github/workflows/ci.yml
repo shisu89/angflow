@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Build, typecheck, test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build @angflow/system
+        run: pnpm --filter @angflow/system run build
+
+      - name: Build @angflow/angular
+        run: pnpm --filter @angflow/angular run build
+
+      - name: Build @angflow/mcp
+        run: pnpm --filter @angflow/mcp run build
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test @angflow/system
+        run: pnpm --filter @angflow/system run test
+
+      - name: Test @angflow/angular
+        run: pnpm --filter @angflow/angular run test
+
+      - name: Test @angflow/mcp
+        run: pnpm --filter @angflow/mcp run test
