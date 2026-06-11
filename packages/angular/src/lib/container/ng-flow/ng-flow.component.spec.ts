@@ -57,6 +57,34 @@ describe('NgFlowComponent fitView startup', () => {
     expect(inst.store.transform()).toEqual(before);
     expect(inst.store.fitViewQueued()).toBe(true);
   });
+
+  it('seeds store width/height synchronously in ngAfterViewInit (before the ResizeObserver fires)', () => {
+    // The ResizeObserver is stubbed to never fire (FakeResizeObserver). React's
+    // useResizeHandler reads getDimensions() synchronously on mount before any
+    // RO callback; without that, the container dimensions stay 0 and a queued
+    // init fitView resolves against a zero-extent viewport — getViewportForBounds
+    // returns zoom 0, which clamps to minZoom (0.5) and emits NaN transforms
+    // through the animated interpolateZoom. Seed dimensions synchronously instead.
+    const sizeSpy = vi
+      .spyOn(HTMLElement.prototype, 'offsetWidth', 'get')
+      .mockReturnValue(800);
+    const heightSpy = vi
+      .spyOn(HTMLElement.prototype, 'offsetHeight', 'get')
+      .mockReturnValue(600);
+    try {
+      const fixture = TestBed.createComponent(NgFlowComponent);
+      const inst = fixture.componentInstance;
+      fixture.detectChanges(); // runs ngAfterViewInit
+
+      // FakeResizeObserver never delivers dims, so these are 0 unless seeded
+      // synchronously from getBoundingClientRect/offset* in ngAfterViewInit.
+      expect(inst.store.width()).toBe(800);
+      expect(inst.store.height()).toBe(600);
+    } finally {
+      sizeSpy.mockRestore();
+      heightSpy.mockRestore();
+    }
+  });
 });
 
 describe('NgFlowComponent controlled [viewport]', () => {

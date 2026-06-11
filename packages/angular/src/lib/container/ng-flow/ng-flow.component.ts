@@ -26,6 +26,7 @@ import {
   SelectionMode,
   infiniteExtent,
   XYPanZoom,
+  getDimensions,
   type Viewport,
   type CoordinateExtent,
   type NodeOrigin,
@@ -901,6 +902,17 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     if (!containerEl) return;
 
     this.store.domNode.set(containerEl);
+
+    // Seed container dimensions synchronously BEFORE initPanZoom drains any
+    // queued init fitView. The ResizeObserver below only delivers dimensions
+    // asynchronously (next frame), so without this seed the first fitView runs
+    // against width/height 0 — getViewportForBounds then returns zoom 0, which
+    // clamps to minZoom and emits NaN transforms through the animated
+    // interpolateZoom. Mirrors React's useResizeHandler, including the non-zero
+    // fallback so a zero-sized container never yields a degenerate fit.
+    const initialSize = getDimensions(containerEl);
+    this.store.width.set(initialSize.width || 500);
+    this.store.height.set(initialSize.height || 500);
 
     // Set up ResizeObserver for container dimensions
     this.resizeObserver = new ResizeObserver((entries) => {
