@@ -373,6 +373,35 @@ describe('onNodeKeyDown selection guards', () => {
     component.onNodeKeyDown(new KeyboardEvent('keydown', { key: 'Enter' }), node);
     expect(store.selectedNodes()).toHaveLength(0);
   });
+
+  it('Space keydown selects a normal node (parity with Enter)', () => {
+    store.elementsSelectable.set(true);
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {} }]);
+    const node = store.nodeLookup.get('n1')!.internals.userNode;
+    component.onNodeKeyDown(new KeyboardEvent('keydown', { key: ' ' }), node);
+    expect(store.selectedNodes()).toHaveLength(1);
+  });
+
+  it('Enter on an already-selected node is a no-op without multi-selection', () => {
+    store.elementsSelectable.set(true);
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {} }]);
+    store.addSelectedNodes(['n1']);
+    expect(store.selectedNodes()).toHaveLength(1);
+    const node = store.nodeLookup.get('n1')!.internals.userNode;
+    component.onNodeKeyDown(new KeyboardEvent('keydown', { key: 'Enter' }), node);
+    // Still selected — Enter neither re-selects (no-op) nor deselects.
+    expect(store.selectedNodes()).toHaveLength(1);
+  });
+
+  it('Enter on an already-selected node toggles off when multiSelectionActive', () => {
+    store.elementsSelectable.set(true);
+    store.multiSelectionActive.set(true);
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {} }]);
+    store.addSelectedNodes(['n1']);
+    const selected = store.nodeLookup.get('n1')!.internals.userNode;
+    component.onNodeKeyDown(new KeyboardEvent('keydown', { key: 'Enter' }), selected);
+    expect(store.selectedNodes()).toHaveLength(0);
+  });
 });
 
 describe('computeNodeInputsKey (pure)', () => {

@@ -308,10 +308,21 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
       this.store.unselectNodesAndEdges({ nodes: [node] });
       // Move focus to the container to avoid the node staying focused
       (event.currentTarget as HTMLElement)?.blur();
-    } else if (event.key === 'Enter') {
-      if (this.store.elementsSelectable() && node.selectable !== false && !node.selected) {
-        this.store.addSelectedNodes([node.id]);
-      }
+      return;
+    }
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    if (!this.store.elementsSelectable() || node.selectable === false) return;
+
+    // Mirror React's handleNodeClick for the selection keys: select when
+    // unselected; toggle off only when already selected AND multi-selection is
+    // active. (React: unselect=false for Enter/Space, so a selected node with
+    // multiSelectionActive=false is a no-op.)
+    this.store.nodesSelectionActive.set(false);
+    if (!node.selected) {
+      this.store.addSelectedNodes([node.id]);
+    } else if (this.store.multiSelectionActive()) {
+      this.store.unselectNodesAndEdges({ nodes: [node] });
+      (event.currentTarget as HTMLElement)?.blur();
     }
   }
 
