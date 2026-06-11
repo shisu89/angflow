@@ -45,6 +45,20 @@ import { applyNodeChanges, applyEdgeChanges, createSelectionChange, getSelection
 import { sampleTween, prefersReducedMotion, type TweenEntry } from '../utils/position-tween';
 import { getCollapsedHiddenIds, rewriteEdgesForCollapse, type DisplayEdge } from '../graph/collapse';
 
+/**
+ * Content equality for derived string-id sets. Used as a computed `equal` so
+ * a recompute that lands on identical membership keeps the previous Set
+ * identity and does not notify consumers. Exported for tests.
+ */
+export function stringSetEquals(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
+  if (a === b) return true;
+  if (a.size !== b.size) return false;
+  for (const v of a) {
+    if (!b.has(v)) return false;
+  }
+  return true;
+}
+
 @Injectable()
 export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edge> implements OnDestroy {
   // ── Writable signals ──────────────────────────────────────────────────
@@ -298,7 +312,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   readonly collapsedHiddenIds = computed(() => {
     this.version();
     return getCollapsedHiddenIds(this.nodeLookup);
-  });
+  }, { equal: stringSetEquals });
 
   readonly visibleNodes: Signal<InternalNodeBase<NodeType>[]> = computed(() => {
     // Read version to trigger recomputation on any visual change (drag, add, remove)
@@ -331,7 +345,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
         .filter((e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target))
         .map((e) => e.id)
     );
-  });
+  }, { equal: stringSetEquals });
 
   // ── Actions ───────────────────────────────────────────────────────────
 

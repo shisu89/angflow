@@ -778,6 +778,59 @@ describe('FlowStore', () => {
     });
   });
 
+  describe('derived id sets keep identity when membership is unchanged', () => {
+    it('collapsedHiddenIds preserves identity across version bumps', () => {
+      store.setNodes([
+        { id: 'g', data: {}, position: { x: 0, y: 0 }, collapsed: true },
+        { id: 'a', data: {}, position: { x: 0, y: 0 }, parentId: 'g' },
+      ]);
+      const first = store.collapsedHiddenIds();
+      expect(first).toEqual(new Set(['a']));
+      store.bumpVersion();
+      expect(store.collapsedHiddenIds()).toBe(first);
+    });
+
+    it('PERF: visibleEdgeIds does not notify consumers on a drag-frame bump', () => {
+      store.setNodes([makeNode('1'), makeNode('2')]);
+      store.setEdges([makeEdge('e1', '1', '2')]);
+      const spy = vi.fn();
+      const consumer = computed(() => {
+        spy();
+        return store.visibleEdgeIds();
+      });
+      consumer();
+      const calls = spy.mock.calls.length;
+
+      store.triggerNodeChanges([
+        { id: '1', type: 'position', position: { x: 5, y: 5 }, dragging: true },
+      ]);
+      consumer();
+      expect(spy.mock.calls.length).toBe(calls); // membership unchanged -> no re-fire
+    });
+
+    it('REGRESSION: visibleEdgeIds still updates when the edge set changes', () => {
+      store.setNodes([makeNode('1'), makeNode('2'), makeNode('3')]);
+      store.setEdges([makeEdge('e1', '1', '2')]);
+      expect(store.visibleEdgeIds().has('e1')).toBe(true);
+      store.setEdges([makeEdge('e1', '1', '2'), makeEdge('e2', '2', '3')]);
+      expect(store.visibleEdgeIds().has('e2')).toBe(true);
+      expect(store.visibleEdgeIds().size).toBe(2);
+    });
+
+    it('REGRESSION: collapsedHiddenIds still updates when collapse state changes', () => {
+      store.setNodes([
+        { id: 'g', data: {}, position: { x: 0, y: 0 }, collapsed: true },
+        { id: 'a', data: {}, position: { x: 0, y: 0 }, parentId: 'g' },
+      ]);
+      expect(store.collapsedHiddenIds()).toEqual(new Set(['a']));
+      store.setNodes([
+        { id: 'g', data: {}, position: { x: 0, y: 0 }, collapsed: false },
+        { id: 'a', data: {}, position: { x: 0, y: 0 }, parentId: 'g' },
+      ]);
+      expect(store.collapsedHiddenIds()).toEqual(new Set());
+    });
+  });
+
   describe('transform writes are version-free', () => {
     it('writing transform does not change version; viewport stays reactive', () => {
       store.setNodes([makeNode('1')]);
