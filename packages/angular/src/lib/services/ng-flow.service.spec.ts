@@ -587,6 +587,35 @@ describe('setNodePositions coordinateSpace', () => {
     await service.setNodePositions({ c: { x: 300, y: 200 } }, { coordinateSpace: 'absolute', animate: { duration: 100 } });
     expect(tween).toHaveBeenCalledWith({ c: { x: 200, y: 150 } }, 100);
   });
+
+  it("absolute: moving a parent AND its child in one map resolves the child against the parent's NEW position", async () => {
+    store.setNodes([
+      { id: 'p', data: {}, position: { x: 100, y: 50 } },
+      { id: 'c', data: {}, position: { x: 0, y: 0 }, parentId: 'p' },
+    ]);
+    await service.setNodePositions(
+      { p: { x: 200, y: 100 }, c: { x: 250, y: 160 } },
+      { coordinateSpace: 'absolute' },
+    );
+    expect(store.nodeLookup.get('p')!.position).toEqual({ x: 200, y: 100 });
+    expect(store.nodeLookup.get('c')!.position).toEqual({ x: 50, y: 60 });
+    expect(store.nodeLookup.get('c')!.internals.positionAbsolute).toEqual({ x: 250, y: 160 });
+  });
+
+  it("absolute: nested groups moved together resolve each child against its own parent's NEW position", async () => {
+    store.setNodes([
+      { id: 'g', data: {}, position: { x: 0, y: 0 } },
+      { id: 'p', data: {}, position: { x: 100, y: 100 }, parentId: 'g' },
+      { id: 'c', data: {}, position: { x: 10, y: 10 }, parentId: 'p' },
+    ]);
+    await service.setNodePositions(
+      { g: { x: 1000, y: 1000 }, p: { x: 1100, y: 1100 }, c: { x: 1150, y: 1150 } },
+      { coordinateSpace: 'absolute' },
+    );
+    expect(store.nodeLookup.get('g')!.position).toEqual({ x: 1000, y: 1000 });
+    expect(store.nodeLookup.get('p')!.position).toEqual({ x: 100, y: 100 });
+    expect(store.nodeLookup.get('c')!.position).toEqual({ x: 50, y: 50 });
+  });
 });
 
 describe('applyLayout coordinateSpace', () => {

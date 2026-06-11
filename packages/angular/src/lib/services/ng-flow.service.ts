@@ -248,9 +248,10 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * no children. Immediate (not animated).
    *
    * Resolves the box-origin ↔ child-coordinate feedback loop by capturing the
-   * children's absolute positions first, moving the box, then re-applying those
-   * absolutes against the moved box so the children's parent-relative positions
-   * shift to keep them pinned.
+   * children's absolute positions, then applying one combined absolute map (the
+   * group's new position + those child absolutes) — `setNodePositions` resolves
+   * each child against the group's NEW position from the same map, so the
+   * children's parent-relative positions shift to keep them visually pinned.
    */
   async sizeGroupToChildren(groupId: string, opts?: GroupBoundsOptions): Promise<void> {
     const children = this.getNodes()
@@ -273,8 +274,13 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     const bounds = getGroupBounds(members, opts);
     this.updateNode(groupId, { width: bounds.width, height: bounds.height } as Partial<NodeType>);
     // animate:false — this is a synchronous pin; tweening would drift the children mid-flight.
-    await this.setNodePositions({ [groupId]: bounds.position }, { coordinateSpace: 'absolute', animate: false });
-    await this.setNodePositions(childAbsolute, { coordinateSpace: 'absolute', animate: false });
+    // One combined absolute map: the group's new position + the children's
+    // (unchanged) absolutes. toRelativePositions resolves each child against the
+    // group's NEW position from this same map, keeping them visually pinned.
+    await this.setNodePositions(
+      { [groupId]: bounds.position, ...childAbsolute },
+      { coordinateSpace: 'absolute', animate: false },
+    );
   }
 
   /**
@@ -343,8 +349,19 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * Convert a flow-absolute position map into the store's `node.position` space
    * (parent-relative for parented nodes). Inverts the store's child transform
    * (`updateChildNode` → `calculateChildXYZ` → `getNodePositionWithOrigin`):
-   * `relative = absolute − parent.positionAbsolute + dims·origin`, using the
-   * child's origin (`node.origin ?? store.nodeOrigin`) and resolved dimensions.
+   * `relative = absolute − parentAbs + dims·origin`, using the child's origin
+   * (`node.origin ?? store.nodeOrigin`) and resolved dimensions.
+   *
+   * `parentAbs` is the parent's NEW absolute position when the SAME map also
+   * moves the parent (`positions[parentId]`) — exactly what compound
+   * `layoutNodes` returns, which moves a group and its members together. Because
+   * the incoming map is already in absolute space, the parent's own entry IS its
+   * new absolute, so no recursion is needed. When the map does not move the
+   * parent, we fall back to the parent's current `internals.positionAbsolute`.
+   * This avoids resolving the child against the parent's *pre-move* absolute,
+   * which would offset children by the parent's movement delta (compounding for
+   * nested groups).
+   *
    * Top-level nodes, unknown ids, and nodes whose parent is missing pass through
    * unchanged. The store re-applies extent clamping on write, so we don't clamp.
    */
@@ -363,7 +380,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
       const origin = node.origin ?? storeOrigin;
       const w = node.measured?.width ?? node.width ?? node.initialWidth ?? 0;
       const h = node.measured?.height ?? node.height ?? node.initialHeight ?? 0;
-      const pAbs = parent.internals.positionAbsolute;
+      const pAbs = positions[node.parentId!] ?? parent.internals.positionAbsolute;
       out[id] = { x: abs.x - pAbs.x + w * origin[0], y: abs.y - pAbs.y + h * origin[1] };
     }
     return out;
