@@ -1325,6 +1325,30 @@ describe('AngflowAgentBridge', () => {
     });
   });
 
+  describe('lifecycle', () => {
+    it('stops every transport when the bridge injector is destroyed', () => {
+      const stopSpy = vi.spyOn(transport, 'stop');
+      // Resetting the testing module destroys the environment injector the bridge lives in.
+      TestBed.resetTestingModule();
+      expect(stopSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps stopping remaining transports when one stop() throws', () => {
+      const throwing: AgentTransport = {
+        start: () => {},
+        send: () => {},
+        stop: () => {
+          throw new Error('boom');
+        },
+      };
+      const tail = new CapturingTransport();
+      setup([throwing, tail]);
+      const stopSpy = vi.spyOn(tail, 'stop');
+      TestBed.resetTestingModule();
+      expect(stopSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('history (undo/redo)', () => {
     async function flushEffects(): Promise<void> {
       TestBed.tick();

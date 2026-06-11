@@ -1,4 +1,5 @@
 import {
+  DestroyRef,
   Inject,
   Injectable,
   InjectionToken,
@@ -107,6 +108,7 @@ export class AngflowAgentBridge {
   private readonly history: AgentHistory | null;
   private readonly handlers = new Map<string, ToolHandler>();
   private readonly injector = inject(Injector);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly layoutFn: AgentLayoutFn | null;
   private started = false;
   private nextInProcessId = 1;
@@ -132,6 +134,7 @@ export class AngflowAgentBridge {
     this.layoutFn = layoutFn ?? null;
     this.installHandlers();
     this.start();
+    this.destroyRef.onDestroy(() => this.stop());
   }
 
   private reportError(err: unknown, ctx: { kind: 'transport-start' | 'transport-send' | 'dispatch'; transport?: AgentTransport; method?: string }): void {
@@ -226,6 +229,19 @@ export class AngflowAgentBridge {
         }
       } catch (err) {
         this.reportError(err, { kind: 'transport-start', transport: t });
+      }
+    }
+  }
+
+  /** Stop all transports. Invoked automatically when the owning injector is destroyed. */
+  private stop(): void {
+    if (!this.started) return;
+    this.started = false;
+    for (const t of this.transports) {
+      try {
+        t.stop();
+      } catch {
+        // A transport that throws during teardown must not break the others.
       }
     }
   }
