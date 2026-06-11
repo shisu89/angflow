@@ -1073,6 +1073,11 @@ function executeOp(flow: NgFlowService, op: Record<string, unknown>): unknown {
     case 'add_nodes': {
       const nodes = op['nodes'];
       if (!Array.isArray(nodes)) throw new InvalidParamsError('add_nodes: "nodes" must be an array.');
+      if (nodes.length > MAX_BULK_ELEMENTS) {
+        throw new InvalidParamsError(
+          `add_nodes: "nodes" exceeds the maximum of ${MAX_BULK_ELEMENTS} elements per call (got ${nodes.length}).`,
+        );
+      }
       const validated = nodes.map((n, i) =>
         validateNodeShape(n, `apply_changes/add_nodes[${i}]`),
       );
@@ -1087,6 +1092,11 @@ function executeOp(flow: NgFlowService, op: Record<string, unknown>): unknown {
     case 'add_edges': {
       const edges = op['edges'];
       if (!Array.isArray(edges)) throw new InvalidParamsError('add_edges: "edges" must be an array.');
+      if (edges.length > MAX_BULK_ELEMENTS) {
+        throw new InvalidParamsError(
+          `add_edges: "edges" exceeds the maximum of ${MAX_BULK_ELEMENTS} elements per call (got ${edges.length}).`,
+        );
+      }
       const validated = edges.map((e, i) =>
         validateEdgeShape(e, `apply_changes/add_edges[${i}]`),
       );
@@ -1184,9 +1194,17 @@ function requireObject(params: Record<string, unknown>, key: string): Record<str
   return value as Record<string, unknown>;
 }
 
+/** Hard cap on elements per bulk call (nodes, edges, apply_changes ops). */
+const MAX_BULK_ELEMENTS = 5000;
+
 function requireArray(params: Record<string, unknown>, key: string): unknown[] {
   const value = params[key];
   if (!Array.isArray(value)) throw new InvalidParamsError(`Param "${key}" must be an array.`);
+  if (value.length > MAX_BULK_ELEMENTS) {
+    throw new InvalidParamsError(
+      `Param "${key}" exceeds the maximum of ${MAX_BULK_ELEMENTS} elements per call (got ${value.length}).`,
+    );
+  }
   return value;
 }
 

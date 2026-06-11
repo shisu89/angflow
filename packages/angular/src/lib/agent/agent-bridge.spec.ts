@@ -1753,3 +1753,55 @@ describe('AngflowAgentBridge — style/className validation', () => {
     });
   });
 });
+
+describe('AngflowAgentBridge — bulk payload caps', () => {
+  let bridge: AngflowAgentBridge;
+  let transport: CapturingTransport;
+  let newFlow: () => NgFlowService;
+
+  beforeEach(() => {
+    transport = new CapturingTransport();
+    ({ bridge, newFlow } = setup([transport]));
+  });
+
+  describe('bulk payload caps', () => {
+    const bigNodes = (count: number) =>
+      Array.from({ length: count }, (_, i) => ({ id: `n${i}`, position: { x: 0, y: 0 }, data: {} }));
+
+    it('rejects add_nodes with more than 5000 elements with -32602 and mutates nothing', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const res = await transport.call('add_nodes', { nodes: bigNodes(5001) });
+      expect('error' in res && res.error.code).toBe(-32602);
+      expect('error' in res && res.error.message).toContain('5000');
+      expect(flow.getNodes()).toHaveLength(0);
+    });
+
+    it('rejects apply_changes with more than 5000 ops with -32602', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const ops = Array.from({ length: 5001 }, () => ({ op: 'deselect_all' }));
+      const res = await transport.call('apply_changes', { ops });
+      expect('error' in res && res.error.code).toBe(-32602);
+    });
+
+    it('rejects an oversized nested add_nodes op inside apply_changes (rollback, -32603 + failedIndex)', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const res = await transport.call('apply_changes', {
+        ops: [{ op: 'add_nodes', nodes: bigNodes(5001) }],
+      });
+      expect('error' in res && res.error.code).toBe(-32603);
+      expect('error' in res && res.error.data).toEqual({ failedIndex: 0 });
+      expect(flow.getNodes()).toHaveLength(0);
+    });
+
+    it('accepts bulk payloads at the 5000-element boundary', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const res = await transport.call('set_nodes', { nodes: bigNodes(5000) });
+      expect('error' in res).toBe(false);
+      expect(flow.getNodes()).toHaveLength(5000);
+    });
+  });
+});

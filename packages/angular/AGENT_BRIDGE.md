@@ -65,7 +65,7 @@ After this, the browser devtools console can do `await angflow.callTool('add_nod
 
 Every tool takes an optional `flowId` (omit when only one flow is registered; required otherwise). All payloads use the `Node` / `Edge` types from `@angflow/angular`.
 
-**Payload validation.** `add_node`, `add_nodes`, `set_nodes`, and the corresponding `add_node` / `add_nodes` ops inside `apply_changes` require each node to have a non-empty string `id` and a `position: { x: number, y: number }`. The edge variants require non-empty string `id`, `source`, and `target`. Malformed payloads fail with `-32602` *before* reaching `NgFlowService`. Additionally, `style` (when present) must be a plain object whose values are strings or numbers, string values must not contain `url(` or `expression(` (CSS-redressing guard), and `className` (when present) must be a string — violations fail with `-32602`. Inside `apply_changes`, the same violations surface as the batch's `-32603` rollback error with `data.failedIndex`. Note: `update_node` / `update_edge` *patches* are not currently subject to the style/className checks (the checks guard the add/replace paths).
+**Payload validation.** `add_node`, `add_nodes`, `set_nodes`, and the corresponding `add_node` / `add_nodes` ops inside `apply_changes` require each node to have a non-empty string `id` and a `position: { x: number, y: number }`. The edge variants require non-empty string `id`, `source`, and `target`. Malformed payloads fail with `-32602` *before* reaching `NgFlowService`. Additionally, `style` (when present) must be a plain object whose values are strings or numbers, string values must not contain `url(` or `expression(` (CSS-redressing guard), and `className` (when present) must be a string — violations fail with `-32602`. Inside `apply_changes`, the same violations surface as the batch's `-32603` rollback error with `data.failedIndex`. Note: `update_node` / `update_edge` *patches* are not currently subject to the style/className checks (the checks guard the add/replace paths). Bulk array parameters (`add_nodes`, `add_edges`, `set_nodes`, `set_edges`, and `apply_changes`' `ops`) are capped at 5000 elements per call; larger payloads fail with `-32602` before any mutation.
 
 ### Discovery / read
 
@@ -396,6 +396,8 @@ Emitted synchronously after every mutating tool call (before `flow.state`), and 
 | `-32603` | Internal error from the underlying `NgFlowService` call |
 
 **Note:** `apply_changes` rollback errors use code `-32603` and carry `data: { failedIndex }` in the error object indicating which op caused the failure.
+
+**Bulk caps:** array params above 5000 elements return `-32602` at the top level; an oversized nested `add_nodes`/`add_edges` op inside `apply_changes` rolls the batch back and returns `-32603` with `data: { failedIndex }`.
 
 **`layout_nodes` without a configured layout function** returns `-32601` with the message `"layout_nodes unavailable: no layout function configured. Pass \`layout\` to provideAgentBridge (e.g. dagreLayout from @angflow/angular/layout)."`. This is `-32601` (not `-32602`) because the issue is a missing capability on the deployment side, not a malformed request.
 
