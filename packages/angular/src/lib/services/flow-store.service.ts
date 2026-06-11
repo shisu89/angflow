@@ -582,8 +582,9 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     if (allPosition) {
       // Update user nodes array with new positions (cheap shallow copy)
       const currentNodes = this.nodes();
+      const storeOrigin = this.nodeOrigin();
       let nodesChanged = false;
-      let touchedParented = false;
+      let needsAbsoluteRecompute = false;
 
       for (const change of changes) {
         if (change.type !== 'position') continue;
@@ -598,7 +599,21 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
           if (internalNode.internals) {
             internalNode.internals.positionAbsolute = change.position;
           }
-          if (internalNode.parentId) touchedParented = true;
+          // The verbatim `positionAbsolute = change.position` assignment above is
+          // only correct for a top-level, origin-[0,0], childless node. It is wrong
+          // and needs a full recompute when the moved node:
+          //   - is parented (its absolute depends on the parent chain), or
+          //   - is itself a parent (children's absolutes shift with it), or
+          //   - has a non-zero effective origin (absolute = position − dims·origin).
+          const origin = internalNode.origin ?? storeOrigin;
+          if (
+            internalNode.parentId ||
+            this.parentLookup.has(change.id) ||
+            origin[0] !== 0 ||
+            origin[1] !== 0
+          ) {
+            needsAbsoluteRecompute = true;
+          }
           mutated = true;
         }
         if (change.dragging !== undefined) {
@@ -623,11 +638,11 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
         }
       }
 
-      // Parented nodes need positionAbsolute recomputed from their parent chain;
-      // the in-place assignment above is correct only for top-level nodes. This
-      // walks the whole lookup, so it's gated to runs where a parented node moved
-      // (top-level-only drags keep the O(1) fast path).
-      if (touchedParented) {
+      // Recompute absolute positions when the verbatim assignment above is not
+      // sufficient (parented nodes, group/parent moves, or non-default origins).
+      // This walks the whole lookup, so it's gated to those runs — plain
+      // top-level, origin-[0,0], childless drags keep the O(changes) fast path.
+      if (needsAbsoluteRecompute) {
         updateAbsolutePositions(this.nodeLookup, this.parentLookup, {
           nodeOrigin: this.nodeOrigin(),
           nodeExtent: this.nodeExtent(),

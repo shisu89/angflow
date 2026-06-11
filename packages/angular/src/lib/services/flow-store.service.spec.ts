@@ -142,6 +142,60 @@ describe('FlowStore', () => {
     });
   });
 
+  // ── position fast-path: positionAbsolute consistency ──────────────────
+
+  describe('position fast-path keeps positionAbsolute consistent', () => {
+    it('moving a group updates its children’s positionAbsolute', () => {
+      store.setNodes([
+        makeNode('g', { position: { x: 100, y: 100 } }),
+        makeNode('c', { position: { x: 10, y: 10 }, parentId: 'g' }),
+      ]);
+      expect(store.nodeLookup.get('c')!.internals!.positionAbsolute).toEqual({ x: 110, y: 110 });
+
+      store.triggerNodeChanges([
+        { id: 'g', type: 'position', position: { x: 200, y: 300 }, dragging: true },
+      ]);
+
+      expect(store.nodeLookup.get('g')!.internals!.positionAbsolute).toEqual({ x: 200, y: 300 });
+      expect(store.nodeLookup.get('c')!.internals!.positionAbsolute).toEqual({ x: 210, y: 310 });
+    });
+
+    it('moving a group updates grandchildren too (nested groups)', () => {
+      store.setNodes([
+        makeNode('g', { position: { x: 0, y: 0 } }),
+        makeNode('sub', { position: { x: 10, y: 10 }, parentId: 'g' }),
+        makeNode('leaf', { position: { x: 5, y: 5 }, parentId: 'sub' }),
+      ]);
+      store.triggerNodeChanges([
+        { id: 'g', type: 'position', position: { x: 100, y: 100 } },
+      ]);
+      expect(store.nodeLookup.get('leaf')!.internals!.positionAbsolute).toEqual({ x: 115, y: 115 });
+    });
+
+    it('a top-level node with non-default origin gets an origin-adjusted positionAbsolute', () => {
+      store.nodeOrigin.set([0.5, 0.5]);
+      store.setNodes([
+        makeNode('n', { position: { x: 0, y: 0 }, width: 100, height: 40 }),
+      ]);
+      store.triggerNodeChanges([
+        { id: 'n', type: 'position', position: { x: 100, y: 100 } },
+      ]);
+      // positionAbsolute = position − dims·origin = (100 − 50, 100 − 20)
+      expect(store.nodeLookup.get('n')!.internals!.positionAbsolute).toEqual({ x: 50, y: 80 });
+    });
+
+    it('moving a child node resolves against the parent chain (regression guard)', () => {
+      store.setNodes([
+        makeNode('g', { position: { x: 100, y: 100 } }),
+        makeNode('c', { position: { x: 0, y: 0 }, parentId: 'g' }),
+      ]);
+      store.triggerNodeChanges([
+        { id: 'c', type: 'position', position: { x: 25, y: 25 }, dragging: true },
+      ]);
+      expect(store.nodeLookup.get('c')!.internals!.positionAbsolute).toEqual({ x: 125, y: 125 });
+    });
+  });
+
   // ── Middleware pipeline ────────────────────────────────────────────────
 
   describe('middleware pipeline', () => {
