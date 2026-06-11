@@ -120,7 +120,8 @@ export class PaneComponent implements OnDestroy {
       this.store.nodeLookup,
       selectionRect,
       transform,
-      partially
+      partially,
+      true  // excludeNonSelectableNodes: honour node.selectable === false
     );
 
     // Always dispatch — passing an empty list through addSelectedNodes is how

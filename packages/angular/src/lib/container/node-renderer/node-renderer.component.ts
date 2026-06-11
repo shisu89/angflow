@@ -309,7 +309,7 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
       // Move focus to the container to avoid the node staying focused
       (event.currentTarget as HTMLElement)?.blur();
     } else if (event.key === 'Enter') {
-      if (this.store.elementsSelectable() && !node.selected) {
+      if (this.store.elementsSelectable() && node.selectable !== false && !node.selected) {
         this.store.addSelectedNodes([node.id]);
       }
     }

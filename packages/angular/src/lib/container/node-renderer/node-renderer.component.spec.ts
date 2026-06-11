@@ -344,6 +344,37 @@ describe('getNodeInputs cache keying (per-node, not global version)', () => {
   });
 });
 
+describe('onNodeKeyDown selection guards', () => {
+  let store: FlowStore;
+  let component: NodeRendererComponent;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NodeRendererComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    store = TestBed.inject(FlowStore);
+    component = TestBed.createComponent(NodeRendererComponent).componentInstance;
+  });
+
+  it('Enter keydown selects a normal node', () => {
+    store.elementsSelectable.set(true);
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {} }]);
+    const node = store.nodeLookup.get('n1')!.internals.userNode;
+    component.onNodeKeyDown(new KeyboardEvent('keydown', { key: 'Enter' }), node);
+    expect(store.selectedNodes()).toHaveLength(1);
+  });
+
+  it('Enter keydown does not select a node with selectable: false', () => {
+    store.elementsSelectable.set(true);
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {}, selectable: false }]);
+    const node = store.nodeLookup.get('n1')!.internals.userNode;
+    component.onNodeKeyDown(new KeyboardEvent('keydown', { key: 'Enter' }), node);
+    expect(store.selectedNodes()).toHaveLength(0);
+  });
+});
+
 describe('computeNodeInputsKey (pure)', () => {
   const internal = (overrides: Record<string, unknown> = {}) =>
     ({
