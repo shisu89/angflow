@@ -55,6 +55,19 @@ export class PaneComponent implements OnDestroy {
     if (!shouldSelect) return;
     if (event.button !== 0) return;
 
+    // React parity (Pane/index.tsx `onPointerDownCapture`):
+    //   const eventTargetIsContainer = event.target === container.current;
+    //   const isSelectionActive = (selectionOnDrag && eventTargetIsContainer) || selectionKeyPressed;
+    //   if (!isSelectionActive ...) return;
+    //
+    // When selectionOnDrag is the trigger, the event target MUST be the pane
+    // element itself — clicks on children (nodes-selection box, nodes, edges)
+    // must not be hijacked. Key-based selection bypasses this requirement.
+    const eventTargetIsPane = event.target === this.el.nativeElement;
+    if (this.selectionOnDrag() && !eventTargetIsPane && !this.store.selectionKeyActive()) {
+      return;
+    }
+
     const target = event.target as HTMLElement;
     if (target.closest('.xy-flow__node') || target.closest('.xy-flow__handle') ||
         target.closest('.xy-flow__edge') || target.closest('.xy-flow__controls') ||
