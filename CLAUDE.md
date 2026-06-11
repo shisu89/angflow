@@ -1,6 +1,6 @@
 # angflow — Angular Port of xyflow/ReactFlow
 
-Published as `@angflow/system` and `@angflow/angular` on npm.
+Published as `@angflow/system`, `@angflow/angular`, and `@angflow/mcp` on npm.
 
 ## Project Structure
 
@@ -37,6 +37,14 @@ cd packages/angular
 npm run build        # ngc + CSS bundle → dist/esm/ + dist/style.css
 npm pack             # → angflow-angular-x.x.x.tgz
 ```
+
+### CI
+
+`.github/workflows/ci.yml` runs on pushes/PRs to main: `pnpm install --frozen-lockfile`,
+builds system → angular → mcp, then `pnpm typecheck`, `pnpm lint`, and vitest in all
+three packages. The mcp schema-drift test runs in CI as part of the mcp test suite —
+regenerate the snapshot (`pnpm -F @angflow/mcp run generate:schemas`) when the agent
+tool catalog changes.
 
 ## Publish to npm
 
