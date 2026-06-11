@@ -1,3 +1,14 @@
+# @angflow/system
+
+## @angflow fork
+
+This package diverged from `@xyflow/system` at v0.0.76. Everything below this
+section is the inherited upstream xyflow changelog and does not describe
+@angflow releases. For @angflow/system history (0.0.77+), see
+`git log --oneline -- packages/system`.
+
+---
+
 # @xyflow/system
 
 ## 0.0.76
