@@ -1,6 +1,6 @@
 # @angflow/angular
 
-## Unreleased (next minor)
+## 0.3.0
 
 ### Added
 
