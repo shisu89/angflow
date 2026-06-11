@@ -1122,6 +1122,64 @@ describe('AngflowAgentBridge', () => {
       flow.setNodes([makeNode('a')]);
       await expect(b.callTool('layout_nodes', { fitView: false })).rejects.toMatchObject({ code: -32603 });
     });
+
+    it('forwards parentId to the layout fn when the parent is in the layout set', async () => {
+      const seen: Array<Array<{ id: string; parentId?: string }>> = [];
+      const spy: AgentLayoutFn = (nodes) => {
+        seen.push(nodes.map((n) => ({ id: n.id, parentId: n.parentId })));
+        return Object.fromEntries(nodes.map((n) => [n.id, { x: 0, y: 0 }]));
+      };
+      const { bridge: b, newFlow: nf } = setupWithLayout(spy);
+      const flow = nf();
+      b.register('main', flow);
+      flow.setNodes([
+        makeNode('g'),
+        makeNode('c', { parentId: 'g' }),
+        makeNode('x'),
+      ]);
+      await b.callTool('layout_nodes', { fitView: false });
+      expect(seen[0]).toEqual([
+        { id: 'g', parentId: undefined },
+        { id: 'c', parentId: 'g' },
+        { id: 'x', parentId: undefined },
+      ]);
+    });
+
+    it('omits parentId when the parent is excluded via nodeIds', async () => {
+      const seen: Array<Array<{ id: string; parentId?: string }>> = [];
+      const spy: AgentLayoutFn = (nodes) => {
+        seen.push(nodes.map((n) => ({ id: n.id, parentId: n.parentId })));
+        return Object.fromEntries(nodes.map((n) => [n.id, { x: 0, y: 0 }]));
+      };
+      const { bridge: b, newFlow: nf } = setupWithLayout(spy);
+      const flow = nf();
+      b.register('main', flow);
+      flow.setNodes([
+        makeNode('g'),
+        makeNode('c', { parentId: 'g' }),
+        makeNode('x'),
+      ]);
+      await b.callTool('layout_nodes', { nodeIds: ['c', 'x'], fitView: false });
+      expect(seen[0]).toEqual([
+        { id: 'c', parentId: undefined },
+        { id: 'x', parentId: undefined },
+      ]);
+    });
+
+    it('applies layout results as ABSOLUTE coordinates (grouped child lands parent-relative)', async () => {
+      const absoluteLayout: AgentLayoutFn = () => ({ g: { x: 100, y: 100 }, c: { x: 130, y: 140 } });
+      const { bridge: b, newFlow: nf } = setupWithLayout(absoluteLayout);
+      const flow = nf();
+      b.register('main', flow);
+      flow.setNodes([
+        makeNode('g', { position: { x: 0, y: 0 } }),
+        makeNode('c', { parentId: 'g', position: { x: 10, y: 10 } }),
+      ]);
+      await b.callTool('layout_nodes', { fitView: false });
+      expect(flow.getNode('g')?.position).toEqual({ x: 100, y: 100 });
+      // c is absolute {130,140}; relative to g's new absolute {100,100} → {30,40}.
+      expect(flow.getNode('c')?.position).toEqual({ x: 30, y: 40 });
+    });
   });
 
   describe('history (undo/redo)', () => {

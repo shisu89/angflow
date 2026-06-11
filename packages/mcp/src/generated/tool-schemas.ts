@@ -1,7 +1,7 @@
 /**
  * GENERATED FILE — DO NOT EDIT.
  *
- * Snapshot of AGENT_TOOL_SCHEMAS from @angflow/angular@0.0.17.
+ * Snapshot of AGENT_TOOL_SCHEMAS from @angflow/angular@0.2.0.
  * Regenerate with `npm run generate:schemas` (runs automatically in
  * `npm run build`). The drift test in test/schema-snapshot.spec.ts compares
  * this file against the workspace source.
@@ -17,7 +17,7 @@ export interface AgentToolSchema {
   };
 }
 
-export const GENERATED_FROM_ANGULAR_VERSION = "0.0.17";
+export const GENERATED_FROM_ANGULAR_VERSION = "0.2.0";
 
 export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
   {
@@ -1275,7 +1275,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
   },
   {
     "name": "layout_nodes",
-    "description": "Auto-layout nodes using the host-configured layout engine (typically dagre). Computes tidy positions for the whole graph (or the nodeIds subset and the edges among them), applies them in one undoable step, and fits the viewport unless fitView is false. Returns the applied positions. Prefer this over computing coordinates manually whenever you add more than a couple of nodes.",
+    "description": "Auto-layout nodes using the host-configured layout engine (typically dagre). Computes tidy positions for the whole graph (or the nodeIds subset and the edges among them), applies them in one undoable step, and fits the viewport unless fitView is false. Returns the applied positions. Prefer this over computing coordinates manually whenever you add more than a couple of nodes. Group (parentId) nodes are laid out as compound clusters; results are applied in absolute coordinates, so grouped children stay inside their group.",
     "inputSchema": {
       "type": "object",
       "properties": {

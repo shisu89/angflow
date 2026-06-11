@@ -868,6 +868,10 @@ export class AngflowAgentBridge {
           width: internal?.measured?.width ?? n.width ?? 150,
           height: internal?.measured?.height ?? n.height ?? 40,
           position: { x: n.position.x, y: n.position.y },
+          // Forward parentId only when the parent is also being laid out, so the
+          // layout fn clusters grouped children within their group. Excluding the
+          // parent (e.g. via nodeIds) drops it — the child is then a free node.
+          parentId: n.parentId != null && idSet.has(n.parentId) ? n.parentId : undefined,
         };
       });
       // Induced subgraph: only edges with BOTH endpoints in the target set.
@@ -923,7 +927,10 @@ export class AngflowAgentBridge {
       }
       // Honors the host's [animate] input: positions tween when it's on, and
       // the await keeps the subsequent fitView measuring settled positions.
-      await flow.setNodePositions(actuallyApplied);
+      // Layout fns emit flow-absolute coordinates, so apply in absolute space:
+      // setNodePositions resolves each parented child against its parent's new
+      // position, keeping grouped children inside their group.
+      await flow.setNodePositions(actuallyApplied, { coordinateSpace: 'absolute' });
 
       const shouldFit = params['fitView'] !== false;
       if (shouldFit && Object.keys(actuallyApplied).length > 0) {

@@ -66,7 +66,14 @@ export interface AgentLayoutOptions {
  * See `dagreLayout` in `@angflow/angular/layout` for a turnkey adapter.
  */
 export type AgentLayoutFn = (
-  nodes: Array<{ id: string; width: number; height: number; position: { x: number; y: number } }>,
+  nodes: Array<{
+    id: string;
+    width: number;
+    height: number;
+    position: { x: number; y: number };
+    /** Present when the node is grouped AND its parent is in the layout set. */
+    parentId?: string;
+  }>,
   edges: Array<{ source: string; target: string }>,
   opts: AgentLayoutOptions,
 ) => Record<string, { x: number; y: number }> | Promise<Record<string, { x: number; y: number }>>;

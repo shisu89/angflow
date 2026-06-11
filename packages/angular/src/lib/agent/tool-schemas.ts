@@ -771,7 +771,9 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
       'Computes tidy positions for the whole graph (or the nodeIds subset and the edges ' +
       'among them), applies them in one undoable step, and fits the viewport unless ' +
       'fitView is false. Returns the applied positions. Prefer this over computing ' +
-      'coordinates manually whenever you add more than a couple of nodes.',
+      'coordinates manually whenever you add more than a couple of nodes. ' +
+      'Group (parentId) nodes are laid out as compound clusters; results are applied ' +
+      'in absolute coordinates, so grouped children stay inside their group.',
     inputSchema: {
       type: 'object',
       properties: {
