@@ -57,10 +57,12 @@ npm publish --access public
 
 # Angular
 cd packages/angular
-# Update @angflow/system version in package.json if system was bumped
+# @angflow/system is a workspace:^ dependency — pnpm rewrites it to ^<system version>
+# on publish, so no manual version sync is needed. MUST publish with pnpm (not npm):
+# a raw `npm publish` would ship a literal, unresolvable "workspace:^" specifier.
 npm version patch          # bump 0.0.1 → 0.0.2
 npm run build
-npm publish --access public
+pnpm publish --access public
 ```
 
 ### @angflow/mcp
@@ -97,7 +99,7 @@ npm publish --access public
 | Build system | `npm run build` | `packages/system` |
 | Pack system | `npm pack` | `packages/system` |
 | Publish system | `npm publish --access public` | `packages/system` |
-| Publish angular | `npm publish --access public` | `packages/angular` |
+| Publish angular | `pnpm publish --access public` | `packages/angular` |
 | Build mcp | `npm run build` | `packages/mcp` |
 | Test mcp | `npm run test` | `packages/mcp` |
 | Publish mcp | `npm publish --access public` | `packages/mcp` |
