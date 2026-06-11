@@ -573,7 +573,7 @@ export class EdgeRendererComponent {
   onEdgeEvent(event: MouseEvent, edge: Edge, eventType: string): void {
     switch (eventType) {
       case 'click':
-        if (this.store.elementsSelectable()) {
+        if (this.store.elementsSelectable() && edge.selectable !== false) {
           this.store.addSelectedEdges([edge.id]);
         }
         this.edgeClick.emit({ event, edge });
@@ -600,14 +600,14 @@ export class EdgeRendererComponent {
     if (event.key === 'Escape') {
       this.store.unselectNodesAndEdges({ edges: [edge] });
     } else if (event.key === 'Enter') {
-      if (this.store.elementsSelectable()) {
+      if (this.store.elementsSelectable() && edge.selectable !== false) {
         this.store.addSelectedEdges([edge.id]);
       }
     }
   }
 
   onEdgeFocus(edge: Edge): void {
-    if (this.store.elementsSelectable() && !edge.selected) {
+    if (this.store.elementsSelectable() && edge.selectable !== false && !edge.selected) {
       this.store.addSelectedEdges([edge.id]);
     }
   }

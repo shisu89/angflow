@@ -152,16 +152,20 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
   }
 
   private handleSelectAll(): void {
-    const nodeChanges = this.store.nodes().map((n) => ({
-      id: n.id,
-      type: 'select' as const,
-      selected: true,
-    }));
-    const edgeChanges = this.store.edges().map((e) => ({
-      id: e.id,
-      type: 'select' as const,
-      selected: true,
-    }));
+    const nodeChanges = this.store.nodes()
+      .filter((n) => n.selectable !== false)
+      .map((n) => ({
+        id: n.id,
+        type: 'select' as const,
+        selected: true,
+      }));
+    const edgeChanges = this.store.edges()
+      .filter((e) => e.selectable !== false)
+      .map((e) => ({
+        id: e.id,
+        type: 'select' as const,
+        selected: true,
+      }));
 
     this.store.triggerNodeChanges(nodeChanges as NodeChange[]);
     this.store.triggerEdgeChanges(edgeChanges as EdgeChange[]);
