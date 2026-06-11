@@ -1013,7 +1013,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     });
 
     this.panZoomInstance = panZoom;
-    this.store.panZoom.set(panZoom);
+    this.store.setPanZoom(panZoom);
 
     // Set initial transform from the resolved initial viewport
     this.store.transform.set([initialViewport.x, initialViewport.y, initialViewport.zoom]);

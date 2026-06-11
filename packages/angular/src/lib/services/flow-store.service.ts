@@ -365,7 +365,10 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     this.nodes.set(nodes);
     this.bumpVersion();
 
-    if (this.fitViewQueued() && nodesInitialized) {
+    // Only drain the queue once panZoom exists — otherwise resolveFitView()
+    // no-ops against a null panZoom and we would silently lose the request.
+    // setPanZoom() drains the queue when panZoom is created later.
+    if (this.fitViewQueued() && nodesInitialized && this.panZoom()) {
       this.resolveFitView();
       this.fitViewQueued.set(false);
       this.fitViewOptions.set(undefined);
@@ -410,7 +413,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       zIndexMode: this.zIndexMode(),
     });
 
-    if (this.fitViewQueued()) {
+    if (this.fitViewQueued() && this.panZoom()) {
       this.resolveFitView();
       this.fitViewQueued.set(false);
       this.fitViewOptions.set(undefined);
@@ -791,6 +794,22 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     );
 
     return true;
+  }
+
+  /**
+   * Set the panZoom instance and drain any fitView queued before it existed.
+   * Init order is setNodes (ngOnInit) → panZoom (ngAfterViewInit); a flow whose
+   * nodes carry explicit dimensions reports nodesInitialized on that first
+   * setNodes, so the queued fit must wait here for panZoom rather than firing
+   * against null. Signal-write-driven (no timer): the queue drains exactly once.
+   */
+  setPanZoom(panZoom: PanZoomInstance | null): void {
+    this.panZoom.set(panZoom);
+    if (panZoom && this.fitViewQueued() && this.nodesInitialized()) {
+      this.resolveFitView();
+      this.fitViewQueued.set(false);
+      this.fitViewOptions.set(undefined);
+    }
   }
 
   async setCenter(x: number, y: number, options?: { zoom?: number; duration?: number; ease?: (t: number) => number; interpolate?: string }): Promise<boolean> {

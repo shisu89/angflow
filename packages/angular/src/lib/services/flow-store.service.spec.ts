@@ -904,6 +904,29 @@ describe('FlowStore', () => {
       expect(store.fitViewQueued()).toBe(false);
       expect(setViewport).toHaveBeenCalledTimes(1);
     });
+
+    it('defers the queued fit until panZoom exists, then fits exactly once', () => {
+      // panZoom is NOT set yet — mirrors the real init order (setNodes runs in
+      // ngOnInit's setDefaultNodesAndEdges, before ngAfterViewInit's initPanZoom).
+      store.width.set(800);
+      store.height.set(600);
+      store.fitViewQueued.set(true);
+
+      // Nodes arrive fully measured → nodesInitialized is true on the first call.
+      store.setNodes([
+        { id: 'a', position: { x: 0, y: 0 }, data: {}, measured: { width: 100, height: 50 } },
+      ] as never);
+
+      // The request must survive — panZoom did not exist, so nothing was fitted.
+      expect(store.fitViewQueued()).toBe(true);
+
+      // panZoom appears later. setPanZoom drains the queue.
+      const setViewport = vi.fn().mockResolvedValue(undefined);
+      store.setPanZoom({ setViewport } as never);
+
+      expect(setViewport).toHaveBeenCalledTimes(1);
+      expect(store.fitViewQueued()).toBe(false);
+    });
   });
 });
 
