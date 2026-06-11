@@ -179,4 +179,45 @@ describe('layoutNodes compound groups', () => {
     expect(Number.isFinite(positions['s'].x)).toBe(true);
     expect(Number.isFinite(positions['s'].y)).toBe(true);
   });
+
+  it('does not throw when an edge targets a group node (x → group)', () => {
+    const positions = layoutNodes(
+      [
+        { id: 'g', width: 10, height: 10 },
+        { id: 'm', width: 40, height: 40, parentId: 'g' },
+        { id: 'x', width: 40, height: 40 },
+      ],
+      [{ source: 'x', target: 'g' }],
+      { direction: 'TB' },
+    );
+    for (const id of ['g', 'm', 'x']) {
+      expect(Number.isFinite(positions[id].x)).toBe(true);
+      expect(Number.isFinite(positions[id].y)).toBe(true);
+    }
+  });
+
+  it('does not throw when a member connects to its own group (member → group)', () => {
+    const positions = layoutNodes(
+      [
+        { id: 'g', width: 10, height: 10 },
+        { id: 'm', width: 40, height: 40, parentId: 'g' },
+      ],
+      [{ source: 'm', target: 'g' }],
+      { direction: 'TB' },
+    );
+    expect(Number.isFinite(positions['m'].x)).toBe(true);
+    expect(Number.isFinite(positions['g'].y)).toBe(true);
+  });
+
+  it('is deterministic: the same input twice yields identical output', () => {
+    const nodes = [
+      { id: 'g', width: 10, height: 10 },
+      { id: 'a', width: 40, height: 40, parentId: 'g' },
+      { id: 'b', width: 40, height: 40, parentId: 'g' },
+      { id: 'x', width: 40, height: 40 },
+    ];
+    const edges = [{ source: 'x', target: 'a' }, { source: 'a', target: 'b' }];
+    expect(layoutNodes(nodes, edges, { direction: 'TB' }))
+      .toEqual(layoutNodes(nodes, edges, { direction: 'TB' }));
+  });
 });

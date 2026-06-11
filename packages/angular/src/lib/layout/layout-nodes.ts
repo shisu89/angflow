@@ -103,10 +103,12 @@ export function layoutNodes(
     g.setNode(n.id, { width, height });
   }
 
+  const compoundParentIds = new Set<string>();
   if (compound) {
     for (const n of nodes) {
       if (n.parentId != null && n.parentId !== n.id && ids.has(n.parentId)) {
         g.setParent(n.id, n.parentId);
+        compoundParentIds.add(n.parentId);
       }
     }
   }
@@ -115,6 +117,9 @@ export function layoutNodes(
     // Skip dangling edges: otherwise dagre auto-creates phantom nodes that
     // distort layout (especially compound clusters).
     if (!ids.has(e.source) || !ids.has(e.target)) continue;
+    // Skip edges incident on a compound parent: dagre cannot rank an edge
+    // touching a cluster and throws ("Cannot set properties of undefined").
+    if (compoundParentIds.has(e.source) || compoundParentIds.has(e.target)) continue;
     const hasExplicitBox = e.labelWidth != null || e.labelHeight != null;
     if (e.label || hasExplicitBox) {
       g.setEdge(e.source, e.target, {
