@@ -246,8 +246,11 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   onNodesChange: ((changes: NodeChange<NodeType>[]) => void) | null = null;
   onEdgesChange: ((changes: EdgeChange<EdgeType>[]) => void) | null = null;
 
-  // A version counter bumped on every visual change to trigger recomputation
-  // of visibleNodes/visibleEdges without rebuilding the full nodeLookup
+  // A version counter bumped on graph changes (node/edge add/remove/move,
+  // selection, measurement) to trigger recomputation of visibleNodes /
+  // visibleEdges without rebuilding the full nodeLookup. Deliberately NOT
+  // bumped on transform (pan/zoom) writes — transform consumers read
+  // this.transform() directly.
   readonly version = signal(0);
   private batchDepth = 0;
   private batchDirty = false;

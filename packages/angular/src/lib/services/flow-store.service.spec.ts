@@ -2,7 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { computed } from '@angular/core';
 import type { NodeChange } from '@angflow/system';
 import { FlowStore } from './flow-store.service';
+import { getCollapsedHiddenIds } from '../graph/collapse';
 import type { Node, Edge } from '../types';
+
+vi.mock('../graph/collapse', { spy: true });
 
 function makeNode(id: string, overrides: Partial<Node> = {}): Node {
   return { id, position: { x: 0, y: 0 }, data: {}, type: 'default', ...overrides };
@@ -772,6 +775,52 @@ describe('FlowStore', () => {
       expect(store.handleDataRegistry().size).toBe(2);
       store.reset();
       expect(store.handleDataRegistry().size).toBe(0);
+    });
+  });
+
+  describe('transform writes are version-free', () => {
+    it('writing transform does not change version; viewport stays reactive', () => {
+      store.setNodes([makeNode('1')]);
+      const v0 = store.version();
+      store.transform.set([100, 50, 2]);
+      expect(store.version()).toBe(v0);
+      expect(store.viewport()).toEqual({ x: 100, y: 50, zoom: 2 });
+    });
+
+    it('REGRESSION: culling re-evaluates on transform writes without a bump', () => {
+      store.width.set(500);
+      store.height.set(500);
+      store.transform.set([0, 0, 1]);
+      store.onlyRenderVisibleElements.set(true);
+      store.setNodes([
+        makeNode('near', { position: { x: 100, y: 100 }, width: 100, height: 50 }),
+        makeNode('far', { position: { x: 5000, y: 5000 }, width: 100, height: 50 }),
+      ]);
+      for (const [, n] of store.nodeLookup) {
+        n.measured = { width: n.width ?? 100, height: n.height ?? 50 };
+        n.internals.handleBounds = { source: [], target: [] };
+      }
+      store.bumpVersion();
+      expect(store.visibleNodes().map((n) => n.id)).toEqual(['near']);
+
+      const v0 = store.version();
+      store.transform.set([-4900, -4900, 1]); // pan to the far node
+      expect(store.version()).toBe(v0);
+      expect(store.visibleNodes().map((n) => n.id)).toEqual(['far']);
+    });
+
+    it('PERF: a pure transform write triggers zero collapse/visibility recomputation', () => {
+      store.setNodes([makeNode('1'), makeNode('2')]);
+      store.visibleNodes(); // settle the computeds
+      const before = vi.mocked(getCollapsedHiddenIds).mock.calls.length;
+
+      store.transform.set([120, 40, 1.25]);
+      store.visibleNodes();
+      expect(vi.mocked(getCollapsedHiddenIds).mock.calls.length).toBe(before);
+
+      store.bumpVersion();
+      store.visibleNodes();
+      expect(vi.mocked(getCollapsedHiddenIds).mock.calls.length).toBe(before + 1);
     });
   });
 });

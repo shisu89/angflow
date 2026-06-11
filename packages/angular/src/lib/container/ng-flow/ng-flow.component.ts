@@ -958,8 +958,11 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       },
       onPanZoom: (event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
         const transform: Transform = [viewport.x, viewport.y, viewport.zoom];
+        // Transform-only write: every transform consumer (viewport CSS
+        // transform, minimap mask, culling, connection line) reads
+        // this.transform() directly — bumping version here would dirty all
+        // node/edge templates O(N+E) per pan frame for nothing.
         this.store.transform.set(transform);
-        this.store.bumpVersion();
         this.move.emit({ event, viewport });
         this.viewportChange.emit(viewport);
       },

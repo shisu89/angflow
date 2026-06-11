@@ -358,7 +358,6 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
       const currentY = startY + (newY - startY) * ease;
 
       this.store.transform.set([currentX, currentY, zoom]);
-      this.store.bumpVersion();
 
       if (t < 1) {
         this.animationFrameId = requestAnimationFrame(animate);
@@ -408,7 +407,6 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
     const newY = this.store.height() / 2 - flowY * zoom;
 
     this.store.transform.set([newX, newY, zoom]);
-    this.store.bumpVersion();
     try {
       this.store.panZoom()?.syncViewport({ x: newX, y: newY, zoom });
     } catch { /* noop */ }
@@ -440,7 +438,6 @@ export class MiniMapComponent implements AfterViewInit, OnDestroy {
     const newY = cy - (cy - y) * scale;
 
     this.store.transform.set([newX, newY, nextZoom]);
-    this.store.bumpVersion();
     try {
       this.store.panZoom()?.syncViewport({ x: newX, y: newY, zoom: nextZoom });
     } catch { /* noop */ }

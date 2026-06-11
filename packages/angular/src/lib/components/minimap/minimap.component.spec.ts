@@ -12,7 +12,7 @@
  * Like the other component specs we drive signal inputs directly via ɵSIGNAL
  * (JIT does not populate ɵcmp.inputs from signal `input()` declarations).
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection, ɵSIGNAL } from '@angular/core';
 import { MiniMapComponent } from './minimap.component';
@@ -137,5 +137,100 @@ describe('MiniMapComponent excludes collapsed-hidden nodes', () => {
     const fixture = createMinimap();
     const ids = fixture.componentInstance.minimapNodes().map((n) => n.id).sort();
     expect(ids).toEqual(['g', 'x']);
+  });
+});
+
+describe('MiniMapComponent pan/zoom interactions do not bump the store version', () => {
+  let store: FlowStore;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [MiniMapComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    store = TestBed.inject(FlowStore);
+    store.width.set(800);
+    store.height.set(600);
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {} }] as never);
+  });
+
+  it('wheel zoom updates the transform without bumping version', () => {
+    const fixture = createMinimap();
+    setSignalInput(fixture.componentInstance, 'zoomable', true);
+    fixture.detectChanges();
+
+    const v0 = store.version();
+    const t0 = store.transform();
+    fixture.componentInstance.onMinimapWheel(new WheelEvent('wheel', { deltaY: -100, cancelable: true }));
+
+    expect(store.transform()).not.toEqual(t0);
+    expect(store.version()).toBe(v0);
+  });
+
+  it('drag pan updates the transform without bumping version', () => {
+    const fixture = createMinimap();
+    setSignalInput(fixture.componentInstance, 'pannable', true);
+    fixture.detectChanges();
+
+    const v0 = store.version();
+    fixture.componentInstance.onMinimapMouseDown(new MouseEvent('mousedown'));
+    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 120, clientY: 90 }));
+    document.dispatchEvent(new MouseEvent('mouseup'));
+
+    expect(store.transform()).not.toEqual([0, 0, 1]);
+    expect(store.version()).toBe(v0);
+  });
+
+  it('click-pan animation frames update the transform without bumping version', () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { frames.push(cb); return frames.length; });
+    vi.stubGlobal('cancelAnimationFrame', () => {});
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
+    const fixture = createMinimap();
+    // Attach to the live DOM so the #minimapContainer viewChild resolves and
+    // the click handler actually schedules the pan animation (otherwise it
+    // returns early at the container guard and never reaches the rAF closure).
+    document.body.appendChild(fixture.nativeElement);
+    try {
+      setSignalInput(fixture.componentInstance, 'pannable', true);
+      fixture.detectChanges();
+      // Move the viewport off-origin so the pan target differs and the frame
+      // produces an observable transform change.
+      store.transform.set([10, 10, 1]);
+
+      // Drain any rAF callbacks the framework scheduled before the click so the
+      // next frame we run is unambiguously the pan animation closure.
+      frames.length = 0;
+
+      const v0 = store.version();
+      fixture.componentInstance.onMinimapClick(new MouseEvent('click', { clientX: 100, clientY: 75 }));
+      // The animation must actually have been scheduled — otherwise the frame
+      // closure (which is what we're asserting doesn't bump) never runs and the
+      // version assertion below would pass vacuously.
+      expect(frames.length).toBeGreaterThan(0);
+      nowSpy.mockReturnValue(50);
+      frames.shift()!(50); // run one animation frame: writes transform, must not bump
+
+      expect(store.version()).toBe(v0);
+    } finally {
+      fixture.nativeElement.remove();
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('REGRESSION: viewport indicator still reacts to pure transform writes', () => {
+    const fixture = createMinimap();
+    fixture.detectChanges();
+    const v0 = store.version();
+    const viewBoxBefore = fixture.componentInstance.viewBox();
+    const maskBefore = fixture.componentInstance.maskPath();
+
+    store.transform.set([-250, -180, 1.6]); // no bump involved
+
+    expect(store.version()).toBe(v0);
+    expect(fixture.componentInstance.viewBox()).not.toBe(viewBoxBefore);
+    expect(fixture.componentInstance.maskPath()).not.toBe(maskBefore);
   });
 });
