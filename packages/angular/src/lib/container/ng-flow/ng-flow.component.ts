@@ -447,6 +447,9 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   /** Pixels-per-frame speed for auto-pan. */
   readonly autoPanSpeed = input(15);
 
+  /** Pan the viewport automatically when a node receives keyboard focus. */
+  readonly autoPanOnNodeFocus = input(true);
+
   // ── Distances ─────────────────────────────────────────────────────────
 
   /** Radius (in px) within which a handle is considered a valid connection target. */
@@ -743,6 +746,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       this.store.autoPanOnConnect.set(this.autoPanOnConnect());
       this.store.autoPanOnNodeDrag.set(this.autoPanOnNodeDrag());
       this.store.autoPanSpeed.set(this.autoPanSpeed());
+      this.store.autoPanOnNodeFocus.set(this.autoPanOnNodeFocus());
       this.store.noDragClassName.set(this.noDragClassName());
       this.store.noWheelClassName.set(this.noWheelClassName());
       this.store.noPanClassName.set(this.noPanClassName());
