@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, DestroyRef, inject, signal } from '@angular/core';
 import {
   NgFlowComponent,
   NgFlowService,
@@ -116,8 +116,13 @@ interface PersistedFlow {
 })
 export class SaveRestoreExampleComponent {
   private flow?: NgFlowService<Node, Edge>;
+  private flashTimer: ReturnType<typeof setTimeout> | undefined;
   readonly hasSaved = signal<boolean>(this.readStorage() !== null);
   readonly status = signal<string>('');
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => clearTimeout(this.flashTimer));
+  }
 
   private readonly initialNodes: Node[] = [
     { id: '1', type: 'input', position: { x: 100, y: 100 }, data: { label: 'A' } },
@@ -175,7 +180,8 @@ export class SaveRestoreExampleComponent {
 
   private flash(message: string): void {
     this.status.set(message);
-    setTimeout(() => this.status.set(''), 1500);
+    clearTimeout(this.flashTimer);
+    this.flashTimer = setTimeout(() => this.status.set(''), 1500);
   }
 
   onNodesChange(changes: NodeChange[]): void {
