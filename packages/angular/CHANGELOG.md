@@ -1,5 +1,24 @@
 # @angflow/angular
 
+## 0.3.2
+
+### Changed
+
+- Lowered the `@angular/core` / `@angular/common` peer range from `>=21.0.0` back
+  to `>=19.0.0`. The published partial-Ivy output only requires linker 17.1+
+  (its `minVersion` is set by the features used — signal inputs — not by the
+  compiler that built it), so the library is consumable from Angular 19+ even
+  though it is built and tested on Angular 21. Verified by building an Angular 19
+  app against the packed output.
+
+### Fixed
+
+- `NgFlowService` now imports `DOCUMENT` from `@angular/common` instead of
+  `@angular/core`. `@angular/core` only re-exports `DOCUMENT` on Angular 20+, so
+  the previous import broke Angular 19 consumers at bundle time
+  (`No matching export … for import "DOCUMENT"`). `@angular/common` exports it on
+  both 19 and 21.
+
 ## 0.3.0
 
 ### Added

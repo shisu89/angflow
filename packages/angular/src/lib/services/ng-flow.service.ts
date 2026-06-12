@@ -1,4 +1,5 @@
-import { Injectable, inject, computed, signal, DestroyRef, DOCUMENT, type Signal } from '@angular/core';
+import { Injectable, inject, computed, signal, DestroyRef, type Signal } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import {
   pointToRendererPoint,
   rendererPointToPoint,

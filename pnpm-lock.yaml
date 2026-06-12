@@ -133,10 +133,10 @@ importers:
         specifier: '>=0.1.2'
         version: 0.1.2
       '@angular/common':
-        specifier: '>=21.0.0'
+        specifier: '>=19.0.0'
         version: 21.2.15(@angular/core@21.2.15(@angular/compiler@21.2.15)(rxjs@7.8.2))(rxjs@7.8.2)
       '@angular/core':
-        specifier: '>=21.0.0'
+        specifier: '>=19.0.0'
         version: 21.2.15(@angular/compiler@21.2.15)(rxjs@7.8.2)
       rxjs:
         specifier: '>=7.0.0'
