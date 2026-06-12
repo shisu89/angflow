@@ -15,7 +15,6 @@ type TeamNode = Node<{ label: string; team: 'red' | 'blue' }>;
 
 @Component({
   selector: 'app-connection-validation-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgFlowComponent,

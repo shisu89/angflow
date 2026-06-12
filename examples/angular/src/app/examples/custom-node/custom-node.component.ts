@@ -21,7 +21,6 @@ interface EmojiData { icon: string; title: string; subtitle: string }
 // equivalent example with explanatory framing.
 @Component({
   selector: 'app-emoji-node',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HandleComponent],
   template: `
@@ -83,7 +82,6 @@ export class EmojiNodeComponent {
 
 @Component({
   selector: 'app-custom-node-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, BackgroundComponent, ControlsComponent, ExampleCardComponent],
   template: `

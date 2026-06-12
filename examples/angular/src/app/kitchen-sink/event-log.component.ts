@@ -9,7 +9,6 @@ export interface EventEntry {
 
 @Component({
   selector: 'app-event-log',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="log">

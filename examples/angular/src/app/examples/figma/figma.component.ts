@@ -17,7 +17,6 @@ const PAN_ON_DRAG = [1, 2];
 
 @Component({
   selector: 'app-figma-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgFlowComponent,

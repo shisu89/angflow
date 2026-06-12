@@ -48,7 +48,6 @@ const INITIAL_EDGES: Edge[] = [
 
 @Component({
   selector: 'app-layouting-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, ControlsComponent, PanelComponent, ExampleCardComponent],
   template: `

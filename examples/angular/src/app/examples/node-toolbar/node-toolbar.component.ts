@@ -22,7 +22,6 @@ type ToolbarNodeData = {
 
 @Component({
   selector: 'app-toolbar-node',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HandleComponent, NodeToolbarComponent],
   host: { style: 'display: contents;' },
@@ -96,7 +95,6 @@ export class ToolbarNodeComponent {
 
 @Component({
   selector: 'app-node-toolbar-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, BackgroundComponent, ControlsComponent, ExampleCardComponent],
   template: `

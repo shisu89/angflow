@@ -10,7 +10,6 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
 @Component({
   selector: 'app-update-node-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, ExampleCardComponent],
   template: `

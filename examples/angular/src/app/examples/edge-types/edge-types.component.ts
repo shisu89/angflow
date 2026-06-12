@@ -14,7 +14,6 @@ const EDGE_TYPES = ['default', 'straight', 'step', 'smoothstep', 'simplebezier']
 
 @Component({
   selector: 'app-edge-types-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, BackgroundComponent, ControlsComponent, ExampleCardComponent],
   template: `

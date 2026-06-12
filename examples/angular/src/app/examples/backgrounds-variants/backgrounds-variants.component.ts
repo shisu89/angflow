@@ -14,7 +14,6 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
 @Component({
   selector: 'app-backgrounds-variants-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgFlowComponent,

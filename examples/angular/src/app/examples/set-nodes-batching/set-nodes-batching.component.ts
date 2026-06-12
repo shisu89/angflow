@@ -18,7 +18,6 @@ const C: Node = { id: 'c', data: { label: 'C' }, position: { x: 400, y: 100 } };
 
 @Component({
   selector: 'app-set-nodes-batching-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgFlowComponent,

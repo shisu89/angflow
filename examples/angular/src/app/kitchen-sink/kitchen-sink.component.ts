@@ -249,7 +249,6 @@ function parseKeyCode(raw: string): string | string[] {
 
 @Component({
   selector: 'app-kitchen-sink',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgFlowComponent,

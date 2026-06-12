@@ -35,7 +35,6 @@ function isPaletteItem(v: unknown): v is PaletteItem {
 
 @Component({
   selector: 'app-drag-from-sidebar-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgFlowComponent,

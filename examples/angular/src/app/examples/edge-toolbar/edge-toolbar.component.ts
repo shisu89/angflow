@@ -24,7 +24,6 @@ type EdgeData = {
 // guessing from node dimensions.
 @Component({
   selector: 'app-toolbar-edge',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [BaseEdgeComponent, EdgeToolbarComponent],
   host: { style: 'display: contents;' },
@@ -99,7 +98,6 @@ export class ToolbarEdgeComponent {
 
 @Component({
   selector: 'app-edge-toolbar-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, BackgroundComponent, ControlsComponent, ExampleCardComponent],
   template: `

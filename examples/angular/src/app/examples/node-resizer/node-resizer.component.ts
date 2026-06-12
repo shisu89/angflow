@@ -18,7 +18,6 @@ interface ResizableData { label: string }
 
 @Component({
   selector: 'app-resizable-node',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HandleComponent, NodeResizerComponent],
   template: `
@@ -75,7 +74,6 @@ export class ResizableNodeComponent {
 
 @Component({
   selector: 'app-node-resizer-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, BackgroundComponent, ControlsComponent, ExampleCardComponent],
   template: `

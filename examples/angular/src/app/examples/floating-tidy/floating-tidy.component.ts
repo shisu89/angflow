@@ -26,7 +26,6 @@ const INITIAL_EDGES: Edge[] = [
 
 @Component({
   selector: 'app-floating-tidy-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, ControlsComponent, PanelComponent, BackgroundComponent, ExampleCardComponent],
   template: `

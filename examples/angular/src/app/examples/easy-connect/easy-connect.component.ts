@@ -14,7 +14,6 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
 @Component({
   selector: 'app-easy-connect-node',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HandleComponent],
   host: { style: 'display: contents;' },
@@ -68,7 +67,6 @@ export class EasyConnectNodeComponent {
 
 @Component({
   selector: 'app-easy-connect-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, ExampleCardComponent],
   template: `

@@ -13,7 +13,6 @@ const getId = () => `${nextId++}`;
 
 @Component({
   selector: 'app-add-node-on-edge-drop-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, ExampleCardComponent],
   template: `

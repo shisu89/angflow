@@ -21,7 +21,6 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
 // pill styling) is code you own in your own app.
 @Component({
   selector: 'app-labeled-edge',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [EdgeLabelRendererComponent],
   host: { 'style': 'display: contents;' },
@@ -127,7 +126,6 @@ export class LabeledEdgeComponent {
 
 @Component({
   selector: 'app-custom-edge-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, BackgroundComponent, ControlsComponent, ExampleCardComponent],
   template: `

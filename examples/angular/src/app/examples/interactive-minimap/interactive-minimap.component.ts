@@ -29,7 +29,6 @@ const INITIAL_NODES: Node[] = [
 
 @Component({
   selector: 'app-interactive-minimap-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgFlowComponent,

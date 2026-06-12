@@ -13,7 +13,6 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
 @Component({
   selector: 'app-detached-handle-node',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HandleComponent],
   host: { style: 'display: contents;' },
@@ -43,7 +42,6 @@ export class DetachedHandleNodeComponent {
 
 @Component({
   selector: 'app-detached-handle-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, BackgroundComponent, ExampleCardComponent],
   template: `

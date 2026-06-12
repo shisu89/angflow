@@ -14,7 +14,6 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
 @Component({
   selector: 'app-undirectional-node',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HandleComponent],
   host: { style: 'display: contents;' },
@@ -60,7 +59,6 @@ const genId = () => `${nextId++}`;
 
 @Component({
   selector: 'app-undirectional-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, ExampleCardComponent],
   template: `

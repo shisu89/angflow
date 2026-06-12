@@ -21,7 +21,6 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
  */
 @Component({
   selector: 'app-custom-connection-line',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: contents;' },
   template: `
@@ -70,7 +69,6 @@ export class CustomConnectionLineComponent {
 
 @Component({
   selector: 'app-custom-connection-line-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, BackgroundComponent, ExampleCardComponent],
   template: `

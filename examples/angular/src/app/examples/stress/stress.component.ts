@@ -22,7 +22,6 @@ const INITIAL = getNodesAndEdges(25, 25);
 
 @Component({
   selector: 'app-stress-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgFlowComponent,

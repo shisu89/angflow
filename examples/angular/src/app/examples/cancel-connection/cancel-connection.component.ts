@@ -14,7 +14,6 @@ const CANCEL_AFTER = 5; // seconds
 
 @Component({
   selector: 'app-cancel-connection-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgFlowComponent,

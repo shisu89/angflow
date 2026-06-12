@@ -16,7 +16,6 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
 @Component({
   selector: 'app-floating-node',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HandleComponent],
   host: { style: 'display: contents;' },
@@ -70,7 +69,6 @@ export class FloatingNodeComponent {
 
 @Component({
   selector: 'app-mixed-node',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HandleComponent],
   host: { style: 'display: contents;' },
@@ -149,7 +147,6 @@ export class MixedNodeComponent {
 
 @Component({
   selector: 'app-floating-edges-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, BackgroundComponent, ControlsComponent, ExampleCardComponent],
   template: `

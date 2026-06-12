@@ -6,7 +6,6 @@ import { HARNESS_ROUTES } from './app.routes';
 
 @Component({
   selector: 'app-root',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterOutlet],
   templateUrl: './app.html',

@@ -12,7 +12,6 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
 @Component({
   selector: 'app-drag-handle-node',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HandleComponent],
   host: { style: 'display: contents;' },
@@ -45,7 +44,6 @@ export class DragHandleNodeComponent {
 
 @Component({
   selector: 'app-drag-handle-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, ExampleCardComponent],
   template: `

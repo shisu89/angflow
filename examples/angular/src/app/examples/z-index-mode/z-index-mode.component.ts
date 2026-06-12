@@ -17,7 +17,6 @@ const NODE_DEFAULTS = { sourcePosition: Position.Right, targetPosition: Position
 
 @Component({
   selector: 'app-z-index-mode-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgFlowComponent,

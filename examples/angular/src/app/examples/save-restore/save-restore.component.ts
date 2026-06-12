@@ -22,7 +22,6 @@ interface PersistedFlow {
 
 @Component({
   selector: 'app-save-restore-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgFlowComponent,

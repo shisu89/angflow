@@ -18,7 +18,6 @@ interface EmojiData { icon: string; title: string; subtitle: string }
 // Custom node using the injection-based API. Note the class body: two lines.
 @Component({
   selector: 'app-emoji-inject-node',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HandleComponent],
   template: `
@@ -88,7 +87,6 @@ export class EmojiInjectNodeComponent {
 
 @Component({
   selector: 'app-custom-node-inject-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, BackgroundComponent, ControlsComponent, ExampleCardComponent],
   template: `

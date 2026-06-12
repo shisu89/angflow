@@ -27,7 +27,6 @@ const ariaLabelConfig: Partial<AriaLabelConfig> = {
 
 @Component({
   selector: 'app-a11y-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgFlowComponent,

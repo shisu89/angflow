@@ -57,7 +57,6 @@ const DEFAULT_EDGE_OPTIONS = {
 
 @Component({
   selector: 'app-edge-routing-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, ExampleCardComponent],
   template: `

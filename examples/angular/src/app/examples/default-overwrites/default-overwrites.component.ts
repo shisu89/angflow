@@ -15,7 +15,6 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
 @Component({
   selector: 'app-custom-default-node',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HandleComponent],
   host: { style: 'display: contents;' },
@@ -49,7 +48,6 @@ export class CustomDefaultNodeComponent {
 
 @Component({
   selector: 'app-custom-default-edge',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [BaseEdgeComponent],
   host: { style: 'display: contents;' },
@@ -85,7 +83,6 @@ export class CustomDefaultEdgeComponent {
 
 @Component({
   selector: 'app-default-overwrites-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, BackgroundComponent, ExampleCardComponent],
   template: `

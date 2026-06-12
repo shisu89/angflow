@@ -2,7 +2,6 @@ import { Component, ChangeDetectionStrategy, input, output } from '@angular/core
 
 @Component({
   selector: 'app-accordion-section',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="section">

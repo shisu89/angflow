@@ -16,7 +16,6 @@ import {
  */
 @Component({
   selector: 'app-ks-rich-node',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HandleComponent, NodeResizerComponent, NodeToolbarComponent],
   template: `

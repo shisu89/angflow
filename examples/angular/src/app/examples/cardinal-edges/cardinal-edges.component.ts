@@ -44,7 +44,6 @@ function pickCardinalHandles(
 
 @Component({
   selector: 'app-cardinal-node',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HandleComponent],
   host: { style: 'display: contents;' },
@@ -102,7 +101,6 @@ export class CardinalNodeComponent {
 
 @Component({
   selector: 'app-cardinal-edges-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, BackgroundComponent, ControlsComponent, ExampleCardComponent],
   template: `

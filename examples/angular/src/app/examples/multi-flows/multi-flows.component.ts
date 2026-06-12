@@ -25,7 +25,6 @@ const INITIAL_EDGES = (): Edge[] => [
 
 @Component({
   selector: 'app-single-mini-flow',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgFlowComponent, BackgroundComponent, MiniMapComponent],
   template: `
@@ -52,7 +51,6 @@ export class SingleMiniFlowComponent {
 
 @Component({
   selector: 'app-multi-flows-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [SingleMiniFlowComponent, ExampleCardComponent],
   template: `

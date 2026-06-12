@@ -22,7 +22,6 @@ const CATEGORY_COLORS: Record<Category, string> = {
 
 @Component({
   selector: 'app-minimap-custom-example',
-  standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgFlowComponent,
