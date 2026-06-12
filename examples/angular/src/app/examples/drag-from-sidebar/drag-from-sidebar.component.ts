@@ -22,6 +22,17 @@ const PALETTE: PaletteItem[] = [
   { kind: 'output', label: 'Output' },
 ];
 
+const PALETTE_KINDS: readonly PaletteItem['kind'][] = ['input', 'default', 'output'];
+
+function isPaletteItem(v: unknown): v is PaletteItem {
+  if (!v || typeof v !== 'object') return false;
+  const item = v as Record<string, unknown>;
+  return (
+    typeof item['label'] === 'string' &&
+    (PALETTE_KINDS as readonly string[]).includes(item['kind'] as string)
+  );
+}
+
 @Component({
   selector: 'app-drag-from-sidebar-example',
   standalone: true,
@@ -36,20 +47,23 @@ const PALETTE: PaletteItem[] = [
   template: `
     <app-example-card
       title="Drag from Sidebar"
-      description="Drag any item from the palette onto the canvas. The drop zone directive converts screen coordinates to flow space automatically."
+      description="Drag any item from the palette onto the canvas — or click it to add the node directly. The drop zone directive converts screen coordinates to flow space automatically."
     >
       <div class="drag-example">
         <aside class="drag-example__palette">
           <div class="drag-example__palette-label">Palette</div>
           @for (item of palette; track item.kind) {
-            <div
+            <button
+              type="button"
               class="palette-item"
               [class]="'palette-item--' + item.kind"
               draggable="true"
+              [attr.aria-label]="'Add ' + item.label + ' node'"
               (dragstart)="onPaletteDragStart($event, item)"
+              (click)="addFromPalette(item)"
             >
               {{ item.label }}
-            </div>
+            </button>
           }
         </aside>
         <div class="drag-example__canvas">
@@ -106,6 +120,7 @@ const PALETTE: PaletteItem[] = [
       border-radius: 8px;
       font-size: 12px;
       font-weight: 600;
+      font-family: inherit;
       color: #334155;
       cursor: grab;
       text-align: center;
@@ -144,25 +159,30 @@ export class DragFromSidebarExampleComponent {
     }
   }
 
-  onNodeDrop(payload: { event: DragEvent; flowPosition: XYPosition; data: string | null }): void {
-    if (!payload.data) return;
-    let item: PaletteItem;
-    try {
-      item = JSON.parse(payload.data) as PaletteItem;
-    } catch {
-      return;
-    }
+  private addNode(item: PaletteItem, position: XYPosition): void {
     const id = `dropped-${++this.idCounter}`;
     const type = item.kind === 'default' ? undefined : item.kind;
     this.nodes = [
       ...this.nodes,
-      {
-        id,
-        type,
-        position: payload.flowPosition,
-        data: { label: item.label },
-      },
+      { id, type, position, data: { label: item.label } },
     ];
+  }
+
+  addFromPalette(item: PaletteItem): void {
+    const offset = (this.nodes.length % 8) * 28;
+    this.addNode(item, { x: 240 + offset, y: 80 + offset });
+  }
+
+  onNodeDrop(payload: { event: DragEvent; flowPosition: XYPosition; data: string | null }): void {
+    if (!payload.data) return;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(payload.data);
+    } catch {
+      return;
+    }
+    if (!isPaletteItem(parsed)) return;
+    this.addNode(parsed, payload.flowPosition);
   }
 
   onNodesChange(changes: NodeChange[]): void {
