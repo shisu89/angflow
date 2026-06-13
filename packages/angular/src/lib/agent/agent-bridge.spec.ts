@@ -1955,5 +1955,30 @@ describe('AngflowAgentBridge — bulk payload caps', () => {
       const status = (await bridge.callTool('history_status', {})) as { pastDepth: number };
       expect(status.pastDepth).toBe(0);
     });
+
+    it('fit_bounds returns { zoom, clamped } and threads minZoom to the service', async () => {
+      const { bridge, newFlow } = setup();
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const spy = vi.spyOn(flow, 'fitBounds');
+      const res = (await bridge.callTool('fit_bounds', {
+        bounds: { x: 0, y: 0, width: 200, height: 100 },
+        minZoom: 0.2,
+      })) as { zoom: number; clamped: boolean };
+      expect(res).toHaveProperty('zoom');
+      expect(typeof res.clamped).toBe('boolean');
+      expect(spy).toHaveBeenCalledWith(
+        { x: 0, y: 0, width: 200, height: 100 },
+        expect.objectContaining({ minZoom: 0.2 }),
+      );
+    });
+
+    it('fit_bounds rejects a non-positive minZoom with -32602', async () => {
+      const { bridge, newFlow } = setup();
+      bridge.register('main', newFlow());
+      await expect(
+        bridge.callTool('fit_bounds', { bounds: { x: 0, y: 0, width: 10, height: 10 }, minZoom: 0 }),
+      ).rejects.toMatchObject({ code: -32602 });
+    });
   });
 });

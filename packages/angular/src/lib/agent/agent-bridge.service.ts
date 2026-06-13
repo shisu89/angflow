@@ -696,7 +696,8 @@ export class AngflowAgentBridge {
       const bounds = requireObject(params, 'bounds') as { x: number; y: number; width: number; height: number };
       const padding = typeof params['padding'] === 'number' ? (params['padding'] as number) : undefined;
       const duration = typeof params['duration'] === 'number' ? (params['duration'] as number) : undefined;
-      return flow.fitBounds(bounds, { padding, duration });
+      const minZoom = optionalPositiveNumber(params, 'minZoom');
+      return flow.fitBounds(bounds, { padding, duration, minZoom });
     });
 
     this.handlers.set('add_nodes', (flow, params) => {
