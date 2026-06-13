@@ -339,3 +339,94 @@ describe('packComponentsIntoGrid', () => {
     }
   });
 });
+
+describe('layoutNodes packing (feedback #12)', () => {
+  const bbox = (positions: Record<string, { x: number; y: number }>, sizeById: Record<string, number>) => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const [id, p] of Object.entries(positions)) {
+      const s = sizeById[id] ?? 0;
+      minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x + s); maxY = Math.max(maxY, p.y + s);
+    }
+    return { w: maxX - minX, h: maxY - minY };
+  };
+
+  it('grid-packs many disconnected ungrouped nodes instead of cascading them', () => {
+    const nodes = Array.from({ length: 16 }, (_, i) => ({ id: `n${i}`, width: 100, height: 100 }));
+    const positions = layoutNodes(nodes, [], { direction: 'LR' });
+    const sizeById = Object.fromEntries(nodes.map((n) => [n.id, 100]));
+    const { w, h } = bbox(positions, sizeById);
+    expect(w).toBeLessThan(1200);
+    expect(h).toBeLessThan(1200);
+    expect(Math.max(w, h) / Math.min(w, h)).toBeLessThan(3);
+  });
+
+  it('keeps a spatially-grouped, internally-disconnected canvas compact (no diagonal staircase)', () => {
+    const nodes: Array<{ id: string; width: number; height: number; parentId?: string }> = [];
+    for (let g = 0; g < 4; g++) {
+      nodes.push({ id: `g${g}`, width: 10, height: 10 });
+      for (let m = 0; m < 4; m++) nodes.push({ id: `g${g}_m${m}`, width: 80, height: 80, parentId: `g${g}` });
+    }
+    const positions = layoutNodes(nodes, [], { direction: 'LR' });
+    for (const id of Object.keys(positions)) {
+      expect(Number.isFinite(positions[id].x)).toBe(true);
+      expect(Number.isFinite(positions[id].y)).toBe(true);
+    }
+    const groupOnly = Object.fromEntries(Object.entries(positions).filter(([id]) => /^g\d+$/.test(id)));
+    const sizeById = Object.fromEntries(Object.keys(groupOnly).map((id) => [id, 10]));
+    const { w, h } = bbox(groupOnly, sizeById);
+    expect(Math.max(w, h) / Math.min(w, h)).toBeLessThan(4);
+  });
+
+  it('clusters each group\'s members within its own region', () => {
+    const nodes = [
+      { id: 'gA', width: 10, height: 10 },
+      { id: 'gB', width: 10, height: 10 },
+      { id: 'a1', width: 40, height: 40, parentId: 'gA' },
+      { id: 'a2', width: 40, height: 40, parentId: 'gA' },
+      { id: 'b1', width: 40, height: 40, parentId: 'gB' },
+      { id: 'b2', width: 40, height: 40, parentId: 'gB' },
+    ];
+    const positions = layoutNodes(nodes, [], { direction: 'LR' });
+    const aXs = [positions.a1.x, positions.a2.x];
+    const bXs = [positions.b1.x, positions.b2.x];
+    const separated = Math.max(...aXs) < Math.min(...bXs) || Math.max(...bXs) < Math.min(...aXs);
+    expect(separated).toBe(true);
+  });
+
+  it('places members inside their group box (padding + header offset)', () => {
+    const nodes = [
+      { id: 'g', width: 10, height: 10 },
+      { id: 'm', width: 60, height: 60, parentId: 'g' },
+    ];
+    const positions = layoutNodes(nodes, [], { direction: 'TB', groupPadding: 24, groupHeaderHeight: 40 });
+    expect(positions.m.x - positions.g.x).toBeCloseTo(24, 5);
+    expect(positions.m.y - positions.g.y).toBeCloseTo(64, 5);
+  });
+
+  it('nests: a sub-group\'s members land inside the sub-group, inside the outer group', () => {
+    const nodes = [
+      { id: 'g', width: 10, height: 10 },
+      { id: 'sub', width: 10, height: 10, parentId: 'g' },
+      { id: 'leaf', width: 40, height: 40, parentId: 'sub' },
+    ];
+    const positions = layoutNodes(nodes, [], { direction: 'TB', groupPadding: 24, groupHeaderHeight: 40 });
+    expect(positions.leaf.x).toBeGreaterThan(positions.sub.x);
+    expect(positions.leaf.y).toBeGreaterThan(positions.sub.y);
+    expect(positions.sub.x).toBeGreaterThanOrEqual(positions.g.x);
+    expect(positions.sub.y).toBeGreaterThan(positions.g.y);
+  });
+
+  it('packComponents:false leaves dagre\'s spread cascade; packing makes it compact', () => {
+    const nodes = Array.from({ length: 6 }, (_, i) => ({ id: `n${i}`, width: 100, height: 100 }));
+    const packed = layoutNodes(nodes, [], { direction: 'LR' });
+    const cascaded = layoutNodes(nodes, [], { direction: 'LR', packComponents: false });
+    const span = (pos: Record<string, { x: number; y: number }>) => {
+      const xs = Object.values(pos).map((p) => p.x);
+      const ys = Object.values(pos).map((p) => p.y);
+      return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+    };
+    // Packing collapses dagre's disconnected-component cascade into a compact grid.
+    expect(span(packed)).toBeLessThan(span(cascaded));
+  });
+});

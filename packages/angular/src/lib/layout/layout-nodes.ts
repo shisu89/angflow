@@ -7,6 +7,13 @@ export interface LayoutNodesOptions {
   nodeSep?: number;
   /** Pixels between ranks. Default 80. */
   rankSep?: number;
+  /** Grid-pack disconnected components instead of letting dagre cascade them
+   *  along the cross-axis. No-op for a single connected component. Default true. */
+  packComponents?: boolean;
+  /** Padding (all sides) when sizing a group's box to its members. Default 24. */
+  groupPadding?: number;
+  /** Extra top inset reserved for a group header when sizing its box. Default 40. */
+  groupHeaderHeight?: number;
 }
 
 /**
@@ -48,6 +55,10 @@ const DEFAULT_HEIGHT = 40;
 // Conservative reservation for a labeled edge whose label box wasn't measured.
 const DEFAULT_LABEL_WIDTH = 60;
 const DEFAULT_LABEL_HEIGHT = 20;
+
+// Group box inset defaults (match the app's GROUP_PAD / GROUP_HEADER).
+const DEFAULT_GROUP_PADDING = 24;
+const DEFAULT_GROUP_HEADER = 40;
 
 /** Partition `ids` into connected components over `edges` (union-find). Edges
  *  whose endpoints aren't both in `ids` are ignored. Used to detect disconnected
@@ -132,73 +143,31 @@ export function packComponentsIntoGrid(
   return out;
 }
 
-/**
- * Standalone dagre auto-layout: returns a map of node id → top-left position
- * in flow coordinates. Pure — no store, no DI, callable from anywhere:
- *
- * ```ts
- * import { layoutNodes } from '@angflow/angular/layout';
- * const positions = layoutNodes(flow.getNodes(), flow.getEdges(), { direction: 'LR' });
- * flow.setNodePositions(positions);
- * // or in one call: flow.applyLayout(layoutNodes, { direction: 'LR' });
- * ```
- *
- * Dimensions resolve per node as `measured` → `width`/`height` →
- * `initialWidth`/`initialHeight` → 150×40. Edges referencing ids not present in `nodes` are ignored in the result. Lives in the
- * `@angflow/angular/layout` subpath so `@dagrejs/dagre` (an optional peer
- * dependency) is only pulled into bundles that import it.
- *
- * Prefer `NgFlowService.applyLayout(layoutNodes, …)`: it measures live node
- * footprints and edge-label boxes from the DOM and passes them in, so layout is
- * correct even when `measured` is absent/stale (e.g. the controlled-mode
- * round-trip). Calling `layoutNodes` directly uses only the dimensions on the
- * objects you pass — supply measured nodes (e.g. internal nodes) for best
- * results. Edge labels: pass `labelWidth`/`labelHeight` (or a truthy `label` for
- * a default reservation) to reserve dagre space.
- *
- * Groups: a node with a `parentId` that is also in the input is clustered within
- * that parent (dagre compound layout); nesting is supported. Compound output is
- * in absolute coordinates — apply it with
- * `applyLayout(layoutNodes, { coordinateSpace: 'absolute' })` so parented nodes
- * are translated into their parent-relative space. Group boxes are laid out but
- * NOT resized to wrap their members (size them app-side, or see the auto-size
- * feature). Edges whose endpoints aren't in the node set are skipped.
- * Edges whose source or target is a compound parent are also skipped (dagre
- * cannot rank cluster-touching edges). parentId cycles (of any length) are
- * treated as top-level (matching collapse semantics) — cycle members are
- * detached from each other and laid out as ordinary nodes.
- */
-export function layoutNodes(
-  nodes: LayoutNodeInput[],
-  edges: ReadonlyArray<LayoutEdgeInput>,
-  opts: LayoutNodesOptions = {},
-): Record<string, { x: number; y: number }> {
-  const ids = new Set(nodes.map((n) => n.id));
+/** Resolve a node's footprint the way layout does: measured → width → initial → default. */
+function baseDims(n: LayoutNodeInput): { width: number; height: number } {
+  return {
+    width: n.measured?.width ?? n.width ?? n.initialWidth ?? DEFAULT_WIDTH,
+    height: n.measured?.height ?? n.height ?? n.initialHeight ?? DEFAULT_HEIGHT,
+  };
+}
 
-  // Build the valid parent-child map: entries where the parent exists in the
-  // input set and is not the node itself (self-parent guard).
+/** Build the valid, cycle-free parent map: entries where the parent exists in the
+ *  set and isn't the node itself; parentId cycles (any length) are removed so the
+ *  members are treated as top-level (matching collapse semantics). */
+function buildValidParentOf(nodes: LayoutNodeInput[], ids: Set<string>): Map<string, string> {
   const parentOf = new Map<string, string>();
   for (const n of nodes) {
     if (n.parentId != null && n.parentId !== n.id && ids.has(n.parentId)) {
       parentOf.set(n.id, n.parentId);
     }
   }
-
-  // Cycle detection: walk each node's parent chain; if the walk revisits a
-  // node already seen in this walk, a cycle exists — collect its members and
-  // remove them from parentOf so graphlib never sees a cycle.
-  // Only actual cycle members are removed; nodes that point INTO a cycle but
-  // are not on it (e.g. d→a where a∈cycle) keep their parentOf entry intact
-  // (the parent was just demoted to top-level, which is a valid parent).
   const inCycle = new Set<string>();
   for (const start of parentOf.keys()) {
-    if (inCycle.has(start)) continue; // already processed as part of a known cycle
+    if (inCycle.has(start)) continue;
     const seen = new Set<string>();
     let cur: string | undefined = start;
     while (cur !== undefined && parentOf.has(cur)) {
       if (seen.has(cur)) {
-        // cur is the entry point of the cycle — trace from cur back to cur
-        // to collect exactly the cycle members.
         let walker = cur;
         do {
           inCycle.add(walker);
@@ -210,41 +179,45 @@ export function layoutNodes(
       cur = parentOf.get(cur);
     }
   }
-  for (const id of inCycle) {
-    parentOf.delete(id);
-  }
+  for (const id of inCycle) parentOf.delete(id);
+  return parentOf;
+}
 
-  const compound = parentOf.size > 0;
+interface LayoutCtx {
+  parentOf: Map<string, string>;
+  childrenOf: Map<string, LayoutNodeInput[]>;
+  nodeById: Map<string, LayoutNodeInput>;
+  edges: ReadonlyArray<LayoutEdgeInput>;
+  opts: LayoutNodesOptions;
+  /** group id → its laid-out box size, filled bottom-up by the recursion. */
+  boxes: Record<string, { width: number; height: number }>;
+  groupPadding: number;
+  groupHeaderHeight: number;
+  packComponents: boolean;
+}
 
-  const g = new graphlib.Graph(compound ? { compound: true } : undefined);
+/** Lay out one flat level with dagre (no compound — group members are pre-sized
+ *  boxes). Returns top-left positions. */
+function dagreFlat(
+  members: LayoutNodeInput[],
+  edges: ReadonlyArray<LayoutEdgeInput>,
+  opts: LayoutNodesOptions,
+  sizeOf: (id: string) => { width: number; height: number },
+): Record<string, { x: number; y: number }> {
+  const g = new graphlib.Graph();
   g.setGraph({
     rankdir: opts.direction ?? 'TB',
     nodesep: opts.nodeSep ?? 50,
     ranksep: opts.rankSep ?? 80,
   });
   g.setDefaultEdgeLabel(() => ({}));
-
-  for (const n of nodes) {
-    const width = n.measured?.width ?? n.width ?? n.initialWidth ?? DEFAULT_WIDTH;
-    const height = n.measured?.height ?? n.height ?? n.initialHeight ?? DEFAULT_HEIGHT;
-    g.setNode(n.id, { width, height });
+  const idSet = new Set(members.map((m) => m.id));
+  for (const m of members) {
+    const s = sizeOf(m.id);
+    g.setNode(m.id, { width: s.width, height: s.height });
   }
-
-  const compoundParentIds = new Set<string>();
-  if (compound) {
-    for (const [child, parent] of parentOf) {
-      g.setParent(child, parent);
-      compoundParentIds.add(parent);
-    }
-  }
-
   for (const e of edges) {
-    // Skip dangling edges: otherwise dagre auto-creates phantom nodes that
-    // distort layout (especially compound clusters).
-    if (!ids.has(e.source) || !ids.has(e.target)) continue;
-    // Skip edges incident on a compound parent: dagre cannot rank an edge
-    // touching a cluster and throws ("Cannot set properties of undefined").
-    if (compoundParentIds.has(e.source) || compoundParentIds.has(e.target)) continue;
+    if (!idSet.has(e.source) || !idSet.has(e.target) || e.source === e.target) continue;
     const hasExplicitBox = e.labelWidth != null || e.labelHeight != null;
     if (e.label || hasExplicitBox) {
       g.setEdge(e.source, e.target, {
@@ -256,16 +229,170 @@ export function layoutNodes(
       g.setEdge(e.source, e.target);
     }
   }
-
   layout(g);
-
   const positions: Record<string, { x: number; y: number }> = {};
-  for (const n of nodes) {
-    const placed = g.node(n.id) as { x: number; y: number; width: number; height: number };
-    // dagre positions by center; angflow by top-left. Use dagre's computed
-    // width/height so cluster (group) nodes convert by their wrapping size
-    // (for leaf nodes this equals the size we set, so flat output is unchanged).
-    positions[n.id] = { x: placed.x - placed.width / 2, y: placed.y - placed.height / 2 };
+  for (const m of members) {
+    const placed = g.node(m.id) as { x: number; y: number; width: number; height: number };
+    positions[m.id] = { x: placed.x - placed.width / 2, y: placed.y - placed.height / 2 };
   }
   return positions;
+}
+
+/** Lift every edge to the members of the current level: map each endpoint to its
+ *  ancestor that is in `memberIds`, drop intra-member and dangling edges, and
+ *  dedupe parallels created by lifting. Labels are kept only for edges that were
+ *  NOT lifted (both endpoints are real siblings at this level). */
+function liftEdges(members: LayoutNodeInput[], ctx: LayoutCtx): LayoutEdgeInput[] {
+  const memberIds = new Set(members.map((m) => m.id));
+  const lift = (id: string): string | undefined => {
+    let cur = id;
+    while (!memberIds.has(cur)) {
+      const p = ctx.parentOf.get(cur);
+      if (p === undefined) return undefined;
+      cur = p;
+    }
+    return cur;
+  };
+  const seen = new Set<string>();
+  const out: LayoutEdgeInput[] = [];
+  for (const e of ctx.edges) {
+    if (!ctx.nodeById.has(e.source) || !ctx.nodeById.has(e.target)) continue; // dangling
+    const s = lift(e.source);
+    const t = lift(e.target);
+    if (s === undefined || t === undefined || s === t) continue;
+    // JSON-encode the pair so the dedupe key can't collide for ids containing
+    // the separator (node ids may contain spaces, arrows, etc.).
+    const key = JSON.stringify([s, t]);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const lifted = !(s === e.source && t === e.target);
+    out.push(
+      lifted
+        ? { source: s, target: t }
+        : { source: s, target: t, label: e.label, labelWidth: e.labelWidth, labelHeight: e.labelHeight },
+    );
+  }
+  return out;
+}
+
+/** Recursively lay out one level (the nodes whose parent is the level's owner).
+ *  Returns absolute top-left positions for every node at AND under this level.
+ *  Group members are sized to their recursively-laid-out box; disconnected
+ *  components at this level are grid-packed. */
+function layoutLevel(members: LayoutNodeInput[], ctx: LayoutCtx): Record<string, { x: number; y: number }> {
+  const sizeOf = (id: string): { width: number; height: number } =>
+    ctx.boxes[id] ?? baseDims(ctx.nodeById.get(id)!);
+
+  const localChild: Record<string, Record<string, { x: number; y: number }>> = {};
+  const localBoxOrigin: Record<string, { x: number; y: number }> = {};
+  for (const m of members) {
+    const children = ctx.childrenOf.get(m.id);
+    if (!children || children.length === 0) continue;
+    const childAbs = layoutLevel(children, ctx); // fills ctx.boxes for any sub-groups first
+    localChild[m.id] = childAbs;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const c of children) {
+      const s = sizeOf(c.id);
+      const p = childAbs[c.id];
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x + s.width);
+      maxY = Math.max(maxY, p.y + s.height);
+    }
+    ctx.boxes[m.id] = {
+      width: maxX - minX + 2 * ctx.groupPadding,
+      height: maxY - minY + 2 * ctx.groupPadding + ctx.groupHeaderHeight,
+    };
+    // Box top-left in the children's coordinate space (children sit pad in from the
+    // left and pad+header down from the top).
+    localBoxOrigin[m.id] = { x: minX - ctx.groupPadding, y: minY - ctx.groupPadding - ctx.groupHeaderHeight };
+  }
+
+  const levelEdges = liftEdges(members, ctx);
+  let positions = dagreFlat(members, levelEdges, ctx.opts, sizeOf);
+  if (ctx.packComponents) {
+    const components = connectedComponents(members.map((m) => m.id), levelEdges);
+    positions = packComponentsIntoGrid(positions, sizeOf, components, ctx.opts);
+  }
+
+  const result: Record<string, { x: number; y: number }> = {};
+  for (const m of members) {
+    result[m.id] = positions[m.id];
+    const childAbs = localChild[m.id];
+    if (!childAbs) continue;
+    const origin = localBoxOrigin[m.id];
+    // childAbs is the FULL subtree returned by the recursive layoutLevel call —
+    // direct children AND all descendants — so this single shift re-bases the
+    // whole nested group under m's final position. (Don't change layoutLevel to
+    // return direct children only without revisiting this.)
+    for (const id of Object.keys(childAbs)) {
+      result[id] = {
+        x: positions[m.id].x + (childAbs[id].x - origin.x),
+        y: positions[m.id].y + (childAbs[id].y - origin.y),
+      };
+    }
+  }
+  return result;
+}
+
+/**
+ * Standalone dagre auto-layout: returns a map of node id → top-left position in
+ * flow coordinates. Pure — no store, no DI:
+ *
+ * ```ts
+ * import { layoutNodes } from '@angflow/angular/layout';
+ * flow.applyLayout(layoutNodes, { direction: 'LR' });
+ * ```
+ *
+ * Dimensions resolve per node as `measured` → `width`/`height` →
+ * `initialWidth`/`initialHeight` → 150×40. Edges referencing ids not in `nodes`
+ * are skipped. Lives in the `@angflow/angular/layout` subpath so `@dagrejs/dagre`
+ * (an optional peer) is only pulled into bundles that import it.
+ *
+ * Prefer `NgFlowService.applyLayout(layoutNodes, …)`: it measures live node and
+ * edge-label footprints from the DOM and passes them in, so layout is correct
+ * even when `measured` is absent/stale (controlled-mode round-trip).
+ *
+ * Groups: a node with a `parentId` that is also in the input is laid out *within*
+ * that parent. Each group is sized to its (recursively laid-out) members plus
+ * `groupPadding` and `groupHeaderHeight`, and laid out at the level above as a
+ * single box. Nesting is supported. Output is in absolute coordinates — apply it
+ * with `applyLayout(layoutNodes, { coordinateSpace: 'absolute' })` so parented
+ * nodes are translated into their parent-relative space.
+ *
+ * Disconnected components (within a group or among top-level nodes) are packed
+ * into a near-square grid rather than cascaded along the cross-axis — keeping
+ * spatially-grouped, sparsely-connected canvases compact (set
+ * `packComponents: false` to keep dagre's raw cascade). parentId cycles (any
+ * length) are treated as top-level.
+ */
+export function layoutNodes(
+  nodes: LayoutNodeInput[],
+  edges: ReadonlyArray<LayoutEdgeInput>,
+  opts: LayoutNodesOptions = {},
+): Record<string, { x: number; y: number }> {
+  const ids = new Set(nodes.map((n) => n.id));
+  const parentOf = buildValidParentOf(nodes, ids);
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+  const childrenOf = new Map<string, LayoutNodeInput[]>();
+  for (const n of nodes) {
+    const p = parentOf.get(n.id);
+    if (p === undefined) continue;
+    const arr = childrenOf.get(p);
+    if (arr) arr.push(n);
+    else childrenOf.set(p, [n]);
+  }
+  const topLevel = nodes.filter((n) => !parentOf.has(n.id));
+  const ctx: LayoutCtx = {
+    parentOf,
+    childrenOf,
+    nodeById,
+    edges,
+    opts,
+    boxes: {},
+    groupPadding: opts.groupPadding ?? DEFAULT_GROUP_PADDING,
+    groupHeaderHeight: opts.groupHeaderHeight ?? DEFAULT_GROUP_HEADER,
+    packComponents: opts.packComponents ?? true,
+  };
+  return layoutLevel(topLevel, ctx);
 }
