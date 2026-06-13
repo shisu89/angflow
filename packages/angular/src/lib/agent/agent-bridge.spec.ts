@@ -1966,6 +1966,7 @@ describe('AngflowAgentBridge — bulk payload caps', () => {
         minZoom: 0.2,
       })) as { zoom: number; clamped: boolean };
       expect(res).toHaveProperty('zoom');
+      expect(res).toHaveProperty('clamped');
       expect(typeof res.clamped).toBe('boolean');
       expect(spy).toHaveBeenCalledWith(
         { x: 0, y: 0, width: 200, height: 100 },
@@ -1976,9 +1977,10 @@ describe('AngflowAgentBridge — bulk payload caps', () => {
     it('fit_bounds rejects a non-positive minZoom with -32602', async () => {
       const { bridge, newFlow } = setup();
       bridge.register('main', newFlow());
-      await expect(
-        bridge.callTool('fit_bounds', { bounds: { x: 0, y: 0, width: 10, height: 10 }, minZoom: 0 }),
-      ).rejects.toMatchObject({ code: -32602 });
+      const bounds = { x: 0, y: 0, width: 10, height: 10 };
+      await expect(bridge.callTool('fit_bounds', { bounds, minZoom: 0 })).rejects.toMatchObject({ code: -32602 });
+      await expect(bridge.callTool('fit_bounds', { bounds, minZoom: -1 })).rejects.toMatchObject({ code: -32602 });
+      await expect(bridge.callTool('fit_bounds', { bounds, minZoom: 'big' })).rejects.toMatchObject({ code: -32602 });
     });
   });
 });
