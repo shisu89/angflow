@@ -908,6 +908,7 @@ export class AngflowAgentBridge {
       }
       const nodeSep = typeof params['nodeSep'] === 'number' ? (params['nodeSep'] as number) : undefined;
       const rankSep = typeof params['rankSep'] === 'number' ? (params['rankSep'] as number) : undefined;
+      const minZoom = optionalPositiveNumber(params, 'minZoom');
       const nodeIds = optionalStringArray(params, 'nodeIds');
       if (nodeIds) {
         for (const id of nodeIds) {
@@ -992,16 +993,17 @@ export class AngflowAgentBridge {
       await flow.setNodePositions(actuallyApplied, { coordinateSpace: 'absolute' });
 
       const shouldFit = params['fitView'] !== false;
+      let fit: { zoom: number; clamped: boolean } | null = null;
       if (shouldFit && Object.keys(actuallyApplied).length > 0) {
         try {
-          await flow.fitView({});
+          fit = await flow.fitView({ minZoom });
         } catch (err) {
           // Best-effort viewport fit: never fail the tool over a cosmetic step,
           // but surface the error to hosts observing onError.
           this.reportError(err, { kind: 'dispatch', method: 'layout_nodes' });
         }
       }
-      return { positions: actuallyApplied };
+      return { positions: actuallyApplied, fit };
     });
   }
 }

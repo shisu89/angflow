@@ -1182,6 +1182,39 @@ describe('AngflowAgentBridge', () => {
       // c is absolute {130,140}; relative to g's new absolute {100,100} → {30,40}.
       expect(flow.getNode('c')?.position).toEqual({ x: 30, y: 40 });
     });
+
+    it('returns a fit result when fitView is on', async () => {
+      const { bridge: b, newFlow: nf } = setupWithLayout(fakeLayout);
+      const flow = nf();
+      b.register('main', flow);
+      flow.setNodes([makeNode('a'), makeNode('b')]);
+      const res = (await b.callTool('layout_nodes', {})) as {
+        positions: Record<string, { x: number; y: number }>;
+        fit: { zoom: number; clamped: boolean } | null;
+      };
+      expect(res.positions).toBeDefined();
+      expect(res.fit).not.toBeNull();
+      expect(res.fit).toHaveProperty('clamped');
+    });
+
+    it('returns fit: null when fitView is false', async () => {
+      const { bridge: b, newFlow: nf } = setupWithLayout(fakeLayout);
+      const flow = nf();
+      b.register('main', flow);
+      flow.setNodes([makeNode('a')]);
+      const res = (await b.callTool('layout_nodes', { fitView: false })) as { fit: unknown };
+      expect(res.fit).toBeNull();
+    });
+
+    it('threads minZoom into the post-layout fit', async () => {
+      const { bridge: b, newFlow: nf } = setupWithLayout(fakeLayout);
+      const flow = nf();
+      b.register('main', flow);
+      flow.setNodes([makeNode('a')]);
+      const spy = vi.spyOn(flow, 'fitView');
+      await b.callTool('layout_nodes', { minZoom: 0.25 });
+      expect(spy).toHaveBeenCalledWith(expect.objectContaining({ minZoom: 0.25 }));
+    });
   });
 
   describe('flow.state throttling during drag', () => {
