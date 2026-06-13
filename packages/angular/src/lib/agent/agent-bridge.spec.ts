@@ -1194,7 +1194,7 @@ describe('AngflowAgentBridge', () => {
       };
       expect(res.positions).toBeDefined();
       expect(res.fit).not.toBeNull();
-      expect(res.fit).toHaveProperty('clamped');
+      expect(typeof res.fit!.clamped).toBe('boolean');
     });
 
     it('returns fit: null when fitView is false', async () => {

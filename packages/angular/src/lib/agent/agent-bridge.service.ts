@@ -11,6 +11,7 @@ import {
   signal,
 } from '@angular/core';
 
+import type { FitViewResult } from '@angflow/system';
 import type { NgFlowService } from '../services/ng-flow.service';
 import type { Node, Edge } from '../types';
 import type { AgentLayoutFn, NodeTemplateSpec } from '../types/node-template';
@@ -993,7 +994,7 @@ export class AngflowAgentBridge {
       await flow.setNodePositions(actuallyApplied, { coordinateSpace: 'absolute' });
 
       const shouldFit = params['fitView'] !== false;
-      let fit: { zoom: number; clamped: boolean } | null = null;
+      let fit: FitViewResult | null = null;
       if (shouldFit && Object.keys(actuallyApplied).length > 0) {
         try {
           fit = await flow.fitView({ minZoom });
