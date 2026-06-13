@@ -1935,5 +1935,25 @@ describe('AngflowAgentBridge — bulk payload caps', () => {
       expect(typeof res.zoom).toBe('number');
       expect(typeof res.clamped).toBe('boolean');
     });
+
+    it('fit_view rejects a non-positive minZoom with -32602', async () => {
+      const { bridge, newFlow } = setup();
+      bridge.register('main', newFlow());
+      await expect(bridge.callTool('fit_view', { minZoom: 0 })).rejects.toMatchObject({ code: -32602 });
+      await expect(bridge.callTool('fit_view', { minZoom: -1 })).rejects.toMatchObject({ code: -32602 });
+      await expect(bridge.callTool('fit_view', { minZoom: 'big' })).rejects.toMatchObject({ code: -32602 });
+    });
+
+    it('fit_view threads minZoom to the service and captures no history', async () => {
+      const { bridge, newFlow } = setup();
+      const flow = newFlow();
+      bridge.register('main', flow);
+      flow.setNodes([makeNode('a')]);
+      const spy = vi.spyOn(flow, 'fitView');
+      await bridge.callTool('fit_view', { minZoom: 0.3 });
+      expect(spy).toHaveBeenCalledWith(expect.objectContaining({ minZoom: 0.3 }));
+      const status = (await bridge.callTool('history_status', {})) as { pastDepth: number };
+      expect(status.pastDepth).toBe(0);
+    });
   });
 });

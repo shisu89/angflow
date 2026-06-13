@@ -552,6 +552,7 @@ export class AngflowAgentBridge {
     this.handlers.set('fit_view', (flow, params) => {
       const padding = typeof params['padding'] === 'number' ? (params['padding'] as number) : undefined;
       const duration = typeof params['duration'] === 'number' ? (params['duration'] as number) : undefined;
+      const minZoom = optionalPositiveNumber(params, 'minZoom');
       const nodeIds = optionalStringArray(params, 'nodeIds');
       const nodes = nodeIds
         ? nodeIds
@@ -559,7 +560,7 @@ export class AngflowAgentBridge {
             .filter((n): n is Node => !!n)
             .map((n) => ({ id: n.id }))
         : undefined;
-      return flow.fitView({ padding, duration, nodes });
+      return flow.fitView({ padding, duration, minZoom, nodes });
     });
 
     this.handlers.set('set_viewport', (flow, params) => {
@@ -1221,6 +1222,15 @@ function optionalStringArray(params: Record<string, unknown>, key: string): stri
     );
   }
   return value as string[];
+}
+
+function optionalPositiveNumber(params: Record<string, unknown>, key: string): number | undefined {
+  const value = params[key];
+  if (value == null) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    throw new InvalidParamsError(`Param "${key}" must be a finite number greater than 0.`);
+  }
+  return value;
 }
 
 const BADGE_COLOR_SET = new Set(['slate', 'indigo', 'emerald', 'amber', 'rose']);
