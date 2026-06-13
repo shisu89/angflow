@@ -132,14 +132,19 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     return this.store.setCenter(x, y, options);
   }
 
-  /** Fit the viewport to a specific `Rect` in flow coordinates. Resolves `false` if pan/zoom isn't yet initialized. */
-  async fitBounds(bounds: Rect, options?: { padding?: number; duration?: number }): Promise<boolean> {
+  /** Fit the viewport to a specific `Rect` in flow coordinates. Resolves `{ zoom: NaN, clamped: false }` if pan/zoom isn't yet initialized. */
+  async fitBounds(
+    bounds: Rect,
+    options?: { padding?: number; duration?: number; minZoom?: number; maxZoom?: number },
+  ): Promise<FitViewResult> {
     const pz = this.store.panZoom();
-    if (!pz) return false;
+    if (!pz) return { zoom: NaN, clamped: false };
 
-    const { x, y, zoom } = this.getViewportForBoundsInternal(bounds, options?.padding ?? 0.1);
-    await pz.setViewport({ x, y, zoom }, { duration: options?.duration });
-    return true;
+    const effMin = options?.minZoom ?? this.store.minZoom();
+    const effMax = options?.maxZoom ?? this.store.maxZoom();
+    const viewport = this.getViewportForBoundsInternal(bounds, options?.padding ?? 0.1, effMin, effMax);
+    await pz.setViewport({ x: viewport.x, y: viewport.y, zoom: viewport.zoom }, { duration: options?.duration });
+    return { zoom: viewport.zoom, clamped: viewport.zoom <= effMin + 1e-6 };
   }
 
   // ── Coordinate Conversion ─────────────────────────────────────────────
@@ -1046,13 +1051,18 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
   // ── Helpers ───────────────────────────────────────────────────────────
 
-  private getViewportForBoundsInternal(bounds: Rect, padding: number) {
+  private getViewportForBoundsInternal(
+    bounds: Rect,
+    padding: number,
+    minZoom = this.store.minZoom(),
+    maxZoom = this.store.maxZoom(),
+  ) {
     return getViewportForBounds(
       bounds,
       this.store.width(),
       this.store.height(),
-      this.store.minZoom(),
-      this.store.maxZoom(),
+      minZoom,
+      maxZoom,
       padding
     );
   }
