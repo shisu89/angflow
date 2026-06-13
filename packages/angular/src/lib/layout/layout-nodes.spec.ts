@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { layoutNodes } from './layout-nodes';
+import { layoutNodes, connectedComponents, packComponentsIntoGrid } from './layout-nodes';
 
 describe('layoutNodes', () => {
   it('accepts nodes with measured dimensions and lays out LR', () => {
@@ -267,6 +267,75 @@ describe('layoutNodes compound groups', () => {
     for (const id of ['a', 'b', 'd']) {
       expect(Number.isFinite(positions[id].x)).toBe(true);
       expect(Number.isFinite(positions[id].y)).toBe(true);
+    }
+  });
+});
+
+describe('connectedComponents', () => {
+  it('groups ids joined by edges and isolates the rest', () => {
+    const comps = connectedComponents(
+      ['a', 'b', 'c', 'd'],
+      [{ source: 'a', target: 'b' }],
+    );
+    const sets = comps.map((c) => new Set(c));
+    expect(comps).toHaveLength(3);
+    expect(sets.some((s) => s.has('a') && s.has('b'))).toBe(true);
+    expect(sets.some((s) => s.size === 1 && s.has('c'))).toBe(true);
+    expect(sets.some((s) => s.size === 1 && s.has('d'))).toBe(true);
+  });
+
+  it('returns one component when all ids are connected', () => {
+    const comps = connectedComponents(
+      ['a', 'b', 'c'],
+      [{ source: 'a', target: 'b' }, { source: 'b', target: 'c' }],
+    );
+    expect(comps).toHaveLength(1);
+  });
+
+  it('ignores edges whose endpoints are not in the id list', () => {
+    const comps = connectedComponents(['a', 'b'], [{ source: 'a', target: 'ghost' }]);
+    expect(comps).toHaveLength(2);
+  });
+});
+
+describe('packComponentsIntoGrid', () => {
+  const size = () => ({ width: 100, height: 100 });
+
+  it('returns positions unchanged for a single component', () => {
+    const positions = { a: { x: 0, y: 0 }, b: { x: 100, y: 0 } };
+    const out = packComponentsIntoGrid(positions, () => size(), [['a', 'b']], {});
+    expect(out).toEqual(positions);
+  });
+
+  it('packs many disconnected single-node components into a compact grid (not a line)', () => {
+    const ids = Array.from({ length: 9 }, (_, i) => `n${i}`);
+    const positions = Object.fromEntries(ids.map((id, i) => [id, { x: i * 500, y: i * 500 }]));
+    const components = ids.map((id) => [id]);
+    const out = packComponentsIntoGrid(positions, () => size(), components, { nodeSep: 50 });
+    const xs = ids.map((id) => out[id].x);
+    const ys = ids.map((id) => out[id].y);
+    const bboxW = Math.max(...xs) - Math.min(...xs) + 100;
+    const bboxH = Math.max(...ys) - Math.min(...ys) + 100;
+    expect(bboxW).toBeLessThan(700);
+    expect(bboxH).toBeLessThan(700);
+  });
+
+  it('preserves each component\'s internal layout (relative offsets) while repacking', () => {
+    const positions = {
+      a1: { x: 0, y: 0 }, a2: { x: 20, y: 0 },
+      b1: { x: 9999, y: 9999 }, b2: { x: 10019, y: 9999 },
+    };
+    const out = packComponentsIntoGrid(positions, () => size(), [['a1', 'a2'], ['b1', 'b2']], { nodeSep: 50 });
+    expect(out.a2.x - out.a1.x).toBe(20);
+    expect(out.b2.x - out.b1.x).toBe(20);
+  });
+
+  it('ignores empty components and never emits NaN positions', () => {
+    const positions = { a: { x: 0, y: 0 }, b: { x: 500, y: 500 } };
+    const out = packComponentsIntoGrid(positions, () => size(), [['a'], [], ['b']], { nodeSep: 50 });
+    for (const id of ['a', 'b']) {
+      expect(Number.isFinite(out[id].x)).toBe(true);
+      expect(Number.isFinite(out[id].y)).toBe(true);
     }
   });
 });

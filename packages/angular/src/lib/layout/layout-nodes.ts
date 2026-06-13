@@ -49,6 +49,89 @@ const DEFAULT_HEIGHT = 40;
 const DEFAULT_LABEL_WIDTH = 60;
 const DEFAULT_LABEL_HEIGHT = 20;
 
+/** Partition `ids` into connected components over `edges` (union-find). Edges
+ *  whose endpoints aren't both in `ids` are ignored. Used to detect disconnected
+ *  pieces so they can be grid-packed instead of left to dagre's cross-axis cascade. */
+export function connectedComponents(
+  ids: string[],
+  edges: ReadonlyArray<{ source: string; target: string }>,
+): string[][] {
+  const parent = new Map<string, string>();
+  for (const id of ids) parent.set(id, id);
+  const find = (x: string): string => {
+    let root = x;
+    while (parent.get(root) !== root) root = parent.get(root)!;
+    let cur = x;
+    while (parent.get(cur) !== root) {
+      const next = parent.get(cur)!;
+      parent.set(cur, root);
+      cur = next;
+    }
+    return root;
+  };
+  const idSet = new Set(ids);
+  for (const e of edges) {
+    if (!idSet.has(e.source) || !idSet.has(e.target)) continue;
+    const a = find(e.source);
+    const b = find(e.target);
+    if (a !== b) parent.set(a, b);
+  }
+  const groups = new Map<string, string[]>();
+  for (const id of ids) {
+    const root = find(id);
+    const g = groups.get(root);
+    if (g) g.push(id);
+    else groups.set(root, [id]);
+  }
+  return [...groups.values()];
+}
+
+/** Repack disconnected components into a near-square grid, preserving each
+ *  component's internal layout. No-op for a single component. `sizeOf` returns
+ *  each node's footprint so component bounding boxes (and grid cells) are sized
+ *  correctly. Replaces dagre's tendency to stack disconnected pieces along the
+ *  cross-axis (angflow-feedback #12). */
+export function packComponentsIntoGrid(
+  positions: Record<string, { x: number; y: number }>,
+  sizeOf: (id: string) => { width: number; height: number },
+  components: string[][],
+  opts: { nodeSep?: number },
+): Record<string, { x: number; y: number }> {
+  // Ignore empty components defensively: an empty id list would yield an
+  // Infinity bbox and propagate NaN into every cell. connectedComponents never
+  // emits empties, but this keeps the helper total for any caller.
+  const groups = components.filter((ids) => ids.length > 0);
+  if (groups.length <= 1) return positions;
+  const sep = opts.nodeSep ?? 50;
+  const boxes = groups.map((ids) => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const id of ids) {
+      const p = positions[id];
+      const s = sizeOf(id);
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x + s.width);
+      maxY = Math.max(maxY, p.y + s.height);
+    }
+    return { ids, minX, minY, w: maxX - minX, h: maxY - minY };
+  });
+  boxes.sort((a, b) => b.w * b.h - a.w * a.h);
+  const cols = Math.ceil(Math.sqrt(boxes.length));
+  const cellW = Math.max(...boxes.map((b) => b.w)) + sep;
+  const cellH = Math.max(...boxes.map((b) => b.h)) + sep;
+  const out: Record<string, { x: number; y: number }> = {};
+  boxes.forEach((box, i) => {
+    const cellX = (i % cols) * cellW;
+    const cellY = Math.floor(i / cols) * cellH;
+    const dx = cellX - box.minX;
+    const dy = cellY - box.minY;
+    for (const id of box.ids) {
+      out[id] = { x: positions[id].x + dx, y: positions[id].y + dy };
+    }
+  });
+  return out;
+}
+
 /**
  * Standalone dagre auto-layout: returns a map of node id → top-left position
  * in flow coordinates. Pure — no store, no DI, callable from anywhere:
