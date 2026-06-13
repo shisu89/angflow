@@ -144,6 +144,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     const effMax = options?.maxZoom ?? this.store.maxZoom();
     const viewport = this.getViewportForBoundsInternal(bounds, options?.padding ?? 0.1, effMin, effMax);
     await pz.setViewport({ x: viewport.x, y: viewport.y, zoom: viewport.zoom }, { duration: options?.duration });
+    // 1e-6 matches ZOOM_CLAMP_EPSILON in @angflow/system (utils/graph.ts).
     return { zoom: viewport.zoom, clamped: viewport.zoom <= effMin + 1e-6 };
   }
 
