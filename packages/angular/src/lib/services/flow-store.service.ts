@@ -800,11 +800,11 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     });
   }
 
-  async fitView(options?: FitViewOptionsBase<NodeType>): Promise<boolean> {
+  async fitView(options?: FitViewOptionsBase<NodeType>): Promise<{ zoom: number; clamped: boolean }> {
     const pz = this.panZoom();
-    if (!pz) return false;
+    if (!pz) return { zoom: NaN, clamped: false };
 
-    await fitViewport(
+    return fitViewport(
       {
         nodes: this.nodeLookup,
         width: this.width(),
@@ -815,8 +815,6 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       },
       options
     );
-
-    return true;
   }
 
   /**

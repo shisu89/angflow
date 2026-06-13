@@ -1921,4 +1921,17 @@ describe('AngflowAgentBridge — bulk payload caps', () => {
       }
     });
   });
+
+  describe('fit clamp signal', () => {
+    it('fit_view returns { zoom, clamped }', async () => {
+      const { bridge, newFlow } = setup();
+      const flow = newFlow();
+      bridge.register('main', flow);
+      flow.setNodes([makeNode('a'), makeNode('b')]);
+      const res = (await bridge.callTool('fit_view', {})) as { zoom: number; clamped: boolean };
+      expect(res).toHaveProperty('zoom');
+      expect(res).toHaveProperty('clamped');
+      expect(typeof res.clamped).toBe('boolean');
+    });
+  });
 });

@@ -216,6 +216,7 @@ export type {
   ViewportHelperFunctionOptions,
   SetCenterOptions,
   FitBoundsOptions,
+  FitViewResult,
   PanelPosition,
   SelectionRect,
   ProOptions,

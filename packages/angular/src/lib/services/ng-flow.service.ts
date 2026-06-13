@@ -13,6 +13,7 @@ import {
   type Viewport,
   type Rect,
   type FitViewOptionsBase,
+  type FitViewResult,
   type HandleConnection,
   type ConnectionState,
   type NodeBase,
@@ -105,8 +106,9 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   /**
    * Zoom and pan so all nodes (or `options.nodes`) fit in the canvas.
    * Respects `minZoom`, `maxZoom`, and `padding`.
+   * Returns the achieved zoom and whether it was clamped at the min-zoom floor.
    */
-  fitView(options?: FitViewOptionsBase<NodeType>) {
+  fitView(options?: FitViewOptionsBase<NodeType>): Promise<FitViewResult> {
     return this.store.fitView(options);
   }
 
