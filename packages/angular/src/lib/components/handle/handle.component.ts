@@ -56,7 +56,7 @@ import { NODE_ID } from '../../services/tokens';
     '[attr.data-floating]': 'floating() ? "" : null',
     '[attr.data-id]': 'dataId()',
     '[attr.aria-describedby]': 'store.rfId() + "-handle-desc"',
-    '(mousedown)': 'onPointerDown($event)',
+    '(pointerdown)': 'onPointerDown($event)',
     '(click)': 'onClick($event)',
   },
   template: `<ng-content />`,

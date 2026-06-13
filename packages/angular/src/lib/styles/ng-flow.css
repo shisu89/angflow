@@ -261,6 +261,9 @@ svg.xy-flow__connectionline {
 .xy-flow__handle {
   position: absolute;
   pointer-events: none;
+  /* Prevent the browser from claiming a touch that starts on a handle as a
+     scroll/pan gesture, so a touch-drag can start (and track) a connection. */
+  touch-action: none;
   min-width: 5px;
   min-height: 5px;
   width: 8px;

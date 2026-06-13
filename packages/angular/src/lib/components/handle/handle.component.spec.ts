@@ -263,3 +263,59 @@ describe('HandleComponent — isNodeVisible wiring to XYHandle.onPointerDown', (
     }
   });
 });
+
+// ── Pointer trigger: connections must start from a touch-capable pointer event ──
+//
+// Regression for "connecting nodes on mobile doesn't work": the host bound the
+// connection trigger to `mousedown`, which never fires during a touch-drag. The
+// whole connection pipeline (XYHandle.onPointerDown attaches mouse AND touch
+// move/up listeners; getEventPosition is touch-aware) supports touch — only the
+// trigger was mouse-only. The host now binds `pointerdown`, which unifies mouse,
+// touch and pen.
+
+describe('HandleComponent — connection trigger uses pointerdown', () => {
+  let store: FlowStore;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [HandleComponent],
+      providers: [
+        provideZonelessChangeDetection(),
+        FlowStore,
+        { provide: NODE_ID, useValue: 'node-A' },
+      ],
+    });
+    store = TestBed.inject(FlowStore);
+  });
+
+  function mountSourceHandle() {
+    const fixture = TestBed.createComponent(HandleComponent);
+    setSignalInput(fixture.componentInstance, 'type', 'source' as HandleType);
+    setSignalInput(fixture.componentInstance, 'isConnectableStart', true);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('starts a connection on pointerdown (covers touch + pen, not just mouse)', () => {
+    const fixture = mountSourceHandle();
+    const spy = vi.spyOn(system.XYHandle, 'onPointerDown').mockImplementation(() => {});
+    try {
+      fixture.nativeElement.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      expect(spy).toHaveBeenCalledOnce();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('no longer triggers on a bare mousedown (the mouse-only trigger is gone)', () => {
+    const fixture = mountSourceHandle();
+    const spy = vi.spyOn(system.XYHandle, 'onPointerDown').mockImplementation(() => {});
+    try {
+      fixture.nativeElement.dispatchEvent(new Event('mousedown', { bubbles: true }));
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
