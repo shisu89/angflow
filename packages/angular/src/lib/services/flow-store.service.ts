@@ -336,7 +336,18 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     this.version();
     const edges = this.edges();
     const hidden = this.collapsedHiddenIds();
-    return hidden.size ? rewriteEdgesForCollapse(edges, this.nodeLookup, hidden) : (edges as DisplayEdge<EdgeType>[]);
+    if (hidden.size) {
+      return rewriteEdgesForCollapse(edges, this.nodeLookup, hidden);
+    }
+    // Return a *fresh* array even when not rewriting for collapse. `version()` is
+    // read above so this recomputes on node-position changes (drag, tween), but a
+    // `computed` only notifies its consumers when the return value changes under
+    // `Object.is`. Returning the same `edges` reference would swallow that
+    // notification, so the EdgeRenderer would not re-render and edge paths would
+    // freeze mid-drag while the nodes move (edges read live node positions, so the
+    // geometry must be recomputed). `visibleNodes` returns a fresh array for the
+    // same reason — keep these two symmetric.
+    return [...edges] as DisplayEdge<EdgeType>[];
   });
 
   readonly visibleEdgeIds: Signal<Set<string>> = computed(() => {

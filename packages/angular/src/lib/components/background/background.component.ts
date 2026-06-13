@@ -62,6 +62,7 @@ export type BackgroundVariant = 'dots' | 'lines' | 'cross';
             >
               <path
                 [class]="'xy-flow__background-pattern lines ' + (patternClassName() ?? '')"
+                fill="none"
                 [attr.stroke]="color()"
                 [attr.stroke-width]="resolvedLineWidth() * zoom()"
                 [attr.d]="'M ' + scaledGapX() + ' 0 L 0 0 0 ' + scaledGapY()"
@@ -79,6 +80,7 @@ export type BackgroundVariant = 'dots' | 'lines' | 'cross';
             >
               <path
                 [class]="'xy-flow__background-pattern cross ' + (patternClassName() ?? '')"
+                fill="none"
                 [attr.stroke]="color()"
                 [attr.stroke-width]="resolvedLineWidth() * zoom()"
                 [attr.d]="crossPath()"

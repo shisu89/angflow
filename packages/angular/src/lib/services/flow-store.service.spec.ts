@@ -1201,6 +1201,34 @@ describe('collapse computeds', () => {
   });
 });
 
+describe('displayEdges reactivity on node drag', () => {
+  let store: FlowStore;
+
+  beforeEach(() => {
+    store = new FlowStore();
+  });
+
+  // Regression: a node position change (drag/tween bumps `version`) must yield a
+  // NEW displayEdges array reference. A `computed` only notifies consumers when
+  // its return value differs under Object.is — returning the same `edges`
+  // reference would swallow the notification, so the EdgeRenderer would never
+  // re-render and edge paths would freeze mid-drag while the nodes move.
+  it('emits a fresh displayEdges reference when a node position changes', () => {
+    store.setNodes([
+      { id: 'a', data: {}, position: { x: 0, y: 0 } },
+      { id: 'b', data: {}, position: { x: 100, y: 0 } },
+    ]);
+    store.setEdges([{ id: 'e1', source: 'a', target: 'b' }]);
+
+    const before = store.displayEdges();
+    store.triggerNodeChanges([{ id: 'b', type: 'position', position: { x: 100, y: 80 } }]);
+    const after = store.displayEdges();
+
+    expect(after).not.toBe(before); // new reference → consumers (EdgeRenderer) are notified
+    expect(after.map((e) => e.id)).toEqual(['e1']); // content unchanged
+  });
+});
+
 describe('position fast-path absolute positions', () => {
   let store: FlowStore;
   beforeEach(() => { store = new FlowStore(); });
