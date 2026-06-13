@@ -202,6 +202,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
         padding: { type: 'number' },
         duration: { type: 'number' },
         nodeIds: { type: 'array', items: { type: 'string' } },
+        minZoom: { type: 'number', description: 'Per-call min-zoom floor for this fit (overrides host minZoom). Returns { zoom, clamped } where clamped means the board could not be fully framed.' },
       },
       additionalProperties: false,
     },
@@ -486,6 +487,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
         },
         padding: { type: 'number' },
         duration: { type: 'number' },
+        minZoom: { type: 'number', description: 'Per-call min-zoom floor for this fit (overrides host minZoom). Returns { zoom, clamped }.' },
       },
       required: ['bounds'],
       additionalProperties: false,
@@ -770,7 +772,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
       'Auto-layout nodes using the host-configured layout engine (typically dagre). ' +
       'Computes tidy positions for the whole graph (or the nodeIds subset and the edges ' +
       'among them), applies them in one undoable step, and fits the viewport unless ' +
-      'fitView is false. Returns the applied positions. Prefer this over computing ' +
+      'fitView is false. Returns the applied positions plus a fit result ({ zoom, clamped } or null). Prefer this over computing ' +
       'coordinates manually whenever you add more than a couple of nodes. ' +
       'Group (parentId) nodes are laid out as compound clusters; results are applied ' +
       'in absolute coordinates, so grouped children stay inside their group.',
@@ -791,6 +793,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
         nodeSep: { type: 'number', description: 'Separation between nodes in the same rank (px).' },
         rankSep: { type: 'number', description: 'Separation between ranks (px).' },
         fitView: { type: 'boolean', description: 'Fit the viewport afterwards. Default true.' },
+        minZoom: { type: 'number', description: 'Per-call min-zoom floor used for the post-layout fit. The result includes fit: { zoom, clamped } | null (null when fitView is false).' },
       },
       additionalProperties: false,
     },

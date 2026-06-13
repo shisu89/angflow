@@ -146,13 +146,15 @@ Every tool takes an optional `flowId` (omit when only one flow is registered; re
 
 | Tool | Params | Notes |
 |---|---|---|
-| `fit_view` | `nodeIds?`, `padding?`, `duration?` | Animates to fit the given nodes (all nodes if omitted) |
+| `fit_view` | `nodeIds?`, `padding?`, `duration?`, `minZoom?` | Animates to fit the given nodes (all if omitted). Returns `{ zoom, clamped }` — `clamped` is true when the fit hit the min-zoom floor (board too big to frame). |
 | `set_viewport` | `viewport: { x, y, zoom }`, `duration?` | Animate to an explicit viewport |
 | `zoom_in` | `duration?: number` | Incremental zoom in |
 | `zoom_out` | `duration?: number` | Incremental zoom out |
 | `zoom_to` | `level: number`, `duration?: number` | Set zoom to an absolute level |
 | `set_center` | `x: number`, `y: number`, `zoom?: number`, `duration?: number` | Center the viewport on a flow coordinate |
-| `fit_bounds` | `bounds: { x, y, width, height }`, `padding?: number`, `duration?: number` | Fit the viewport to an explicit bounding rect |
+| `fit_bounds` | `bounds: { x, y, width, height }`, `padding?: number`, `duration?: number`, `minZoom?` | Fit the viewport to an explicit bounding rect. Returns `{ zoom, clamped }`. |
+
+**`FitViewResult`** — `{ zoom: number; clamped: boolean }`. `zoom` is the achieved zoom (JSON `null` when there was nothing to fit); `clamped` is true only when the fit was limited by the minimum zoom (content larger than the viewport can show) — a signal to split into regions or use `set_center`. Clamping at `maxZoom` is not flagged.
 
 ### Transactional batch
 
@@ -168,9 +170,9 @@ Requires a layout function to be passed to `provideAgentBridge({ layout: dagreLa
 
 | Tool | Params | Returns |
 |---|---|---|
-| `layout_nodes` | `direction?: 'TB' \| 'LR' \| 'BT' \| 'RL'` (default `'TB'`), `nodeIds?: string[]` (omit = all nodes), `nodeSep?: number`, `rankSep?: number`, `fitView?: boolean` (default `true`) | `{ positions: Record<nodeId, { x: number; y: number }> }` |
+| `layout_nodes` | `direction?: 'TB' \| 'LR' \| 'BT' \| 'RL'` (default `'TB'`), `nodeIds?: string[]` (omit = all nodes), `nodeSep?: number`, `rankSep?: number`, `fitView?: boolean` (default `true`), `minZoom?` | `{ positions: Record<nodeId, { x: number; y: number }>, fit: { zoom, clamped } \| null }` |
 
-`layout_nodes` computes tidy positions using the host-configured layout engine (typically dagre), applies them in one undoable step, and fits the viewport. Returned positions are **flow-absolute** (top-left corners in flow coordinates). When `nodeIds` is supplied, only those nodes and the edges among them form the layout subgraph — nodes outside the subset are left untouched. The `dagreLayout` adapter ships in `@angflow/angular/layout` (requires the optional peer dep `@dagrejs/dagre >= 3`). When the host enables `[animate]` on `<ng-flow>`, applied positions tween smoothly (default 300 ms) instead of jumping; the tool response is sent after the transition settles, and `fitView` measures the final positions.
+`layout_nodes` computes tidy positions using the host-configured layout engine (typically dagre), applies them in one undoable step, and fits the viewport. Returned positions are **flow-absolute** (top-left corners in flow coordinates). When `nodeIds` is supplied, only those nodes and the edges among them form the layout subgraph — nodes outside the subset are left untouched. The `dagreLayout` adapter ships in `@angflow/angular/layout` (requires the optional peer dep `@dagrejs/dagre >= 3`). When the host enables `[animate]` on `<ng-flow>`, applied positions tween smoothly (default 300 ms) instead of jumping; the tool response is sent after the transition settles, and `fitView` measures the final positions. The optional `minZoom` param sets the floor for the post-layout fit; `fit` is the fit result (`null` when `fitView` is false). `clamped` indicates the board could not be fully framed.
 
 **Groups (compound layout).** A node carrying a `parentId` is forwarded to the layout fn with that `parentId` **only when its parent is also in the layout set** (the whole graph, or within the `nodeIds` subset) — so the engine clusters grouped children within their group. If the parent is excluded from the set, the child is laid out as a free top-level node. Results are applied via the `'absolute'` coordinate space, so each grouped child is re-parented against its group's new position and stays inside the group; top-level nodes are unaffected (absolute == relative for them). When a child's parent is excluded via `nodeIds`, the child is laid out as a free node but the result is still applied parent-relative (its `parentId` is unchanged), so it may land outside the group's visual box; children with `extent: 'parent'` are re-clamped by the store on write. Note: prior to v0.2.x the bridge applied layout results in relative space, which mis-placed grouped children; results are now always applied as flow-absolute positions.
 
