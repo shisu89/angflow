@@ -179,9 +179,17 @@ export type FitViewOptionsBase<NodeType extends NodeBase = NodeBase> = {
  * Result of a fit-to-content operation.
  */
 export type FitViewResult = {
-  /** Achieved zoom after the fit. NaN when there was nothing to fit (no nodes). */
+  /**
+   * Achieved zoom after the fit. `NaN` when there was nothing to fit (no nodes).
+   * Note: `NaN` serializes to JSON `null`, so JSON-RPC consumers (e.g. the agent
+   * bridge) see `null` for the empty case.
+   */
   zoom: number;
-  /** True when the fit hit the minimum-zoom floor — the content could not be fully framed. */
+  /**
+   * True when the ideal zoom was below `minZoom` and had to be clamped up — i.e.
+   * the content is larger than the viewport can frame. Clamping at `maxZoom`
+   * (content smaller than the viewport, over-zoom) is intentionally NOT flagged.
+   */
   clamped: boolean;
 };
 

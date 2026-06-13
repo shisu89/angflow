@@ -10,7 +10,7 @@ function buildLookup(nodes: NodeBase[]): NodeLookup<InternalNodeBase<NodeBase>> 
   return nodeLookup;
 }
 
-// Records the viewport fitViewport asks for; setViewport resolves like the real panZoom.
+// Minimal PanZoom stub; setViewport resolves immediately like the real instance.
 const fakePanZoom = (): PanZoomInstance =>
   ({ setViewport: async () => true } as unknown as PanZoomInstance);
 

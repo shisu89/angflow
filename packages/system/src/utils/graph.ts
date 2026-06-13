@@ -21,6 +21,7 @@ import {
   type EdgeBase,
   type FitViewParamsBase,
   type FitViewOptionsBase,
+  type FitViewResult,
   CoordinateExtent,
   OnError,
   OnBeforeDeleteBase,
@@ -363,7 +364,7 @@ export async function fitViewport<
 >(
   { nodes, width, height, panZoom, minZoom, maxZoom }: Params,
   options?: Omit<Options, 'nodes' | 'includeHiddenNodes'>
-): Promise<{ zoom: number; clamped: boolean }> {
+): Promise<FitViewResult> {
   if (nodes.size === 0) {
     return { zoom: NaN, clamped: false };
   }
