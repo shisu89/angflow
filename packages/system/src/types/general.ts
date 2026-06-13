@@ -176,6 +176,16 @@ export type FitViewOptionsBase<NodeType extends NodeBase = NodeBase> = {
 };
 
 /**
+ * Result of a fit-to-content operation.
+ */
+export type FitViewResult = {
+  /** Achieved zoom after the fit. NaN when there was nothing to fit (no nodes). */
+  zoom: number;
+  /** True when the fit hit the minimum-zoom floor — the content could not be fully framed. */
+  clamped: boolean;
+};
+
+/**
  * Internally, React Flow maintains a coordinate system that is independent of the
  * rest of the page. The `Viewport` type tells you where in that system your flow
  * is currently being display at and how zoomed in or out it is.

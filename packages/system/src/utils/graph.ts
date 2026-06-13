@@ -354,29 +354,27 @@ function getFitViewNodes<
   return fitViewNodes;
 }
 
+/** Tolerance for detecting that a fit's zoom was clamped to the minimum floor. */
+const ZOOM_CLAMP_EPSILON = 1e-6;
+
 export async function fitViewport<
   Params extends FitViewParamsBase<NodeBase>,
   Options extends FitViewOptionsBase<NodeBase>
 >(
   { nodes, width, height, panZoom, minZoom, maxZoom }: Params,
   options?: Omit<Options, 'nodes' | 'includeHiddenNodes'>
-): Promise<boolean> {
+): Promise<{ zoom: number; clamped: boolean }> {
   if (nodes.size === 0) {
-    return Promise.resolve(true);
+    return { zoom: NaN, clamped: false };
   }
 
   const nodesToFit = getFitViewNodes(nodes, options);
-
   const bounds = getInternalNodesBounds(nodesToFit);
 
-  const viewport = getViewportForBounds(
-    bounds,
-    width,
-    height,
-    options?.minZoom ?? minZoom,
-    options?.maxZoom ?? maxZoom,
-    options?.padding ?? 0.1
-  );
+  const effMin = options?.minZoom ?? minZoom;
+  const effMax = options?.maxZoom ?? maxZoom;
+
+  const viewport = getViewportForBounds(bounds, width, height, effMin, effMax, options?.padding ?? 0.1);
 
   await panZoom.setViewport(viewport, {
     duration: options?.duration,
@@ -384,7 +382,9 @@ export async function fitViewport<
     interpolate: options?.interpolate,
   });
 
-  return Promise.resolve(true);
+  // getViewportForBounds clamps the ideal zoom to >= effMin, so zoom landing at
+  // the floor means the ideal zoom was below it — the content couldn't be framed.
+  return { zoom: viewport.zoom, clamped: viewport.zoom <= effMin + ZOOM_CLAMP_EPSILON };
 }
 
 /**
