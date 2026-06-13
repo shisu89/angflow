@@ -333,7 +333,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
   },
   {
     "name": "fit_view",
-    "description": "Zoom and pan so all (or the given) nodes are visible.",
+    "description": "Zoom and pan so all (or the given) nodes are visible. Returns { zoom, clamped }; clamped is true when the content was too large to frame at minZoom.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -810,7 +810,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
   },
   {
     "name": "fit_bounds",
-    "description": "Fit the viewport to a specific Rect in flow coordinates.",
+    "description": "Fit the viewport to a specific Rect in flow coordinates. Returns { zoom, clamped }; clamped is true when the rect was too large to frame at minZoom.",
     "inputSchema": {
       "type": "object",
       "properties": {
