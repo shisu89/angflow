@@ -535,6 +535,38 @@ describe('setNodePositions / applyLayout', () => {
       expect(selectors).toEqual([`[data-id="${escaped}"]`]);
     });
   });
+
+  it('getAbsolutePosition resolves a top-level node verbatim', () => {
+    store.setNodes([{ id: 'a', data: {}, position: { x: 30, y: 40 } }]);
+    expect(service.getAbsolutePosition('a')).toEqual({ x: 30, y: 40 });
+  });
+
+  it('getAbsolutePosition sums the parentId chain for nested nodes', () => {
+    store.setNodes([
+      { id: 'g', data: {}, position: { x: 100, y: 100 } },
+      { id: 'sub', data: {}, position: { x: 10, y: 20 }, parentId: 'g' },
+      { id: 'leaf', data: {}, position: { x: 5, y: 5 }, parentId: 'sub' },
+    ]);
+    expect(service.getAbsolutePosition('leaf')).toEqual({ x: 115, y: 125 });
+  });
+
+  it('getAbsolutePosition returns null for an unknown id', () => {
+    store.setNodes([{ id: 'a', data: {}, position: { x: 0, y: 0 } }]);
+    expect(service.getAbsolutePosition('ghost')).toBeNull();
+  });
+
+  it('positionAbsolute and getAbsolutePosition agree right after applyLayout on a grouped canvas', async () => {
+    store.setNodes([
+      { id: 'g', data: {}, position: { x: 0, y: 0 }, type: 'group' },
+      { id: 'c', data: {}, position: { x: 0, y: 0 }, parentId: 'g' },
+    ]);
+    await service.applyLayout(
+      () => ({ g: { x: 200, y: 200 }, c: { x: 224, y: 264 } }),
+      { coordinateSpace: 'absolute', animate: false },
+    );
+    expect(service.getAbsolutePosition('c')).toEqual({ x: 224, y: 264 });
+    expect(store.nodeLookup.get('c')!.internals.positionAbsolute).toEqual({ x: 224, y: 264 });
+  });
 });
 
 describe('collapse writers', () => {

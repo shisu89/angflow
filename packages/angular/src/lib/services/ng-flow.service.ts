@@ -205,6 +205,36 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     return this.store.nodeLookup.get(id) as InternalNode<NodeType> | undefined;
   }
 
+  /**
+   * Resolve a node's absolute (flow-space) top-left position by walking the
+   * `parentId` chain from the current store state. Correct immediately after
+   * `applyLayout` / `setNodePositions`, regardless of tween timing — unlike a
+   * raw read of `internals.positionAbsolute`, which a caller may observe before
+   * the derived value is recomputed. Returns `null` for an unknown id.
+   *
+   * Does NOT apply `extent` clamping — it returns the unclamped chain sum. For a
+   * clamped absolute, read `getInternalNode(id)?.internals.positionAbsolute`.
+   */
+  getAbsolutePosition(id: string): { x: number; y: number } | null {
+    const lookup = this.store.nodeLookup;
+    const storeOrigin = this.store.nodeOrigin();
+    let cur = lookup.get(id);
+    if (!cur) return null;
+    let x = 0;
+    let y = 0;
+    const seen = new Set<string>();
+    while (cur && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      const origin = cur.origin ?? storeOrigin;
+      const w = cur.measured?.width ?? cur.width ?? cur.initialWidth ?? 0;
+      const h = cur.measured?.height ?? cur.height ?? cur.initialHeight ?? 0;
+      x += cur.position.x - w * origin[0];
+      y += cur.position.y - h * origin[1];
+      cur = cur.parentId ? lookup.get(cur.parentId) : undefined;
+    }
+    return { x, y };
+  }
+
   /** Replace the full `nodes` array. Triggers `(nodesChange)` through the store. */
   setNodes(nodes: NodeType[]): void {
     this.store.setNodes(nodes);

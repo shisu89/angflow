@@ -28,7 +28,7 @@ export interface LayoutNodeInput {
   initialHeight?: number;
   measured?: { width?: number; height?: number };
   /** Group/sub-flow parent id. When present (and in the node set), the node is
-   *  clustered within that parent via dagre compound layout. */
+   *  laid out within that parent's box (recursive level-by-level layout). */
   parentId?: string;
 }
 
