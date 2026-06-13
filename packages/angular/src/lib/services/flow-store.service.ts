@@ -36,6 +36,7 @@ import {
   type ZIndexMode,
   type AriaLabelConfig,
   type FitViewOptionsBase,
+  type FitViewResult,
   type HandleType,
 } from '@angflow/system';
 
@@ -800,7 +801,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     });
   }
 
-  async fitView(options?: FitViewOptionsBase<NodeType>): Promise<{ zoom: number; clamped: boolean }> {
+  async fitView(options?: FitViewOptionsBase<NodeType>): Promise<FitViewResult> {
     const pz = this.panZoom();
     if (!pz) return { zoom: NaN, clamped: false };
 

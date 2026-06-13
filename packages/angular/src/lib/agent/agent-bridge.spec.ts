@@ -1931,6 +1931,8 @@ describe('AngflowAgentBridge — bulk payload caps', () => {
       const res = (await bridge.callTool('fit_view', {})) as { zoom: number; clamped: boolean };
       expect(res).toHaveProperty('zoom');
       expect(res).toHaveProperty('clamped');
+      // No panZoom in the harness, so the fit is a no-op: zoom is the NaN sentinel.
+      expect(typeof res.zoom).toBe('number');
       expect(typeof res.clamped).toBe('boolean');
     });
   });
