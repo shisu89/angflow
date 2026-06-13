@@ -274,8 +274,6 @@ describe('HandleComponent — isNodeVisible wiring to XYHandle.onPointerDown', (
 // touch and pen.
 
 describe('HandleComponent — connection trigger uses pointerdown', () => {
-  let store: FlowStore;
-
   beforeEach(() => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
@@ -286,7 +284,8 @@ describe('HandleComponent — connection trigger uses pointerdown', () => {
         { provide: NODE_ID, useValue: 'node-A' },
       ],
     });
-    store = TestBed.inject(FlowStore);
+    // Instantiate FlowStore so the component can inject it during mounting.
+    TestBed.inject(FlowStore);
   });
 
   function mountSourceHandle() {
