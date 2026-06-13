@@ -1,9 +1,15 @@
 {
   "name": "@angflow/mcp",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "description": "MCP server that exposes a live angflow canvas to AI agents (Claude Code, Claude Desktop, Cursor) over the agent-bridge WebSocket transport.",
-  "keywords": ["mcp", "model-context-protocol", "angflow", "agent", "diagram"],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "angflow",
+    "agent",
+    "diagram"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/shisu89/angflow.git",
@@ -15,7 +21,10 @@
   },
   "main": "dist/server.js",
   "types": "dist/server.d.ts",
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "publishConfig": {
     "access": "public"
   },
