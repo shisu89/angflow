@@ -98,8 +98,8 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
   {
     name: 'add_node',
     description:
-      'Append a node to the flow. The node must include id, position { x, y }, and data. ' +
-      'Optional: type, width, height, draggable, selectable, hidden, etc.',
+      'Append a node to the flow. The node must include position { x, y } and data. ' +
+      'Optional: type, width, height, draggable, selectable, hidden, etc. If id is omitted, the bridge mints and returns one.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -116,7 +116,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
             },
             data: { type: 'object' },
           },
-          required: ['id', 'position', 'data'],
+          required: ['position', 'data'],
         },
       },
       required: ['node'],
@@ -149,6 +149,84 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
         },
       },
       required: ['edge'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'group_nodes',
+    description:
+      'Create a group (container) node wrapping the given nodes and reparent them into it (visually pinned). ' +
+      'Mints and returns a groupId when none is supplied. Returns { groupId }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        nodeIds: { type: 'array', items: { type: 'string' }, description: 'Members to group (non-empty).' },
+        label: { type: 'string', description: 'Group title (→ data.label).' },
+        collapsed: { type: 'boolean' },
+        groupId: { type: 'string', description: 'Optional id for the new group; minted when omitted.' },
+        padding: { type: 'number', description: 'Box inset around members. Default 20.' },
+        headerHeight: { type: 'number', description: 'Top inset for the title bar. Default 40.' },
+      },
+      required: ['nodeIds'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'set_node_group',
+    description:
+      'Reparent a node into a group (or detach to top-level with groupId null), keeping it visually fixed. ' +
+      'Rejects cycles (-32602). Returns { nodeId, groupId }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        nodeId: { type: 'string' },
+        groupId: { type: ['string', 'null'], description: 'Target group id, or null to detach.' },
+      },
+      required: ['nodeId', 'groupId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'set_group_collapsed',
+    description: 'Collapse or expand a group node (hides/shows its descendants). Returns { groupId, collapsed }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        groupId: { type: 'string' },
+        collapsed: { type: 'boolean' },
+      },
+      required: ['groupId', 'collapsed'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'dissolve_group',
+    description:
+      'Remove a group node; its direct children survive (reparented to the group\'s parent, pinned in place). ' +
+      'Returns { dissolvedGroupId, memberIds }.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        groupId: { type: 'string' },
+      },
+      required: ['groupId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_group_bounds',
+    description: "Return a group's current box on the canvas { x, y, width, height } (absolute), or null if absent.",
+    inputSchema: {
+      type: 'object',
+      properties: {
+        flowId: { type: 'string' },
+        groupId: { type: 'string' },
+      },
+      required: ['groupId'],
       additionalProperties: false,
     },
   },

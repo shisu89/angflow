@@ -118,7 +118,7 @@ Every tool takes an optional `flowId` (omit when only one flow is registered; re
 
 | Tool | Params | Notes |
 |---|---|---|
-| `add_node` | `node: { id, position:{x,y}, data, type?, … }` | Returns the created `Node` |
+| `add_node` | `node: { id?, position:{x,y}, data, type?, … }` | Returns the created `Node` (`id` is optional — minted and returned when omitted) |
 | `add_nodes` | `nodes: Node[]` | Bulk version of `add_node`; returns `Node[]` |
 | `add_edge` | `edge: { id, source, target, sourceHandle?, targetHandle?, type?, animated?, label?, data? }` | Use this to **link nodes**; returns the created `Edge` |
 | `add_edges` | `edges: Edge[]` | Bulk version of `add_edge`; returns `Edge[]` |
@@ -134,6 +134,16 @@ Every tool takes an optional `flowId` (omit when only one flow is registered; re
 |---|---|
 | `set_nodes` | `nodes: Node[]` — full replacement |
 | `set_edges` | `edges: Edge[]` — full replacement |
+
+### Groups
+
+| Tool | Params | Returns |
+|---|---|---|
+| `group_nodes` | `nodeIds: string[]`, `label?`, `collapsed?`, `groupId?`, `padding?`, `headerHeight?` | `{ groupId }` — creates a group wrapping the nodes (visually pinned), mints groupId when omitted |
+| `set_node_group` | `nodeId: string`, `groupId: string \| null` | `{ nodeId, groupId }` — reparent into a group or detach (null); rejects cycles (`-32602`) |
+| `set_group_collapsed` | `groupId: string`, `collapsed: boolean` | `{ groupId, collapsed }` — fold/unfold a group's descendants |
+| `dissolve_group` | `groupId: string` | `{ dissolvedGroupId, memberIds }` — remove the group; children survive pinned |
+| `get_group_bounds` | `groupId: string` | `{ x, y, width, height } \| null` — current absolute box (read-only) |
 
 ### Selection
 
