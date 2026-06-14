@@ -611,6 +611,28 @@ export class AngflowAgentBridge {
       return { nodeId, groupId };
     });
 
+    this.handlers.set('set_group_collapsed', (flow, params) => {
+      const groupId = requireString(params, 'groupId');
+      if (!flow.getNode(groupId)) throw new InvalidParamsError(`set_group_collapsed: unknown group id "${groupId}".`);
+      const collapsed = params['collapsed'];
+      if (typeof collapsed !== 'boolean') throw new InvalidParamsError('Param "collapsed" must be a boolean.');
+      flow.setNodeCollapsed(groupId, collapsed);
+      return { groupId, collapsed };
+    });
+
+    this.handlers.set('dissolve_group', async (flow, params) => {
+      const groupId = requireString(params, 'groupId');
+      if (!flow.getNode(groupId)) throw new InvalidParamsError(`dissolve_group: unknown group id "${groupId}".`);
+      const memberIds = await flow.dissolveGroup(groupId);
+      return { dissolvedGroupId: groupId, memberIds };
+    });
+
+    this.handlers.set('get_group_bounds', (flow, params) => {
+      const groupId = requireString(params, 'groupId');
+      if (!flow.getNode(groupId)) return null;
+      return flow.getGroupBox(groupId);
+    });
+
     this.handlers.set('add_edge', (flow, params) => {
       const edge = validateEdgeShape(requireObject(params, 'edge'), 'add_edge');
       flow.addEdges(edge);

@@ -2240,4 +2240,41 @@ describe('group lifecycle + minted ids', () => {
     await bridge.callTool('set_node_group', { nodeId: 'a', groupId: null });
     expect(flow.getNode('a')?.parentId).toBeUndefined();
   });
+
+  it('set_group_collapsed flips the collapsed flag', async () => {
+    const { bridge, newFlow } = setup();
+    const flow = newFlow();
+    bridge.register('main', flow);
+    flow.setNodes([makeNode('g', { type: 'group' }), makeNode('a', { parentId: 'g' })]);
+    const res = (await bridge.callTool('set_group_collapsed', { groupId: 'g', collapsed: true })) as { groupId: string; collapsed: boolean };
+    expect(res).toEqual({ groupId: 'g', collapsed: true });
+    const state = (await bridge.callTool('get_state', {})) as { collapsedHiddenIds: string[] };
+    expect(state.collapsedHiddenIds).toEqual(['a']);
+  });
+
+  it('dissolve_group removes the group and returns member ids', async () => {
+    const { bridge, newFlow } = setup();
+    const flow = newFlow();
+    bridge.register('main', flow);
+    flow.setNodes([
+      makeNode('g', { type: 'group', position: { x: 0, y: 0 }, width: 400, height: 400 }),
+      makeNode('a', { parentId: 'g', position: { x: 100, y: 100 }, width: 50, height: 50 }),
+    ]);
+    const res = (await bridge.callTool('dissolve_group', { groupId: 'g' })) as { dissolvedGroupId: string; memberIds: string[] };
+    expect(res).toEqual({ dissolvedGroupId: 'g', memberIds: ['a'] });
+    expect(flow.getNode('g')).toBeUndefined();
+    expect(flow.getNode('a')?.parentId).toBeUndefined();
+  });
+
+  it('get_group_bounds returns the box, null for unknown, and captures no history', async () => {
+    const { bridge, newFlow } = setup();
+    const flow = newFlow();
+    bridge.register('main', flow);
+    flow.setNodes([makeNode('g', { type: 'group', position: { x: 10, y: 20 }, width: 200, height: 100 })]);
+    const box = (await bridge.callTool('get_group_bounds', { groupId: 'g' })) as { x: number; y: number; width: number; height: number };
+    expect(box).toEqual({ x: 10, y: 20, width: 200, height: 100 });
+    expect(await bridge.callTool('get_group_bounds', { groupId: 'nope' })).toBeNull();
+    const status = (await bridge.callTool('history_status', {})) as { pastDepth: number };
+    expect(status.pastDepth).toBe(0);
+  });
 });
