@@ -384,6 +384,30 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   }
 
   /**
+   * Remove a group node; its direct children survive, reparented to the group's
+   * own parent (top-level if it had none) and pinned in place. Returns freed ids.
+   */
+  async dissolveGroup(groupId: string): Promise<string[]> {
+    const group = this.getNode(groupId);
+    if (!group) return [];
+    const newParent = group.parentId;
+    const children = this.getNodes().filter((n) => n.parentId === groupId);
+    const childAbs: Record<string, { x: number; y: number }> = {};
+    for (const c of children) {
+      const a = this.getAbsolutePosition(c.id);
+      if (a) childAbs[c.id] = a;
+    }
+    this.store.batch(() => {
+      for (const c of children) this.updateNode(c.id, { parentId: newParent } as Partial<NodeType>);
+    });
+    await this.deleteElements({ nodes: [{ id: groupId } as NodeType] });
+    if (Object.keys(childAbs).length > 0) {
+      await this.setNodePositions(childAbs, { coordinateSpace: 'absolute', animate: false });
+    }
+    return children.map((c) => c.id);
+  }
+
+  /**
    * Set a (group/parent) node's `collapsed` state. Emits a `replace` node change
    * so controlled apps can journal it. angflow derives descendant hiding and
    * crossing-edge rerouting from this flag.

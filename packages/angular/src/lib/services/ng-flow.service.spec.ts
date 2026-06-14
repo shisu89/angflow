@@ -971,3 +971,31 @@ describe('setNodeGroup', () => {
     expect(service.getAbsolutePosition('a')).toEqual(before);
   });
 });
+
+describe('dissolveGroup', () => {
+  let store: FlowStore;
+  let service: NgFlowService;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), FlowStore, NgFlowService],
+    });
+    store = TestBed.inject(FlowStore);
+    service = TestBed.inject(NgFlowService);
+  });
+
+  it('removes the group, frees its children to top-level, and pins them', async () => {
+    service.setNodes([
+      makeNode('g', { type: 'group', position: { x: 50, y: 50 }, width: 400, height: 400 }),
+      makeNode('a', { parentId: 'g', position: { x: 100, y: 100 }, width: 50, height: 50 }),
+      makeNode('b', { parentId: 'g', position: { x: 150, y: 150 }, width: 50, height: 50 }),
+    ]);
+    const absA = service.getAbsolutePosition('a');
+    const freed = await service.dissolveGroup('g');
+    expect(freed.sort()).toEqual(['a', 'b']);
+    expect(service.getNode('g')).toBeUndefined();
+    expect(service.getNode('a')?.parentId).toBeUndefined();
+    expect(service.getAbsolutePosition('a')).toEqual(absA);
+  });
+});
