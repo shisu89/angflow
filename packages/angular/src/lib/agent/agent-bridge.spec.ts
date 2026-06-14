@@ -264,11 +264,14 @@ describe('AngflowAgentBridge', () => {
       expect('error' in res && res.error.code).toBe(-32602);
     });
 
-    it('add_node with empty id returns INVALID_PARAMS', async () => {
+    it('add_node with empty id mints an id (empty string treated as omitted)', async () => {
       const res = await transport.call('add_node', {
         node: { id: '', position: { x: 0, y: 0 }, data: {} },
       });
-      expect('error' in res && res.error.code).toBe(-32602);
+      expect('result' in res).toBe(true);
+      const node = (res as { result: { id: string } }).result;
+      expect(typeof node.id).toBe('string');
+      expect(node.id.length).toBeGreaterThan(0);
     });
   });
 
@@ -2160,5 +2163,29 @@ describe('summarized / scoped reads', () => {
     await bridge.callTool('get_summary', {});
     const status = (await bridge.callTool('history_status', {})) as { pastDepth: number };
     expect(status.pastDepth).toBe(0);
+  });
+});
+
+describe('group lifecycle + minted ids', () => {
+  it('add_node mints an id when omitted and returns the created node', async () => {
+    const { bridge, newFlow } = setup();
+    const flow = newFlow();
+    bridge.register('main', flow);
+    const node = (await bridge.callTool('add_node', {
+      node: { position: { x: 0, y: 0 }, data: {} },
+    })) as { id: string } | null;
+    expect(typeof node?.id).toBe('string');
+    expect(node!.id.length).toBeGreaterThan(0);
+    expect(flow.getNode(node!.id)).toBeTruthy();
+  });
+
+  it('add_node honors an agent-supplied id', async () => {
+    const { bridge, newFlow } = setup();
+    const flow = newFlow();
+    bridge.register('main', flow);
+    const node = (await bridge.callTool('add_node', {
+      node: { id: 'mine', position: { x: 0, y: 0 }, data: {} },
+    })) as { id: string };
+    expect(node.id).toBe('mine');
   });
 });

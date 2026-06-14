@@ -113,6 +113,7 @@ export class AngflowAgentBridge {
   private readonly layoutFn: AgentLayoutFn | null;
   private started = false;
   private nextInProcessId = 1;
+  private nextNodeIdSeq = 0;
   private warnedOnBeforeDeleteBypass = false;
 
   /** Bumped every time a flow registers/unregisters. Useful for diagnostics. */
@@ -192,6 +193,15 @@ export class AngflowAgentBridge {
   /** Look up a registered flow. */
   getFlow(id: string): NgFlowService | undefined {
     return this.flows.get(id)?.service;
+  }
+
+  /** Mint a unique node/group id for a flow (collision-safe vs agent-supplied ids). */
+  private mintId(flow: NgFlowService, prefix: string): string {
+    let id: string;
+    do {
+      id = `${prefix}_${++this.nextNodeIdSeq}`;
+    } while (flow.getNode(id));
+    return id;
   }
 
   /**
@@ -546,7 +556,11 @@ export class AngflowAgentBridge {
     });
 
     this.handlers.set('add_node', (flow, params) => {
-      const node = validateNodeShape(requireObject(params, 'node'), 'add_node');
+      const raw = requireObject(params, 'node');
+      if (raw['id'] == null || raw['id'] === '') {
+        raw['id'] = this.mintId(flow, 'node');
+      }
+      const node = validateNodeShape(raw, 'add_node');
       flow.addNodes(node);
       return flow.getNode(node.id) ?? null;
     });
