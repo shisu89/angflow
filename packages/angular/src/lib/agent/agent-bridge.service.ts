@@ -410,12 +410,14 @@ export class AngflowAgentBridge {
   private emitHistory(flowId: string, source?: string): void {
     if (!this.history) return;
     const status = this.history.status(flowId);
-    this.emit({ event: 'flow.history', params: { flowId, ...status, source } });
+    this.emit({ event: 'flow.history', params: { flowId, ...status, ...(source ? { source } : {}) } });
   }
 
   private recordOp(flowId: string, method: string, params: Record<string, unknown>, source?: string): void {
     if (!this.opLog) return;
-    const entry = this.opLog.append(flowId, { method, params, source });
+    // Shallow-clone params so a later in-place mutation of the caller's object
+    // can't corrupt a stored (replay-able) log entry.
+    const entry = this.opLog.append(flowId, { method, params: { ...params }, source });
     if (this.onOp) {
       try { this.onOp(entry); } catch (err) { this.reportError(err, { kind: 'dispatch', method }); }
     }
