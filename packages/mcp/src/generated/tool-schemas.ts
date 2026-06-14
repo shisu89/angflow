@@ -1262,6 +1262,23 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
     }
   },
   {
+    "name": "get_changes_since",
+    "description": "Poll the op-log: return mutating tool calls applied since a cursor. Returns { ops: [{ cursor, flowId, method, params, source? }], cursor, truncated }. Pass the returned cursor on the next call; truncated:true means entries were dropped (re-sync via get_state). Records only bridge-initiated mutations (not UI edits or undo/redo).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "flowId": {
+          "type": "string"
+        },
+        "since": {
+          "type": "number",
+          "description": "Return ops with cursor greater than this. Omit/0 for all retained."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "list_node_types",
     "description": "List every node type name renderable on a flow, tagged with its source: \"builtin\" (shipped with the library), \"host\" (registered by the application — its expected data shape is app-specific), or \"template\" (a data-driven template created via register_node_template — introspect its spec with list_node_templates).",
     "inputSchema": {

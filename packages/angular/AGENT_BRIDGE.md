@@ -39,6 +39,10 @@ export const appConfig: ApplicationConfig = {
       // Optional. Receives transport / dispatch errors the bridge would
       // otherwise swallow (start() rejection, send() throw).
       onError: (err, ctx) => console.warn('[agent-bridge]', ctx.kind, err),
+      // Optional provenance config:
+      canMutate: (op, source) => true,  // return false/string to deny with -32001
+      onOp: (entry) => {},              // called after each applied mutating op (host persistence)
+      opLog: { maxOps: 1000 },          // per-flow op retention; pass `false` to disable
     }),
   ],
 };
@@ -79,6 +83,7 @@ Every tool takes an optional `flowId` (omit when only one flow is registered; re
 | `get_node` | `id: string` | `Node \| null` |
 | `get_edge` | `id: string` | `Edge \| null` |
 | `get_viewport` | — | `{ x, y, zoom }` |
+| `get_changes_since` | `since?: number` | `{ ops: [{ cursor, flowId, method, params, source? }], cursor, truncated }` — poll the op-log; records bridge-initiated mutations only (not UI edits/undo/redo). Pass `since: 0` or omit to get all retained ops; pass the returned `cursor` on the next call. `truncated: true` means entries were dropped — re-sync via `get_state`. |
 
 ### Discovery — types & templates
 
@@ -202,7 +207,7 @@ Subscribers (`angflow.subscribe(h)`) receive:
 
 - `flow.registered` — `{ flowId }`
 - `flow.unregistered` — `{ flowId }`
-- `flow.history` — `{ flowId, canUndo, canRedo, pastDepth, futureDepth }`. Emitted **synchronously inside `dispatch`** immediately after a history-capturing mutation completes (or after `undo`/`redo`/`clear_history`).
+- `flow.history` — `{ flowId, canUndo, canRedo, pastDepth, futureDepth, params?: unknown, source?: string }`. Emitted **synchronously inside `dispatch`** immediately after a history-capturing mutation completes (or after `undo`/`redo`/`clear_history`). `params` is the call's params object; `source` is the origin string passed by the caller (e.g. `"agent:claude"`) — both are present only for bridge-initiated mutations, not for undo/redo/clear_history.
 - `flow.state` — `{ flowId, nodes, edges, viewport, selection: { nodeIds, edgeIds } }`. Coalesced per microtask; duplicates suppressed via a cheap signature. Emitted in the **next microtask** via the `watchFlow` effect. While any node is mid-drag (`dragging: true`), emissions are additionally throttled to at most one per 100ms, with a trailing emission that guarantees the latest drag state is always delivered; drag end emits promptly.
 
 **Ordering note:** When a mutating tool fires, consumers receive `flow.history` first (synchronously), then `flow.state` (next microtask). This ordering is reliable — useful when a consumer wants to update UI affordances before rendering the new graph state. During an active node drag, the throttle may delay flow.state past the next microtask (up to ~100ms); the synchronous flow.history ordering is unaffected.
@@ -399,12 +404,89 @@ Shape: `{ flowId: string, canUndo: boolean, canRedo: boolean, pastDepth: number,
 
 Emitted synchronously after every mutating tool call (before `flow.state`), and after `undo`, `redo`, and `clear_history`. Useful for updating UI affordances in real time.
 
+## Provenance
+
+The bridge provides first-class tracking of *who* triggered each mutation and *what* was mutated, via three cooperating mechanisms: a per-call `source` tag, a `canMutate` guard, and a per-flow op-log.
+
+### Source
+
+Every tool call may carry a host-defined `source` string (e.g. `"agent:claude"`, `"agent:gpt"`, `"user"`). Provide it at call time:
+
+```ts
+// In-process
+bridge.callTool('add_node', { node: { … } }, { source: 'agent:claude' });
+```
+
+For transport-based calls, inject a default source at the transport level by attaching a `source` field to the inbound JSON-RPC request frame before dispatching. The bridge threads `source` through to the `canMutate` guard, the op-log entry, and the `flow.history` push event. `source` is always optional — callers that omit it are not rejected.
+
+### `canMutate` guard
+
+Provide a `canMutate` predicate to gate mutating tool calls:
+
+```ts
+provideAgentBridge({
+  transports: [new WindowTransport()],
+  canMutate: (op, source) => {
+    if (source !== 'agent:trusted') return 'untrusted source';
+    return true;
+  },
+  onError: (err, ctx) => console.warn('[agent-bridge]', ctx.kind, err),
+});
+```
+
+- `op` — `{ method: string, params: unknown }` — the tool call about to execute.
+- `source` — the caller's source string (may be `undefined`).
+- Return `true` to allow the call. Return `false` or a non-empty string (used as the deny reason) to deny it — the call fails immediately with JSON-RPC error `-32001` and no mutation occurs.
+- `canMutate` may be async; a thrown error is treated as a deny and routed to `onError` (isolated — does not crash the bridge).
+- **Gated tools** — all tools that mutate graph state: `add_node`, `add_nodes`, `add_edge`, `add_edges`, `update_node`, `update_node_data`, `update_edge`, `update_edge_data`, `delete_elements`, `set_nodes`, `set_edges`, `apply_changes`, `layout_nodes`, `group_nodes`, `set_node_group`, `set_group_collapsed`, `dissolve_group`.
+- **Not gated** — reads, selection tools (`select_nodes`, `select_edges`, `deselect_all`), viewport tools, undo/redo, and template management. These proceed unconditionally.
+
+### Op-log, `onOp`, and `get_changes_since`
+
+The bridge maintains a bounded per-flow op-log. After each applied mutating call it appends an entry:
+
+```ts
+{ cursor: number, flowId: string, method: string, params: unknown, source?: string }
+```
+
+`cursor` is a monotonically increasing integer scoped to the flow. The log is bounded (default 1000 entries); when full, the oldest entry is dropped and the next `get_changes_since` response will have `truncated: true` — re-sync via `get_state`.
+
+**Configuration:**
+
+```ts
+provideAgentBridge({
+  transports: [new WindowTransport()],
+  opLog: { maxOps: 500 },   // reduce retention; default is { maxOps: 1000 }
+  // opLog: false,           // disable the op-log entirely
+  onOp: (entry) => {
+    // Host persistence hook — called after each mutating op is applied.
+    // A throwing sink is isolated and routed to onError; it does not crash the bridge.
+    myDb.append(entry);
+  },
+});
+```
+
+**Polling via `get_changes_since`:**
+
+```ts
+let cursor = 0;
+const { ops, cursor: next, truncated } = await angflow.callTool('get_changes_since', { since: cursor });
+if (truncated) {
+  // Entries dropped; re-sync full state
+  const state = await angflow.callTool('get_state', {});
+}
+cursor = next;
+```
+
+**Bridge-only scope:** like the undo history, the op-log records only bridge-initiated mutations — user-driven edits (drag, connect, resize via the UI), `undo`, and `redo` are not recorded. `get_changes_since` is therefore a faithful audit trail of *agent* actions, not a universal change feed.
+
 ## Error codes (JSON-RPC)
 
 | Code | Meaning |
 |---|---|
 | `-32601` | Unknown tool name — or a known tool whose required capability is absent (e.g. `layout_nodes` without a configured layout function) |
 | `-32602` | Invalid params (wrong type, missing required key) |
+| `-32001` | Mutation denied by host (`canMutate` returned false or a reason string) |
 | `-32000` | Flow not found (bad/missing `flowId`) |
 | `-32603` | Internal error from the underlying `NgFlowService` call |
 
