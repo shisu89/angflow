@@ -579,10 +579,15 @@ export class AngflowAgentBridge {
       for (const id of nodeIds) {
         if (!flow.getNode(id)) throw new InvalidParamsError(`group_nodes: unknown node id "${id}".`);
       }
-      const groupId = typeof params['groupId'] === 'string' && params['groupId'] ? (params['groupId'] as string) : this.mintId(flow, 'group');
+      const suppliedGroupId = typeof params['groupId'] === 'string' && params['groupId'] ? (params['groupId'] as string) : undefined;
+      if (suppliedGroupId && flow.getNode(suppliedGroupId)) {
+        throw new InvalidParamsError(`group_nodes: a node with id "${suppliedGroupId}" already exists.`);
+      }
+      const groupId = suppliedGroupId ?? this.mintId(flow, 'group');
       const label = typeof params['label'] === 'string' ? (params['label'] as string) : undefined;
       const collapsed = typeof params['collapsed'] === 'boolean' ? (params['collapsed'] as boolean) : undefined;
-      const padding = optionalPositiveNumber(params, 'padding');
+      // padding/headerHeight: inline typeof (not optionalPositiveNumber) — 0 is a valid inset.
+      const padding = typeof params['padding'] === 'number' ? (params['padding'] as number) : undefined;
       const headerHeight = typeof params['headerHeight'] === 'number' ? (params['headerHeight'] as number) : undefined;
       await flow.groupNodes(nodeIds, { groupId, label, collapsed, padding, headerHeight });
       return { groupId };

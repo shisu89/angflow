@@ -2201,6 +2201,7 @@ describe('group lifecycle + minted ids', () => {
     expect(typeof res.groupId).toBe('string');
     expect(flow.getNode(res.groupId)?.type).toBe('group');
     expect(flow.getNode('a')?.parentId).toBe(res.groupId);
+    expect(flow.getNode('b')?.parentId).toBe(res.groupId);
   });
 
   it('group_nodes rejects empty/unknown nodeIds with -32602', async () => {
@@ -2224,6 +2225,8 @@ describe('group lifecycle + minted ids', () => {
     expect(res).toEqual({ nodeId: 'a', groupId: 'g' });
     expect(flow.getNode('a')?.parentId).toBe('g');
     await expect(bridge.callTool('set_node_group', { nodeId: 'g', groupId: 'a' })).rejects.toMatchObject({ code: -32602 });
+    // self-parent cycle
+    await expect(bridge.callTool('set_node_group', { nodeId: 'a', groupId: 'a' })).rejects.toMatchObject({ code: -32602 });
   });
 
   it('set_node_group detaches to top-level with groupId null', async () => {
