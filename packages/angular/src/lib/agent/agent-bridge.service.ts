@@ -17,6 +17,8 @@ import type { Node, Edge } from '../types';
 import type { AgentLayoutFn, NodeTemplateSpec } from '../types/node-template';
 import { AgentHistory } from './history';
 import type { AgentHistoryOptions } from './history';
+import { OpLog } from './op-log';
+import type { OpLogEntry, OpLogOptions } from './op-log';
 import { AGENT_TOOL_SCHEMAS } from './tool-schemas';
 import type {
   AgentInbound,
@@ -44,6 +46,11 @@ export const AGENT_LAYOUT = new InjectionToken<AgentLayoutFn>('AngflowAgentLayou
 
 /** Optional host write-guard for mutating tools. */
 export const AGENT_CAN_MUTATE = new InjectionToken<AgentCanMutateFn>('AngflowAgentCanMutate');
+
+/** Optional sink receiving each applied mutating op (for host persistence/replay). */
+export const AGENT_ON_OP = new InjectionToken<(entry: OpLogEntry) => void>('AngflowAgentOnOp');
+/** Op-log config. `false` disables the op-log + get_changes_since. Default { maxOps: 1000 }. */
+export const AGENT_OPLOG_OPTIONS = new InjectionToken<OpLogOptions | false>('AngflowAgentOpLogOptions');
 
 const ERROR_INVALID_PARAMS = -32602;
 const ERROR_METHOD_NOT_FOUND = -32601;
@@ -116,6 +123,8 @@ export class AngflowAgentBridge {
   private readonly flows = new Map<string, RegisteredFlow>();
   private readonly transports: AgentTransport[];
   private readonly history: AgentHistory | null;
+  private readonly opLog: OpLog | null;
+  private readonly onOp: ((entry: OpLogEntry) => void) | null;
   private readonly handlers = new Map<string, ToolHandler>();
   private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
@@ -140,6 +149,8 @@ export class AngflowAgentBridge {
     @Optional() @Inject(AGENT_ON_ERROR) onError: ((err: unknown, ctx: { kind: 'transport-start' | 'transport-send' | 'dispatch'; transport?: AgentTransport; method?: string }) => void) | null,
     @Optional() @Inject(AGENT_LAYOUT) layoutFn: AgentLayoutFn | null,
     @Optional() @Inject(AGENT_CAN_MUTATE) canMutate: AgentCanMutateFn | null,
+    @Optional() @Inject(AGENT_ON_OP) onOp: ((entry: OpLogEntry) => void) | null,
+    @Optional() @Inject(AGENT_OPLOG_OPTIONS) opLogOptions: OpLogOptions | false | null,
   ) {
     this.transports = transports ?? [];
     this.history =
@@ -147,6 +158,8 @@ export class AngflowAgentBridge {
     this.onError = onError ?? null;
     this.layoutFn = layoutFn ?? null;
     this.canMutate = canMutate ?? null;
+    this.onOp = onOp ?? null;
+    this.opLog = opLogOptions === false ? null : new OpLog(opLogOptions ?? undefined);
     this.installHandlers();
     this.start();
     this.destroyRef.onDestroy(() => this.stop());
@@ -183,6 +196,7 @@ export class AngflowAgentBridge {
       // restoring them into this service would corrupt it).
       existing.dispose();
       this.history?.dropFlow(id);
+      this.opLog?.dropFlow(id);
     }
 
     const dispose = this.watchFlow(id, flow);
@@ -199,6 +213,7 @@ export class AngflowAgentBridge {
     entry.dispose();
     this.flows.delete(id);
     this.history?.dropFlow(id);
+    this.opLog?.dropFlow(id);
     this.registeredFlows.set(Array.from(this.flows.keys()));
     this.emit({ event: 'flow.unregistered', params: { flowId: id } });
   }
@@ -322,34 +337,29 @@ export class AngflowAgentBridge {
 
       const result = await handler(flow, params);
 
-      // Commit the captured snapshot to history. For apply_changes, the handler
-      // either succeeded entirely or threw and was rolled back already.
-      if (snapshot && flowId && this.history) {
+      // Whether this call counts as a recordable mutation (mirrors the history
+      // capture conditions). Computed independently of `this.history` so the
+      // op-log records even when history is disabled.
+      let recorded = false;
+      if (isMutating && flowId) {
         if (isApplyChanges) {
           const ops = (params['ops'] as Array<Record<string, unknown>>) ?? [];
-          const hasNonSelection = ops.some(
-            (o) =>
-              o['op'] !== 'select_nodes' &&
-              o['op'] !== 'select_edges' &&
-              o['op'] !== 'deselect_all',
+          recorded = ops.some(
+            (o) => o['op'] !== 'select_nodes' && o['op'] !== 'select_edges' && o['op'] !== 'deselect_all',
           );
-          if (hasNonSelection) {
-            this.history.capture(flowId, snapshot);
-            this.emitHistory(flowId);
-          }
         } else if (isLayout) {
-          // Capture only when at least one position was applied — an empty
-          // layout pass must not pollute the undo stack.
-          const positions =
-            (result as { positions?: Record<string, unknown> } | null)?.positions ?? {};
-          if (Object.keys(positions).length > 0) {
-            this.history.capture(flowId, snapshot);
-            this.emitHistory(flowId);
-          }
+          const positions = (result as { positions?: Record<string, unknown> } | null)?.positions ?? {};
+          recorded = Object.keys(positions).length > 0;
         } else {
-          this.history.capture(flowId, snapshot);
-          this.emitHistory(flowId);
+          recorded = true;
         }
+      }
+      if (recorded && flowId) {
+        if (this.history && snapshot) {
+          this.history.capture(flowId, snapshot);
+          this.emitHistory(flowId, source);
+        }
+        this.recordOp(flowId, req.method, params, source);
       }
 
       return { id: req.id, result: result ?? null };
@@ -397,10 +407,18 @@ export class AngflowAgentBridge {
     return null;
   }
 
-  private emitHistory(flowId: string): void {
+  private emitHistory(flowId: string, source?: string): void {
     if (!this.history) return;
     const status = this.history.status(flowId);
-    this.emit({ event: 'flow.history', params: { flowId, ...status } });
+    this.emit({ event: 'flow.history', params: { flowId, ...status, source } });
+  }
+
+  private recordOp(flowId: string, method: string, params: Record<string, unknown>, source?: string): void {
+    if (!this.opLog) return;
+    const entry = this.opLog.append(flowId, { method, params, source });
+    if (this.onOp) {
+      try { this.onOp(entry); } catch (err) { this.reportError(err, { kind: 'dispatch', method }); }
+    }
   }
 
   private emit(evt: AgentEvent): void {

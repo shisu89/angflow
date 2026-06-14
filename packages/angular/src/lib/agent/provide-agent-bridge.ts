@@ -1,5 +1,5 @@
 import { type EnvironmentProviders, makeEnvironmentProviders } from '@angular/core';
-import { AGENT_CAN_MUTATE, AGENT_HISTORY_OPTIONS, AGENT_LAYOUT, AGENT_ON_ERROR, AGENT_TRANSPORTS } from './agent-bridge.service';
+import { AGENT_CAN_MUTATE, AGENT_HISTORY_OPTIONS, AGENT_LAYOUT, AGENT_ON_ERROR, AGENT_ON_OP, AGENT_OPLOG_OPTIONS, AGENT_TRANSPORTS } from './agent-bridge.service';
 import type { AgentHistoryOptions } from './history';
 import type { AgentTransport, AgentCanMutateFn } from './types';
 import type { AgentLayoutFn } from '../types/node-template';
@@ -35,6 +35,10 @@ export interface AgentBridgeConfig {
    * a throw is treated as a deny.
    */
   canMutate?: AgentCanMutateFn;
+  /** Sink called after each applied mutating tool call with its op-log entry. */
+  onOp?: (entry: import('./op-log').OpLogEntry) => void;
+  /** Op-log config. Pass `false` to disable the op-log and `get_changes_since`. Default { maxOps: 1000 }. */
+  opLog?: import('./op-log').OpLogOptions | false;
 }
 
 /**
@@ -66,5 +70,7 @@ export function provideAgentBridge(config: AgentBridgeConfig): EnvironmentProvid
     ...(config.onError ? [{ provide: AGENT_ON_ERROR, useValue: config.onError }] : []),
     ...(config.layout ? [{ provide: AGENT_LAYOUT, useValue: config.layout }] : []),
     ...(config.canMutate ? [{ provide: AGENT_CAN_MUTATE, useValue: config.canMutate }] : []),
+    ...(config.onOp ? [{ provide: AGENT_ON_OP, useValue: config.onOp }] : []),
+    { provide: AGENT_OPLOG_OPTIONS, useValue: config.opLog ?? { maxOps: 1000 } },
   ]);
 }

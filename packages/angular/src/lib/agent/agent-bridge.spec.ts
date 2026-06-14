@@ -2342,3 +2342,69 @@ describe('provenance: canMutate guard', () => {
     expect(calls).toBe(0);
   });
 });
+
+describe('provenance: op-log + onOp + flow.history source', () => {
+  function setupLogged(extra: any = {}) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), provideAgentBridge({ transports: [], ...extra })],
+    });
+    const bridge = TestBed.inject(AngflowAgentBridge);
+    const newFlow = () => {
+      const child = Injector.create({ providers: [FlowStore, NgFlowService], parent: TestBed.inject(Injector) });
+      return child.get(NgFlowService);
+    };
+    return { bridge, newFlow };
+  }
+  const NODE = (id: string) => ({ node: { id, position: { x: 0, y: 0 }, data: {} } });
+
+  it('onOp fires once per applied mutation with method + source + cursor', async () => {
+    const ops: any[] = [];
+    const { bridge, newFlow } = setupLogged({ onOp: (e: any) => ops.push(e) });
+    bridge.register('main', newFlow());
+    await bridge.callTool('add_node', NODE('a'), { source: 'user' });
+    expect(ops).toHaveLength(1);
+    expect(ops[0].method).toBe('add_node');
+    expect(ops[0].source).toBe('user');
+    expect(ops[0].cursor).toBe(1);
+  });
+
+  it('a throwing onOp does not break the call', async () => {
+    const { bridge, newFlow } = setupLogged({ onOp: () => { throw new Error('sink boom'); } });
+    const flow = newFlow();
+    bridge.register('main', flow);
+    await bridge.callTool('add_node', NODE('a'));
+    expect(flow.getNode('a')).toBeTruthy();
+  });
+
+  it('read tools produce no op-log entries', async () => {
+    const ops: any[] = [];
+    const { bridge, newFlow } = setupLogged({ onOp: (e: any) => ops.push(e) });
+    bridge.register('main', newFlow());
+    await bridge.callTool('get_state', {});
+    expect(ops).toHaveLength(0);
+  });
+
+  it('flow.history event carries the source', async () => {
+    const events: any[] = [];
+    const transport = { start() {}, send: (f: any) => events.push(f), stop() {} };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), provideAgentBridge({ transports: [transport] })],
+    });
+    const bridge = TestBed.inject(AngflowAgentBridge);
+    const child = Injector.create({ providers: [FlowStore, NgFlowService], parent: TestBed.inject(Injector) });
+    bridge.register('main', child.get(NgFlowService));
+    await bridge.callTool('add_node', { node: { id: 'a', position: { x: 0, y: 0 }, data: {} } }, { source: 'user' });
+    const hist = events.find((e) => e.event === 'flow.history');
+    expect(hist?.params?.source).toBe('user');
+  });
+
+  it('records ops even when history is disabled', async () => {
+    const ops: any[] = [];
+    const { bridge, newFlow } = setupLogged({ history: false, onOp: (e: any) => ops.push(e) });
+    bridge.register('main', newFlow());
+    await bridge.callTool('add_node', NODE('a'));
+    expect(ops).toHaveLength(1);
+  });
+});
