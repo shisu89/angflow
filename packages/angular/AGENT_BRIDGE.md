@@ -72,7 +72,8 @@ Every tool takes an optional `flowId` (omit when only one flow is registered; re
 | Tool | Params | Returns |
 |---|---|---|
 | `list_flows` | — | `string[]` of registered flow ids |
-| `get_state` | — | `{ nodes, edges, viewport }` |
+| `get_state` | `groupId?: string`, `bounds?: { x, y, width, height }` | `{ nodes, edges, viewport, collapsedHiddenIds }`. Optionally scope to a group's nesting-aware subtree (`groupId`) or a bounds rect (`bounds`) — not both (`-32602`); unknown `groupId` → `-32602`. `collapsedHiddenIds` is the board-wide set of nodes hidden by collapse. |
+| `get_summary` | — | `{ counts, groups, titles, viewport, bounds, collapsedHiddenIds }`. Compact digest for large boards. `groups` = one entry per `type:'group'` node (`memberCount` nesting-aware). `titles` = `{ id, type, label }` per node — no `data`/`style`. `bounds` = bounding rect of all nodes (`null` when empty). |
 | `get_nodes` | — | `Node[]` |
 | `get_edges` | — | `Edge[]` |
 | `get_node` | `id: string` | `Node \| null` |

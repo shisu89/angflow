@@ -16,13 +16,43 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
   {
     name: 'get_state',
     description:
-      'Return a full snapshot of a flow: { nodes, edges, viewport }. ' +
-      'Use this whenever you need to see the current canvas before deciding what to change.',
+      'Return a snapshot of a flow: { nodes, edges, viewport, collapsedHiddenIds }. ' +
+      'collapsedHiddenIds lists nodes hidden because an ancestor group is collapsed. ' +
+      'Optionally scope to a group subtree (groupId) OR a bounds rect (bounds) — not both. ' +
+      'For a compact overview of a large board, prefer get_summary.',
     inputSchema: {
       type: 'object',
       properties: {
         flowId: { type: 'string', description: 'Flow id. Omit if exactly one flow is registered.' },
+        groupId: {
+          type: 'string',
+          description: "Scope to this node's nesting-aware descendant subtree (the group node itself is excluded).",
+        },
+        bounds: {
+          type: 'object',
+          description: 'Scope to nodes intersecting this rect (flow coordinates).',
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+            width: { type: 'number' },
+            height: { type: 'number' },
+          },
+          required: ['x', 'y', 'width', 'height'],
+        },
       },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_summary',
+    description:
+      'Compact digest of a flow for large boards (avoids dumping every node). Returns ' +
+      '{ counts: { nodes, edges, groups }, groups: [{ id, label, collapsed, memberCount }], ' +
+      'titles: [{ id, type, label }], viewport, bounds, collapsedHiddenIds }. ' +
+      'titles carry id/type/label only (no data/style); use get_state (optionally scoped) for full node data.',
+    inputSchema: {
+      type: 'object',
+      properties: { flowId: { type: 'string' } },
       additionalProperties: false,
     },
   },
