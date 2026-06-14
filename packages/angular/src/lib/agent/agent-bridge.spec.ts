@@ -2188,4 +2188,53 @@ describe('group lifecycle + minted ids', () => {
     })) as { id: string };
     expect(node.id).toBe('mine');
   });
+
+  it('group_nodes creates a group (minted id) and reparents members', async () => {
+    const { bridge, newFlow } = setup();
+    const flow = newFlow();
+    bridge.register('main', flow);
+    flow.setNodes([
+      makeNode('a', { position: { x: 100, y: 100 }, width: 50, height: 50 }),
+      makeNode('b', { position: { x: 300, y: 200 }, width: 50, height: 50 }),
+    ]);
+    const res = (await bridge.callTool('group_nodes', { nodeIds: ['a', 'b'], label: 'G' })) as { groupId: string };
+    expect(typeof res.groupId).toBe('string');
+    expect(flow.getNode(res.groupId)?.type).toBe('group');
+    expect(flow.getNode('a')?.parentId).toBe(res.groupId);
+  });
+
+  it('group_nodes rejects empty/unknown nodeIds with -32602', async () => {
+    const { bridge, newFlow } = setup();
+    const flow = newFlow();
+    bridge.register('main', flow);
+    flow.setNodes([makeNode('a')]);
+    await expect(bridge.callTool('group_nodes', { nodeIds: [] })).rejects.toMatchObject({ code: -32602 });
+    await expect(bridge.callTool('group_nodes', { nodeIds: ['ghost'] })).rejects.toMatchObject({ code: -32602 });
+  });
+
+  it('set_node_group reparents and rejects cycles with -32602', async () => {
+    const { bridge, newFlow } = setup();
+    const flow = newFlow();
+    bridge.register('main', flow);
+    flow.setNodes([
+      makeNode('g', { type: 'group', position: { x: 0, y: 0 }, width: 400, height: 400 }),
+      makeNode('a', { position: { x: 100, y: 100 }, width: 50, height: 50 }),
+    ]);
+    const res = (await bridge.callTool('set_node_group', { nodeId: 'a', groupId: 'g' })) as { nodeId: string; groupId: string | null };
+    expect(res).toEqual({ nodeId: 'a', groupId: 'g' });
+    expect(flow.getNode('a')?.parentId).toBe('g');
+    await expect(bridge.callTool('set_node_group', { nodeId: 'g', groupId: 'a' })).rejects.toMatchObject({ code: -32602 });
+  });
+
+  it('set_node_group detaches to top-level with groupId null', async () => {
+    const { bridge, newFlow } = setup();
+    const flow = newFlow();
+    bridge.register('main', flow);
+    flow.setNodes([
+      makeNode('g', { type: 'group', position: { x: 0, y: 0 }, width: 400, height: 400 }),
+      makeNode('a', { parentId: 'g', position: { x: 100, y: 100 }, width: 50, height: 50 }),
+    ]);
+    await bridge.callTool('set_node_group', { nodeId: 'a', groupId: null });
+    expect(flow.getNode('a')?.parentId).toBeUndefined();
+  });
 });

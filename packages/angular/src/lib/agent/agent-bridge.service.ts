@@ -58,6 +58,10 @@ const MUTATING_TOOLS = new Set<string>([
   'delete_elements',
   'set_nodes',
   'set_edges',
+  'group_nodes',
+  'set_node_group',
+  'set_group_collapsed',
+  'dissolve_group',
 ]);
 // apply_changes is treated specially — see dispatch logic.
 
@@ -565,6 +569,41 @@ export class AngflowAgentBridge {
       const node = validateNodeShape(raw, 'add_node');
       flow.addNodes(node);
       return flow.getNode(node.id) ?? null;
+    });
+
+    this.handlers.set('group_nodes', async (flow, params) => {
+      const nodeIds = optionalStringArray(params, 'nodeIds');
+      if (!nodeIds || nodeIds.length === 0) {
+        throw new InvalidParamsError('Param "nodeIds" must be a non-empty array of strings.');
+      }
+      for (const id of nodeIds) {
+        if (!flow.getNode(id)) throw new InvalidParamsError(`group_nodes: unknown node id "${id}".`);
+      }
+      const groupId = typeof params['groupId'] === 'string' && params['groupId'] ? (params['groupId'] as string) : this.mintId(flow, 'group');
+      const label = typeof params['label'] === 'string' ? (params['label'] as string) : undefined;
+      const collapsed = typeof params['collapsed'] === 'boolean' ? (params['collapsed'] as boolean) : undefined;
+      const padding = optionalPositiveNumber(params, 'padding');
+      const headerHeight = typeof params['headerHeight'] === 'number' ? (params['headerHeight'] as number) : undefined;
+      await flow.groupNodes(nodeIds, { groupId, label, collapsed, padding, headerHeight });
+      return { groupId };
+    });
+
+    this.handlers.set('set_node_group', async (flow, params) => {
+      const nodeId = requireString(params, 'nodeId');
+      if (!flow.getNode(nodeId)) throw new InvalidParamsError(`set_node_group: unknown node id "${nodeId}".`);
+      const rawGroup = params['groupId'];
+      if (rawGroup !== null && typeof rawGroup !== 'string') {
+        throw new InvalidParamsError('Param "groupId" must be a string or null.');
+      }
+      const groupId = rawGroup as string | null;
+      if (groupId !== null) {
+        if (!flow.getNode(groupId)) throw new InvalidParamsError(`set_node_group: unknown group id "${groupId}".`);
+        if (groupId === nodeId || descendantIdsOf(nodeId, buildChildMap(flow.getNodes())).has(groupId)) {
+          throw new InvalidParamsError('set_node_group: groupId would create a cycle (it is the node or a descendant).');
+        }
+      }
+      await flow.setNodeGroup(nodeId, groupId);
+      return { nodeId, groupId };
     });
 
     this.handlers.set('add_edge', (flow, params) => {
