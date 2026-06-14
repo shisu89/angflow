@@ -493,7 +493,7 @@ export class AngflowAgentBridge {
         if (!flow.getNode(groupId)) {
           throw new InvalidParamsError(`get_state: no node with id "${groupId}".`);
         }
-        const ids = descendantIdsOf(groupId, allNodes);
+        const ids = descendantIdsOf(groupId, buildChildMap(allNodes));
         nodes = allNodes.filter((n) => ids.has(n.id));
         edges = inducedEdges(allEdges, ids);
       } else if (hasBounds) {
@@ -513,13 +513,14 @@ export class AngflowAgentBridge {
     this.handlers.set('get_summary', (flow) => {
       const nodes = flow.getNodes();
       const edges = flow.getEdges();
+      const childMap = buildChildMap(nodes);
       const groups = nodes
         .filter((n) => n.type === 'group')
         .map((g) => ({
           id: g.id,
           label: nodeTitle(g),
           collapsed: g.collapsed === true,
-          memberCount: descendantIdsOf(g.id, nodes).size,
+          memberCount: descendantIdsOf(g.id, childMap).size,
         }));
       return {
         counts: { nodes: nodes.length, edges: edges.length, groups: groups.length },
@@ -1298,15 +1299,25 @@ function requireRect(
 }
 
 /** Nesting-aware descendant ids of a node (excludes the node itself; cycle-guarded). */
-function descendantIdsOf(groupId: string, nodes: readonly Node[]): Set<string> {
-  const childrenByParent = new Map<string, string[]>();
+/** Build a parentId → child-ids map from a node list in one pass. */
+function buildChildMap(nodes: readonly Node[]): Map<string, string[]> {
+  const map = new Map<string, string[]>();
   for (const n of nodes) {
     if (n.parentId != null) {
-      const arr = childrenByParent.get(n.parentId);
+      const arr = map.get(n.parentId);
       if (arr) arr.push(n.id);
-      else childrenByParent.set(n.parentId, [n.id]);
+      else map.set(n.parentId, [n.id]);
     }
   }
+  return map;
+}
+
+/**
+ * Nesting-aware descendant ids of a node (excludes the node itself; cycle-guarded).
+ * Takes a prebuilt child map so callers that resolve many groups (e.g. get_summary)
+ * build it once rather than per group.
+ */
+function descendantIdsOf(groupId: string, childrenByParent: ReadonlyMap<string, string[]>): Set<string> {
   const out = new Set<string>();
   // BFS with an index pointer rather than queue.shift() (which is O(n) per
   // dequeue) — keeps this O(n) for deep hierarchies up to the bulk cap.

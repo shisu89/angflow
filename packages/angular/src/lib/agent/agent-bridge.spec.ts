@@ -2124,6 +2124,22 @@ describe('summarized / scoped reads', () => {
     expect(res.collapsedHiddenIds).toEqual(['a']);
   });
 
+  it('get_summary memberCount is nesting-aware (counts grandchildren)', async () => {
+    const { bridge, newFlow } = setup();
+    const flow = newFlow();
+    bridge.register('main', flow);
+    flow.setNodes([
+      makeNode('g', { type: 'group' }),
+      makeNode('sub', { type: 'group', parentId: 'g' }),
+      makeNode('leaf', { parentId: 'sub' }),
+    ]);
+    const res = (await bridge.callTool('get_summary', {})) as {
+      groups: { id: string; memberCount: number }[];
+    };
+    const g = res.groups.find((x) => x.id === 'g')!;
+    expect(g.memberCount).toBe(2); // sub + leaf
+  });
+
   it('get_summary returns bounds: null for an empty flow', async () => {
     const { bridge, newFlow } = setup();
     bridge.register('main', newFlow());
