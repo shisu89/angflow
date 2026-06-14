@@ -394,13 +394,18 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     const children = this.getNodes().filter((n) => n.parentId === groupId);
     const childAbs: Record<string, { x: number; y: number }> = {};
     for (const c of children) {
-      const a = this.getAbsolutePosition(c.id);
+      const a = this.getAbsolutePosition(c.id); // capture while the group still exists
       if (a) childAbs[c.id] = a;
     }
+    // Gate on the (vetoable) deletion FIRST: if a host onBeforeDelete vetoes,
+    // leave everything untouched rather than detaching children from a group
+    // that still exists. deleteElements does not cascade child nodes, only the
+    // group node + its connected edges, so the children survive regardless.
+    const { deletedNodes } = await this.deleteElements({ nodes: [{ id: groupId } as NodeType] });
+    if (deletedNodes.length === 0) return [];
     this.store.batch(() => {
       for (const c of children) this.updateNode(c.id, { parentId: newParent } as Partial<NodeType>);
     });
-    await this.deleteElements({ nodes: [{ id: groupId } as NodeType] });
     if (Object.keys(childAbs).length > 0) {
       await this.setNodePositions(childAbs, { coordinateSpace: 'absolute', animate: false });
     }

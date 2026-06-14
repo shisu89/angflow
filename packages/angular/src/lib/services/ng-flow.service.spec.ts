@@ -998,4 +998,30 @@ describe('dissolveGroup', () => {
     expect(service.getNode('a')?.parentId).toBeUndefined();
     expect(service.getAbsolutePosition('a')).toEqual(absA);
   });
+
+  it('reparents children to the group\'s parent for a nested group, pinned', async () => {
+    service.setNodes([
+      makeNode('outer', { type: 'group', position: { x: 10, y: 10 }, width: 600, height: 600 }),
+      makeNode('inner', { type: 'group', parentId: 'outer', position: { x: 40, y: 40 }, width: 300, height: 300 }),
+      makeNode('a', { parentId: 'inner', position: { x: 20, y: 20 }, width: 50, height: 50 }),
+    ]);
+    const absA = service.getAbsolutePosition('a');
+    const freed = await service.dissolveGroup('inner');
+    expect(freed).toEqual(['a']);
+    expect(service.getNode('inner')).toBeUndefined();
+    expect(service.getNode('a')?.parentId).toBe('outer'); // lands in the grandparent
+    expect(service.getAbsolutePosition('a')).toEqual(absA); // still pinned
+  });
+
+  it('leaves everything untouched when onBeforeDelete vetoes', async () => {
+    service.setNodes([
+      makeNode('g', { type: 'group', position: { x: 50, y: 50 }, width: 400, height: 400 }),
+      makeNode('a', { parentId: 'g', position: { x: 100, y: 100 }, width: 50, height: 50 }),
+    ]);
+    store.onBeforeDelete = async () => false;
+    const freed = await service.dissolveGroup('g');
+    expect(freed).toEqual([]);
+    expect(service.getNode('g')).toBeTruthy(); // group survives
+    expect(service.getNode('a')?.parentId).toBe('g'); // child not detached
+  });
 });
