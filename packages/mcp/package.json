@@ -1,6 +1,6 @@
 {
   "name": "@angflow/mcp",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "type": "module",
   "description": "MCP server that exposes a live angflow canvas to AI agents (Claude Code, Claude Desktop, Cursor) over the agent-bridge WebSocket transport.",
   "keywords": [
