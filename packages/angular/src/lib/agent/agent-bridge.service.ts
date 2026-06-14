@@ -1044,6 +1044,13 @@ export class AngflowAgentBridge {
       this.emitHistory(flowId);
     });
 
+    this.handlers.set('get_changes_since', (flow, params) => {
+      const flowId = this.findFlowId(flow);
+      if (!this.opLog || !flowId) return { ops: [], cursor: 0, truncated: false };
+      const since = typeof params['since'] === 'number' ? (params['since'] as number) : 0;
+      return this.opLog.since(flowId, since);
+    });
+
     this.handlers.set('list_node_types', (flow) => ({ types: flow.getNodeTypeNames() }));
     this.handlers.set('list_edge_types', (flow) => ({ types: flow.getEdgeTypeNames() }));
 

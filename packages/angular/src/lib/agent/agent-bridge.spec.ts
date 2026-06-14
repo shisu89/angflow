@@ -2407,4 +2407,43 @@ describe('provenance: op-log + onOp + flow.history source', () => {
     await bridge.callTool('add_node', NODE('a'));
     expect(ops).toHaveLength(1);
   });
+
+  it('get_changes_since returns ops after a cursor, then empty', async () => {
+    const { bridge, newFlow } = setupLogged();
+    bridge.register('main', newFlow());
+    await bridge.callTool('add_node', NODE('a'));
+    await bridge.callTool('add_node', NODE('b'));
+    const first = (await bridge.callTool('get_changes_since', {})) as { ops: any[]; cursor: number; truncated: boolean };
+    expect(first.ops.map((o) => o.method)).toEqual(['add_node', 'add_node']);
+    expect(first.cursor).toBe(2);
+    expect(first.truncated).toBe(false);
+    const next = (await bridge.callTool('get_changes_since', { since: first.cursor })) as { ops: any[] };
+    expect(next.ops).toEqual([]);
+  });
+
+  it('get_changes_since reports truncated when the cursor is too old', async () => {
+    const { bridge, newFlow } = setupLogged({ opLog: { maxOps: 1 } });
+    bridge.register('main', newFlow());
+    await bridge.callTool('add_node', NODE('a'));
+    await bridge.callTool('add_node', NODE('b'));
+    await bridge.callTool('add_node', NODE('c'));
+    const res = (await bridge.callTool('get_changes_since', { since: 1 })) as { truncated: boolean };
+    expect(res.truncated).toBe(true);
+  });
+
+  it('get_changes_since returns an empty log when the op-log is disabled', async () => {
+    const { bridge, newFlow } = setupLogged({ opLog: false });
+    bridge.register('main', newFlow());
+    await bridge.callTool('add_node', NODE('a'));
+    const res = (await bridge.callTool('get_changes_since', {})) as { ops: any[]; cursor: number; truncated: boolean };
+    expect(res).toEqual({ ops: [], cursor: 0, truncated: false });
+  });
+
+  it('get_changes_since captures no history entry', async () => {
+    const { bridge, newFlow } = setupLogged();
+    bridge.register('main', newFlow());
+    await bridge.callTool('get_changes_since', {});
+    const status = (await bridge.callTool('history_status', {})) as { pastDepth: number };
+    expect(status.pastDepth).toBe(0);
+  });
 });
