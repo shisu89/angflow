@@ -413,6 +413,20 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   }
 
   /**
+   * Current rendered box of a group on the canvas: absolute top-left +
+   * measured (or declared) size. Returns null for an unknown id.
+   */
+  getGroupBox(groupId: string): { x: number; y: number; width: number; height: number } | null {
+    const node = this.getNode(groupId);
+    if (!node) return null;
+    const pos = this.getAbsolutePosition(groupId) ?? node.position;
+    const internal = this.getInternalNode(groupId);
+    const width = internal?.measured?.width ?? node.width ?? 0;
+    const height = internal?.measured?.height ?? node.height ?? 0;
+    return { x: pos.x, y: pos.y, width, height };
+  }
+
+  /**
    * Set a (group/parent) node's `collapsed` state. Emits a `replace` node change
    * so controlled apps can journal it. angflow derives descendant hiding and
    * crossing-edge rerouting from this flag.

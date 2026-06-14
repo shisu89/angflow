@@ -972,6 +972,26 @@ describe('setNodeGroup', () => {
   });
 });
 
+describe('getGroupBox', () => {
+  let service: NgFlowService;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), FlowStore, NgFlowService],
+    });
+    service = TestBed.inject(NgFlowService);
+  });
+
+  it('returns the current absolute box of a group, null for unknown id', () => {
+    service.setNodes([
+      makeNode('g', { type: 'group', position: { x: 50, y: 60 }, width: 300, height: 200 }),
+    ]);
+    expect(service.getGroupBox('g')).toEqual({ x: 50, y: 60, width: 300, height: 200 });
+    expect(service.getGroupBox('nope')).toBeNull();
+  });
+});
+
 describe('dissolveGroup', () => {
   let store: FlowStore;
   let service: NgFlowService;
