@@ -2054,6 +2054,20 @@ describe('summarized / scoped reads', () => {
     expect(res.edges.map((e) => e.id)).toEqual(['ab']);
   });
 
+  it('get_state({ groupId }) is nesting-aware (includes grandchildren)', async () => {
+    const { bridge, newFlow } = setup();
+    const flow = newFlow();
+    bridge.register('main', flow);
+    flow.setNodes([
+      makeNode('g', { type: 'group' }),
+      makeNode('sub', { type: 'group', parentId: 'g' }),
+      makeNode('leaf', { parentId: 'sub' }),
+      makeNode('outside'),
+    ]);
+    const res = (await bridge.callTool('get_state', { groupId: 'g' })) as { nodes: { id: string }[] };
+    expect(res.nodes.map((n) => n.id).sort()).toEqual(['leaf', 'sub']);
+  });
+
   it('get_state rejects an unknown groupId with -32602', async () => {
     const { bridge, newFlow } = setup();
     bridge.register('main', newFlow());

@@ -1287,9 +1287,11 @@ function descendantIdsOf(groupId: string, nodes: readonly Node[]): Set<string> {
     }
   }
   const out = new Set<string>();
+  // BFS with an index pointer rather than queue.shift() (which is O(n) per
+  // dequeue) — keeps this O(n) for deep hierarchies up to the bulk cap.
   const queue = [...(childrenByParent.get(groupId) ?? [])];
-  while (queue.length > 0) {
-    const id = queue.shift()!;
+  for (let head = 0; head < queue.length; head++) {
+    const id = queue[head]!;
     if (out.has(id)) continue; // self-parent / cycle guard
     out.add(id);
     const kids = childrenByParent.get(id);
