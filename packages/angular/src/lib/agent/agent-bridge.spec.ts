@@ -2266,6 +2266,13 @@ describe('group lifecycle + minted ids', () => {
     expect(flow.getNode('a')?.parentId).toBeUndefined();
   });
 
+  it('set_group_collapsed and dissolve_group reject an unknown groupId with -32602', async () => {
+    const { bridge, newFlow } = setup();
+    bridge.register('main', newFlow());
+    await expect(bridge.callTool('set_group_collapsed', { groupId: 'ghost', collapsed: true })).rejects.toMatchObject({ code: -32602 });
+    await expect(bridge.callTool('dissolve_group', { groupId: 'ghost' })).rejects.toMatchObject({ code: -32602 });
+  });
+
   it('get_group_bounds returns the box, null for unknown, and captures no history', async () => {
     const { bridge, newFlow } = setup();
     const flow = newFlow();
