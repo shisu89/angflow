@@ -374,6 +374,8 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    */
   async setNodeGroup(nodeId: string, groupId: string | null): Promise<void> {
     if (!this.getNode(nodeId)) return;
+    // Don't orphan parentId against a non-existent group (corrupts absolute coords).
+    if (groupId != null && !this.getNode(groupId)) return;
     const abs = this.getAbsolutePosition(nodeId);
     this.updateNode(nodeId, { parentId: groupId ?? undefined } as Partial<NodeType>);
     if (abs) {
