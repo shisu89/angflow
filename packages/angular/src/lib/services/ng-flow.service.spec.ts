@@ -877,4 +877,23 @@ describe('sizeGroupToChildren', () => {
       expect(pressed()).toBe(false);
     });
   });
+
+  // ── getCollapsedHiddenIds ─────────────────────────────────────────────
+
+  describe('getCollapsedHiddenIds', () => {
+    it('returns [] when nothing is collapsed', () => {
+      service.setNodes([makeNode('g', { type: 'group' }), makeNode('a', { parentId: 'g' })]);
+      expect(service.getCollapsedHiddenIds()).toEqual([]);
+    });
+
+    it('returns the nesting-aware descendants of a collapsed group', () => {
+      service.setNodes([
+        makeNode('g', { type: 'group', collapsed: true }),
+        makeNode('a', { parentId: 'g' }),
+        makeNode('b', { parentId: 'g' }),
+        makeNode('c'),
+      ]);
+      expect(service.getCollapsedHiddenIds().sort()).toEqual(['a', 'b']);
+    });
+  });
 });

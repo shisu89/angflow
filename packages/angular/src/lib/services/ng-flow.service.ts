@@ -747,6 +747,14 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     return getNodesBoundsSystem(nodes, { nodeOrigin: this.store.nodeOrigin() });
   }
 
+  /**
+   * Ids of all nodes currently hidden because an ancestor group is collapsed
+   * (nesting-aware). Non-reactive snapshot — prefer the store signal in templates.
+   */
+  getCollapsedHiddenIds(): string[] {
+    return Array.from(this.store.collapsedHiddenIds());
+  }
+
   // ── Connection Queries ────────────────────────────────────────────────
 
   /** Return all edges that are incident to any of the given node ids (either end). */
