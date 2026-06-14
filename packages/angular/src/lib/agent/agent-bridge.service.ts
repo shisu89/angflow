@@ -113,6 +113,7 @@ export class AngflowAgentBridge {
   private readonly layoutFn: AgentLayoutFn | null;
   private started = false;
   private nextInProcessId = 1;
+  // Shared across flows; mintId's per-flow collision check guarantees uniqueness.
   private nextNodeIdSeq = 0;
   private warnedOnBeforeDeleteBypass = false;
 
@@ -556,7 +557,8 @@ export class AngflowAgentBridge {
     });
 
     this.handlers.set('add_node', (flow, params) => {
-      const raw = requireObject(params, 'node');
+      // Shallow-clone so we never mutate the caller's params object when minting.
+      const raw = { ...requireObject(params, 'node') };
       if (raw['id'] == null || raw['id'] === '') {
         raw['id'] = this.mintId(flow, 'node');
       }
