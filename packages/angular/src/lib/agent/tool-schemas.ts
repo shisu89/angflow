@@ -17,7 +17,8 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
     name: 'get_state',
     description:
       'Return a snapshot of a flow: { nodes, edges, viewport, collapsedHiddenIds }. ' +
-      'collapsedHiddenIds lists nodes hidden because an ancestor group is collapsed. ' +
+      'collapsedHiddenIds is the board-wide set of nodes hidden because an ancestor group ' +
+      'is collapsed (it stays board-wide even when groupId/bounds scopes nodes/edges). ' +
       'Optionally scope to a group subtree (groupId) OR a bounds rect (bounds) — not both. ' +
       'For a compact overview of a large board, prefer get_summary.',
     inputSchema: {
@@ -52,7 +53,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
       'titles carry id/type/label only (no data/style); use get_state (optionally scoped) for full node data.',
     inputSchema: {
       type: 'object',
-      properties: { flowId: { type: 'string' } },
+      properties: { flowId: { type: 'string', description: 'Flow id. Omit if exactly one flow is registered.' } },
       additionalProperties: false,
     },
   },
