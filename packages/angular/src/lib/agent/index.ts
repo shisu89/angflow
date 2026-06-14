@@ -15,5 +15,6 @@ export type {
   AgentOutbound,
   AgentTransport,
   AgentToolSchema,
+  AgentCanMutateFn,
 } from './types';
 export * from './chat';

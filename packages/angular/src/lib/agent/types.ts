@@ -35,6 +35,15 @@ export interface AgentEvent {
   params?: Record<string, unknown>;
 }
 
+/**
+ * Host write-guard for mutating tool calls. Return `true` to allow; `false` or a
+ * non-empty string (the denial reason) to reject with `-32001`. Async-capable.
+ */
+export type AgentCanMutateFn = (
+  op: { method: string; params: Record<string, unknown> },
+  source?: string,
+) => boolean | string | Promise<boolean | string>;
+
 /** Frame sent from agent to bridge. */
 export type AgentInbound = AgentRequest;
 

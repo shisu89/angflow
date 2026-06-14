@@ -90,6 +90,7 @@ export {
   type AgentOutbound,
   type AgentTransport,
   type AgentToolSchema,
+  type AgentCanMutateFn,
   // Agent chat harness (AGENT_CHAT_CONFIG is intentionally omitted — internal)
   provideAgentChat,
   AgentChatService,

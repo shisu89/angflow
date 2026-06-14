@@ -1,7 +1,7 @@
 import { type EnvironmentProviders, makeEnvironmentProviders } from '@angular/core';
 import { AGENT_CAN_MUTATE, AGENT_HISTORY_OPTIONS, AGENT_LAYOUT, AGENT_ON_ERROR, AGENT_TRANSPORTS } from './agent-bridge.service';
 import type { AgentHistoryOptions } from './history';
-import type { AgentTransport } from './types';
+import type { AgentTransport, AgentCanMutateFn } from './types';
 import type { AgentLayoutFn } from '../types/node-template';
 
 export type AgentBridgeErrorContext =
@@ -34,7 +34,7 @@ export interface AgentBridgeConfig {
    * non-empty string (the denial reason) to reject with `-32001`. Async-capable;
    * a throw is treated as a deny.
    */
-  canMutate?: (op: { method: string; params: Record<string, unknown> }, source?: string) => boolean | string | Promise<boolean | string>;
+  canMutate?: AgentCanMutateFn;
 }
 
 /**

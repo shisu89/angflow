@@ -23,6 +23,7 @@ import type {
   AgentResponse,
   AgentTransport,
   AgentEvent,
+  AgentCanMutateFn,
 } from './types';
 
 /** Provider token holding the user-supplied transport(s). */
@@ -42,9 +43,7 @@ export const AGENT_ON_ERROR = new InjectionToken<
 export const AGENT_LAYOUT = new InjectionToken<AgentLayoutFn>('AngflowAgentLayout');
 
 /** Optional host write-guard for mutating tools. */
-export const AGENT_CAN_MUTATE = new InjectionToken<
-  (op: { method: string; params: Record<string, unknown> }, source?: string) => boolean | string | Promise<boolean | string>
->('AngflowAgentCanMutate');
+export const AGENT_CAN_MUTATE = new InjectionToken<AgentCanMutateFn>('AngflowAgentCanMutate');
 
 const ERROR_INVALID_PARAMS = -32602;
 const ERROR_METHOD_NOT_FOUND = -32601;
@@ -121,9 +120,7 @@ export class AngflowAgentBridge {
   private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
   private readonly layoutFn: AgentLayoutFn | null;
-  private readonly canMutate:
-    | ((op: { method: string; params: Record<string, unknown> }, source?: string) => boolean | string | Promise<boolean | string>)
-    | null;
+  private readonly canMutate: AgentCanMutateFn | null;
   private started = false;
   private nextInProcessId = 1;
   // Shared across flows; mintId's per-flow collision check guarantees uniqueness.
@@ -142,7 +139,7 @@ export class AngflowAgentBridge {
     @Optional() @Inject(AGENT_HISTORY_OPTIONS) historyOptions: AgentHistoryOptions | false | null,
     @Optional() @Inject(AGENT_ON_ERROR) onError: ((err: unknown, ctx: { kind: 'transport-start' | 'transport-send' | 'dispatch'; transport?: AgentTransport; method?: string }) => void) | null,
     @Optional() @Inject(AGENT_LAYOUT) layoutFn: AgentLayoutFn | null,
-    @Optional() @Inject(AGENT_CAN_MUTATE) canMutate: ((op: { method: string; params: Record<string, unknown> }, source?: string) => boolean | string | Promise<boolean | string>) | null,
+    @Optional() @Inject(AGENT_CAN_MUTATE) canMutate: AgentCanMutateFn | null,
   ) {
     this.transports = transports ?? [];
     this.history =
@@ -293,6 +290,9 @@ export class AngflowAgentBridge {
       const flowId = this.findFlowId(flow);
       const isApplyChanges = req.method === 'apply_changes';
       const isLayout = req.method === 'layout_nodes';
+      // The guarded/recorded set: forward graph mutations only. Reads, selection,
+      // viewport, and undo/redo/clear_history are intentionally NOT gated — the
+      // guard protects against agent writes, not the host's own recovery ops.
       const isMutating = MUTATING_TOOLS.has(req.method) || isApplyChanges || isLayout;
       const source = req.source;
       if (this.canMutate && isMutating) {
