@@ -908,7 +908,6 @@ describe('sizeGroupToChildren', () => {
 });
 
 describe('groupNodes', () => {
-  let store: FlowStore;
   let service: NgFlowService;
 
   beforeEach(() => {
@@ -916,7 +915,6 @@ describe('groupNodes', () => {
     TestBed.configureTestingModule({
       providers: [provideZonelessChangeDetection(), FlowStore, NgFlowService],
     });
-    store = TestBed.inject(FlowStore);
     service = TestBed.inject(NgFlowService);
   });
 
@@ -938,7 +936,6 @@ describe('groupNodes', () => {
 });
 
 describe('setNodeGroup', () => {
-  let store: FlowStore;
   let service: NgFlowService;
 
   beforeEach(() => {
@@ -946,7 +943,6 @@ describe('setNodeGroup', () => {
     TestBed.configureTestingModule({
       providers: [provideZonelessChangeDetection(), FlowStore, NgFlowService],
     });
-    store = TestBed.inject(FlowStore);
     service = TestBed.inject(NgFlowService);
   });
 
