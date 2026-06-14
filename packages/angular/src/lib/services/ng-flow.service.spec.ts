@@ -936,3 +936,38 @@ describe('groupNodes', () => {
     expect(service.getAbsolutePosition('b')).toEqual({ x: 300, y: 200 });
   });
 });
+
+describe('setNodeGroup', () => {
+  let store: FlowStore;
+  let service: NgFlowService;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), FlowStore, NgFlowService],
+    });
+    store = TestBed.inject(FlowStore);
+    service = TestBed.inject(NgFlowService);
+  });
+
+  it('reparents a node into a group, preserving its absolute position', async () => {
+    service.setNodes([
+      makeNode('g', { type: 'group', position: { x: 50, y: 50 }, width: 400, height: 400 }),
+      makeNode('a', { position: { x: 200, y: 200 }, width: 50, height: 50 }),
+    ]);
+    await service.setNodeGroup('a', 'g');
+    expect(service.getNode('a')?.parentId).toBe('g');
+    expect(service.getAbsolutePosition('a')).toEqual({ x: 200, y: 200 });
+  });
+
+  it('detaches a node to top-level when groupId is null, preserving absolute position', async () => {
+    service.setNodes([
+      makeNode('g', { type: 'group', position: { x: 50, y: 50 }, width: 400, height: 400 }),
+      makeNode('a', { parentId: 'g', position: { x: 150, y: 150 }, width: 50, height: 50 }),
+    ]);
+    const before = service.getAbsolutePosition('a');
+    await service.setNodeGroup('a', null);
+    expect(service.getNode('a')?.parentId).toBeUndefined();
+    expect(service.getAbsolutePosition('a')).toEqual(before);
+  });
+});

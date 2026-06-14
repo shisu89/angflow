@@ -369,6 +369,19 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   }
 
   /**
+   * Reparent a node into `groupId` (or detach to top-level when `null`), keeping
+   * it visually fixed. Caller must ensure no cycle (the agent bridge guards this).
+   */
+  async setNodeGroup(nodeId: string, groupId: string | null): Promise<void> {
+    if (!this.getNode(nodeId)) return;
+    const abs = this.getAbsolutePosition(nodeId);
+    this.updateNode(nodeId, { parentId: groupId ?? undefined } as Partial<NodeType>);
+    if (abs) {
+      await this.setNodePositions({ [nodeId]: abs }, { coordinateSpace: 'absolute', animate: false });
+    }
+  }
+
+  /**
    * Set a (group/parent) node's `collapsed` state. Emits a `replace` node change
    * so controlled apps can journal it. angflow derives descendant hiding and
    * crossing-edge rerouting from this flag.
