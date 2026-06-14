@@ -510,6 +510,27 @@ export class AngflowAgentBridge {
       };
     });
 
+    this.handlers.set('get_summary', (flow) => {
+      const nodes = flow.getNodes();
+      const edges = flow.getEdges();
+      const groups = nodes
+        .filter((n) => n.type === 'group')
+        .map((g) => ({
+          id: g.id,
+          label: nodeTitle(g),
+          collapsed: g.collapsed === true,
+          memberCount: descendantIdsOf(g.id, nodes).size,
+        }));
+      return {
+        counts: { nodes: nodes.length, edges: edges.length, groups: groups.length },
+        groups,
+        titles: nodes.map((n) => ({ id: n.id, type: n.type ?? 'default', label: nodeTitle(n) })),
+        viewport: flow.getViewport(),
+        bounds: nodes.length > 0 ? flow.getNodesBounds(nodes) : null,
+        collapsedHiddenIds: flow.getCollapsedHiddenIds(),
+      };
+    });
+
     this.handlers.set('get_nodes', (flow) => flow.getNodes());
     this.handlers.set('get_edges', (flow) => flow.getEdges());
 
@@ -1303,6 +1324,17 @@ function descendantIdsOf(groupId: string, nodes: readonly Node[]): Set<string> {
 /** Edges whose source AND target are both in the id set. */
 function inducedEdges(edges: readonly Edge[], nodeIds: ReadonlySet<string>): Edge[] {
   return edges.filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target));
+}
+
+/** Best-effort display title for a node: data.label/title/name, else type, else id. */
+function nodeTitle(node: Node): string {
+  const data = node.data as Record<string, unknown> | undefined;
+  for (const key of ['label', 'title', 'name'] as const) {
+    const v = data?.[key];
+    if (typeof v === 'string' && v.length > 0) return v;
+  }
+  if (typeof node.type === 'string' && node.type.length > 0) return node.type;
+  return node.id;
 }
 
 const BADGE_COLOR_SET = new Set(['slate', 'indigo', 'emerald', 'amber', 'rose']);

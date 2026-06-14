@@ -2097,4 +2097,48 @@ describe('summarized / scoped reads', () => {
     expect(res.nodes.map((n) => n.id)).toEqual(['near']);
     expect(res.edges).toEqual([]);
   });
+
+  it('get_summary returns counts, groups, titles, bounds, collapsedHiddenIds', async () => {
+    const { bridge, newFlow } = setup();
+    const flow = newFlow();
+    bridge.register('main', flow);
+    flow.setNodes([
+      makeNode('g', { type: 'group', collapsed: true, data: { label: 'Container' } }),
+      makeNode('a', { parentId: 'g', data: { label: 'Alpha' }, width: 50, height: 50 }),
+      makeNode('b', { type: 'idea', data: { name: 'Bee' }, width: 50, height: 50 }),
+    ]);
+    flow.setEdges([{ id: 'ab', source: 'a', target: 'b' } as Edge]);
+    const res = (await bridge.callTool('get_summary', {})) as {
+      counts: { nodes: number; edges: number; groups: number };
+      groups: { id: string; label: string; collapsed: boolean; memberCount: number }[];
+      titles: { id: string; type: string; label: string }[];
+      bounds: { x: number; y: number; width: number; height: number } | null;
+      collapsedHiddenIds: string[];
+    };
+    expect(res.counts).toEqual({ nodes: 3, edges: 1, groups: 1 });
+    expect(res.groups).toEqual([{ id: 'g', label: 'Container', collapsed: true, memberCount: 1 }]);
+    const titleOf = (id: string) => res.titles.find((t) => t.id === id)!;
+    expect(titleOf('a').label).toBe('Alpha');
+    expect(titleOf('b')).toEqual({ id: 'b', type: 'idea', label: 'Bee' });
+    expect(res.bounds).not.toBeNull();
+    expect(res.collapsedHiddenIds).toEqual(['a']);
+  });
+
+  it('get_summary returns bounds: null for an empty flow', async () => {
+    const { bridge, newFlow } = setup();
+    bridge.register('main', newFlow());
+    const res = (await bridge.callTool('get_summary', {})) as { bounds: unknown; counts: { nodes: number } };
+    expect(res.counts.nodes).toBe(0);
+    expect(res.bounds).toBeNull();
+  });
+
+  it('get_summary does not capture a history entry', async () => {
+    const { bridge, newFlow } = setup();
+    const flow = newFlow();
+    bridge.register('main', flow);
+    flow.setNodes([makeNode('a')]);
+    await bridge.callTool('get_summary', {});
+    const status = (await bridge.callTool('history_status', {})) as { pastDepth: number };
+    expect(status.pastDepth).toBe(0);
+  });
 });
