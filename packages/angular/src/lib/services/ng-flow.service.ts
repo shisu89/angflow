@@ -324,6 +324,48 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   }
 
   /**
+   * Create a `type:'group'` node wrapping the given nodes, reparent them into it,
+   * and pin them visually (their absolute positions are preserved). Returns the
+   * group id. The group box wraps members with `padding`/`headerHeight` insets.
+   */
+  async groupNodes(
+    nodeIds: string[],
+    opts?: { groupId?: string; label?: string; collapsed?: boolean; padding?: number; headerHeight?: number },
+  ): Promise<string> {
+    const groupId = opts?.groupId ?? `group_${nodeIds.join('-')}`;
+    const members = nodeIds
+      .map((id) => this.getInternalNode(id))
+      .filter((n): n is InternalNode<NodeType> => n != null);
+    const abs: Record<string, { x: number; y: number }> = {};
+    const memberBoxes = members.map((m) => {
+      const a = this.getAbsolutePosition(m.id)!;
+      abs[m.id] = a;
+      return { position: a, measured: m.measured, width: m.width, height: m.height };
+    });
+    const box = getGroupBounds(memberBoxes, {
+      padding: opts?.padding ?? 20,
+      headerHeight: opts?.headerHeight ?? 40,
+    });
+    this.addNodes({
+      id: groupId,
+      type: 'group',
+      position: { x: box.position.x, y: box.position.y },
+      width: box.width,
+      height: box.height,
+      data: opts?.label != null ? { label: opts.label } : {},
+      ...(opts?.collapsed != null ? { collapsed: opts.collapsed } : {}),
+    } as unknown as NodeType);
+    this.store.batch(() => {
+      for (const m of members) this.updateNode(m.id, { parentId: groupId } as Partial<NodeType>);
+    });
+    await this.setNodePositions(
+      { [groupId]: box.position, ...abs },
+      { coordinateSpace: 'absolute', animate: false },
+    );
+    return groupId;
+  }
+
+  /**
    * Set a (group/parent) node's `collapsed` state. Emits a `replace` node change
    * so controlled apps can journal it. angflow derives descendant hiding and
    * crossing-edge rerouting from this flag.

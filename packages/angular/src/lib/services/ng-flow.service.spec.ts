@@ -906,3 +906,33 @@ describe('sizeGroupToChildren', () => {
     });
   });
 });
+
+describe('groupNodes', () => {
+  let store: FlowStore;
+  let service: NgFlowService;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), FlowStore, NgFlowService],
+    });
+    store = TestBed.inject(FlowStore);
+    service = TestBed.inject(NgFlowService);
+  });
+
+  it('creates a group node, reparents members, and pins them visually', async () => {
+    service.setNodes([
+      makeNode('a', { position: { x: 100, y: 100 }, width: 50, height: 50 }),
+      makeNode('b', { position: { x: 300, y: 200 }, width: 50, height: 50 }),
+    ]);
+    const gid = await service.groupNodes(['a', 'b'], { groupId: 'g', label: 'G' });
+    expect(gid).toBe('g');
+    const g = service.getNode('g');
+    expect(g?.type).toBe('group');
+    expect(g?.data?.['label']).toBe('G');
+    expect(service.getNode('a')?.parentId).toBe('g');
+    expect(service.getNode('b')?.parentId).toBe('g');
+    expect(service.getAbsolutePosition('a')).toEqual({ x: 100, y: 100 });
+    expect(service.getAbsolutePosition('b')).toEqual({ x: 300, y: 200 });
+  });
+});
