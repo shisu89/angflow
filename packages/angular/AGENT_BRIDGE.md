@@ -207,7 +207,7 @@ Subscribers (`angflow.subscribe(h)`) receive:
 
 - `flow.registered` — `{ flowId }`
 - `flow.unregistered` — `{ flowId }`
-- `flow.history` — `{ flowId, canUndo, canRedo, pastDepth, futureDepth, params?: unknown, source?: string }`. Emitted **synchronously inside `dispatch`** immediately after a history-capturing mutation completes (or after `undo`/`redo`/`clear_history`). `params` is the call's params object; `source` is the origin string passed by the caller (e.g. `"agent:claude"`) — both are present only for bridge-initiated mutations, not for undo/redo/clear_history.
+- `flow.history` — `{ flowId, canUndo, canRedo, pastDepth, futureDepth, source?: string }`. Emitted **synchronously inside `dispatch`** immediately after a history-capturing mutation completes (or after `undo`/`redo`/`clear_history`). `source` is the origin string passed by the caller (e.g. `"agent:claude"`) — present only when a source was supplied for a bridge-initiated mutation (absent for undo/redo/clear_history and unsourced calls).
 - `flow.state` — `{ flowId, nodes, edges, viewport, selection: { nodeIds, edgeIds } }`. Coalesced per microtask; duplicates suppressed via a cheap signature. Emitted in the **next microtask** via the `watchFlow` effect. While any node is mid-drag (`dragging: true`), emissions are additionally throttled to at most one per 100ms, with a trailing emission that guarantees the latest drag state is always delivered; drag end emits promptly.
 
 **Ordering note:** When a mutating tool fires, consumers receive `flow.history` first (synchronously), then `flow.state` (next microtask). This ordering is reliable — useful when a consumer wants to update UI affordances before rendering the new graph state. During an active node drag, the throttle may delay flow.state past the next microtask (up to ~100ms); the synchronous flow.history ordering is unaffected.
@@ -400,9 +400,9 @@ When history is disabled, `undo` and `redo` return `{ undone/redone: 0, canUndo:
 
 ### `flow.history` push event
 
-Shape: `{ flowId: string, canUndo: boolean, canRedo: boolean, pastDepth: number, futureDepth: number }`
+Shape: `{ flowId: string, canUndo: boolean, canRedo: boolean, pastDepth: number, futureDepth: number, source?: string }`
 
-Emitted synchronously after every mutating tool call (before `flow.state`), and after `undo`, `redo`, and `clear_history`. Useful for updating UI affordances in real time.
+Emitted synchronously after every mutating tool call (before `flow.state`), and after `undo`, `redo`, and `clear_history`. Useful for updating UI affordances in real time. `source` (the caller-supplied origin) is included only when supplied for a bridge-initiated mutation. See **Provenance** for details.
 
 ## Provenance
 
