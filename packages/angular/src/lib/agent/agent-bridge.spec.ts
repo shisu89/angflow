@@ -2017,3 +2017,18 @@ describe('AngflowAgentBridge — bulk payload caps', () => {
     });
   });
 });
+
+describe('summarized / scoped reads', () => {
+  it('get_state reports collapsedHiddenIds (empty, then populated)', async () => {
+    const { bridge, newFlow } = setup();
+    const flow = newFlow();
+    bridge.register('main', flow);
+    flow.setNodes([makeNode('g', { type: 'group' }), makeNode('a', { parentId: 'g' })]);
+    let res = (await bridge.callTool('get_state', {})) as { collapsedHiddenIds: string[] };
+    expect(res.collapsedHiddenIds).toEqual([]);
+
+    flow.setNodes([makeNode('g', { type: 'group', collapsed: true }), makeNode('a', { parentId: 'g' })]);
+    res = (await bridge.callTool('get_state', {})) as { collapsedHiddenIds: string[] };
+    expect(res.collapsedHiddenIds).toEqual(['a']);
+  });
+});

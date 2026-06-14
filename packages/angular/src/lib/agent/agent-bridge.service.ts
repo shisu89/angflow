@@ -482,6 +482,7 @@ export class AngflowAgentBridge {
       nodes: flow.getNodes(),
       edges: flow.getEdges(),
       viewport: flow.getViewport(),
+      collapsedHiddenIds: flow.getCollapsedHiddenIds(),
     }));
 
     this.handlers.set('get_nodes', (flow) => flow.getNodes());
