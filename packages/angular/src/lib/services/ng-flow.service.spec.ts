@@ -895,5 +895,14 @@ describe('sizeGroupToChildren', () => {
       ]);
       expect(service.getCollapsedHiddenIds().sort()).toEqual(['a', 'b']);
     });
+
+    it('includes grandchildren (depth > 1) of a collapsed group', () => {
+      service.setNodes([
+        makeNode('g', { type: 'group', collapsed: true }),
+        makeNode('sub', { type: 'group', parentId: 'g' }),
+        makeNode('leaf', { parentId: 'sub' }),
+      ]);
+      expect(service.getCollapsedHiddenIds().sort()).toEqual(['leaf', 'sub']);
+    });
   });
 });
