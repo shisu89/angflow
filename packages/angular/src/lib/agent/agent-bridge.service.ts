@@ -478,12 +478,37 @@ export class AngflowAgentBridge {
   private installHandlers(): void {
     this.handlers.set('list_flows', () => Array.from(this.flows.keys()));
 
-    this.handlers.set('get_state', (flow) => ({
-      nodes: flow.getNodes(),
-      edges: flow.getEdges(),
-      viewport: flow.getViewport(),
-      collapsedHiddenIds: flow.getCollapsedHiddenIds(),
-    }));
+    this.handlers.set('get_state', (flow, params) => {
+      const hasGroup = params['groupId'] !== undefined;
+      const hasBounds = params['bounds'] !== undefined;
+      if (hasGroup && hasBounds) {
+        throw new InvalidParamsError('Pass either "groupId" or "bounds", not both.');
+      }
+      const allNodes = flow.getNodes();
+      const allEdges = flow.getEdges();
+      let nodes = allNodes;
+      let edges = allEdges;
+      if (hasGroup) {
+        const groupId = requireString(params, 'groupId');
+        if (!flow.getNode(groupId)) {
+          throw new InvalidParamsError(`get_state: no node with id "${groupId}".`);
+        }
+        const ids = descendantIdsOf(groupId, allNodes);
+        nodes = allNodes.filter((n) => ids.has(n.id));
+        edges = inducedEdges(allEdges, ids);
+      } else if (hasBounds) {
+        const rect = requireRect(params, 'bounds');
+        nodes = allNodes.filter((n) => flow.isNodeIntersecting(n, rect, true));
+        const idSet = new Set(nodes.map((n) => n.id));
+        edges = inducedEdges(allEdges, idSet);
+      }
+      return {
+        nodes,
+        edges,
+        viewport: flow.getViewport(),
+        collapsedHiddenIds: flow.getCollapsedHiddenIds(),
+      };
+    });
 
     this.handlers.set('get_nodes', (flow) => flow.getNodes());
     this.handlers.set('get_edges', (flow) => flow.getEdges());
@@ -1236,6 +1261,46 @@ function optionalPositiveNumber(params: Record<string, unknown>, key: string): n
     throw new InvalidParamsError(`Param "${key}" must be a finite number greater than 0.`);
   }
   return value;
+}
+
+function requireRect(
+  params: Record<string, unknown>,
+  key: string,
+): { x: number; y: number; width: number; height: number } {
+  const v = requireObject(params, key);
+  for (const k of ['x', 'y', 'width', 'height'] as const) {
+    if (typeof v[k] !== 'number' || !Number.isFinite(v[k])) {
+      throw new InvalidParamsError(`Param "${key}.${k}" must be a finite number.`);
+    }
+  }
+  return v as { x: number; y: number; width: number; height: number };
+}
+
+/** Nesting-aware descendant ids of a node (excludes the node itself; cycle-guarded). */
+function descendantIdsOf(groupId: string, nodes: readonly Node[]): Set<string> {
+  const childrenByParent = new Map<string, string[]>();
+  for (const n of nodes) {
+    if (n.parentId != null) {
+      const arr = childrenByParent.get(n.parentId);
+      if (arr) arr.push(n.id);
+      else childrenByParent.set(n.parentId, [n.id]);
+    }
+  }
+  const out = new Set<string>();
+  const queue = [...(childrenByParent.get(groupId) ?? [])];
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    if (out.has(id)) continue; // self-parent / cycle guard
+    out.add(id);
+    const kids = childrenByParent.get(id);
+    if (kids) queue.push(...kids);
+  }
+  return out;
+}
+
+/** Edges whose source AND target are both in the id set. */
+function inducedEdges(edges: readonly Edge[], nodeIds: ReadonlySet<string>): Edge[] {
+  return edges.filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target));
 }
 
 const BADGE_COLOR_SET = new Set(['slate', 'indigo', 'emerald', 'amber', 'rose']);

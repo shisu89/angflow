@@ -2031,4 +2031,56 @@ describe('summarized / scoped reads', () => {
     res = (await bridge.callTool('get_state', {})) as { collapsedHiddenIds: string[] };
     expect(res.collapsedHiddenIds).toEqual(['a']);
   });
+
+  it('get_state({ groupId }) returns the group subtree + induced edges', async () => {
+    const { bridge, newFlow } = setup();
+    const flow = newFlow();
+    bridge.register('main', flow);
+    flow.setNodes([
+      makeNode('g', { type: 'group' }),
+      makeNode('a', { parentId: 'g' }),
+      makeNode('b', { parentId: 'g' }),
+      makeNode('c'),
+    ]);
+    flow.setEdges([
+      { id: 'ab', source: 'a', target: 'b' } as Edge,
+      { id: 'bc', source: 'b', target: 'c' } as Edge,
+    ]);
+    const res = (await bridge.callTool('get_state', { groupId: 'g' })) as {
+      nodes: { id: string }[];
+      edges: { id: string }[];
+    };
+    expect(res.nodes.map((n) => n.id).sort()).toEqual(['a', 'b']);
+    expect(res.edges.map((e) => e.id)).toEqual(['ab']);
+  });
+
+  it('get_state rejects an unknown groupId with -32602', async () => {
+    const { bridge, newFlow } = setup();
+    bridge.register('main', newFlow());
+    await expect(bridge.callTool('get_state', { groupId: 'nope' })).rejects.toMatchObject({ code: -32602 });
+  });
+
+  it('get_state rejects groupId + bounds together with -32602', async () => {
+    const { bridge, newFlow } = setup();
+    bridge.register('main', newFlow());
+    await expect(
+      bridge.callTool('get_state', { groupId: 'g', bounds: { x: 0, y: 0, width: 1, height: 1 } }),
+    ).rejects.toMatchObject({ code: -32602 });
+  });
+
+  it('get_state({ bounds }) returns intersecting nodes + induced edges', async () => {
+    const { bridge, newFlow } = setup();
+    const flow = newFlow();
+    bridge.register('main', flow);
+    flow.setNodes([
+      makeNode('near', { position: { x: 0, y: 0 }, width: 100, height: 100 }),
+      makeNode('far', { position: { x: 10000, y: 10000 }, width: 100, height: 100 }),
+    ]);
+    flow.setEdges([{ id: 'nf', source: 'near', target: 'far' } as Edge]);
+    const res = (await bridge.callTool('get_state', {
+      bounds: { x: -10, y: -10, width: 50, height: 50 },
+    })) as { nodes: { id: string }[]; edges: { id: string }[] };
+    expect(res.nodes.map((n) => n.id)).toEqual(['near']);
+    expect(res.edges).toEqual([]);
+  });
 });
