@@ -50,9 +50,10 @@ export class OpLog {
       return { ops: [...log], cursor: latest, truncated: false };
     }
     const oldestRetained = log.length > 0 ? log[0].cursor : latest + 1;
-    // Truncated when the ring buffer start is past the caller's cursor — some
-    // entries may have been evicted that the caller never saw → re-sync via get_state.
-    const truncated = oldestRetained > sinceCursor;
+    // Truncated when the caller's NEXT-needed entry (sinceCursor + 1) was evicted
+    // — i.e. there's a gap between what they've seen and the oldest we still hold.
+    // (sinceCursor + 1 === oldestRetained means no gap: their next entry is present.)
+    const truncated = oldestRetained > sinceCursor + 1;
     return { ops: log.filter((e) => e.cursor > sinceCursor), cursor: latest, truncated };
   }
 
