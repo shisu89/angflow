@@ -337,25 +337,28 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
       .map((id) => this.getInternalNode(id))
       .filter((n): n is InternalNode<NodeType> => n != null);
     const abs: Record<string, { x: number; y: number }> = {};
-    const memberBoxes = members.map((m) => {
-      const a = this.getAbsolutePosition(m.id)!;
+    const memberBoxes: { position: { x: number; y: number }; measured?: { width?: number; height?: number }; width?: number | null; height?: number | null }[] = [];
+    for (const m of members) {
+      const a = this.getAbsolutePosition(m.id);
+      if (!a) continue;
       abs[m.id] = a;
-      return { position: a, measured: m.measured, width: m.width, height: m.height };
-    });
+      memberBoxes.push({ position: a, measured: m.measured, width: m.width, height: m.height });
+    }
     const box = getGroupBounds(memberBoxes, {
       padding: opts?.padding ?? 20,
       headerHeight: opts?.headerHeight ?? 40,
     });
-    this.addNodes({
-      id: groupId,
-      type: 'group',
-      position: { x: box.position.x, y: box.position.y },
-      width: box.width,
-      height: box.height,
-      data: opts?.label != null ? { label: opts.label } : {},
-      ...(opts?.collapsed != null ? { collapsed: opts.collapsed } : {}),
-    } as unknown as NodeType);
+    // One atomic emission: add the group node and reparent members together.
     this.store.batch(() => {
+      this.addNodes({
+        id: groupId,
+        type: 'group',
+        position: box.position,
+        width: box.width,
+        height: box.height,
+        data: opts?.label != null ? { label: opts.label } : {},
+        ...(opts?.collapsed != null ? { collapsed: opts.collapsed } : {}),
+      } as unknown as NodeType);
       for (const m of members) this.updateNode(m.id, { parentId: groupId } as Partial<NodeType>);
     });
     await this.setNodePositions(
