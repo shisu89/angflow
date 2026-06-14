@@ -1298,7 +1298,6 @@ function requireRect(
   return v as { x: number; y: number; width: number; height: number };
 }
 
-/** Nesting-aware descendant ids of a node (excludes the node itself; cycle-guarded). */
 /** Build a parentId → child-ids map from a node list in one pass. */
 function buildChildMap(nodes: readonly Node[]): Map<string, string[]> {
   const map = new Map<string, string[]>();

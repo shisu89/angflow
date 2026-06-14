@@ -2088,14 +2088,18 @@ describe('summarized / scoped reads', () => {
     bridge.register('main', flow);
     flow.setNodes([
       makeNode('near', { position: { x: 0, y: 0 }, width: 100, height: 100 }),
+      makeNode('near2', { position: { x: 20, y: 20 }, width: 100, height: 100 }),
       makeNode('far', { position: { x: 10000, y: 10000 }, width: 100, height: 100 }),
     ]);
-    flow.setEdges([{ id: 'nf', source: 'near', target: 'far' } as Edge]);
+    flow.setEdges([
+      { id: 'nn', source: 'near', target: 'near2' } as Edge, // both in scope — kept
+      { id: 'nf', source: 'near', target: 'far' } as Edge, // crosses out — dropped
+    ]);
     const res = (await bridge.callTool('get_state', {
       bounds: { x: -10, y: -10, width: 50, height: 50 },
     })) as { nodes: { id: string }[]; edges: { id: string }[] };
-    expect(res.nodes.map((n) => n.id)).toEqual(['near']);
-    expect(res.edges).toEqual([]);
+    expect(res.nodes.map((n) => n.id).sort()).toEqual(['near', 'near2']);
+    expect(res.edges.map((e) => e.id)).toEqual(['nn']);
   });
 
   it('get_summary returns counts, groups, titles, bounds, collapsedHiddenIds', async () => {
