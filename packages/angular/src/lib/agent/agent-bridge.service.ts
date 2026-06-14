@@ -41,10 +41,16 @@ export const AGENT_ON_ERROR = new InjectionToken<
 /** Optional host-provided layout function backing the `layout_nodes` tool. */
 export const AGENT_LAYOUT = new InjectionToken<AgentLayoutFn>('AngflowAgentLayout');
 
+/** Optional host write-guard for mutating tools. */
+export const AGENT_CAN_MUTATE = new InjectionToken<
+  (op: { method: string; params: Record<string, unknown> }, source?: string) => boolean | string | Promise<boolean | string>
+>('AngflowAgentCanMutate');
+
 const ERROR_INVALID_PARAMS = -32602;
 const ERROR_METHOD_NOT_FOUND = -32601;
 const ERROR_FLOW_NOT_FOUND = -32000;
 const ERROR_INTERNAL = -32603;
+const ERROR_MUTATION_DENIED = -32001;
 
 const MUTATING_TOOLS = new Set<string>([
   'add_node',
@@ -115,6 +121,9 @@ export class AngflowAgentBridge {
   private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
   private readonly layoutFn: AgentLayoutFn | null;
+  private readonly canMutate:
+    | ((op: { method: string; params: Record<string, unknown> }, source?: string) => boolean | string | Promise<boolean | string>)
+    | null;
   private started = false;
   private nextInProcessId = 1;
   // Shared across flows; mintId's per-flow collision check guarantees uniqueness.
@@ -133,12 +142,14 @@ export class AngflowAgentBridge {
     @Optional() @Inject(AGENT_HISTORY_OPTIONS) historyOptions: AgentHistoryOptions | false | null,
     @Optional() @Inject(AGENT_ON_ERROR) onError: ((err: unknown, ctx: { kind: 'transport-start' | 'transport-send' | 'dispatch'; transport?: AgentTransport; method?: string }) => void) | null,
     @Optional() @Inject(AGENT_LAYOUT) layoutFn: AgentLayoutFn | null,
+    @Optional() @Inject(AGENT_CAN_MUTATE) canMutate: ((op: { method: string; params: Record<string, unknown> }, source?: string) => boolean | string | Promise<boolean | string>) | null,
   ) {
     this.transports = transports ?? [];
     this.history =
       historyOptions === false ? null : new AgentHistory(historyOptions ?? undefined);
     this.onError = onError ?? null;
     this.layoutFn = layoutFn ?? null;
+    this.canMutate = canMutate ?? null;
     this.installHandlers();
     this.start();
     this.destroyRef.onDestroy(() => this.stop());
@@ -215,11 +226,12 @@ export class AngflowAgentBridge {
    * `flow.history` / `flow.state` events, and throws a structured error
    * (with `code` and `data` attached) on failure.
    */
-  async callTool(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
+  async callTool(method: string, params: Record<string, unknown> = {}, opts?: { source?: string }): Promise<unknown> {
     const response = await this.dispatch({
       id: `in-process:${this.nextInProcessId++}`,
       method,
       params,
+      source: opts?.source,
     });
     if ('error' in response) {
       const err = new Error(response.error.message) as Error & { code?: number; data?: unknown };
@@ -281,6 +293,20 @@ export class AngflowAgentBridge {
       const flowId = this.findFlowId(flow);
       const isApplyChanges = req.method === 'apply_changes';
       const isLayout = req.method === 'layout_nodes';
+      const isMutating = MUTATING_TOOLS.has(req.method) || isApplyChanges || isLayout;
+      const source = req.source;
+      if (this.canMutate && isMutating) {
+        let verdict: boolean | string;
+        try {
+          verdict = await this.canMutate({ method: req.method, params }, source);
+        } catch (err) {
+          this.reportError(err, { kind: 'dispatch', method: req.method });
+          verdict = false; // fail safe
+        }
+        if (verdict !== true) {
+          throw new MutationDeniedError(typeof verdict === 'string' && verdict ? verdict : 'Mutation denied by host.');
+        }
+      }
 
       // Pre-mutation snapshot for history capture. Skipped for non-mutating tools.
       // Shallow-clone each element so subsequent in-place mutations (notably
@@ -346,6 +372,9 @@ export class AngflowAgentBridge {
             data: { failedIndex: err.failedIndex },
           },
         };
+      }
+      if (err instanceof MutationDeniedError) {
+        return { id: req.id, error: { code: ERROR_MUTATION_DENIED, message: err.message } };
       }
       // Anything that lands here is an unexpected throw inside a handler — a
       // bug or an underlying service failure. Surface it via onError so the
@@ -1143,6 +1172,7 @@ class FlowNotFoundError extends Error {}
 class InvalidParamsError extends Error {}
 /** Tool exists in the catalog but the deployment lacks a required capability. Maps to -32601. */
 class MethodUnavailableError extends Error {}
+class MutationDeniedError extends Error {}
 class ApplyChangesError extends Error {
   constructor(public readonly failedIndex: number, message: string) {
     super(message);

@@ -1,5 +1,5 @@
 import { type EnvironmentProviders, makeEnvironmentProviders } from '@angular/core';
-import { AGENT_HISTORY_OPTIONS, AGENT_LAYOUT, AGENT_ON_ERROR, AGENT_TRANSPORTS } from './agent-bridge.service';
+import { AGENT_CAN_MUTATE, AGENT_HISTORY_OPTIONS, AGENT_LAYOUT, AGENT_ON_ERROR, AGENT_TRANSPORTS } from './agent-bridge.service';
 import type { AgentHistoryOptions } from './history';
 import type { AgentTransport } from './types';
 import type { AgentLayoutFn } from '../types/node-template';
@@ -28,6 +28,13 @@ export interface AgentBridgeConfig {
    * error.
    */
   layout?: AgentLayoutFn;
+  /**
+   * Optional host write-guard. Called before any mutating tool executes with
+   * `({ method, params }, source)`. Return `true` to allow; `false` or a
+   * non-empty string (the denial reason) to reject with `-32001`. Async-capable;
+   * a throw is treated as a deny.
+   */
+  canMutate?: (op: { method: string; params: Record<string, unknown> }, source?: string) => boolean | string | Promise<boolean | string>;
 }
 
 /**
@@ -58,5 +65,6 @@ export function provideAgentBridge(config: AgentBridgeConfig): EnvironmentProvid
     },
     ...(config.onError ? [{ provide: AGENT_ON_ERROR, useValue: config.onError }] : []),
     ...(config.layout ? [{ provide: AGENT_LAYOUT, useValue: config.layout }] : []),
+    ...(config.canMutate ? [{ provide: AGENT_CAN_MUTATE, useValue: config.canMutate }] : []),
   ]);
 }

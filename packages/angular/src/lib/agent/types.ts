@@ -11,6 +11,8 @@ export interface AgentRequest {
   id: number | string;
   method: string;
   params?: Record<string, unknown>;
+  /** Host-defined origin of this call (e.g. "agent:claude", "user"). Threaded to canMutate / op-log / flow.history. */
+  source?: string;
 }
 
 /** A successful response to an `AgentRequest`. */

@@ -2285,3 +2285,60 @@ describe('group lifecycle + minted ids', () => {
     expect(status.pastDepth).toBe(0);
   });
 });
+
+describe('provenance: canMutate guard', () => {
+  function setupGuarded(canMutate: any) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), provideAgentBridge({ transports: [], canMutate })],
+    });
+    const bridge = TestBed.inject(AngflowAgentBridge);
+    const newFlow = () => {
+      const child = Injector.create({ providers: [FlowStore, NgFlowService], parent: TestBed.inject(Injector) });
+      return child.get(NgFlowService);
+    };
+    return { bridge, newFlow };
+  }
+  const NODE = { node: { id: 'a', position: { x: 0, y: 0 }, data: {} } };
+
+  it('denies a mutating tool with -32001 when canMutate returns false', async () => {
+    const { bridge, newFlow } = setupGuarded(() => false);
+    const flow = newFlow();
+    bridge.register('main', flow);
+    await expect(bridge.callTool('add_node', NODE)).rejects.toMatchObject({ code: -32001 });
+    expect(flow.getNode('a')).toBeUndefined();
+  });
+
+  it('uses the returned string as the denial reason', async () => {
+    const { bridge, newFlow } = setupGuarded(() => 'read only board');
+    bridge.register('main', newFlow());
+    await expect(bridge.callTool('add_node', NODE)).rejects.toMatchObject({ code: -32001, message: 'read only board' });
+  });
+
+  it('allows when canMutate returns true and passes the source through', async () => {
+    const seen: any[] = [];
+    const { bridge, newFlow } = setupGuarded((op: any, source: any) => { seen.push({ op, source }); return true; });
+    const flow = newFlow();
+    bridge.register('main', flow);
+    await bridge.callTool('add_node', NODE, { source: 'agent:claude' });
+    expect(flow.getNode('a')).toBeTruthy();
+    expect(seen[0].op.method).toBe('add_node');
+    expect(seen[0].source).toBe('agent:claude');
+  });
+
+  it('treats a throwing canMutate as a deny (fail-safe)', async () => {
+    const { bridge, newFlow } = setupGuarded(() => { throw new Error('boom'); });
+    const flow = newFlow();
+    bridge.register('main', flow);
+    await expect(bridge.callTool('add_node', NODE)).rejects.toMatchObject({ code: -32001 });
+    expect(flow.getNode('a')).toBeUndefined();
+  });
+
+  it('does not call canMutate for read tools', async () => {
+    let calls = 0;
+    const { bridge, newFlow } = setupGuarded(() => { calls++; return true; });
+    bridge.register('main', newFlow());
+    await bridge.callTool('get_state', {});
+    expect(calls).toBe(0);
+  });
+});
