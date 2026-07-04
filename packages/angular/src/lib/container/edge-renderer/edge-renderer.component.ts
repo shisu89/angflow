@@ -19,6 +19,7 @@ import {
   getBezierPath,
   getSmoothStepPath,
   getStraightPath,
+  getSimpleBezierPath,
   getFloatingEndpoint,
   inferSide,
   isEdgeVisible,
@@ -110,6 +111,9 @@ export function computeEdgePathData(ei: Record<string, unknown>): {
       break;
     case 'smoothstep':
       result = getSmoothStepPath(params);
+      break;
+    case 'simplebezier':
+      result = getSimpleBezierPath(params);
       break;
     case 'default':
     case 'bezier':

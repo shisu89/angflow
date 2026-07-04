@@ -365,6 +365,42 @@ describe('NgFlowService', () => {
       const spaced = service.selectKeyPressed('a b');
       expect(spaced).not.toBe(combo);
     });
+
+    it('requires all parts of a "+"-combo to be held', () => {
+      const pressed = service.selectKeyPressed('Control+a');
+      expect(pressed()).toBe(false);
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Control' }));
+      expect(pressed()).toBe(false); // only one part down
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }));
+      expect(pressed()).toBe(true); // both down
+
+      document.dispatchEvent(new KeyboardEvent('keyup', { key: 'a' }));
+      expect(pressed()).toBe(false);
+      document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Control' }));
+    });
+
+    it('matches against KeyboardEvent.code as well as key', () => {
+      const pressed = service.selectKeyPressed('KeyS');
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 's', code: 'KeyS' }));
+      expect(pressed()).toBe(true);
+      document.dispatchEvent(new KeyboardEvent('keyup', { key: 's', code: 'KeyS' }));
+      expect(pressed()).toBe(false);
+    });
+  });
+
+  describe('selectNodesInitialized includeHiddenNodes', () => {
+    it('ignores hidden nodes by default but requires them when includeHiddenNodes', () => {
+      // A measured visible node + an unmeasured hidden node.
+      store.setNodes([
+        { id: 'v', position: { x: 0, y: 0 }, data: {}, measured: { width: 10, height: 10 } },
+        { id: 'h', position: { x: 0, y: 0 }, data: {}, hidden: true },
+      ] as never);
+
+      expect(service.selectNodesInitialized()()).toBe(true);
+      expect(service.selectNodesInitialized({ includeHiddenNodes: true })()).toBe(false);
+    });
   });
 });
 

@@ -45,6 +45,17 @@ import {
 
 import type { Node, Edge } from '../types';
 import type { NodeTemplateSpec } from '../types/node-template';
+
+/**
+ * Animation options accepted by the viewport helpers (zoomIn/zoomOut/zoomTo/
+ * setViewport/setCenter). `ease` is a custom easing fn (t: 0→1); `interpolate`
+ * chooses the interpolation curve. Mirrors the system PanZoomTransformOptions.
+ */
+export type ViewportAnimationOptions = {
+  duration?: number;
+  ease?: (t: number) => number;
+  interpolate?: 'smooth' | 'linear';
+};
 import { applyNodeChanges, applyEdgeChanges, createSelectionChange, getSelectionChanges } from '../utils/changes';
 import { sampleTween, prefersReducedMotion, type TweenEntry } from '../utils/position-tween';
 import { getCollapsedHiddenIds, rewriteEdgesForCollapse, type DisplayEdge } from '../graph/collapse';
@@ -861,7 +872,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     }
   }
 
-  async setCenter(x: number, y: number, options?: { zoom?: number; duration?: number; ease?: (t: number) => number; interpolate?: 'smooth' | 'linear' }): Promise<boolean> {
+  async setCenter(x: number, y: number, options?: ViewportAnimationOptions & { zoom?: number }): Promise<boolean> {
     const pz = this.panZoom();
     if (!pz) return false;
 
@@ -879,29 +890,29 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     return true;
   }
 
-  async setViewport(viewport: Viewport, options?: { duration?: number }): Promise<void> {
+  async setViewport(viewport: Viewport, options?: ViewportAnimationOptions): Promise<void> {
     const pz = this.panZoom();
     if (!pz) return;
 
-    await pz.setViewport(viewport, { duration: options?.duration });
+    await pz.setViewport(viewport, options);
   }
 
-  async zoomIn(options?: { duration?: number }): Promise<boolean> {
+  async zoomIn(options?: ViewportAnimationOptions): Promise<boolean> {
     const pz = this.panZoom();
     if (!pz) return false;
-    return pz.scaleBy(1.2, { duration: options?.duration });
+    return pz.scaleBy(1.2, options);
   }
 
-  async zoomOut(options?: { duration?: number }): Promise<boolean> {
+  async zoomOut(options?: ViewportAnimationOptions): Promise<boolean> {
     const pz = this.panZoom();
     if (!pz) return false;
-    return pz.scaleBy(1 / 1.2, { duration: options?.duration });
+    return pz.scaleBy(1 / 1.2, options);
   }
 
-  async zoomTo(zoomLevel: number, options?: { duration?: number }): Promise<boolean> {
+  async zoomTo(zoomLevel: number, options?: ViewportAnimationOptions): Promise<boolean> {
     const pz = this.panZoom();
     if (!pz) return false;
-    return pz.scaleTo(zoomLevel, { duration: options?.duration });
+    return pz.scaleTo(zoomLevel, options);
   }
 
   setMinZoom(minZoom: number): void {

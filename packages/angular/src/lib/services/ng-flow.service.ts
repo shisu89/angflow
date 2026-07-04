@@ -25,6 +25,7 @@ import {
 
 import { elementToRemoveChange } from '../utils/changes';
 import { injectFlowStore } from '../utils/inject-flow-store';
+import type { ViewportAnimationOptions } from './flow-store.service';
 import type { Node, Edge, InternalNode, DeleteElementsOptions } from '../types';
 import type { NodeTemplateSpec } from '../types/node-template';
 import { prefersReducedMotion } from '../utils/position-tween';
@@ -88,18 +89,18 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
   // ── Viewport operations ───────────────────────────────────────────────
 
-  /** Zoom the viewport in by one step. Optionally animate over `duration` ms. */
-  zoomIn(options?: { duration?: number }) {
+  /** Zoom the viewport in by one step. Optionally animate over `duration` ms (with `ease`/`interpolate`). */
+  zoomIn(options?: ViewportAnimationOptions) {
     return this.store.zoomIn(options);
   }
 
-  /** Zoom the viewport out by one step. Optionally animate over `duration` ms. */
-  zoomOut(options?: { duration?: number }) {
+  /** Zoom the viewport out by one step. Optionally animate over `duration` ms (with `ease`/`interpolate`). */
+  zoomOut(options?: ViewportAnimationOptions) {
     return this.store.zoomOut(options);
   }
 
   /** Set the viewport zoom to an absolute level (clamped to `minZoom`/`maxZoom`). */
-  zoomTo(zoomLevel: number, options?: { duration?: number }) {
+  zoomTo(zoomLevel: number, options?: ViewportAnimationOptions) {
     return this.store.zoomTo(zoomLevel, options);
   }
 
@@ -112,8 +113,8 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     return this.store.fitView(options);
   }
 
-  /** Set the viewport to an absolute `{ x, y, zoom }`. */
-  setViewport(viewport: Viewport, options?: { duration?: number }) {
+  /** Set the viewport to an absolute `{ x, y, zoom }`. Optionally animate (`duration`/`ease`/`interpolate`). */
+  setViewport(viewport: Viewport, options?: ViewportAnimationOptions) {
     return this.store.setViewport(viewport, options);
   }
 
@@ -127,8 +128,8 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     return this.store.transform()[2];
   }
 
-  /** Center the viewport on a flow-space coordinate. */
-  setCenter(x: number, y: number, options?: { zoom?: number; duration?: number }) {
+  /** Center the viewport on a flow-space coordinate. Optionally animate (`duration`/`ease`/`interpolate`). */
+  setCenter(x: number, y: number, options?: ViewportAnimationOptions & { zoom?: number }) {
     return this.store.setCenter(x, y, options);
   }
 
@@ -972,11 +973,24 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   }
 
   /**
-   * Returns a signal indicating whether all nodes have been initialized (have measured dimensions).
-   * Equivalent to React's `useNodesInitialized()`.
+   * Returns a signal indicating whether all nodes have been initialized (have
+   * measured dimensions). Equivalent to React's `useNodesInitialized()`.
+   *
+   * By default `hidden` nodes are ignored (they are never measured). Pass
+   * `{ includeHiddenNodes: true }` to require hidden nodes to be measured too.
    */
-  selectNodesInitialized(): Signal<boolean> {
-    return this.store.nodesInitialized;
+  selectNodesInitialized(options?: { includeHiddenNodes?: boolean }): Signal<boolean> {
+    if (!options?.includeHiddenNodes) return this.store.nodesInitialized;
+    return computed(() => {
+      this.store.version();
+      const lookup = this.store.nodeLookup;
+      if (lookup.size === 0) return false;
+      for (const node of lookup.values()) {
+        const m = node.measured;
+        if (!m || m.width === undefined || m.height === undefined) return false;
+      }
+      return true;
+    });
   }
 
   /**
@@ -1043,16 +1057,31 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
       return inert;
     }
 
+    // Each spec is a '+'-separated combo whose parts must all be held together;
+    // the signal is true when ANY spec matches. Parts match against both
+    // KeyboardEvent.key and .code, so 'a', 'KeyA', 'Meta+a', 'Control+Shift+s'
+    // all work. A plain 'Shift' or an array ['a','d'] behaves as before.
+    const keySpecs = keys.map((k) => k.split('+').map((s) => s.trim()).filter(Boolean));
+    const downKeys = new Set<string>();
+    const matches = () => keySpecs.some((parts) => parts.length > 0 && parts.every((p) => downKeys.has(p)));
+
     const pressed = signal(false);
     const onKeyDown = (e: KeyboardEvent) => {
-      if (keys.includes(e.key)) pressed.set(true);
+      downKeys.add(e.key);
+      downKeys.add(e.code);
+      pressed.set(matches());
     };
     const onKeyUp = (e: KeyboardEvent) => {
-      if (keys.includes(e.key)) pressed.set(false);
+      downKeys.delete(e.key);
+      downKeys.delete(e.code);
+      pressed.set(matches());
     };
     // Reset on blur: keyup is not delivered after the window loses focus
     // (Cmd/Alt+Tab, native menus), which would otherwise leave the key stuck.
-    const onBlur = () => pressed.set(false);
+    const onBlur = () => {
+      downKeys.clear();
+      pressed.set(false);
+    };
     const win = this.doc.defaultView;
 
     this.doc.addEventListener('keydown', onKeyDown);

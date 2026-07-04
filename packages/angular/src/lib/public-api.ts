@@ -29,6 +29,7 @@ export { PanelComponent } from './components/panel/panel.component';
 export { ViewportPortalComponent } from './components/viewport-portal/viewport-portal.component';
 export { BackgroundComponent, type BackgroundVariant } from './components/background/background.component';
 export { ControlsComponent } from './components/controls/controls.component';
+export { ControlButtonComponent } from './components/controls/control-button.component';
 export { MiniMapComponent, type GetMiniMapNodeAttribute } from './components/minimap/minimap.component';
 export { NodeToolbarComponent } from './components/node-toolbar/node-toolbar.component';
 export { EdgeToolbarComponent } from './components/edge-toolbar/edge-toolbar.component';
@@ -47,7 +48,7 @@ export { NgFlowNodeTypeDirective } from './directives/node-type.directive';
 export { NgFlowDropZoneDirective } from './directives/drop-zone.directive';
 
 // Services
-export { FlowStore } from './services/flow-store.service';
+export { FlowStore, type ViewportAnimationOptions } from './services/flow-store.service';
 export { NgFlowService } from './services/ng-flow.service';
 
 // Tokens
@@ -116,6 +117,7 @@ export {
 
   // Path utilities
   getBezierPath,
+  getSimpleBezierPath,
   getSmoothStepPath,
   getStraightPath,
 
