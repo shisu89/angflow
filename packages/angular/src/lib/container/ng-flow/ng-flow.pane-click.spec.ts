@@ -197,4 +197,35 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
 
     expect(store.selectionInProgress()).toBe(false);
   });
+
+  function endMovedMarquee(pointerType: string): FlowStore {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [PaneComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    const fixture = TestBed.createComponent(PaneComponent);
+    const paneInst = fixture.componentInstance;
+    const store = TestBed.inject(FlowStore);
+    fixture.detectChanges();
+    // A marquee that moved (moved=true, flag set), then release.
+    (paneInst as any).isSelecting = true;
+    (paneInst as any).moved = true;
+    (paneInst as any).activePointerId = 1;
+    store.selectionInProgress.set(true);
+    (paneInst as any).onPointerUp({ clientX: 150, clientY: 150, pointerId: 1, pointerType } as PointerEvent);
+    return store;
+  }
+
+  it('keeps selectionInProgress set after a MOUSE marquee (synthesised click will consume it)', () => {
+    const store = endMovedMarquee('mouse');
+    expect(store.selectionInProgress()).toBe(true);
+  });
+
+  it('clears selectionInProgress after a TOUCH marquee (no synthesised click to consume it)', () => {
+    // Regression: previously the flag stayed stuck on touch, swallowing the
+    // next genuine pane tap's deselect/(paneClick).
+    const store = endMovedMarquee('touch');
+    expect(store.selectionInProgress()).toBe(false);
+  });
 });

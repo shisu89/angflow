@@ -37,6 +37,7 @@ export class PaneComponent implements OnDestroy {
   private boundOnPointerMove: ((e: PointerEvent) => void) | null = null;
   private boundOnPointerUp: ((e: PointerEvent) => void) | null = null;
   private nativePointerDownHandler: ((e: Event) => void) | null = null;
+  private nativeTouchStartHandler: ((e: Event) => void) | null = null;
 
   onWheel(event: WheelEvent): void {
     this.paneScroll.emit(event);
@@ -52,6 +53,26 @@ export class PaneComponent implements OnDestroy {
     this.nativePointerDownHandler = (e: Event) => this.onPointerDown(e as PointerEvent);
     // Capture phase fires before d3-zoom's bubble-phase listener
     this.el.nativeElement.addEventListener('pointerdown', this.nativePointerDownHandler, true);
+
+    // preventDefault(pointerdown) suppresses the compat mouse events (so d3-zoom's
+    // mousedown.zoom never fires alongside a marquee), but it does NOT suppress
+    // touchstart — so d3-zoom's touchstart.zoom would still pan while a touch
+    // marquee runs. pointerdown fires before touchstart, so by the time this
+    // capture-phase touchstart handler runs, onPointerDown has already set
+    // isSelecting; stopImmediatePropagation then kills d3's same-element
+    // touchstart.zoom synchronously (mirroring the old mousedown approach). The
+    // d3 filter's userSelectionActive is a stale snapshot on the initiating
+    // event, so it can't be relied on here.
+    this.nativeTouchStartHandler = (e: Event) => {
+      if (this.isSelecting) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+      }
+    };
+    this.el.nativeElement.addEventListener('touchstart', this.nativeTouchStartHandler, {
+      capture: true,
+      passive: false,
+    });
   }
 
   private onPointerDown(event: PointerEvent): void {
@@ -193,9 +214,15 @@ export class PaneComponent implements OnDestroy {
 
     this.store.userSelectionActive.set(false);
     this.store.userSelectionRect.set(null);
-    // selectionInProgress was set in onPointerMove on the first real movement,
-    // so a genuine marquee absorbs its synthesised click via onPaneClick while a
-    // zero-movement click leaves the flag false and reaches onPaneClick normally.
+    // selectionInProgress (set in onPointerMove on the first real movement)
+    // exists to make the marquee absorb the synthesised `click` that a mouse
+    // gesture fires afterwards. A moved TOUCH/pen gesture fires NO click, so the
+    // flag would otherwise stay stuck and swallow the next genuine pane tap —
+    // clear it here for those pointer types. For mouse, leave it for onPaneClick
+    // to consume. (A zero-movement gesture never set the flag.)
+    if (this.moved && event.pointerType !== 'mouse') {
+      this.store.selectionInProgress.set(false);
+    }
     // Mark nodes selection active only if nodes were selected.
     if (this.store.selectedNodes().length > 0) {
       this.store.nodesSelectionActive.set(true);
@@ -206,6 +233,9 @@ export class PaneComponent implements OnDestroy {
   ngOnDestroy(): void {
     if (this.nativePointerDownHandler) {
       this.el.nativeElement.removeEventListener('pointerdown', this.nativePointerDownHandler, true);
+    }
+    if (this.nativeTouchStartHandler) {
+      this.el.nativeElement.removeEventListener('touchstart', this.nativeTouchStartHandler, true);
     }
     if (this.boundOnPointerMove) {
       document.removeEventListener('pointermove', this.boundOnPointerMove);
