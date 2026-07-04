@@ -21,7 +21,11 @@ All correctness, security, mobile/touch, and connection findings below have been
 8. **Feature quick wins** — `getSimpleBezierPath` (parity bug), viewport `ease`/`interpolate`, `ControlButtonComponent`, `selectKeyPressed` combos, `includeHiddenNodes`.
 9. **Feature (large)** — public `FlowHistoryService` (undo/redo).
 
-**Deferred to dedicated follow-up changes** (net-new feature projects, not review fixes): `model()` two-way bindings for `nodes`/`edges` (reworks the just-repaired controlled/uncontrolled input contract); export-to-image (`toPng`/`toSvg`) + agent tool (needs a DOM-rasterization dependency decision); helper-lines / alignment-snap plugin; `ng add` schematic + CDK drag-drop recipe; CDK `ComponentHarness` test harnesses. The `EdgeLabelRenderer`-as-`<ng-flow>`-child and built-in-edge-`label`-input items remain as documented usage constraints.
+**Intentionally out of core — already shipped as `angflow-pro` examples** (app-level concerns, matching how React Flow keeps them as examples rather than library primitives): **helper-lines / alignment-snap** (`examples/interaction/helper-lines` — userland `computeHelperLines()` over the public `(nodesChange)` + `applyNodeChanges` APIs, guides drawn via `ViewportPortalComponent`) and **export-to-image** (`examples/interaction/export-image` — the maintained `html-to-image` package plus an `inlineEdgeStyles()` workaround for its SVG-presentation-prop gap). These validate that the existing core is already capable; promoting them into `@angflow/angular` would duplicate the examples and bloat core, so they stay out.
+
+**Blocked / not cleanly implementable:** `model()` two-way bindings for `nodes`/`edges` — Angular's `model('nodes')` auto-generates a `nodesChange` output emitting the full array, which collides with the library's existing delta-based `(nodesChange)` output (`NodeChange[]`); offering `[(nodes)]` would break the delta API, so the `(nodesChange)` + `applyNodeChanges` pattern remains the supported controlled flow.
+
+**Deferred (need new dependencies / build infra, and likely belong outside core too):** `ng add` schematic (`@angular-devkit/schematics`) and CDK `ComponentHarness` test harnesses (`@angular/cdk`). The `EdgeLabelRenderer`-as-`<ng-flow>`-child and built-in-edge-`label`-input items remain as documented usage constraints.
 
 ---
 
