@@ -123,6 +123,10 @@ if (ephemeralToken && logLevel !== 'silent') {
   console.error(
     `[angflow-mcp] no --token provided — generated an ephemeral canvas token: ${token}\n` +
       `[angflow-mcp] browser canvases from allowlisted origins (${allowedOrigins.join(', ')}) connect without it.\n` +
+      `[angflow-mcp] SECURITY: in this mode any local page from an allowlisted origin can connect and\n` +
+      `[angflow-mcp]   EVICT the active canvas (single-canvas policy), then answer the agent's tool calls\n` +
+      `[angflow-mcp]   itself or cause a repeated-disconnect DoS. Pass --token <secret> and configure the\n` +
+      `[angflow-mcp]   canvas to present it when other local apps share this machine.\n` +
       `[angflow-mcp] non-browser clients must present it (subprotocol "angflow.token.<token>" or ?token=<token>).\n` +
       `[angflow-mcp] pass --token <secret> to pin a token, or --no-token to disable token auth.`,
   );

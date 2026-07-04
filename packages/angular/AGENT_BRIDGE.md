@@ -41,6 +41,10 @@ export const appConfig: ApplicationConfig = {
       onError: (err, ctx) => console.warn('[agent-bridge]', ctx.kind, err),
       // Optional provenance config:
       canMutate: (op, source) => true,  // return false/string to deny with -32001
+      // canMutate gates every graph mutation (add/update/delete/set/group/
+      // apply_changes/layout_nodes) AND the node-template registry tools
+      // (register_node_template / unregister_node_template). Read tools are NOT
+      // gated — see "Transport trust model" below.
       onOp: (entry) => {},              // called after each applied mutating op (host persistence)
       opLog: { maxOps: 1000 },          // per-flow op retention; pass `false` to disable
     }),
@@ -65,11 +69,21 @@ After this, the browser devtools console can do `await angflow.callTool('add_nod
 
 **Re-registration.** `register(id, service)` is idempotent for the same service instance — calling it twice with the same `(id, service)` is a no-op (no extra `flow.registered` event, history preserved). Calling it with a different `NgFlowService` under the same id tears down the previous watcher, drops the previous history stack (since those snapshots refer to a different graph), and emits `flow.registered` again.
 
+## Transport trust model
+
+The bridge authorizes **writes**, not **reads**. `canMutate` gates graph mutations and the template-registry tools; all read tools (`get_state`, `get_nodes`, `get_edges`, `get_summary`, `get_node`, `watch`/`flow.state` subscriptions, …) are intentionally ungated. Whoever can reach a transport can read the full graph — including all `node.data` / `edge.data` payloads. Treat a transport as granting read access to the entire flow:
+
+- **`WindowTransport`** installs `window.angflow.callTool` / `window.angflow.subscribe` on the global object, exposing the whole tool catalog to **any script running in the page** — including third-party dependencies and injected/XSS payloads. Do not store secrets in `node.data`/`edge.data` if you enable `WindowTransport` on a page that loads untrusted script, and prefer a namespaced/capability-gated custom transport when reads must be restricted.
+- **`WebSocketTransport`** executes every inbound frame as a tool request and does not authenticate the server it dials. Point it only at a **trusted loopback** endpoint or an authenticated `wss://` server — never a plaintext `ws://` endpoint reachable by a network MITM. The peer on the other end has full read access and, absent `canMutate`, full write access.
+- The `@angflow/mcp` canvas server binds `127.0.0.1` by default and, in ephemeral-token mode (no `--token`), admits token-less connections from allowlisted local origins. In that mode any local page can evict the active canvas (single-canvas policy) — pass `--token` when other local apps share the machine. See the CLI's startup warning.
+
+Prompt-injection note: tool results and any external content are surfaced to the agent as untrusted data; the bridge does not sanitize graph `data` on read.
+
 ## Tool catalog
 
 Every tool takes an optional `flowId` (omit when only one flow is registered; required otherwise). All payloads use the `Node` / `Edge` types from `@angflow/angular`.
 
-**Payload validation.** `add_nodes`, `set_nodes`, and the `add_node` / `add_nodes` ops inside `apply_changes` require each node to have a non-empty string `id` and a `position: { x: number, y: number }`. The standalone `add_node` tool requires only `position` — its `id` is optional and minted (and returned) when omitted (batch minting is not available inside `apply_changes`). The edge variants require non-empty string `id`, `source`, and `target`. Malformed payloads fail with `-32602` *before* reaching `NgFlowService`. Additionally, `style` (when present) must be a plain object whose values are strings or numbers, string values must not contain `url(` or `expression(` (CSS-redressing guard), and `className` (when present) must be a string — violations fail with `-32602`. Inside `apply_changes`, the same violations surface as the batch's `-32603` rollback error with `data.failedIndex`. Note: `update_node` / `update_edge` *patches* are not currently subject to the style/className checks (the checks guard the add/replace paths). Bulk array parameters (`add_nodes`, `add_edges`, `set_nodes`, `set_edges`, and `apply_changes`' `ops`) are capped at 5000 elements per call; larger payloads fail with `-32602` before any mutation. Id-array parameters (`delete_elements` nodeIds/edgeIds, `select_nodes` nodeIds, `select_edges` edgeIds, `get_connected_edges` nodeIds, `layout_nodes` nodeIds) are similarly capped at 5000 elements.
+**Payload validation.** `add_nodes`, `set_nodes`, and the `add_node` / `add_nodes` ops inside `apply_changes` require each node to have a non-empty string `id` and a `position: { x: number, y: number }`. The standalone `add_node` tool requires only `position` — its `id` is optional and minted (and returned) when omitted (batch minting is not available inside `apply_changes`). The edge variants require non-empty string `id`, `source`, and `target`. Malformed payloads fail with `-32602` *before* reaching `NgFlowService`. Additionally, `style` (when present) must be a plain object whose values are strings or numbers, and neither the values **nor the property names** may contain `url(`, `expression(`, or (for keys) `:` / `;` (CSS-redressing / remote-fetch guard); `className` (when present) must be a string — violations fail with `-32602`. This guard runs on **every style-setting path**: `add_*`, `set_*`, the `update_node` / `update_edge` patches, and the corresponding `apply_changes` update ops. Inside `apply_changes`, the same violations surface as the batch's `-32603` rollback error with `data.failedIndex`. Bulk array parameters (`add_nodes`, `add_edges`, `set_nodes`, `set_edges`, and `apply_changes`' `ops`) are capped at 5000 elements per call; larger payloads fail with `-32602` before any mutation. `apply_changes` additionally caps the **aggregate** element count across all its ops (sum of `add_node`/`add_edge`/`add_nodes`/`add_edges`) at 5000, rejecting the whole batch upfront with `-32602` — this prevents a multiplicative payload (many `add_nodes` ops) from bypassing the per-op cap. Id-array parameters (`delete_elements` nodeIds/edgeIds, `select_nodes` nodeIds, `select_edges` edgeIds, `get_connected_edges` nodeIds, `layout_nodes` nodeIds) are similarly capped at 5000 elements.
 
 ### Discovery / read
 
@@ -353,7 +367,7 @@ add_node { id: 'n1', type: 'svc', ... }
 undo
 ```
 
-After `undo`: node `n1` is removed from the graph, but the `svc` template remains registered. The template outlives the undo stack entry that created nodes of that type.
+After `undo`: node `n1` is removed from the graph, but the `svc` template remains registered. The template outlives the undo stack entry that created nodes of that type. `register_node_template` / `unregister_node_template` are `canMutate`-gated and recorded in the op-log (visible to `get_changes_since` / `onOp`), but they are **not** part of the graph-history snapshot — an `undo` cannot restore or remove a template, since history tracks nodes/edges only.
 
 ### Lifecycle
 

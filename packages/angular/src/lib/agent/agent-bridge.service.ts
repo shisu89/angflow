@@ -77,6 +77,11 @@ const MUTATING_TOOLS = new Set<string>([
 ]);
 // apply_changes is treated specially — see dispatch logic.
 
+// Tools that mutate the node-template registry. They change rendering state but
+// not graph nodes/edges, so they are canMutate-gated and op-logged, but NOT put
+// through the graph-history snapshot (an undo can't restore a template).
+const TEMPLATE_TOOLS = new Set<string>(['register_node_template', 'unregister_node_template']);
+
 /** Max flow.state emission rate while any node drag is in progress. */
 const DRAG_STATE_EMIT_INTERVAL_MS = 100;
 
@@ -309,8 +314,9 @@ export class AngflowAgentBridge {
       // viewport, and undo/redo/clear_history are intentionally NOT gated — the
       // guard protects against agent writes, not the host's own recovery ops.
       const isMutating = MUTATING_TOOLS.has(req.method) || isApplyChanges || isLayout;
+      const isTemplateMutation = TEMPLATE_TOOLS.has(req.method);
       const source = req.source;
-      if (this.canMutate && isMutating) {
+      if (this.canMutate && (isMutating || isTemplateMutation)) {
         let verdict: boolean | string;
         try {
           verdict = await this.canMutate({ method: req.method, params }, source);
@@ -359,6 +365,11 @@ export class AngflowAgentBridge {
           this.history.capture(flowId, snapshot);
           this.emitHistory(flowId, source);
         }
+        this.recordOp(flowId, req.method, params, source);
+      }
+      // Template-registry mutations are op-logged (for get_changes_since
+      // visibility) but not history-snapshotted.
+      if (isTemplateMutation && flowId) {
         this.recordOp(flowId, req.method, params, source);
       }
 
@@ -691,6 +702,7 @@ export class AngflowAgentBridge {
     this.handlers.set('update_node', (flow, params) => {
       const id = requireString(params, 'id');
       const patch = requireObject(params, 'patch') as Partial<Node>;
+      validateStylePatch(patch, 'update_node/patch', 'node');
       flow.updateNode(id, patch);
       return flow.getNode(id) ?? null;
     });
@@ -698,6 +710,7 @@ export class AngflowAgentBridge {
     this.handlers.set('update_edge', (flow, params) => {
       const id = requireString(params, 'id');
       const patch = requireObject(params, 'patch') as Partial<Edge>;
+      validateStylePatch(patch, 'update_edge/patch', 'edge');
       flow.updateEdge(id, patch);
       return flow.getEdge(id) ?? null;
     });
@@ -932,6 +945,23 @@ export class AngflowAgentBridge {
 
     this.handlers.set('apply_changes', (flow, params) => {
       const ops = requireArray(params, 'ops') as Array<Record<string, unknown>>;
+
+      // Cap the AGGREGATE element count across all ops. Each add_nodes/add_edges
+      // op is already capped at MAX_BULK_ELEMENTS, but nothing bounded the
+      // product — 5000 add_nodes ops of 5000 nodes each would request ~25M
+      // inserts in one synchronous batch (main-thread freeze / OOM).
+      let requestedElements = 0;
+      for (const o of ops) {
+        const op = o['op'];
+        if (op === 'add_node' || op === 'add_edge') requestedElements += 1;
+        else if (op === 'add_nodes') requestedElements += Array.isArray(o['nodes']) ? (o['nodes'] as unknown[]).length : 0;
+        else if (op === 'add_edges') requestedElements += Array.isArray(o['edges']) ? (o['edges'] as unknown[]).length : 0;
+      }
+      if (requestedElements > MAX_BULK_ELEMENTS) {
+        throw new InvalidParamsError(
+          `apply_changes: the batch requests ${requestedElements} elements, exceeding the maximum of ${MAX_BULK_ELEMENTS} across all ops.`,
+        );
+      }
 
       // apply_changes' delete_elements op takes the synchronous setNodes/
       // setEdges path so the whole batch can roll back, which means
@@ -1302,6 +1332,7 @@ function executeOp(flow: NgFlowService, op: Record<string, unknown>): unknown {
       if (typeof id !== 'string') throw new InvalidParamsError('update_node: "id" must be a string.');
       if (!patch || typeof patch !== 'object') throw new InvalidParamsError('update_node: "patch" must be an object.');
       if (!flow.getNode(id)) throw new InvalidParamsError(`update_node: node "${id}" not found.`);
+      validateStylePatch(patch, 'apply_changes/update_node', 'node');
       flow.updateNode(id, patch as Partial<Node>);
       return flow.getNode(id) ?? null;
     }
@@ -1320,6 +1351,7 @@ function executeOp(flow: NgFlowService, op: Record<string, unknown>): unknown {
       if (typeof id !== 'string') throw new InvalidParamsError('update_edge: "id" must be a string.');
       if (!patch || typeof patch !== 'object') throw new InvalidParamsError('update_edge: "patch" must be an object.');
       if (!flow.getEdge(id)) throw new InvalidParamsError(`update_edge: edge "${id}" not found.`);
+      validateStylePatch(patch, 'apply_changes/update_edge', 'edge');
       flow.updateEdge(id, patch as Partial<Edge>);
       return flow.getEdge(id) ?? null;
     }
@@ -1593,6 +1625,14 @@ function validateStyleAndClassName(
       );
     }
     for (const [prop, raw] of Object.entries(style as Record<string, unknown>)) {
+      // Validate the KEY too: edge styles are rendered via raw `[attr.style]`
+      // string concatenation, so a key like "x: url(...); y" would smuggle a
+      // remote-fetch declaration past a value-only check.
+      if (/[:;]|url\s*\(|expression\s*\(/i.test(prop)) {
+        throw new InvalidParamsError(
+          `${ctx}: ${kind}.style property name "${prop}" is invalid (must be a plain CSS property).`,
+        );
+      }
       if (typeof raw !== 'string' && typeof raw !== 'number') {
         throw new InvalidParamsError(`${ctx}: ${kind}.style["${prop}"] must be a string or number.`);
       }
@@ -1605,6 +1645,20 @@ function validateStyleAndClassName(
   }
   if (o['className'] !== undefined && typeof o['className'] !== 'string') {
     throw new InvalidParamsError(`${ctx}: ${kind}.className must be a string.`);
+  }
+}
+
+/**
+ * Validate the style/className on a mutation patch (update_node / update_edge /
+ * apply_changes update ops). Unlike validateNodeShape/validateEdgeShape this
+ * runs on partial patches, so agent-supplied styles on the update paths get the
+ * same url()/expression()/key guard as the add paths.
+ */
+function validateStylePatch(patch: unknown, ctx: string, kind: 'node' | 'edge'): void {
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return;
+  const p = patch as Record<string, unknown>;
+  if ('style' in p || 'className' in p) {
+    validateStyleAndClassName(p, ctx, kind);
   }
 }
 

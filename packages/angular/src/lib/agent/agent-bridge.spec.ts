@@ -1748,6 +1748,61 @@ describe('AngflowAgentBridge — style/className validation', () => {
       expect('error' in stringStyle && stringStyle.error.code).toBe(-32602);
     });
 
+    it('rejects url() on the update_node path (not just add_*)', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      await transport.call('add_node', { node: { id: 'n1', position: { x: 0, y: 0 }, data: {} } });
+      const res = await transport.call('update_node', {
+        id: 'n1',
+        patch: { style: { 'background-image': 'url(https://evil.example/beacon)' } },
+      });
+      expect('error' in res && res.error.code).toBe(-32602);
+      expect(flow.getNode('n1')?.style).toBeUndefined();
+    });
+
+    it('rejects url() on the update_edge path', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      await transport.call('add_node', { node: { id: 'a', position: { x: 0, y: 0 }, data: {} } });
+      await transport.call('add_node', { node: { id: 'b', position: { x: 0, y: 0 }, data: {} } });
+      await transport.call('add_edge', { edge: { id: 'e1', source: 'a', target: 'b' } });
+      const res = await transport.call('update_edge', {
+        id: 'e1',
+        patch: { style: { background: 'url(https://evil.example/x)' } },
+      });
+      expect('error' in res && res.error.code).toBe(-32602);
+    });
+
+    it('rejects a smuggled url() in a style KEY (not just the value)', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const res = await transport.call('add_node', {
+        node: {
+          id: 'n1',
+          position: { x: 0, y: 0 },
+          data: {},
+          // The value is benign but the key smuggles a second declaration.
+          style: { 'background-image: url(https://evil/x); color': 'red' },
+        },
+      });
+      expect('error' in res && res.error.code).toBe(-32602);
+      expect(flow.getNode('n1')).toBeUndefined();
+    });
+
+    it('rejects url() on the apply_changes update_node op', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      await transport.call('add_node', { node: { id: 'n1', position: { x: 0, y: 0 }, data: {} } });
+      const res = await transport.call('apply_changes', {
+        ops: [{ op: 'update_node', id: 'n1', patch: { style: { background: 'url(https://evil/x)' } } }],
+      });
+      // Inside apply_changes an op validation failure is wrapped as -32603 with
+      // the failing op index (the batch rolls back).
+      expect('error' in res && res.error.code).toBe(-32603);
+      expect('error' in res && res.error.data).toEqual({ failedIndex: 0 });
+      expect(flow.getNode('n1')?.style).toBeUndefined();
+    });
+
     it('rejects non-string className on nodes and edges', async () => {
       const flow = newFlow();
       bridge.register('main', flow);
@@ -1821,14 +1876,30 @@ describe('AngflowAgentBridge — bulk payload caps', () => {
       expect('error' in res && res.error.code).toBe(-32602);
     });
 
-    it('rejects an oversized nested add_nodes op inside apply_changes (rollback, -32603 + failedIndex)', async () => {
+    it('rejects an oversized nested add_nodes op inside apply_changes upfront (-32602, no work done)', async () => {
       const flow = newFlow();
       bridge.register('main', flow);
       const res = await transport.call('apply_changes', {
         ops: [{ op: 'add_nodes', nodes: bigNodes(5001) }],
       });
-      expect('error' in res && res.error.code).toBe(-32603);
-      expect('error' in res && res.error.data).toEqual({ failedIndex: 0 });
+      // The aggregate element cap rejects before the batch runs (InvalidParams),
+      // so nothing is inserted and there is no partial-then-rollback.
+      expect('error' in res && res.error.code).toBe(-32602);
+      expect(flow.getNodes()).toHaveLength(0);
+    });
+
+    it('rejects a multiplicative apply_changes batch that exceeds the aggregate cap', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      // Two ops of 3000 nodes each = 6000 > 5000 aggregate, even though each op
+      // is individually under the per-op cap.
+      const res = await transport.call('apply_changes', {
+        ops: [
+          { op: 'add_nodes', nodes: bigNodes(3000) },
+          { op: 'add_nodes', nodes: bigNodes(3000) },
+        ],
+      });
+      expect('error' in res && res.error.code).toBe(-32602);
       expect(flow.getNodes()).toHaveLength(0);
     });
 
