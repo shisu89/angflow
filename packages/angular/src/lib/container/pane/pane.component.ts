@@ -65,8 +65,8 @@ export class PaneComponent implements OnDestroy {
     // initiating event so it can't be relied on here. Single-finger only — a
     // two-finger gesture is a pinch, left to d3.
     this.nativeTouchStartHandler = (e: Event) => {
-      const te = e as TouchEvent;
-      if (te.touches && te.touches.length > 1) return;
+      const touchEv = e as TouchEvent;
+      if (touchEv.touches && touchEv.touches.length > 1) return;
       if (this.shouldStartSelectionFor(e.target)) {
         e.stopImmediatePropagation();
         e.preventDefault();

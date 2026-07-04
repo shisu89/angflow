@@ -147,7 +147,7 @@ Reconnect anchors start via `(mousedown)` and their active affordance is toggled
 
 ### [MEDIUM] `touch-action: none` applied to only the handle
 `packages/angular/src/lib/styles/ng-flow.css:266`
-Missing from `.xy-flow__pane`, `.xy-flow__node`, `.xy-flow__resize-control`, `.xy-flow__minimap`, `.xy-flow__nodesselection-rect`. Those rely purely on d3 v3's non-passive `preventDefault`, which some mobile browsers can pre-empt for native scroll → stuttering/failed drags and page-scroll during pinch. **Fix:** add `touch-action: none;` to those selectors.
+Missing from `.xy-flow__pane`, `.xy-flow__node`, `.xy-flow__resize-control`, `.xy-flow__minimap`, `.xy-flow__nodesselection-rect`. Those rely purely on d3 v3's non-passive `preventDefault`, which some mobile browsers can preempt for native scroll → stuttering/failed drags and page-scroll during pinch. **Fix:** add `touch-action: none;` to those selectors.
 
 ### Lower severity
 - **No touch equivalent for hover affordances.** `nodeMouseEnter`/`edgeMouseEnter`/`:hover` (`node-renderer.component.ts:117-119`, `ng-flow.css:199,332`) never fire/apply on touch, so consumer UI built on them is dead. **Fix:** emit enter/leave from pointer events too, or document a tap-reveal pattern.

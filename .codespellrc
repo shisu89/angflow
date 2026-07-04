@@ -6,4 +6,6 @@ check-hidden = true
 # mistic - GitHub username @mistic in CHANGELOGs
 # inout - legitimate "inout field" (input/output) term
 # alledges - the camelCase identifier `allEdges` (all edges), not "alleges"
-ignore-words-list = ned,mistic,inout,alledges
+# currenty/doubleclick - camelCase identifiers `currentY`, `doubleClick`
+# unparseable - valid variant spelling used in an error-message string
+ignore-words-list = ned,mistic,inout,alledges,currenty,doubleclick,unparseable

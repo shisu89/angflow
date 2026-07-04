@@ -1168,7 +1168,7 @@ Write `examples/angular/src/app/timeseries/nodes/nodes.css`:
 ```css
 /*
  * Shared styles for timeseries demo nodes.
- * Each node type imports this (or re-declares via styles array).
+ * Each node type imports this (or redeclares via styles array).
  */
 
 .ts-node {
