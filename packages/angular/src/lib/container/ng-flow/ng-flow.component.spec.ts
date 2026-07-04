@@ -157,3 +157,142 @@ describe('NgFlowComponent controlled [viewport]', () => {
     expect(inst.store.version()).toBe(v0);
   });
 });
+
+describe('NgFlowComponent uncontrolled mode', () => {
+  beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NgFlowComponent],
+      providers: [provideZonelessChangeDetection()],
+    });
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('renders [defaultNodes] when [nodes] is unbound (uncontrolled mode)', () => {
+    const fixture = TestBed.createComponent(NgFlowComponent);
+    const inst = fixture.componentInstance;
+    // Bind defaultNodes only; leave [nodes] unbound. Previously the [nodes] input
+    // defaulted to [] and the sync effect wiped the defaults on first CD.
+    setSignalInput(inst, 'defaultNodes', [
+      { id: 'a', position: { x: 0, y: 0 }, data: {} },
+      { id: 'b', position: { x: 100, y: 100 }, data: {} },
+    ]);
+    fixture.detectChanges();
+
+    expect(inst.store.nodes().length).toBe(2);
+    expect(inst.store.nodes().map((n) => n.id)).toEqual(['a', 'b']);
+  });
+
+  it('an explicit empty [nodes] binding still controls (stays empty)', () => {
+    const fixture = TestBed.createComponent(NgFlowComponent);
+    const inst = fixture.componentInstance;
+    setSignalInput(inst, 'defaultNodes', [{ id: 'a', position: { x: 0, y: 0 }, data: {} }]);
+    setSignalInput(inst, 'nodesModel', []); // controlled empty
+    fixture.detectChanges();
+
+    expect(inst.store.nodes().length).toBe(0);
+  });
+});
+
+describe('NgFlowComponent initial fitView landed transform', () => {
+  beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NgFlowComponent],
+      providers: [provideZonelessChangeDetection()],
+    });
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('lands the fitted transform in the store and keeps it in sync with d3', async () => {
+    const sizeSpy = vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(800);
+    const heightSpy = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(600);
+    try {
+      const fixture = TestBed.createComponent(NgFlowComponent);
+      const inst = fixture.componentInstance;
+      setSignalInput(inst, 'fitView', true);
+      // Pre-measured nodes (as from a restored toObject() serialization) so
+      // nodesInitialized is true and the queued fit resolves during setPanZoom().
+      setSignalInput(inst, 'nodesModel', [
+        { id: 'a', position: { x: 0, y: 0 }, measured: { width: 100, height: 50 }, data: {} },
+        { id: 'b', position: { x: 600, y: 400 }, measured: { width: 100, height: 50 }, data: {} },
+      ]);
+      fixture.detectChanges();
+      // resolveFitView writes the transform in a microtask after the async fit.
+      await new Promise((r) => setTimeout(r, 0));
+
+      const t = inst.store.transform();
+      // The fit must have landed — not the identity transform.
+      expect(t).not.toEqual([0, 0, 1]);
+
+      // Store transform must match d3's internal transform (no desync).
+      const pz = inst.store.panZoom()!;
+      const vp = pz.getViewport();
+      expect(t[0]).toBeCloseTo(vp.x, 5);
+      expect(t[1]).toBeCloseTo(vp.y, 5);
+      expect(t[2]).toBeCloseTo(vp.zoom, 5);
+    } finally {
+      sizeSpy.mockRestore();
+      heightSpy.mockRestore();
+    }
+  });
+});
+
+describe('NgFlowComponent selectionChange output', () => {
+  beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NgFlowComponent],
+      providers: [provideZonelessChangeDetection()],
+    });
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('emits (selectionChange) when a node becomes selected', () => {
+    const fixture = TestBed.createComponent(NgFlowComponent);
+    const inst = fixture.componentInstance;
+    setSignalInput(inst, 'nodesModel', [
+      { id: 'a', position: { x: 0, y: 0 }, data: {} },
+      { id: 'b', position: { x: 100, y: 100 }, data: {} },
+    ]);
+    fixture.detectChanges();
+
+    const events: { nodes: unknown[]; edges: unknown[] }[] = [];
+    inst.selectionChange.subscribe((e) => events.push(e));
+
+    inst.store.setNodes([
+      { id: 'a', position: { x: 0, y: 0 }, data: {}, selected: true },
+      { id: 'b', position: { x: 100, y: 100 }, data: {} },
+    ] as never);
+    fixture.detectChanges();
+
+    expect(events.length).toBeGreaterThanOrEqual(1);
+    const last = events[events.length - 1];
+    expect(last.nodes.length).toBe(1);
+    expect((last.nodes[0] as { id: string }).id).toBe('a');
+  });
+});

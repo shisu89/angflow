@@ -893,12 +893,24 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   }
 
   setNodeExtent(extent: CoordinateExtent): void {
+    this.setNodeExtentAndOrigin(this.nodeOrigin(), extent);
+  }
+
+  /**
+   * Update the node extent and/or origin and re-adopt existing nodes so their
+   * positions are re-clamped immediately. Routing the `[nodeExtent]` /
+   * `[nodeOrigin]` inputs through here (rather than a raw signal `.set`) makes
+   * runtime changes take effect on nodes already in the store instead of waiting
+   * for the next unrelated `setNodes`.
+   */
+  setNodeExtentAndOrigin(nodeOrigin: NodeOrigin, extent: CoordinateExtent): void {
+    this.nodeOrigin.set(nodeOrigin);
     this.nodeExtent.set(extent);
 
-    // Re-adopt nodes with the new extent so positions are clamped
+    // Re-adopt nodes with the new extent/origin so positions are clamped
     const currentNodes = this.nodes();
     adoptUserNodes(currentNodes, this.nodeLookup, this.parentLookup, {
-      nodeOrigin: this.nodeOrigin(),
+      nodeOrigin,
       nodeExtent: extent,
       elevateNodesOnSelect: this.elevateNodesOnSelect(),
       checkEquality: false,
@@ -906,7 +918,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     });
 
     updateAbsolutePositions(this.nodeLookup, this.parentLookup, {
-      nodeOrigin: this.nodeOrigin(),
+      nodeOrigin,
       nodeExtent: extent,
       zIndexMode: this.zIndexMode(),
     });
@@ -970,6 +982,19 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       },
       this.fitViewOptions()
     );
+
+    // fitViewport applies the transform to d3's internal state; mirror it into
+    // the store so consumers (viewport CSS transform, minimap, culling) reflect
+    // the fit. Without this, an initial fitView drained before the d3 'zoom'
+    // handlers are attached lands in d3 but never reaches the store, and the
+    // first user pan/zoom starts from a different transform than what's rendered.
+    // Transform-only write (no version bump), matching the onPanZoom handler.
+    // Best-effort: guard getViewport so a partial panZoom never throws out of
+    // the fit (the transform sync is an optimization, not load-bearing).
+    if (typeof pz.getViewport === 'function') {
+      const vp = pz.getViewport();
+      this.transform.set([vp.x, vp.y, vp.zoom]);
+    }
   }
 
   /**

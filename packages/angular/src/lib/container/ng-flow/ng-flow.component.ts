@@ -241,6 +241,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 {
   readonly store = injectFlowStore<NodeType, EdgeType>();
   readonly service = injectNgFlowService<NodeType, EdgeType>();
+  private readonly destroyRef = inject(DestroyRef);
   private readonly containerRef = viewChild<ElementRef<HTMLDivElement>>('container');
   private readonly paneRef = viewChild(PaneComponent);
 
@@ -277,11 +278,18 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
   // ── Data (controlled-mode inputs; pair with the *Change outputs) ──────
 
-  /** Nodes to render. Re-bind from `(nodesChange)` after running deltas through `applyNodeChanges` to stay in sync. */
-  readonly nodesModel = input<NodeType[]>([] as NodeType[], { alias: 'nodes' });
+  /**
+   * Nodes to render. Re-bind from `(nodesChange)` after running deltas through
+   * `applyNodeChanges` to stay in sync.
+   *
+   * Defaults to `undefined` (not `[]`) so an unbound `[nodes]` is distinguishable
+   * from an explicit empty array: the input-sync effect skips `undefined`, which
+   * lets uncontrolled mode (`defaultNodes`) survive first change detection.
+   */
+  readonly nodesModel = input<NodeType[] | undefined>(undefined, { alias: 'nodes' });
 
   /** Edges to render. Re-bind from `(edgesChange)` after running deltas through `applyEdgeChanges` to stay in sync. */
-  readonly edgesModel = input<EdgeType[]>([] as EdgeType[], { alias: 'edges' });
+  readonly edgesModel = input<EdgeType[] | undefined>(undefined, { alias: 'edges' });
 
   /** Controlled viewport ({ x, y, zoom }). Re-bind from (viewportChange) to keep it in sync; equal values are not re-applied. */
   readonly viewportModel = input<Viewport | undefined>(undefined, { alias: 'viewport' });
@@ -716,6 +724,23 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       });
     });
 
+    // Emit (selectionChange) when the set of selected node/edge ids changes.
+    // selectedNodes/selectedEdges recompute on any nodes/edges change, so key on
+    // the id-set to avoid re-emitting when unrelated data changed. The initial
+    // empty selection is not emitted (parity with React's onSelectionChange).
+    let prevSelectionKey: string | null = null;
+    effect(() => {
+      const nodes = this.store.selectedNodes();
+      const edges = this.store.selectedEdges();
+      const key =
+        nodes.map((n) => n.id).sort().join(',') + '|' + edges.map((e) => e.id).sort().join(',');
+      if (key === prevSelectionKey) return;
+      const isInitial = prevSelectionKey === null;
+      prevSelectionKey = key;
+      if (isInitial && nodes.length === 0 && edges.length === 0) return;
+      this.selectionChange.emit({ nodes: nodes as Node[], edges: edges as Edge[] });
+    });
+
     // Sync configuration inputs → store
     effect(() => {
       this.store.nodesDraggable.set(this.nodesDraggable());
@@ -729,8 +754,6 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       this.store.connectionMode.set(this.connectionMode());
       this.store.snapToGrid.set(this.snapToGrid());
       this.store.snapGrid.set(this.snapGrid());
-      this.store.nodeOrigin.set(this.nodeOrigin());
-      this.store.nodeExtent.set(this.nodeExtent());
       this.store.elevateNodesOnSelect.set(this.elevateNodesOnSelect());
       this.store.elevateEdgesOnSelect.set(this.elevateEdgesOnSelect());
       this.store.connectionRadius.set(this.connectionRadius());
@@ -757,6 +780,15 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       if (id !== undefined) {
         this.store.rfId.set(id);
       }
+    });
+
+    // nodeExtent / nodeOrigin get a dedicated effect (not the config sync above)
+    // because they must re-adopt and re-clamp existing nodes on change, which is
+    // too expensive to run on every unrelated config change.
+    effect(() => {
+      const origin = this.nodeOrigin();
+      const extent = this.nodeExtent();
+      untracked(() => this.store.setNodeExtentAndOrigin(origin, extent));
     });
 
     effect(() => {
@@ -860,6 +892,27 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     this.store.onSelectionDragStop = (event: MouseEvent, nodes: NodeType[]) => {
       this.selectionDragStop.emit({ event, nodes });
     };
+
+    // In a shared-store (<ng-flow-provider> reuse) context the store outlives
+    // this component. Null the callbacks this component installed on destroy so
+    // post-destroy store activity doesn't emit into a destroyed component.
+    // Identity-guarded: only clear a slot still pointing at our handler, so a
+    // newer sibling <ng-flow>'s handlers are never clobbered.
+    const installedCallbacks = [
+      'onNodesChange', 'onEdgesChange',
+      'onConnect', 'onConnectStart', 'onConnectEnd', 'onClickConnectStart', 'onClickConnectEnd',
+      'onNodeDragStart', 'onNodeDrag', 'onNodeDragStop',
+      'onSelectionDragStart', 'onSelectionDrag', 'onSelectionDragStop',
+    ] as const;
+    const storeRecord = this.store as unknown as Record<string, unknown>;
+    const installedRefs = new Map<string, unknown>(
+      installedCallbacks.map((k) => [k, storeRecord[k]]),
+    );
+    this.destroyRef.onDestroy(() => {
+      for (const k of installedCallbacks) {
+        if (storeRecord[k] === installedRefs.get(k)) storeRecord[k] = undefined;
+      }
+    });
   }
 
   ngOnInit(): void {
@@ -873,9 +926,15 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     // Bridge store errors to the (error) output. Preserve the default handler
     // (devWarn) so unbound consumers still see console warnings.
     const previousOnError = this.store.onError();
-    this.store.onError.set((id, message) => {
+    const onErrorWrapper = (id: string, message: string) => {
       previousOnError?.(id, message);
       this.error.emit({ id, message });
+    };
+    this.store.onError.set(onErrorWrapper);
+    // Restore the previous handler on destroy so a shared store's onError chain
+    // doesn't grow a layer (targeting a destroyed component) on every remount.
+    this.destroyRef.onDestroy(() => {
+      if (this.store.onError() === onErrorWrapper) this.store.onError.set(previousOnError);
     });
 
     // Queue fit view if requested. The store consumes the flag once nodes are
@@ -1029,13 +1088,18 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     });
 
     this.panZoomInstance = panZoom;
-    this.store.setPanZoom(panZoom);
 
-    // Set initial transform from the resolved initial viewport
+    // Set the initial transform and attach the d3 zoom handlers (via update)
+    // BEFORE draining any queued fitView. setPanZoom() drains the queue
+    // synchronously; if the handlers aren't attached yet, a fit applied during
+    // the drain lands in d3 but never propagates to store.transform, and the
+    // post-drain transform write below would clobber it anyway.
     this.store.transform.set([initialViewport.x, initialViewport.y, initialViewport.zoom]);
-
-    // Apply initial pan/zoom options
     this.updatePanZoomOptions();
+
+    // Drain a queued initial fitView last; resolveFitView() writes the fitted
+    // transform back into the store.
+    this.store.setPanZoom(panZoom);
   }
 
   private updatePanZoomOptions(): void {

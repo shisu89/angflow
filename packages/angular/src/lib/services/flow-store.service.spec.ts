@@ -972,7 +972,8 @@ describe('FlowStore', () => {
 
       // panZoom appears later. setPanZoom drains the queue.
       const setViewport = vi.fn().mockResolvedValue(undefined);
-      store.setPanZoom({ setViewport } as never);
+      const getViewport = vi.fn().mockReturnValue({ x: 0, y: 0, zoom: 1 });
+      store.setPanZoom({ setViewport, getViewport } as never);
 
       expect(setViewport).toHaveBeenCalledTimes(1);
       expect(store.fitViewQueued()).toBe(false);
