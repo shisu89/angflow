@@ -455,8 +455,13 @@ export function updateNodeInternals<NodeType extends InternalNodeBase>(
       const extent = isCoordinateExtent(node.extent) ? node.extent : nodeExtent;
       let { positionAbsolute } = node.internals;
 
-      if (node.parentId && node.extent === 'parent') {
-        positionAbsolute = clampPositionToParent(positionAbsolute, dimensions, nodeLookup.get(node.parentId)!);
+      const parentNode = node.parentId ? nodeLookup.get(node.parentId) : undefined;
+      if (node.extent === 'parent' && parentNode) {
+        // Guard the parent lookup: a measurement update can arrive for a child
+        // whose parent was just removed from nodeLookup (parent deleted the same
+        // tick, or a bad user-provided parentId). Dereferencing it threw a
+        // TypeError that aborted internals updates for the rest of the batch.
+        positionAbsolute = clampPositionToParent(positionAbsolute, dimensions, parentNode);
       } else if (extent) {
         positionAbsolute = clampPosition(positionAbsolute, extent, dimensions);
       }

@@ -2,7 +2,7 @@ import { drag } from 'd3-drag';
 import { select } from 'd3-selection';
 
 import { getControlDirection, getDimensionsAfterResize, getResizeDirection } from './utils';
-import { getPointerPosition } from '../utils';
+import { getPointerPosition, isCoordinateExtent } from '../utils';
 import type {
   CoordinateExtent,
   InternalNodeBase,
@@ -177,10 +177,16 @@ export function XYResizer({ domNode, nodeId, getStoreItems, onChange, onEnd }: X
         };
 
         parentNode = undefined;
+        // A node's own coordinate extent bounds resizing, not just extent:'parent'.
+        // Without this a node with e.g. extent: [[0,0],[200,200]] could be resized
+        // past its extent and then snap back on the next drag. (Upstream 0.0.77.)
+        parentExtent = isCoordinateExtent(node.extent) ? node.extent : undefined;
 
         if (node.parentId && (node.extent === 'parent' || node.expandParent)) {
           parentNode = nodeLookup.get(node.parentId);
-          parentExtent = parentNode && node.extent === 'parent' ? nodeToParentExtent(parentNode) : undefined;
+          if (parentNode && node.extent === 'parent') {
+            parentExtent = nodeToParentExtent(parentNode);
+          }
         }
 
         /*

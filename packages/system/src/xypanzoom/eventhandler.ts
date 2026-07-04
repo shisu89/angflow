@@ -130,13 +130,17 @@ export function createPanOnScrollHandler({
       onPanZoomStart?.(event, nextViewport);
     } else {
       onPanZoom?.(event, nextViewport);
-
-      zoomPanValues.panScrollTimeout = setTimeout(() => {
-        onPanZoomEnd?.(event, nextViewport);
-
-        zoomPanValues.isPanScrolling = false;
-      }, 150);
     }
+
+    // Arm (re-arm) the end timeout on EVERY event, not just the move branch.
+    // Previously a single wheel tick fired onPanZoomStart but scheduled no end,
+    // leaving isPanScrolling stuck true forever — so onPanZoomEnd never fired
+    // and a later scroll emitted no onPanZoomStart either.
+    zoomPanValues.panScrollTimeout = setTimeout(() => {
+      onPanZoomEnd?.(event, nextViewport);
+
+      zoomPanValues.isPanScrolling = false;
+    }, 150);
 
     return;
   };

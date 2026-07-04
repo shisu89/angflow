@@ -365,9 +365,13 @@ export type ConnectionState<NodeType extends InternalNodeBase = InternalNodeBase
   | NoConnection;
 
 export type FinalConnectionState<NodeType extends InternalNodeBase = InternalNodeBase> = Omit<
-  ConnectionState<NodeType>,
-  'inProgress'
->;
+  ConnectionInProgress<NodeType>,
+  'inProgress' | 'toPosition'
+> & {
+  // A dropped connection reports the in-progress shape but its end handle/position
+  // can be null (dropped on empty pane), so toPosition is nullable at runtime.
+  toPosition: Position | null;
+};
 
 export type UpdateConnection<NodeType extends InternalNodeBase = InternalNodeBase> = (
   params: ConnectionState<NodeType>

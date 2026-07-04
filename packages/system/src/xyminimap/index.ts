@@ -115,7 +115,11 @@ export function XYMinimap({ domNode, panZoom, getTransform, getViewScale }: XYMi
   }
 
   function destroy() {
-    selection.on('zoom', null);
+    // d3-zoom attaches namespaced DOM listeners (wheel.zoom, mousedown.zoom …);
+    // there is no bare 'zoom' DOM event, so 'zoom' → null was a no-op. Clear the
+    // whole '.zoom' namespace instead so re-init on the same element doesn't
+    // stack listeners.
+    selection.on('.zoom', null);
   }
 
   return {

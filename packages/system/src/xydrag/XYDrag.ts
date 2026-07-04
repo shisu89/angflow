@@ -353,6 +353,22 @@ export function XYDrag<OnNodeDrag extends (e: any, nodes: any, node: any) => voi
       })
       .on('end', (event: UseDragEvent) => {
         if (!dragStarted || abortDrag) {
+          // Stop the auto-pan loop even on the abort/never-started path —
+          // otherwise, if the abort happened while the pointer was inside the
+          // auto-pan edge zone, the rAF loop keeps panning the canvas forever.
+          autoPanStarted = false;
+          cancelAnimationFrame(autoPanId);
+
+          // An aborted drag (e.g. a second touch went down, or the dragged node
+          // was removed mid-drag) still committed dragging:true to the affected
+          // nodes. Reset their positions/dragging flag here; otherwise they stay
+          // stuck with dragging:true, which downstream tween/hit-test logic keys
+          // off. (Upstream xyflow 0.0.77 fix.)
+          if (abortDrag && dragItems.size > 0) {
+            const { updateNodePositions } = getStoreItems();
+            updateNodePositions(dragItems, false);
+            nodePositionsChanged = false;
+          }
           return;
         }
 

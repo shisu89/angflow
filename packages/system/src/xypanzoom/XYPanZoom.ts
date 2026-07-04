@@ -199,6 +199,11 @@ export function XYPanZoom({
 
   function destroy() {
     d3ZoomInstance.on('zoom', null);
+    // Remove d3-zoom's DOM listeners (namespaced wheel.zoom / mousedown.zoom /
+    // dblclick.zoom / touchstart.zoom …). Clearing only the 'zoom' behavior
+    // handler above leaves those attached, so re-initializing a flow on the same
+    // element would stack listeners.
+    d3Selection.on('.zoom', null);
   }
 
   async function setViewportConstrained(

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fitViewport } from './graph';
+import { fitViewport, isEdgeBase, isNodeBase, isInternalNodeBase } from './graph';
 import { adoptUserNodes } from './store';
 import type { NodeBase, InternalNodeBase, NodeLookup, ParentLookup, PanZoomInstance } from '../types';
 
@@ -68,5 +68,27 @@ describe('fitViewport', () => {
     );
     expect(Number.isNaN(result.zoom)).toBe(true);
     expect(result.clamped).toBe(false);
+  });
+});
+
+describe('type guards are null/primitive safe', () => {
+  it('return false (not throw) for null, undefined, and primitives', () => {
+    for (const guard of [isEdgeBase, isNodeBase, isInternalNodeBase]) {
+      expect(guard(null as never)).toBe(false);
+      expect(guard(undefined as never)).toBe(false);
+      expect(guard('str' as never)).toBe(false);
+      expect(guard(42 as never)).toBe(false);
+    }
+  });
+
+  it('filtering an array containing null does not throw', () => {
+    const arr = [{ id: 'n', position: { x: 0, y: 0 }, data: {} }, null, undefined];
+    expect(() => arr.filter((e) => isNodeBase(e as never))).not.toThrow();
+    expect(arr.filter((e) => isNodeBase(e as never)).length).toBe(1);
+  });
+
+  it('still identify valid nodes and edges', () => {
+    expect(isNodeBase({ id: 'n', position: { x: 0, y: 0 }, data: {} } as never)).toBe(true);
+    expect(isEdgeBase({ id: 'e', source: 'a', target: 'b' } as never)).toBe(true);
   });
 });
