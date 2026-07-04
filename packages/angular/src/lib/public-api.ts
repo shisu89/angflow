@@ -50,6 +50,7 @@ export { NgFlowDropZoneDirective } from './directives/drop-zone.directive';
 // Services
 export { FlowStore, type ViewportAnimationOptions } from './services/flow-store.service';
 export { NgFlowService } from './services/ng-flow.service';
+export { FlowHistoryService } from './services/flow-history.service';
 
 // Tokens
 export { NODE_ID, EDGE_ID } from './services/tokens';
