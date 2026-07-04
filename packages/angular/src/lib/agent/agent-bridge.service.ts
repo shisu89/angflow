@@ -1608,8 +1608,12 @@ function validateTemplateSpec(value: unknown, ctx: string): NodeTemplateSpec {
  * engines (`expression(`). Angular's style sanitization already blocks
  * script execution, so this is a narrow redressing/beaconing guard rather
  * than a full CSS allowlist.
+ *
+ * The backslash clause defeats CSS unicode-escape obfuscation — e.g. `\75 rl(…)`
+ * decodes to `url(…)` in the browser and would otherwise slip past a plain
+ * substring match. Legitimate inline node/edge styles never need a backslash.
  */
-const CSS_VALUE_BLOCKLIST = /url\s*\(|expression\s*\(/i;
+const CSS_VALUE_BLOCKLIST = /url\s*\(|expression\s*\(|\\/i;
 
 /** Shared style/className validation for agent-supplied nodes and edges. */
 function validateStyleAndClassName(
@@ -1628,7 +1632,7 @@ function validateStyleAndClassName(
       // Validate the KEY too: edge styles are rendered via raw `[attr.style]`
       // string concatenation, so a key like "x: url(...); y" would smuggle a
       // remote-fetch declaration past a value-only check.
-      if (/[:;]|url\s*\(|expression\s*\(/i.test(prop)) {
+      if (/[:;\\]|url\s*\(|expression\s*\(/i.test(prop)) {
         throw new InvalidParamsError(
           `${ctx}: ${kind}.style property name "${prop}" is invalid (must be a plain CSS property).`,
         );
@@ -1638,7 +1642,7 @@ function validateStyleAndClassName(
       }
       if (typeof raw === 'string' && CSS_VALUE_BLOCKLIST.test(raw)) {
         throw new InvalidParamsError(
-          `${ctx}: ${kind}.style["${prop}"] must not contain "url(" or "expression(".`,
+          `${ctx}: ${kind}.style["${prop}"] must not contain "url(", "expression(", or a "\\" escape.`,
         );
       }
     }

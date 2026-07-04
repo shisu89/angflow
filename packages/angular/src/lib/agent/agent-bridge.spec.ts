@@ -1773,6 +1773,22 @@ describe('AngflowAgentBridge — style/className validation', () => {
       expect('error' in res && res.error.code).toBe(-32602);
     });
 
+    it('rejects CSS unicode-escape obfuscated url() (e.g. \\75 rl)', async () => {
+      const flow = newFlow();
+      bridge.register('main', flow);
+      const res = await transport.call('add_node', {
+        node: {
+          id: 'n1',
+          position: { x: 0, y: 0 },
+          data: {},
+          // Decodes to `url(https://evil/x)` in the browser.
+          style: { 'background-image': '\\75 rl(https://evil/x)' },
+        },
+      });
+      expect('error' in res && res.error.code).toBe(-32602);
+      expect(flow.getNode('n1')).toBeUndefined();
+    });
+
     it('rejects a smuggled url() in a style KEY (not just the value)', async () => {
       const flow = newFlow();
       bridge.register('main', flow);

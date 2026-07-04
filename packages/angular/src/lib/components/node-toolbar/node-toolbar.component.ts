@@ -29,6 +29,10 @@ import { NODE_ID } from '../../services/tokens';
     '[style.z-index]': '1000',
     '[style.display]': 'shouldShow() ? "block" : "none"',
     '[style.transform]': 'toolbarTransform()',
+    // Anchor the transform at the top-left. The detached-mode transform applies
+    // scale(zoom); with the CSS default origin (50% 50%) that scale would pivot
+    // about the box center and offset the toolbar by (1-zoom)·halfBox at zoom≠1.
+    '[style.transform-origin]': '"0 0"',
   },
   template: `<ng-content />`,
 })
