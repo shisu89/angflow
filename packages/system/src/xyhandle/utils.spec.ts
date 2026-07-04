@@ -229,7 +229,7 @@ describe('getClosestHandle hidden-node guard', () => {
 
 // ─── helper additions used by predicate tests ─────────────────────────────
 // makeHandleNode: builds a node with a fixed (non-floating) handle so we can
-// test getClosestHandle. Re-uses makeNode + adds a fixed target handle.
+// test getClosestHandle. Reuses makeNode + adds a fixed target handle.
 function makeHandleNode(
   id: string,
   opts: { x: number; y: number; width: number; height: number; zIndex?: number }

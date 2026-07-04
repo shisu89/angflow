@@ -5,4 +5,5 @@ check-hidden = true
 # ned - person name "Ned Batchelder" in .coderabbit.yaml
 # mistic - GitHub username @mistic in CHANGELOGs
 # inout - legitimate "inout field" (input/output) term
-ignore-words-list = ned,mistic,inout
+# alledges - the camelCase identifier `allEdges` (all edges), not "alleges"
+ignore-words-list = ned,mistic,inout,alledges
