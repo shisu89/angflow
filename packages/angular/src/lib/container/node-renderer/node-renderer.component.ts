@@ -169,6 +169,20 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
       const ids = new Set(this.store.nodes().map((n) => n.id));
       const prev = this.previousNodeIds;
       this.previousNodeIds = ids;
+      // Prune per-node caches for removed nodes here (not only via the
+      // MutationObserver's cleanupRemovedNodes): a node added and removed before
+      // the observer registers its id would otherwise leak its cache entries for
+      // the component's lifetime. Runs before the early returns below.
+      if (prev) {
+        for (const id of prev) {
+          if (!ids.has(id)) {
+            this.nodeInjectorCache.delete(id);
+            this.nodeContextCache.delete(id);
+            this.nodeInputsCache.delete(id);
+            this.observedNodeIds.delete(id);
+          }
+        }
+      }
       if (prev === null || !this.store.animationEnabled()) {
         if (this.enteringNodeIds().size > 0) this.enteringNodeIds.set(new Set());
         return;

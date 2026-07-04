@@ -60,8 +60,15 @@ export type GetMiniMapNodeAttribute<NodeType extends Node = Node> = (node: NodeT
           [attr.viewBox]="viewBox()"
           (click)="onMinimapClick($event)"
         >
-          <!-- Background -->
-          <rect x="-10000" y="-10000" width="20000" height="20000" [attr.fill]="bgColor() ?? '#f0f0f0'" />
+          <!-- Background: sized to the viewBox (not a fixed ±10000 box, which
+               clipped for graphs whose coordinates exceed ~10000). -->
+          <rect
+            [attr.x]="outerRect().x"
+            [attr.y]="outerRect().y"
+            [attr.width]="outerRect().width"
+            [attr.height]="outerRect().height"
+            [attr.fill]="bgColor() ?? '#f0f0f0'"
+          />
           <!-- Nodes -->
           <!--
             Colors are bound as inline [style.*], NOT [attr.*]: the bundled
@@ -240,7 +247,12 @@ export class MiniMapComponent {
   readonly minimapNodes = computed(() => {
     this.store.version(); // react to node changes
     const hidden = this.store.collapsedHiddenIds();
-    const nodes = Array.from(this.store.nodeLookup.values()).filter((node) => !hidden.has(node.id));
+    // Exclude collapse-hidden AND node.hidden nodes: the node renderer skips
+    // `hidden` nodes, so the minimap must too (otherwise they show as ghost
+    // rects and inflate the computed viewBox).
+    const nodes = Array.from(this.store.nodeLookup.values()).filter(
+      (node) => !hidden.has(node.id) && !node.hidden,
+    );
     return nodes.map((node) => ({
       id: node.id,
       x: node.internals?.positionAbsolute?.x ?? 0,
@@ -318,14 +330,24 @@ export class MiniMapComponent {
   // minimap's internal coordinate system is.
   readonly scaledMaskStrokeWidth = computed(() => this.maskStrokeWidth() * this.viewBoxData().viewScale);
 
+  // Outer rect for the background + mask, derived from the viewBox with a
+  // generous margin so it always covers the visible minimap area regardless of
+  // how large the graph's coordinates are (replaces a fixed ±10000 box).
+  readonly outerRect = computed(() => {
+    const v = this.viewBoxData();
+    const pad = Math.max(v.width, v.height);
+    return { x: v.x - pad, y: v.y - pad, width: v.width + pad * 2, height: v.height + pad * 2 };
+  });
+
   // SVG path for the mask: big outer rect + inner viewport rect.
   // Combined with fill-rule="evenodd", the overlap of the two subpaths
   // becomes a hole — dimming everything outside the viewport while
   // leaving nodes inside the viewport fully visible.
   readonly maskPath = computed(() => {
     const m = this.maskPosition();
+    const o = this.outerRect();
     return (
-      `M-10000,-10000h20000v20000h-20000z ` +
+      `M${o.x},${o.y}h${o.width}v${o.height}h${-o.width}z ` +
       `M${m.x},${m.y}h${m.width}v${m.height}h${-m.width}z`
     );
   });

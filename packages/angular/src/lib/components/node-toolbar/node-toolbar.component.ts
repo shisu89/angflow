@@ -79,37 +79,70 @@ export class NodeToolbarComponent {
     const ids = this.resolvedNodeIds();
     if (ids.length === 0) return '';
 
-    // Use the first node for positioning
-    const node = this.store.nodeLookup.get(ids[0]);
-    if (!node) return '';
+    // Union bounding box of all target nodes (positionAbsolute space) so a
+    // multi-node toolbar anchors to the whole group, not just the first id.
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let found = false;
+    for (const id of ids) {
+      const node = this.store.nodeLookup.get(id);
+      if (!node) continue;
+      found = true;
+      const nx = node.internals?.positionAbsolute?.x ?? node.position.x;
+      const ny = node.internals?.positionAbsolute?.y ?? node.position.y;
+      const nw = node.measured?.width ?? node.width ?? 0;
+      const nh = node.measured?.height ?? node.height ?? 0;
+      minX = Math.min(minX, nx);
+      minY = Math.min(minY, ny);
+      maxX = Math.max(maxX, nx + nw);
+      maxY = Math.max(maxY, ny + nh);
+    }
+    if (!found) return '';
 
-    const w = node.measured?.width ?? node.width ?? 0;
-    const h = node.measured?.height ?? node.height ?? 0;
+    const w = maxX - minX;
+    const h = maxY - minY;
     const pos = this.position();
     const off = this.offset();
     const alignVal = this.align();
 
+    // Placement context: inside the target node's own template the host already
+    // sits at the node's origin within the transformed viewport, so relative
+    // offsets suffice. Otherwise ([nodeId] targeting another node, or a
+    // multi-node group) the host is in the untransformed container — prefix the
+    // node's screen position + scale(zoom) so the flow-unit offsets still land
+    // on the node instead of the placement site.
+    const inNode = ids.length === 1 && this.contextNodeId === ids[0];
+    let prefix = '';
+    if (!inNode) {
+      const [tx, ty, zoom] = this.store.transform();
+      prefix = `translate(${minX * zoom + tx}px, ${minY * zoom + ty}px) scale(${zoom}) `;
+    }
+
+    let relative = '';
     switch (pos) {
       case Position.Top:
       case Position.Bottom: {
         const xOffset = alignVal === 'start' ? 0 : alignVal === 'end' ? w : w / 2;
         const xTranslate = alignVal === 'start' ? '0' : alignVal === 'end' ? '-100%' : '-50%';
-        if (pos === Position.Top) {
-          return `translate(${xOffset}px, ${-off}px) translate(${xTranslate}, -100%)`;
-        }
-        return `translate(${xOffset}px, ${h + off}px) translate(${xTranslate}, 0)`;
+        relative =
+          pos === Position.Top
+            ? `translate(${xOffset}px, ${-off}px) translate(${xTranslate}, -100%)`
+            : `translate(${xOffset}px, ${h + off}px) translate(${xTranslate}, 0)`;
+        break;
       }
       case Position.Left:
       case Position.Right: {
         const yOffset = alignVal === 'start' ? 0 : alignVal === 'end' ? h : h / 2;
         const yTranslate = alignVal === 'start' ? '0' : alignVal === 'end' ? '-100%' : '-50%';
-        if (pos === Position.Left) {
-          return `translate(${-off}px, ${yOffset}px) translate(-100%, ${yTranslate})`;
-        }
-        return `translate(${w + off}px, ${yOffset}px) translate(0, ${yTranslate})`;
+        relative =
+          pos === Position.Left
+            ? `translate(${-off}px, ${yOffset}px) translate(-100%, ${yTranslate})`
+            : `translate(${w + off}px, ${yOffset}px) translate(0, ${yTranslate})`;
+        break;
       }
       default:
         return '';
     }
+
+    return prefix + relative;
   });
 }

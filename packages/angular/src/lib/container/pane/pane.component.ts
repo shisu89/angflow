@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, output, inject, OnDestroy, ElementRef } from '@angular/core';
-import { getNodesInside, SelectionMode } from '@angflow/system';
+import { getNodesInside, SelectionMode, type KeyCode } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 
 @Component({
@@ -22,8 +22,7 @@ export class PaneComponent implements OnDestroy {
 
   readonly panOnDrag = input<boolean | number[]>(true);
   readonly selectionOnDrag = input(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  readonly selectionKeyCode = input<any>(null); // KeyCode union accepts string|string[]|null
+  readonly selectionKeyCode = input<KeyCode | null>(null);
   readonly selectionMode = input<SelectionMode>(SelectionMode.Full);
 
   readonly selectionStart = output<MouseEvent>();

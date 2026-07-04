@@ -747,6 +747,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       this.store.nodesConnectable.set(this.nodesConnectable());
       this.store.nodesFocusable.set(this.nodesFocusable());
       this.store.edgesFocusable.set(this.edgesFocusable());
+      this.store.disableKeyboardA11y.set(this.disableKeyboardA11y());
       this.store.edgesReconnectable.set(this.edgesReconnectable());
       this.store.elementsSelectable.set(this.elementsSelectable());
       this.store.selectNodesOnDrag.set(this.selectNodesOnDrag());

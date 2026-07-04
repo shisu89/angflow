@@ -13,6 +13,7 @@ import {
   Optional,
   Inject,
 } from '@angular/core';
+import { NgStyle } from '@angular/common';
 import {
   XYResizer,
   type ControlPosition,
@@ -51,6 +52,7 @@ const CONTROL_POSITIONS: ControlPosition[] = [
 @Component({
   selector: 'ng-flow-node-resizer',
   standalone: true,
+  imports: [NgStyle],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     'class': 'ng-flow__node-resizer xy-flow__resize-control',
@@ -61,62 +63,70 @@ const CONTROL_POSITIONS: ControlPosition[] = [
     <div
       class="xy-flow__resize-control nodrag handle handle-top-left top left"
       [class]="handleClassName()"
+      [ngStyle]="handleStyle()"
       [style.position]="'absolute'" [style.top]="'0'" [style.left]="'0'"
       [style.cursor]="'nw-resize'" [style.pointer-events]="'all'"
-      [style.width.px]="10" [style.height.px]="10"
+      [style.width.px]="handlePx()" [style.height.px]="handlePx()"
       [style.background-color]="color() ?? null"
     ></div>
     <div
       class="xy-flow__resize-control nodrag handle handle-top-right top right"
       [class]="handleClassName()"
+      [ngStyle]="handleStyle()"
       [style.position]="'absolute'" [style.top]="'0'" [style.right]="'0'"
       [style.cursor]="'ne-resize'" [style.pointer-events]="'all'"
-      [style.width.px]="10" [style.height.px]="10"
+      [style.width.px]="handlePx()" [style.height.px]="handlePx()"
       [style.background-color]="color() ?? null"
     ></div>
     <div
       class="xy-flow__resize-control nodrag handle handle-bottom-left bottom left"
       [class]="handleClassName()"
+      [ngStyle]="handleStyle()"
       [style.position]="'absolute'" [style.bottom]="'0'" [style.left]="'0'"
       [style.cursor]="'sw-resize'" [style.pointer-events]="'all'"
-      [style.width.px]="10" [style.height.px]="10"
+      [style.width.px]="handlePx()" [style.height.px]="handlePx()"
       [style.background-color]="color() ?? null"
     ></div>
     <div
       class="xy-flow__resize-control nodrag handle handle-bottom-right bottom right"
       [class]="handleClassName()"
+      [ngStyle]="handleStyle()"
       [style.position]="'absolute'" [style.bottom]="'0'" [style.right]="'0'"
       [style.cursor]="'se-resize'" [style.pointer-events]="'all'"
-      [style.width.px]="10" [style.height.px]="10"
+      [style.width.px]="handlePx()" [style.height.px]="handlePx()"
       [style.background-color]="color() ?? null"
     ></div>
     <!-- Resize lines -->
     <div
       class="xy-flow__resize-control nodrag line line-top top"
       [class]="lineClassName()"
+      [ngStyle]="lineStyle()"
       [style.position]="'absolute'" [style.top]="'0'" [style.left]="'0'" [style.right]="'0'"
-      [style.height.px]="2" [style.cursor]="'n-resize'" [style.pointer-events]="'all'"
+      [style.height.px]="linePx()" [style.cursor]="'n-resize'" [style.pointer-events]="'all'"
       [style.border-color]="color() ?? null"
     ></div>
     <div
       class="xy-flow__resize-control nodrag line line-right right"
       [class]="lineClassName()"
+      [ngStyle]="lineStyle()"
       [style.position]="'absolute'" [style.top]="'0'" [style.right]="'0'" [style.bottom]="'0'"
-      [style.width.px]="2" [style.cursor]="'e-resize'" [style.pointer-events]="'all'"
+      [style.width.px]="linePx()" [style.cursor]="'e-resize'" [style.pointer-events]="'all'"
       [style.border-color]="color() ?? null"
     ></div>
     <div
       class="xy-flow__resize-control nodrag line line-bottom bottom"
       [class]="lineClassName()"
+      [ngStyle]="lineStyle()"
       [style.position]="'absolute'" [style.bottom]="'0'" [style.left]="'0'" [style.right]="'0'"
-      [style.height.px]="2" [style.cursor]="'s-resize'" [style.pointer-events]="'all'"
+      [style.height.px]="linePx()" [style.cursor]="'s-resize'" [style.pointer-events]="'all'"
       [style.border-color]="color() ?? null"
     ></div>
     <div
       class="xy-flow__resize-control nodrag line line-left left"
       [class]="lineClassName()"
+      [ngStyle]="lineStyle()"
       [style.position]="'absolute'" [style.top]="'0'" [style.left]="'0'" [style.bottom]="'0'"
-      [style.width.px]="2" [style.cursor]="'w-resize'" [style.pointer-events]="'all'"
+      [style.width.px]="linePx()" [style.cursor]="'w-resize'" [style.pointer-events]="'all'"
       [style.border-color]="color() ?? null"
     ></div>
   `,
@@ -177,6 +187,14 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
   private resizerInstances: ReturnType<typeof XYResizer>[] = [];
 
   /**
+   * Control size in flow-space px. With `autoScale` (default) the size is
+   * divided by the current zoom so handles/lines stay a constant *screen* size
+   * — otherwise they'd shrink to a few px when zoomed out and become ungrabbable.
+   */
+  readonly handlePx = computed(() => (this.autoScale() ? 10 / this.store.transform()[2] : 10));
+  readonly linePx = computed(() => (this.autoScale() ? 2 / this.store.transform()[2] : 2));
+
+  /**
    * Host-level visibility: explicit `isVisible` wins; otherwise follow the
    * owning node's `selected` state so handles only show on selection.
    */
@@ -195,8 +213,32 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
     this.nodeId = nodeId ?? '';
   }
 
+  private currentResolvedNodeId: string | undefined;
+
   ngAfterViewInit(): void {
+    this.buildResizers();
+
+    // Apply config now, then re-apply reactively whenever any config input
+    // changes. XYResizer.update() is idempotent, so the effect's first run
+    // re-applying the same config is harmless.
+    this.applyResizerConfig();
+    effect(() => this.applyResizerConfig(), { injector: this.injector });
+
+    // Rebuild the resizer instances if [nodeId] changes at runtime so they
+    // target the new node instead of staying bound to the original.
+    effect(() => {
+      const resolved = this.nodeIdInput() ?? this.nodeId;
+      if (this.resizerInstances.length > 0 && resolved !== this.currentResolvedNodeId) {
+        this.destroyResizers();
+        this.buildResizers();
+        this.applyResizerConfig();
+      }
+    }, { injector: this.injector });
+  }
+
+  private buildResizers(): void {
     const resolvedNodeId = this.nodeIdInput() ?? this.nodeId;
+    this.currentResolvedNodeId = resolvedNodeId;
     // Template order: 4 corners, then 4 lines. Must match CONTROL_POSITIONS.
     const handles: HTMLDivElement[] = Array.from(
       (this.el.nativeElement as HTMLElement).querySelectorAll(':scope > .xy-flow__resize-control')
@@ -247,8 +289,9 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
           if (nodeChanges.length > 0) {
             this.store.triggerNodeChanges(nodeChanges);
           }
-
-          this.resize.emit({ changes: change, childChanges });
+          // NB: do NOT emit (resize) here. XYResizer also invokes onResize every
+          // frame, which is where the output is emitted (or the onResize cb runs).
+          // Emitting here too double-fired the output with a second payload shape.
         },
         onEnd: (change: Required<XYResizerChange>) => {
           this.store.triggerNodeChanges([
@@ -259,18 +302,17 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
               dimensions: { width: change.width, height: change.height },
             } as NodeDimensionChange,
           ]);
-          this.resizeEnd.emit({ changes: change });
+          // (resizeEnd) is emitted from onResizeEnd (see applyResizerConfig).
         },
       });
 
       this.resizerInstances.push(resizer);
     });
+  }
 
-    // Apply config now, then re-apply reactively whenever any config input
-    // changes. XYResizer.update() is idempotent, so the effect's first run
-    // re-applying the same config is harmless.
-    this.applyResizerConfig();
-    effect(() => this.applyResizerConfig(), { injector: this.injector });
+  private destroyResizers(): void {
+    this.resizerInstances.forEach((r) => r.destroy());
+    this.resizerInstances = [];
   }
 
   private applyResizerConfig(): void {
@@ -306,6 +348,6 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.resizerInstances.forEach((r) => r.destroy());
+    this.destroyResizers();
   }
 }

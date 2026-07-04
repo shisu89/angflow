@@ -167,6 +167,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   readonly nodesConnectable = signal(true);
   readonly nodesFocusable = signal(true);
   readonly edgesFocusable = signal(true);
+  readonly disableKeyboardA11y = signal(false);
   readonly edgesReconnectable = signal(true);
   readonly elementsSelectable = signal(true);
   readonly elevateNodesOnSelect = signal(true);

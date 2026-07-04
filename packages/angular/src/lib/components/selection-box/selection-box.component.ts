@@ -89,6 +89,13 @@ export class SelectionBoxComponent {
         this.dragInstance = XYDrag({
           getStoreItems: () => this.store.getStoreItems(),
         });
+        // Focus the box when it first enters the DOM so its keyboard handlers
+        // (Escape / arrow-key movement) are reachable without a mouse click —
+        // it has tabindex=-1, so nothing else would ever focus it. React does
+        // the same on NodesSelection mount.
+        if (!this.store.disableKeyboardA11y()) {
+          box.nativeElement.focus({ preventScroll: true });
+        }
       }
 
       this.dragInstance.update({
@@ -138,6 +145,8 @@ export class SelectionBoxComponent {
   onKeyDown(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
       event.preventDefault();
+      // Stop the document-level KeyHandlerDirective from also acting on this key.
+      event.stopPropagation();
       this.store.nodesSelectionActive.set(false);
       (event.currentTarget as HTMLElement | null)?.blur();
       return;
@@ -147,6 +156,9 @@ export class SelectionBoxComponent {
     if (!direction) return;
 
     event.preventDefault();
+    // Without this, the event bubbles to the document KeyHandlerDirective, which
+    // moves the selected nodes a second time (6px instead of 5, or two grid cells).
+    event.stopPropagation();
     this.moveSelectedNodes(direction, event.shiftKey ? 4 : 1);
   }
 

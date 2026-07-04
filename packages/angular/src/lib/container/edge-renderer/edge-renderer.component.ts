@@ -79,7 +79,17 @@ export function computeEdgeGeometryKey(
  * equivalent to the inline switch the template used to call per binding —
  * extracted so the memo can compute it exactly once per inputs build.
  */
-export function computeEdgePathFromInputs(ei: Record<string, unknown>): string {
+/**
+ * Compute the SVG path AND the on-path label anchor (labelX/labelY) for a
+ * built-in edge type. The path generators return the geometric label point
+ * (e.g. the elbow of a step edge); using it keeps labels on the path instead of
+ * at the straight-line midpoint between the endpoints.
+ */
+export function computeEdgePathData(ei: Record<string, unknown>): {
+  path: string;
+  labelX: number;
+  labelY: number;
+} {
   const type = ei['type'] || 'default';
   const params = {
     sourceX: ei['sourceX'] as number,
@@ -90,18 +100,28 @@ export function computeEdgePathFromInputs(ei: Record<string, unknown>): string {
     targetPosition: (ei['targetPosition'] ?? Position.Top) as Position,
   };
 
+  let result: [string, number, number, number, number];
   switch (type) {
     case 'straight':
-      return getStraightPath(params)[0];
+      result = getStraightPath(params);
+      break;
     case 'step':
-      return getSmoothStepPath({ ...params, borderRadius: 0 })[0];
+      result = getSmoothStepPath({ ...params, borderRadius: 0 });
+      break;
     case 'smoothstep':
-      return getSmoothStepPath(params)[0];
+      result = getSmoothStepPath(params);
+      break;
     case 'default':
     case 'bezier':
     default:
-      return getBezierPath(params)[0];
+      result = getBezierPath(params);
+      break;
   }
+  return { path: result[0], labelX: result[1], labelY: result[2] };
+}
+
+export function computeEdgePathFromInputs(ei: Record<string, unknown>): string {
+  return computeEdgePathData(ei).path;
 }
 
 @Component({
@@ -563,6 +583,11 @@ export class EdgeRendererComponent {
     }
 
     const inputs = this.buildEdgeInputs(edge);
+    const pathData = computeEdgePathData(inputs);
+    // Attach the on-path label anchor so getEdgeCenterX/Y position the label on
+    // the path (e.g. a step edge's elbow) rather than the straight-line midpoint.
+    inputs['labelX'] = pathData.labelX;
+    inputs['labelY'] = pathData.labelY;
     this.edgeMemo.set(edge.id, {
       key,
       edge,
@@ -570,7 +595,7 @@ export class EdgeRendererComponent {
       sourceHandleBounds: sourceNode?.internals?.handleBounds,
       targetHandleBounds: targetNode?.internals?.handleBounds,
       inputs,
-      path: computeEdgePathFromInputs(inputs),
+      path: pathData.path,
     });
     return inputs;
   }
@@ -630,11 +655,13 @@ export class EdgeRendererComponent {
   }
 
   getEdgeCenterX(ei: Record<string, unknown>): number {
-    return ((ei['sourceX'] as number) + (ei['targetX'] as number)) / 2;
+    // Prefer the on-path label anchor from the path generator; fall back to the
+    // straight-line midpoint if it hasn't been computed.
+    return (ei['labelX'] as number | undefined) ?? ((ei['sourceX'] as number) + (ei['targetX'] as number)) / 2;
   }
 
   getEdgeCenterY(ei: Record<string, unknown>): number {
-    return ((ei['sourceY'] as number) + (ei['targetY'] as number)) / 2;
+    return (ei['labelY'] as number | undefined) ?? ((ei['sourceY'] as number) + (ei['targetY'] as number)) / 2;
   }
 
   getEdgeAriaLabel(edge: Edge): string {

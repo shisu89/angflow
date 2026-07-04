@@ -180,6 +180,16 @@ describe('MiniMapComponent excludes collapsed-hidden nodes', () => {
     const ids = fixture.componentInstance.minimapNodes().map((n) => n.id).sort();
     expect(ids).toEqual(['g', 'x']);
   });
+
+  it('omits node.hidden nodes from minimapNodes (parity with the node renderer)', () => {
+    store.setNodes([
+      { id: 'visible', position: { x: 0, y: 0 }, data: {} },
+      { id: 'ghost', position: { x: 10, y: 10 }, data: {}, hidden: true },
+    ] as never);
+    const fixture = createMinimap();
+    const ids = fixture.componentInstance.minimapNodes().map((n) => n.id).sort();
+    expect(ids).toEqual(['visible']);
+  });
 });
 
 describe('MiniMapComponent viewport indicator reacts to transform writes', () => {

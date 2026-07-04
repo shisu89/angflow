@@ -17,7 +17,7 @@ import { FlowStore } from '../../services/flow-store.service';
       {{ config()['handle.ariaLabel'] }}
     </div>
     <div [id]="rfId + '-edge-desc'" class="xy-flow__sr-only">
-      Edge connection
+      {{ config()['edge.a11yDescription.default'] }}
     </div>
   `,
   host: {

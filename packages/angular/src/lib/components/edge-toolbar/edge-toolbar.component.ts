@@ -75,6 +75,10 @@ export class EdgeToolbarComponent {
     // x,y are in flow coordinates; convert to viewport pixel coordinates
     const vx = this.x() * zoom + tx;
     const vy = this.y() * zoom + ty;
-    return getEdgeToolbarTransform(vx, vy, zoom, this.alignX(), this.alignY());
+    // The toolbar lives in the untransformed container (a direct <ng-flow>
+    // child), so it is already in screen space. Pass zoom=1 to keep it a
+    // constant screen size — applying scale(1/zoom) here would invert zoom
+    // (half-size at 2×, double-size at 0.5×).
+    return getEdgeToolbarTransform(vx, vy, 1, this.alignX(), this.alignY());
   });
 }

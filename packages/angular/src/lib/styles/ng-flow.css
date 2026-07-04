@@ -395,6 +395,16 @@ svg.xy-flow__connectionline {
   left: 0;
   top: 0;
   user-select: none;
+  /* Paint above the pane (z-index:1) and node/edge renderer (z-index:4) so
+     projected overlays are visible and hit-testable. The host itself must not
+     capture pointer events (it covers the whole canvas) — projected content
+     opts back in with `pointer-events: all`, matching the edge-label renderer. */
+  z-index: 5;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+.xy-flow__viewport-portal > * {
+  pointer-events: all;
 }
 
 /* ── Edge reconnect anchors ─────────────────────────────────────── */

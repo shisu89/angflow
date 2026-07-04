@@ -29,8 +29,8 @@ import { PanelComponent } from '../panel/panel.component';
           <button
             type="button"
             class="ng-flow__controls-button xy-flow__controls-button"
-            title="zoom in"
-            aria-label="zoom in"
+            [title]="zoomInLabel()"
+            [attr.aria-label]="zoomInLabel()"
             [disabled]="maxZoomReached()"
             (click)="onZoomIn()"
           >
@@ -39,8 +39,8 @@ import { PanelComponent } from '../panel/panel.component';
           <button
             type="button"
             class="ng-flow__controls-button xy-flow__controls-button"
-            title="zoom out"
-            aria-label="zoom out"
+            [title]="zoomOutLabel()"
+            [attr.aria-label]="zoomOutLabel()"
             [disabled]="minZoomReached()"
             (click)="onZoomOut()"
           >
@@ -51,8 +51,8 @@ import { PanelComponent } from '../panel/panel.component';
           <button
             type="button"
             class="ng-flow__controls-button xy-flow__controls-button"
-            title="fit view"
-            aria-label="fit view"
+            [title]="fitViewLabel()"
+            [attr.aria-label]="fitViewLabel()"
             (click)="onFitView()"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true"><path d="M3.692 4.63c0-.53.4-.938.939-.938h5.215V0H4.708C2.13 0 0 2.054 0 4.63v5.216h3.692V4.631zM27.354 0h-5.2v3.692h5.17c.53 0 .984.4.984.939v5.215H32V4.631A4.624 4.624 0 0027.354 0zm.954 24.83c0 .532-.4.94-.939.94h-5.215v3.768h5.215c2.577 0 4.631-2.13 4.631-4.707v-5.139h-3.692v5.139zm-23.677.94a.919.919 0 01-.939-.94v-5.138H0v5.139c0 2.577 2.13 4.707 4.708 4.707h5.138V25.77H4.631z"/></svg>
@@ -62,8 +62,8 @@ import { PanelComponent } from '../panel/panel.component';
           <button
             type="button"
             class="ng-flow__controls-button xy-flow__controls-button"
-            title="toggle interactivity"
-            aria-label="toggle interactivity"
+            [title]="interactiveLabel()"
+            [attr.aria-label]="interactiveLabel()"
             [attr.aria-pressed]="isLocked()"
             (click)="onToggleLock()"
           >
@@ -82,6 +82,13 @@ import { PanelComponent } from '../panel/panel.component';
 export class ControlsComponent {
   private store = inject(FlowStore);
   private ngFlowService = inject(NgFlowService);
+
+  private readonly aria = this.store.ariaLabelConfig;
+  /** Button aria-labels/titles, sourced from the flow's ariaLabelConfig (localizable). */
+  readonly zoomInLabel = computed(() => this.aria()['controls.zoomIn.ariaLabel']);
+  readonly zoomOutLabel = computed(() => this.aria()['controls.zoomOut.ariaLabel']);
+  readonly fitViewLabel = computed(() => this.aria()['controls.fitView.ariaLabel']);
+  readonly interactiveLabel = computed(() => this.aria()['controls.interactive.ariaLabel']);
 
   /** Where the panel is anchored. */
   readonly position = input<PanelPosition>('bottom-left');
