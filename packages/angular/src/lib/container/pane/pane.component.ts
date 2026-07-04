@@ -57,14 +57,17 @@ export class PaneComponent implements OnDestroy {
     // preventDefault(pointerdown) suppresses the compat mouse events (so d3-zoom's
     // mousedown.zoom never fires alongside a marquee), but it does NOT suppress
     // touchstart — so d3-zoom's touchstart.zoom would still pan while a touch
-    // marquee runs. pointerdown fires before touchstart, so by the time this
-    // capture-phase touchstart handler runs, onPointerDown has already set
-    // isSelecting; stopImmediatePropagation then kills d3's same-element
-    // touchstart.zoom synchronously (mirroring the old mousedown approach). The
-    // d3 filter's userSelectionActive is a stale snapshot on the initiating
-    // event, so it can't be relied on here.
+    // marquee runs. This capture-phase touchstart handler kills d3's same-element
+    // touchstart.zoom synchronously (mirroring the old mousedown approach). It
+    // decides independently of pointerdown (via shouldStartSelectionFor) because
+    // the pointerdown/touchstart firing order is not guaranteed across browsers,
+    // and the d3 filter's userSelectionActive is a stale snapshot on the
+    // initiating event so it can't be relied on here. Single-finger only — a
+    // two-finger gesture is a pinch, left to d3.
     this.nativeTouchStartHandler = (e: Event) => {
-      if (this.isSelecting) {
+      const te = e as TouchEvent;
+      if (te.touches && te.touches.length > 1) return;
+      if (this.shouldStartSelectionFor(e.target)) {
         e.stopImmediatePropagation();
         e.preventDefault();
       }
@@ -75,33 +78,41 @@ export class PaneComponent implements OnDestroy {
     });
   }
 
+  /**
+   * Whether a press on `target` should begin a marquee. Shared by onPointerDown
+   * (which starts the marquee) and the touchstart suppressor (which kills
+   * d3-zoom's pan) so the two agree regardless of pointerdown/touchstart order.
+   *
+   * React parity (Pane/index.tsx `onPointerDownCapture`): when selectionOnDrag is
+   * the trigger the target MUST be the pane itself (children like nodes/edges/
+   * the selection box are not hijacked); key-based selection bypasses that.
+   */
+  private shouldStartSelectionFor(target: EventTarget | null): boolean {
+    if (!(this.selectionOnDrag() || this.store.selectionKeyActive())) return false;
+    const eventTargetIsPane = target === this.el.nativeElement;
+    if (this.selectionOnDrag() && !eventTargetIsPane && !this.store.selectionKeyActive()) {
+      return false;
+    }
+    const el = target as HTMLElement | null;
+    if (
+      el &&
+      (el.closest('.xy-flow__node') ||
+        el.closest('.xy-flow__handle') ||
+        el.closest('.xy-flow__edge') ||
+        el.closest('.xy-flow__controls') ||
+        el.closest('.xy-flow__panel'))
+    ) {
+      return false;
+    }
+    return true;
+  }
+
   private onPointerDown(event: PointerEvent): void {
-    const shouldSelect = this.selectionOnDrag() || this.store.selectionKeyActive();
-    if (!shouldSelect) return;
     // Only the primary, left button. `isPrimary === false` filters secondary
     // touch points; `=== false` (not `!isPrimary`) so synthetic events without
     // the property still work.
     if (event.button !== 0 || event.isPrimary === false) return;
-
-    // React parity (Pane/index.tsx `onPointerDownCapture`):
-    //   const eventTargetIsContainer = event.target === container.current;
-    //   const isSelectionActive = (selectionOnDrag && eventTargetIsContainer) || selectionKeyPressed;
-    //   if (!isSelectionActive ...) return;
-    //
-    // When selectionOnDrag is the trigger, the event target MUST be the pane
-    // element itself — clicks on children (nodes-selection box, nodes, edges)
-    // must not be hijacked. Key-based selection bypasses this requirement.
-    const eventTargetIsPane = event.target === this.el.nativeElement;
-    if (this.selectionOnDrag() && !eventTargetIsPane && !this.store.selectionKeyActive()) {
-      return;
-    }
-
-    const target = event.target as HTMLElement;
-    if (target.closest('.xy-flow__node') || target.closest('.xy-flow__handle') ||
-        target.closest('.xy-flow__edge') || target.closest('.xy-flow__controls') ||
-        target.closest('.xy-flow__panel')) {
-      return;
-    }
+    if (!this.shouldStartSelectionFor(event.target)) return;
 
     // Prevent d3-zoom from seeing this event
     event.stopImmediatePropagation();
