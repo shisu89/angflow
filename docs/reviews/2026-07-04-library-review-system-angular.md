@@ -7,6 +7,24 @@
 
 ---
 
+## Remediation status (branch `claude/library-review-system-angular-v2p5ru`)
+
+All correctness, security, mobile/touch, and connection findings below have been fixed, plus the quick-win feature items, across nine themed commits (test suites green: 55 system + 702 angular + 65 mcp; typecheck + lint clean throughout):
+
+1. **Handle & connection** — `dragThreshold`, `isConnectable`/lock gating, mouse-button guard, feedback classes.
+2. **NgFlowComponent boundary** — uncontrolled mode, initial fitView transform, `selectionChange`, provider-store cleanup, runtime nodeExtent/nodeOrigin (+ regression specs).
+3. **System upstream drift** — drag-abort dragging reset, auto-pan rAF leak, panOnScroll end, parent-clamp crash, type guards, FinalConnectionState, resizer extent, d3 teardown.
+4. **Store & non-drag interaction** — extent clamping on the fast path, key-blur reset, delete callbacks, edge culling, object-aliasing.
+5. **Components & a11y** — NodeResizer double-emit + dead inputs, selection-box keys/focus, EdgeToolbar scale, NodeToolbar `[nodeId]`, ViewportPortal z-order, minimap hidden/mask, edge-label midpoint, ariaLabelConfig, cache prune.
+6. **Mobile / touch** — pointer-events marquee rewrite (+ selectionOnDrag), edge-reconnect pointerdown, `touch-action`, `getEventPosition` guard.
+7. **Security** — style-injection guard on all update paths + keys, template tools under `canMutate`/op-log, `apply_changes` aggregate cap, mcp warning, transport trust-model docs (+ AGENT_BRIDGE.md).
+8. **Feature quick wins** — `getSimpleBezierPath` (parity bug), viewport `ease`/`interpolate`, `ControlButtonComponent`, `selectKeyPressed` combos, `includeHiddenNodes`.
+9. **Feature (large)** — public `FlowHistoryService` (undo/redo).
+
+**Deferred to dedicated follow-up changes** (net-new feature projects, not review fixes): `model()` two-way bindings for `nodes`/`edges` (reworks the just-repaired controlled/uncontrolled input contract); export-to-image (`toPng`/`toSvg`) + agent tool (needs a DOM-rasterization dependency decision); helper-lines / alignment-snap plugin; `ng add` schematic + CDK drag-drop recipe; CDK `ComponentHarness` test harnesses. The `EdgeLabelRenderer`-as-`<ng-flow>`-child and built-in-edge-`label`-input items remain as documented usage constraints.
+
+---
+
 ## Executive summary
 
 The library is in genuinely good shape for a young port: the zoneless-first invariant holds everywhere (no `NgZone` anywhere in scope, all outside-Angular callbacks drive views via signal writes), lifecycle/cleanup is careful, there's no XSS surface (all user data flows through text bindings; no `innerHTML`/`bypassSecurityTrust`), and the system core tracks its upstream xyflow baseline faithfully with cleanly-layered, unit-tested local additions. The agent bridge is unusually security-conscious (runtime param validation, spread-based merges that neutralize `__proto__`, server-side API keys in the chat harness).
