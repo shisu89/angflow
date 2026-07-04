@@ -18,6 +18,8 @@ The problems cluster in a few places:
 - **Upstream drift in `system`**: the most impactful defects (aborted-drag `dragging`-state reset, an auto-pan rAF leak, a `panOnScroll` start/end imbalance, a parent-clamp crash) are already fixed at upstream xyflow HEAD — a periodic upstream-diff pass would recover them.
 - **A cluster of silently-dead documented inputs and coordinate-space confusion** in the toolbar/portal/label-renderer/resizer family.
 - **Security gaps that matter against a compromised/injected agent**: the CSS `url()` exfiltration guard misses the `update_*` mutation paths and only checks style values (not keys), and there's no read-side authorization on any transport.
+- **The node-to-node connection interaction "feels off"** — traced to a hardcoded `dragThreshold: 0` in the handle (should be `connectionDragThreshold`, default 1), which flashes/spams connect events on every click and causes surprise near-tap connections. Much worse on touch. One-line fix. See the dedicated *Connection interaction* section.
+- **Mobile/touch: the core canvas works, but marquee/box selection is mouse-only (a port regression), edge reconnection is mouse-only, and `touch-action: none` is missing from most surfaces.** See the dedicated *Mobile / touch interactions* section.
 
 Feature parity with React/Svelte is near-total; the gaps are small and there are strong Angular-native expansion opportunities.
 
@@ -85,6 +87,52 @@ The `end` handler early-returns on `abortDrag` (multitouch second finger, or nod
 **Components:** connection-feedback classes (`connectingfrom`/`connectingto`/`valid`) are never applied, so shipped CSS is dead (`handle.component.ts:41-61`); MiniMap renders `hidden:true` nodes (`minimap.component.ts:240-253`) and hardcodes a ±10 000-unit mask/background (`minimap.component.ts:64,325-331`); NodeResizer `handleStyle`/`lineStyle`/`autoScale` inputs are dead and `nodeId` is read once (`node-resizer.component.ts:152-159`); a11y edge description is hardcoded + unreferenced and Controls/MiniMap ignore `ariaLabelConfig` (`a11y-descriptions.component.ts:19-21`, `controls.component.ts:30-102`); EdgeLabelRenderer only works inside a custom edge, not as a `<ng-flow>` child (`edge-label-renderer.component.ts:7-16`); built-in edge `label` input is dead and labels use the straight-line midpoint instead of the path `labelX/labelY` (`edge-renderer.component.ts:619-625`).
 
 **Security:** `register_node_template`/`unregister_node_template` bypass the `canMutate` guard and op-log (`agent-bridge.service.ts:61-78,1057-1079`); `apply_changes` allows multiplicative bulk growth past the 5000 cap (`agent-bridge.service.ts:933-934`); ephemeral-token mode lets any localhost-origin page hijack the single canvas slot (`packages/mcp/src/canvas-socket.ts:240-292`); browser `WebSocketTransport` executes every inbound frame as a tool call over plaintext `ws://` with no server auth (`transports/websocket.ts:104-115`).
+
+---
+
+## Connection interaction (node-to-node linking)
+
+A dedicated end-to-end trace of both drag-to-connect and click-to-connect (`connectOnClick`), mouse and touch. The connection *logic* is faithfully ported and correct — orientation swap (start from a `target` handle yields `source`=source-side handle), strict/loose `connectionMode`, `isValidConnection`, coordinate math, and click-vs-drag state all match React. But one hardcoded value spoils the feel:
+
+### [HIGH] Handle hardcodes `dragThreshold: 0`, breaking connection UX
+`packages/angular/src/lib/components/handle/handle.component.ts:171`
+Should pass `store.connectionDragThreshold()` (default 1), which is what React does and what this codebase's own edge-reconnect path already does (`edge-renderer.component.ts:703`). In `XYHandle.onPointerDown`, `dragThreshold === 0` starts the connection synchronously on pointerdown before any drag (`XYHandle.ts:123-125`); threshold 1 defers the start to first real movement.
+- **Desktop:** every click on a connector flashes a zero-length connection line, toggles all handles' connecting styling, and fires spurious `onConnectStart`/`onConnectEnd` pairs (~3× each for a two-tap connect) around the real click-connect events — any "connecting…" UI flickers on every handle click. A click that drifts 1–2px near another handle within the 20px `connectionRadius` silently completes a drag connection, firing `onConnect` for a link the user never dragged.
+- **Touch:** worse — finger jitter almost always exceeds "0px," so taps meant to arm click-to-connect kick into the drag path and either abort with a flash or auto-connect to an unintended nearby handle on lift. This is the primary cause of connections "feeling off" on mobile.
+- **Fix:** `dragThreshold: store.connectionDragThreshold(),` — one line; eliminates the flashing, the event noise, and surprise near-tap connections.
+
+### [MEDIUM] No mouse-button guard on handle pointerdown
+`packages/angular/src/lib/components/handle/handle.component.ts:128-132`
+React only starts a connection for `event.button === 0` on mouse pointers; Angular has no button check, so a right/middle-click on a handle starts a connection (and, with the threshold-0 bug, immediately flashes/aborts one). **Fix:** guard `if (event.pointerType === 'mouse' && event.button !== 0) return;` before starting.
+
+### [MEDIUM] `nodesConnectable` / lock button doesn't reach handles
+`packages/angular/src/lib/components/handle/handle.component.ts:74-78`; lock toggle at `controls.component.ts:151`
+The handle's `isConnectable`/`isConnectableStart`/`isConnectableEnd` are plain inputs defaulting `true` and drive the `.connectable*` classes; they never consult `store.nodesConnectable()`. So the Controls lock button has zero effect on user-authored handles, and since completion validity in `isValidHandle` reads those same classes (`XYHandle.ts:316`), the lock blocks neither starting nor completing a connection. (Related to the `isConnectable` handle finding above.) **Fix:** AND the node's connectable context — `node-renderer.component.ts:494` already computes `node.connectable ?? nodesConnectable` — into the handle's class bindings and the pointerdown guard.
+
+---
+
+## Mobile / touch interactions
+
+Tapping is not clicking, and three interaction paths don't survive the difference. The d3-backed paths (node drag, pane pan, pinch-zoom, double-tap zoom, minimap) and — notably — **connection dragging from a handle** are correctly touch-capable (`handle.component.ts:59` uses `(pointerdown)`; `XYHandle` registers `touchmove`/`touchend`). But:
+
+### [HIGH] Marquee / box selection is mouse-only (port regression)
+`packages/angular/src/lib/container/pane/pane.component.ts:48-108,147-159`
+The pane reimplements rubber-band selection with a capture-phase `mousedown` + document `mousemove`/`mouseup`. React uses pointer events — the code comment at line 59 even cites `onPointerDownCapture` as the parity source, but the implementation dropped to `mousedown`. A finger-drag on the pane produces no selection box, and because the group-drag box only appears after a marquee selects nodes, **group select and group drag are entirely unreachable by touch.** **Fix:** rewrite on Pointer Events + `setPointerCapture`.
+
+### [MED-HIGH] Edge reconnection is mouse-only and hover-gated
+`packages/angular/src/lib/container/edge-renderer/edge-renderer.component.ts:218-232,649-665`
+Reconnect anchors start via `(mousedown)` and their active affordance is toggled by `(mouseenter)`/`(mouseleave)` — neither exists on touch, so edges can't be reconnected by finger and the "over the anchor" cue never shows. Mirrors the React reference (inherited xyflow gap, not a port regression), but still a real hole; `XYHandle` already handles touch internally, so only the entry binding blocks it. **Fix:** change anchor bindings to `(pointerdown)`; drop the button gate for non-mouse pointers.
+
+### [MEDIUM] `touch-action: none` applied to only the handle
+`packages/angular/src/lib/styles/ng-flow.css:266`
+Missing from `.xy-flow__pane`, `.xy-flow__node`, `.xy-flow__resize-control`, `.xy-flow__minimap`, `.xy-flow__nodesselection-rect`. Those rely purely on d3 v3's non-passive `preventDefault`, which some mobile browsers can pre-empt for native scroll → stuttering/failed drags and page-scroll during pinch. **Fix:** add `touch-action: none;` to those selectors.
+
+### Lower severity
+- **No touch equivalent for hover affordances.** `nodeMouseEnter`/`edgeMouseEnter`/`:hover` (`node-renderer.component.ts:117-119`, `ng-flow.css:199,332`) never fire/apply on touch, so consumer UI built on them is dead. **Fix:** emit enter/leave from pointer events too, or document a tap-reveal pattern.
+- **`getEventPosition` throws on empty `touches`** (`packages/system/src/utils/dom.ts:52-61`) — latent (callers currently guard), crashes on any future `touchend`-path call. **Fix:** fall back to `changedTouches?.[0]`.
+- **Touch targets below 44px** — resize lines are 2px and corners shrink with zoom (~2.5px at low zoom, nearly untappable — `node-resizer.component.ts:98-119`); handles 8px; control buttons 26px. **Fix:** enlarge hit areas on coarse pointers independent of visual size; clamp resize-control hit area to a px minimum regardless of zoom.
+
+**Verdict:** usable for the core canvas, broken for selection and edge-editing on touch. The single highest-leverage touch fix overlaps with the connection review — restoring `connectionDragThreshold` fixes tap-to-connect; a Pointer Events rewrite of the pane fixes marquee/group selection.
 
 ---
 
