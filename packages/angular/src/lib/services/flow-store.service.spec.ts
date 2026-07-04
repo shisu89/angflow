@@ -223,6 +223,36 @@ describe('FlowStore', () => {
       expect(store.nodeLookup.get('g')!.internals!.positionAbsolute).toEqual({ x: 1200, y: 1200 });
       expect(store.nodeLookup.get('c')!.internals!.positionAbsolute).toEqual({ x: 1210, y: 1210 });
     });
+
+    it('clamps a top-level move to a finite store nodeExtent (arrow-key/tween path)', () => {
+      store.nodeExtent.set([[0, 0], [200, 200]]);
+      store.setNodes([makeNode('n', { position: { x: 0, y: 0 }, width: 50, height: 50 })]);
+      // A non-drag mover pushes the node past the extent; the fast path must clamp
+      // (extent max minus node dimensions => 150,150).
+      store.triggerNodeChanges([
+        { id: 'n', type: 'position', position: { x: 500, y: 500 } },
+      ]);
+      expect(store.nodeLookup.get('n')!.position).toEqual({ x: 150, y: 150 });
+      expect(store.nodeLookup.get('n')!.internals!.positionAbsolute).toEqual({ x: 150, y: 150 });
+    });
+
+    it('respects a per-node coordinate extent on the fast path', () => {
+      store.setNodes([
+        makeNode('n', { position: { x: 0, y: 0 }, width: 20, height: 20, extent: [[0, 0], [100, 100]] }),
+      ]);
+      store.triggerNodeChanges([{ id: 'n', type: 'position', position: { x: 999, y: 999 } }]);
+      expect(store.nodeLookup.get('n')!.position).toEqual({ x: 80, y: 80 });
+    });
+
+    it('does not alias position, positionAbsolute and userNode.position to one object', () => {
+      store.setNodes([makeNode('n', { position: { x: 0, y: 0 } })]);
+      store.triggerNodeChanges([{ id: 'n', type: 'position', position: { x: 10, y: 10 } }]);
+      const internal = store.nodeLookup.get('n')!;
+      expect(internal.position).not.toBe(internal.internals!.positionAbsolute);
+      // Mutating one must not bleed into the other.
+      internal.position.x = 999;
+      expect(internal.internals!.positionAbsolute.x).toBe(10);
+    });
   });
 
   // ── Middleware pipeline ────────────────────────────────────────────────

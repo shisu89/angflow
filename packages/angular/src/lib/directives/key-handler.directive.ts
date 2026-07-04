@@ -23,6 +23,7 @@ import type { Node, Edge } from '../types';
   host: {
     '(document:keydown)': 'onKeyDown($event)',
     '(document:keyup)': 'onKeyUp($event)',
+    '(window:blur)': 'onWindowBlur()',
   },
 })
 export class KeyHandlerDirective implements OnInit, OnDestroy {
@@ -95,6 +96,23 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
     }
 
     if (this.matchesKey(event.key, this.multiSelectionKeyCode())) {
+      this.multiSelectionKeyPressed = false;
+      this.store.multiSelectionActive.set(false);
+    }
+  }
+
+  /**
+   * Reset held-key state when the window loses focus. A keyup is not delivered
+   * after Cmd/Alt+Tab, a native context menu, or an OS shortcut steals focus, so
+   * without this the selection / multi-selection modifiers stay stuck active —
+   * every click keeps extending the selection until the user taps the key again.
+   */
+  onWindowBlur(): void {
+    if (this.selectionKeyPressed) {
+      this.selectionKeyPressed = false;
+      this.store.selectionKeyActive.set(false);
+    }
+    if (this.multiSelectionKeyPressed) {
       this.multiSelectionKeyPressed = false;
       this.store.multiSelectionActive.set(false);
     }

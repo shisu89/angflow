@@ -89,6 +89,23 @@ describe('NgFlowService', () => {
       expect(store.edges()).toHaveLength(2);
     });
 
+    it('fires onNodesDelete/onEdgesDelete/onDelete for programmatic deletion', async () => {
+      const onNodesDelete = vi.fn();
+      const onEdgesDelete = vi.fn();
+      const onDelete = vi.fn();
+      store.onNodesDelete = onNodesDelete;
+      store.onEdgesDelete = onEdgesDelete;
+      store.onDelete = onDelete;
+
+      await service.deleteElements({ nodes: [{ id: 'b' } as Node] });
+
+      expect(onNodesDelete).toHaveBeenCalledTimes(1);
+      expect(onNodesDelete.mock.calls[0][0].map((n: Node) => n.id)).toEqual(['b']);
+      expect(onEdgesDelete).toHaveBeenCalledTimes(1);
+      expect(onEdgesDelete.mock.calls[0][0].map((e: Edge) => e.id).sort()).toEqual(['ab', 'bc']);
+      expect(onDelete).toHaveBeenCalledTimes(1);
+    });
+
     it('onBeforeDelete returning false vetoes the entire deletion', async () => {
       store.onBeforeDelete = async () => false;
 

@@ -63,4 +63,17 @@ describe('KeyHandlerDirective select-all', () => {
     expect(store.selectedNodes().map((n) => n.id)).toEqual(['n1']);
     expect(store.selectedEdges().map((e) => e.id)).toEqual(['e1']);
   });
+
+  it('resets stuck modifier keys on window blur', () => {
+    directive.onKeyDown(new KeyboardEvent('keydown', { key: 'Shift' }));
+    directive.onKeyDown(new KeyboardEvent('keydown', { key: 'Meta' }));
+    expect(store.selectionKeyActive()).toBe(true);
+    expect(store.multiSelectionActive()).toBe(true);
+
+    // Window blur (e.g. Cmd+Tab) never delivers keyup — the reset must clear both.
+    directive.onWindowBlur();
+
+    expect(store.selectionKeyActive()).toBe(false);
+    expect(store.multiSelectionActive()).toBe(false);
+  });
 });

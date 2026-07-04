@@ -893,6 +893,11 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       this.selectionDragStop.emit({ event, nodes });
     };
 
+    // Programmatic deletion (service.deleteElements / agent bridge) → outputs.
+    this.store.onNodesDelete = (nodes: NodeType[]) => this.nodesDelete.emit(nodes);
+    this.store.onEdgesDelete = (edges: EdgeType[]) => this.edgesDelete.emit(edges);
+    this.store.onDelete = (params: { nodes: NodeType[]; edges: EdgeType[] }) => this.deleteEvent.emit(params);
+
     // In a shared-store (<ng-flow-provider> reuse) context the store outlives
     // this component. Null the callbacks this component installed on destroy so
     // post-destroy store activity doesn't emit into a destroyed component.
@@ -900,6 +905,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     // newer sibling <ng-flow>'s handlers are never clobbered.
     const installedCallbacks = [
       'onNodesChange', 'onEdgesChange',
+      'onNodesDelete', 'onEdgesDelete', 'onDelete',
       'onConnect', 'onConnectStart', 'onConnectEnd', 'onClickConnectStart', 'onClickConnectEnd',
       'onNodeDragStart', 'onNodeDrag', 'onNodeDragStop',
       'onSelectionDragStart', 'onSelectionDrag', 'onSelectionDragStop',

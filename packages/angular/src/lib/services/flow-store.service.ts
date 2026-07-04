@@ -9,6 +9,9 @@ import {
   fitViewport,
   getHandlePosition,
   infiniteExtent,
+  clampPosition,
+  getNodeDimensions,
+  isCoordinateExtent,
   ConnectionMode,
   initialConnection,
   devWarn,
@@ -268,6 +271,12 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
   onNodesChange: ((changes: NodeChange<NodeType>[]) => void) | null = null;
   onEdgesChange: ((changes: EdgeChange<EdgeType>[]) => void) | null = null;
+  // Fired by programmatic deletion (NgFlowService.deleteElements, dissolveGroup,
+  // agent bridge) so those paths notify (nodesDelete)/(edgesDelete)/(delete) too,
+  // not just the delete-key path.
+  onNodesDelete: ((nodes: NodeType[]) => void) | null = null;
+  onEdgesDelete: ((edges: EdgeType[]) => void) | null = null;
+  onDelete: ((params: { nodes: NodeType[]; edges: EdgeType[] }) => void) | null = null;
 
   // A version counter bumped on graph changes (node/edge add/remove/move,
   // selection, measurement) to trigger recomputation of visibleNodes /
@@ -623,6 +632,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       // Update user nodes array with new positions (cheap shallow copy)
       const currentNodes = this.nodes();
       const storeOrigin = this.nodeOrigin();
+      const storeExtent = this.nodeExtent();
       let nodesChanged = false;
       let needsAbsoluteRecompute = false;
 
@@ -635,25 +645,41 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
         // Update internal node position in-place (fast)
         if (change.position) {
-          internalNode.position = change.position;
-          if (internalNode.internals) {
-            internalNode.internals.positionAbsolute = change.position;
-          }
-          // The verbatim `positionAbsolute = change.position` assignment above is
-          // only correct for a top-level, origin-[0,0], childless node. It is wrong
-          // and needs a full recompute when the moved node:
+          // The verbatim `position = positionAbsolute = change.position`
+          // assignment is only correct for a top-level, origin-[0,0], childless
+          // node. It needs a full recompute when the moved node:
           //   - is parented (its absolute depends on the parent chain), or
           //   - is itself a parent (children's absolutes shift with it), or
           //   - has a non-zero effective origin (absolute = position − dims·origin).
           const origin = internalNode.origin ?? storeOrigin;
-          if (
-            internalNode.parentId ||
+          const isComplex =
+            !!internalNode.parentId ||
             this.parentLookup.has(change.id) ||
             origin[0] !== 0 ||
-            origin[1] !== 0
-          ) {
+            origin[1] !== 0;
+
+          let pos = change.position;
+          if (isComplex) {
             needsAbsoluteRecompute = true;
+          } else {
+            // Top-level, origin-[0,0], childless node: clamp to the effective
+            // extent inline so non-drag movers (arrow keys, tweens,
+            // setNodePositions) respect [nodeExtent] / node.extent — XYDrag
+            // already clamps on pointer drags, but those paths never did.
+            // clampPosition against the default infinite extent is a no-op, so
+            // the common case is unaffected.
+            const extent = isCoordinateExtent(internalNode.extent) ? internalNode.extent : storeExtent;
+            pos = clampPosition(pos, extent, getNodeDimensions(internalNode));
           }
+
+          // Assign fresh {x,y} copies per target so position, positionAbsolute
+          // and userNode.position are not aliased to one shared object (an
+          // in-place mutation of one would otherwise silently mutate the others).
+          internalNode.position = { x: pos.x, y: pos.y };
+          if (internalNode.internals) {
+            internalNode.internals.positionAbsolute = { x: pos.x, y: pos.y };
+          }
+          change.position = pos;
           mutated = true;
         }
         if (change.dragging !== undefined) {
@@ -668,7 +694,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
           | undefined;
         if (userNode) {
           if (change.position) {
-            userNode.position = change.position;
+            userNode.position = { x: change.position.x, y: change.position.y };
           }
           if (change.dragging !== undefined) {
             userNode.dragging = change.dragging;

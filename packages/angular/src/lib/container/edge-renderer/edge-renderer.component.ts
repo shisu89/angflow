@@ -21,6 +21,7 @@ import {
   getStraightPath,
   getFloatingEndpoint,
   inferSide,
+  isEdgeVisible,
   type EdgeMarker,
   type HandleType,
   type Connection,
@@ -307,7 +308,19 @@ export class EdgeRendererComponent {
     const edges = this.store.displayEdges();
     if (!this.store.onlyRenderVisibleElements()) return edges;
     const visibleNodeIds = new Set(this.store.visibleNodes().map((n) => n.id));
-    return edges.filter((e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target));
+    const transform = this.store.transform();
+    const width = this.store.width();
+    const height = this.store.height();
+    return edges.filter((e) => {
+      if (visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target)) return true;
+      // Both endpoints (or one) are culled: keep the edge if its bounding box
+      // still crosses the viewport — otherwise a long edge spanning the screen
+      // between two offscreen nodes would vanish while it's clearly visible.
+      const sourceNode = this.store.nodeLookup.get(e.source);
+      const targetNode = this.store.nodeLookup.get(e.target);
+      if (!sourceNode || !targetNode) return false;
+      return isEdgeVisible({ sourceNode, targetNode, width, height, transform });
+    });
   });
 
   readonly markers = computed(() => {

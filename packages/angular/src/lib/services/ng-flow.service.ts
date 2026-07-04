@@ -771,6 +771,15 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
       );
     }
 
+    // Notify delete callbacks so programmatic deletion reaches the
+    // (nodesDelete)/(edgesDelete)/(delete) outputs, matching React Flow where
+    // onNodesDelete/onDelete fire for programmatic deletes too.
+    if (nodesToDelete.length > 0) this.store.onNodesDelete?.(nodesToDelete);
+    if (edgesToDelete.length > 0) this.store.onEdgesDelete?.(edgesToDelete);
+    if (nodesToDelete.length > 0 || edgesToDelete.length > 0) {
+      this.store.onDelete?.({ nodes: nodesToDelete, edges: edgesToDelete });
+    }
+
     return { deletedNodes: nodesToDelete, deletedEdges: edgesToDelete };
   }
 
@@ -1041,13 +1050,19 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     const onKeyUp = (e: KeyboardEvent) => {
       if (keys.includes(e.key)) pressed.set(false);
     };
+    // Reset on blur: keyup is not delivered after the window loses focus
+    // (Cmd/Alt+Tab, native menus), which would otherwise leave the key stuck.
+    const onBlur = () => pressed.set(false);
+    const win = this.doc.defaultView;
 
     this.doc.addEventListener('keydown', onKeyDown);
     this.doc.addEventListener('keyup', onKeyUp);
+    win?.addEventListener('blur', onBlur);
 
     this.destroyRef.onDestroy(() => {
       this.doc!.removeEventListener('keydown', onKeyDown);
       this.doc!.removeEventListener('keyup', onKeyUp);
+      win?.removeEventListener('blur', onBlur);
     });
 
     const readonlySignal = pressed.asReadonly();
