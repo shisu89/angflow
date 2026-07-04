@@ -30,13 +30,6 @@ function makePaneClick(x = 0, y = 0): MouseEvent {
   return ev;
 }
 
-function makeMouseUp(x = 0, y = 0): MouseEvent {
-  const el = document.createElement('div');
-  const ev = new MouseEvent('mouseup', { clientX: x, clientY: y, button: 0, bubbles: true, cancelable: true });
-  Object.defineProperty(ev, 'target', { value: el, writable: false });
-  return ev;
-}
-
 describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
   beforeEach(() => {
     vi.stubGlobal('ResizeObserver', FakeResizeObserver);
@@ -149,12 +142,13 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
   });
 
   /**
-   * Unit test: PaneComponent.onMouseUp MUST set selectionInProgress when
-   * completing a marquee, regardless of how many nodes were selected.
-   * Before the fix, it only set the flag when selectedNodes().length > 0,
-   * allowing empty marquees' synthesised clicks to fall through and emit paneClick.
+   * Unit test: PaneComponent sets selectionInProgress on the FIRST pointer move
+   * of a marquee (even one that selects nothing), so the synthesised click is
+   * guarded — but a zero-movement click leaves the flag false so click-to-
+   * deselect / (paneClick) still fire. React parity: selectionInProgress is set
+   * in onPointerMove, not unconditionally on pointerup.
    */
-  it('PaneComponent.onMouseUp sets selectionInProgress even with empty marquee', () => {
+  it('PaneComponent sets selectionInProgress on first move, not on a zero-move click', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [PaneComponent],
@@ -164,24 +158,43 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
     const fixture = TestBed.createComponent(PaneComponent);
     const paneInst = fixture.componentInstance;
     const store = TestBed.inject(FlowStore);
-
     fixture.detectChanges();
 
-    // Set up to simulate an in-progress marquee
-    (paneInst as any).isSelecting = true;
-    store.userSelectionActive.set(true);
+    const container = document.createElement('div');
+    Object.defineProperty(container, 'getBoundingClientRect', {
+      value: () => ({ left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 }),
+    });
+    store.domNode.set(container as HTMLDivElement);
 
-    // Verify we start with an empty selection
-    expect(store.selectedNodes().length).toBe(0);
+    // Simulate an in-progress marquee.
+    (paneInst as any).isSelecting = true;
+    (paneInst as any).activePointerId = 1;
+    (paneInst as any).startX = 100;
+    (paneInst as any).startY = 100;
     expect(store.selectionInProgress()).toBe(false);
 
-    // Call onMouseUp via the public interface (it's private, so use any cast)
-    // Simulate the internal state from an active drag that caught no nodes
-    const mouseUpEvent = makeMouseUp(150, 150);
-    (paneInst as any).onMouseUp(mouseUpEvent);
-
-    // After onMouseUp with zero selected nodes, selectionInProgress MUST be true
+    // A pointer move (even selecting nothing) marks the marquee in progress.
+    (paneInst as any).onPointerMove({ clientX: 150, clientY: 150, pointerId: 1 } as PointerEvent);
     expect(store.selectionInProgress()).toBe(true);
-    expect(store.selectedNodes().length).toBe(0);
+  });
+
+  it('PaneComponent leaves selectionInProgress false for a click with no movement', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [PaneComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+
+    const fixture = TestBed.createComponent(PaneComponent);
+    const paneInst = fixture.componentInstance;
+    const store = TestBed.inject(FlowStore);
+    fixture.detectChanges();
+
+    // Simulate a marquee gesture that ends with no move (a plain click).
+    (paneInst as any).isSelecting = true;
+    (paneInst as any).activePointerId = 1;
+    (paneInst as any).onPointerUp({ clientX: 100, clientY: 100, pointerId: 1 } as PointerEvent);
+
+    expect(store.selectionInProgress()).toBe(false);
   });
 });

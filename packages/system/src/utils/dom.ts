@@ -51,8 +51,11 @@ export const isMouseEvent = (event: MouseEvent | TouchEvent): event is MouseEven
 
 export const getEventPosition = (event: MouseEvent | TouchEvent, bounds?: DOMRect) => {
   const isMouse = isMouseEvent(event);
-  const evtX = isMouse ? event.clientX : event.touches?.[0].clientX;
-  const evtY = isMouse ? event.clientY : event.touches?.[0].clientY;
+  // On touchend/touchcancel `touches` is empty; fall back to `changedTouches`
+  // (which still holds the lifted finger) so this never dereferences undefined.
+  const touch = isMouse ? undefined : (event.touches?.[0] ?? event.changedTouches?.[0]);
+  const evtX = isMouse ? event.clientX : (touch?.clientX ?? 0);
+  const evtY = isMouse ? event.clientY : (touch?.clientY ?? 0);
 
   return {
     x: evtX - (bounds?.left ?? 0),

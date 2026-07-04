@@ -108,6 +108,9 @@
 .xy-flow__pane {
   z-index: 1;
   cursor: default;
+  /* Stop the browser from claiming a touch that starts on the pane as a
+     scroll/pan gesture, so pan/pinch/marquee-drag start reliably on touch. */
+  touch-action: none;
 }
 .xy-flow__pane.selection { cursor: pointer; }
 
@@ -190,6 +193,8 @@ svg.xy-flow__connectionline {
   transform-origin: 0 0;
   box-sizing: border-box;
   cursor: default;
+  /* Allow touch-drag of the node without the browser hijacking it for scroll. */
+  touch-action: none;
 }
 .xy-flow__node.selectable { cursor: pointer; }
 .xy-flow__node.connection-target {
@@ -255,7 +260,11 @@ svg.xy-flow__connectionline {
   position: absolute;
   pointer-events: all;
   cursor: grab;
+  touch-action: none;
 }
+
+/* Resize controls must capture the touch-drag rather than let it scroll. */
+.xy-flow__resize-control { touch-action: none; }
 
 /* ── Handles ────────────────────────────────────────────────────── */
 .xy-flow__handle {
@@ -345,6 +354,8 @@ svg.xy-flow__connectionline {
 /* ── Minimap ────────────────────────────────────────────────────── */
 .xy-flow__minimap {
   background: var(--xy-minimap-background-color, var(--xy-minimap-background-color-default));
+  /* Let touch pan/zoom the minimap instead of scrolling the page. */
+  touch-action: none;
 }
 .xy-flow__minimap-svg { display: block; }
 .xy-flow__minimap-mask {

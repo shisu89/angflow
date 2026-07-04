@@ -236,7 +236,8 @@ export function computeEdgePathFromInputs(ei: Record<string, unknown>): string {
               [attr.r]="reconnectRadius()"
               stroke="transparent"
               fill="transparent"
-              (mousedown)="onReconnectSourceMouseDown($event, edge)"
+              style="touch-action: none;"
+              (pointerdown)="onReconnectSourceMouseDown($event, edge)"
               (mouseenter)="hoveredAnchorEdgeId.set(edge.id)"
               (mouseleave)="onReconnectAnchorLeave(edge.id)"
             />
@@ -247,7 +248,8 @@ export function computeEdgePathFromInputs(ei: Record<string, unknown>): string {
               [attr.r]="reconnectRadius()"
               stroke="transparent"
               fill="transparent"
-              (mousedown)="onReconnectTargetMouseDown($event, edge)"
+              style="touch-action: none;"
+              (pointerdown)="onReconnectTargetMouseDown($event, edge)"
               (mouseenter)="hoveredAnchorEdgeId.set(edge.id)"
               (mouseleave)="onReconnectAnchorLeave(edge.id)"
             />
@@ -686,8 +688,10 @@ export class EdgeRendererComponent {
     return y;
   }
 
-  onReconnectSourceMouseDown(event: MouseEvent, edge: Edge): void {
-    if (event.button !== 0) return;
+  onReconnectSourceMouseDown(event: MouseEvent | PointerEvent, edge: Edge): void {
+    // Left mouse button only; touch/pen pointers (no 'mouse' type) are allowed
+    // through so edges can be reconnected by touch.
+    if ('pointerType' in event && event.pointerType === 'mouse' && event.button !== 0) return;
     this.handleEdgeReconnect(event, edge, {
       nodeId: edge.target,
       id: edge.targetHandle ?? null,
@@ -695,8 +699,8 @@ export class EdgeRendererComponent {
     });
   }
 
-  onReconnectTargetMouseDown(event: MouseEvent, edge: Edge): void {
-    if (event.button !== 0) return;
+  onReconnectTargetMouseDown(event: MouseEvent | PointerEvent, edge: Edge): void {
+    if ('pointerType' in event && event.pointerType === 'mouse' && event.button !== 0) return;
     this.handleEdgeReconnect(event, edge, {
       nodeId: edge.source,
       id: edge.sourceHandle ?? null,

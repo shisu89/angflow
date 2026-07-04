@@ -40,11 +40,11 @@ function stubDomNode(store: FlowStore): void {
 }
 
 /**
- * Dispatch a real left-button mousedown on the given element.
+ * Dispatch a real left-button pointerdown on the given element.
  * The capture-phase pane listener receives this event with event.target === el.
  */
 function fireMouseDown(el: HTMLElement): void {
-  el.dispatchEvent(new MouseEvent('mousedown', { button: 0, bubbles: true, cancelable: true }));
+  el.dispatchEvent(new MouseEvent('pointerdown', { button: 0, bubbles: true, cancelable: true }));
 }
 
 describe('PaneComponent — selectionOnDrag target guard', () => {
