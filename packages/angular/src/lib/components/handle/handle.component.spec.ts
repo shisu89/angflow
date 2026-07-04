@@ -318,3 +318,94 @@ describe('HandleComponent — connection trigger uses pointerdown', () => {
     }
   });
 });
+
+// ── Connection-start gating & drag threshold ──────────────────────────────────
+//
+// Regressions for the "connecting feels off" report:
+//  - dragThreshold was hardcoded 0 (should be the configured connectionDragThreshold,
+//    default 1) — 0 started a connection synchronously on every click.
+//  - isConnectable / nodesConnectable (Controls lock) did not gate starting a
+//    connection, so disabled handles could still initiate one.
+//  - non-left mouse buttons started a connection.
+
+describe('HandleComponent — connection-start gating', () => {
+  let store: FlowStore;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [HandleComponent],
+      providers: [
+        provideZonelessChangeDetection(),
+        FlowStore,
+        { provide: NODE_ID, useValue: 'node-A' },
+      ],
+    });
+    store = TestBed.inject(FlowStore);
+  });
+
+  function mountSource() {
+    const fixture = TestBed.createComponent(HandleComponent);
+    setSignalInput(fixture.componentInstance, 'type', 'source' as HandleType);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('passes the configured connectionDragThreshold (default 1), not 0', () => {
+    const fixture = mountSource();
+    const spy = vi.spyOn(system.XYHandle, 'onPointerDown').mockImplementation(() => {});
+    try {
+      fixture.componentInstance.onPointerDown(new MouseEvent('mousedown', { button: 0 }));
+      const params = spy.mock.calls[0][1] as Record<string, unknown>;
+      expect(params['dragThreshold']).toBe(1);
+
+      store.connectionDragThreshold.set(8);
+      fixture.componentInstance.onPointerDown(new MouseEvent('mousedown', { button: 0 }));
+      const params2 = spy.mock.calls[1][1] as Record<string, unknown>;
+      expect(params2['dragThreshold']).toBe(8);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('does not start a connection when isConnectable is false', () => {
+    const fixture = TestBed.createComponent(HandleComponent);
+    setSignalInput(fixture.componentInstance, 'type', 'source' as HandleType);
+    setSignalInput(fixture.componentInstance, 'isConnectable', false);
+    fixture.detectChanges();
+    const spy = vi.spyOn(system.XYHandle, 'onPointerDown').mockImplementation(() => {});
+    try {
+      fixture.componentInstance.onPointerDown(new MouseEvent('mousedown', { button: 0 }));
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('does not start a connection when the flow lock sets nodesConnectable=false', () => {
+    const fixture = mountSource();
+    store.nodesConnectable.set(false);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.effectiveConnectableStart()).toBe(false);
+    const spy = vi.spyOn(system.XYHandle, 'onPointerDown').mockImplementation(() => {});
+    try {
+      fixture.componentInstance.onPointerDown(new MouseEvent('mousedown', { button: 0 }));
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('ignores non-left mouse buttons', () => {
+    const fixture = mountSource();
+    const spy = vi.spyOn(system.XYHandle, 'onPointerDown').mockImplementation(() => {});
+    try {
+      // Right-click via a pointer event with pointerType 'mouse'.
+      const rightClick = { pointerType: 'mouse', button: 2, stopPropagation() {} } as unknown as PointerEvent;
+      fixture.componentInstance.onPointerDown(rightClick);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});

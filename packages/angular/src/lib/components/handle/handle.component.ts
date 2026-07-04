@@ -7,7 +7,6 @@ import {
   computed,
   effect,
   ElementRef,
-  OnInit,
   OnDestroy,
   Optional,
   Inject,
@@ -46,10 +45,13 @@ import { NODE_ID } from '../../services/tokens';
     '[class.xy-flow__handle-right]': 'position() === Position.Right',
     '[class.source]': 'type() === "source"',
     '[class.target]': 'type() === "target"',
-    '[class.connectionindicator]': 'true',
-    '[class.connectable]': 'isConnectable()',
-    '[class.connectablestart]': 'isConnectableStart()',
-    '[class.connectableend]': 'isConnectableEnd()',
+    '[class.connectionindicator]': 'showConnectionIndicator()',
+    '[class.connectable]': 'effectiveConnectable()',
+    '[class.connectablestart]': 'effectiveConnectableStart()',
+    '[class.connectableend]': 'effectiveConnectableEnd()',
+    '[class.connectingfrom]': 'connectingFrom()',
+    '[class.connectingto]': 'connectingTo()',
+    '[class.valid]': 'connectionValid()',
     '[attr.data-handleid]': 'handleId()',
     '[attr.data-nodeid]': 'nodeId',
     '[attr.data-handlepos]': 'position()',
@@ -61,7 +63,7 @@ import { NODE_ID } from '../../services/tokens';
   },
   template: `<ng-content />`,
 })
-export class HandleComponent implements OnInit, OnDestroy {
+export class HandleComponent implements OnDestroy {
   readonly Position = Position;
 
   /** `'source'` or `'target'` — determines which side of an edge this handle connects. */
@@ -94,6 +96,52 @@ export class HandleComponent implements OnInit, OnDestroy {
   // data-id attribute used by XYHandle to find handles in the DOM
   readonly dataId = computed(() => `${this.store.rfId()}-${this.nodeId}-${this.handleId()}-${this.type()}`);
 
+  /**
+   * Effective connectable state — the per-handle `isConnectable` input ANDed with
+   * the node's own `connectable` override (falling back to the flow-level
+   * `nodesConnectable`, which the Controls lock button toggles). Without this the
+   * lock button and `node.connectable` would have no effect on user-authored
+   * handles, and `XYHandle` validity — which reads the `.connectable*` classes —
+   * would allow connections the flow means to forbid.
+   */
+  private readonly nodeConnectable = computed(() => {
+    this.store.version(); // track node updates so a changed override re-evaluates
+    const node = this.store.nodeLookup.get(this.nodeId);
+    return node?.connectable ?? this.store.nodesConnectable();
+  });
+  readonly effectiveConnectable = computed(() => this.isConnectable() && this.nodeConnectable());
+  readonly effectiveConnectableStart = computed(() => this.effectiveConnectable() && this.isConnectableStart());
+  readonly effectiveConnectableEnd = computed(() => this.effectiveConnectable() && this.isConnectableEnd());
+
+  /**
+   * `connectionindicator` gates pointer-events + the crosshair cursor in CSS. It
+   * must reflect whether the handle is usable *right now*: as a start when idle,
+   * or as an end while a connection is in progress. Previously hardcoded `true`,
+   * which left disabled handles interactive.
+   */
+  readonly showConnectionIndicator = computed(() => {
+    const conn = this.store.connection();
+    return this.effectiveConnectable() && (conn.inProgress ? this.effectiveConnectableEnd() : this.effectiveConnectableStart());
+  });
+
+  // Per-handle connection feedback classes (shipped CSS targets these).
+  readonly connectingFrom = computed(() => {
+    const conn = this.store.connection();
+    if (!conn.inProgress) return false;
+    const f = conn.fromHandle;
+    return f.nodeId === this.nodeId && (f.id ?? null) === this.handleId() && f.type === this.type();
+  });
+  readonly connectingTo = computed(() => {
+    const conn = this.store.connection();
+    if (!conn.inProgress || !conn.toHandle) return false;
+    const t = conn.toHandle;
+    return t.nodeId === this.nodeId && (t.id ?? null) === this.handleId() && t.type === this.type();
+  });
+  readonly connectionValid = computed(() => {
+    const conn = this.store.connection();
+    return this.connectingTo() && conn.inProgress && conn.isValid === true;
+  });
+
   private isRegistered = false;
   private prevKey: { nodeId: string; handleId: string | null; type: HandleType } | null = null;
 
@@ -115,8 +163,6 @@ export class HandleComponent implements OnInit, OnDestroy {
     });
   }
 
-  ngOnInit(): void {}
-
   ngOnDestroy(): void {
     // Guard: the effect may never have run if inputs were not resolved before
     // destroy (happens in some test lifecycles). In production, Angular's
@@ -126,7 +172,10 @@ export class HandleComponent implements OnInit, OnDestroy {
   }
 
   onPointerDown(event: MouseEvent | PointerEvent): void {
-    if (!this.isConnectableStart()) return;
+    if (!this.effectiveConnectableStart()) return;
+    // Only left mouse button starts a connection (parity with React). Touch/pen
+    // pointers report button 0 too, so gate on pointerType.
+    if ('pointerType' in event && event.pointerType === 'mouse' && event.button !== 0) return;
 
     // Stop propagation to prevent d3-drag on the parent node from capturing this event
     event.stopPropagation();
@@ -168,7 +217,11 @@ export class HandleComponent implements OnInit, OnDestroy {
         return conn.inProgress ? conn.fromHandle : null;
       },
       autoPanSpeed: store.autoPanSpeed(),
-      dragThreshold: 0,
+      // Honor the configured drag threshold (default 1). A literal 0 started a
+      // connection synchronously on every pointerdown — flashing the connection
+      // line, spamming onConnectStart/End, and turning a slightly-drifted click
+      // into a surprise connection (especially on touch).
+      dragThreshold: store.connectionDragThreshold(),
       handleDomNode: this.el.nativeElement,
       // Variance-forced: validator is declared (NodeType|Connection)=>boolean but the
       // system only ever calls it with a Connection; contravariance blocks a direct assign.
@@ -188,7 +241,7 @@ export class HandleComponent implements OnInit, OnDestroy {
     // validated via XYHandle.isValid below, which checks the target's
     // `.connectable` / `.connectableend` classes (driven by isConnectable /
     // isConnectableEnd inputs).
-    if (!startHandle && !this.isConnectableStart()) return;
+    if (!startHandle && !this.effectiveConnectableStart()) return;
 
     if (!startHandle) {
       // First click — store this handle as the start of the connection
