@@ -48,6 +48,7 @@ import {
 } from '@angflow/system';
 
 import { FlowStore } from '../../services/flow-store.service';
+import { ClickConnectPreview } from '../../services/click-connect-preview.service';
 import { NgFlowService } from '../../services/ng-flow.service';
 import { injectFlowStore, injectNgFlowService } from '../../utils/inject-flow-store';
 import { NodeRendererComponent } from '../node-renderer/node-renderer.component';
@@ -158,6 +159,10 @@ function viewportsEqual(a: Viewport, b: Viewport): boolean {
       useFactory: () =>
         inject(NgFlowService, { optional: true, skipSelf: true }) ?? new NgFlowService(),
     },
+    // Draws the click-to-connect preview line. Provided here (not root) so it
+    // binds to THIS flow's FlowStore; instantiated in the constructor for its
+    // side effects.
+    ClickConnectPreview,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -241,6 +246,8 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 {
   readonly store = injectFlowStore<NodeType, EdgeType>();
   readonly service = injectNgFlowService<NodeType, EdgeType>();
+  // Instantiated for its side effects: draws the click-to-connect preview line.
+  private readonly clickConnectPreview = inject(ClickConnectPreview);
   private readonly destroyRef = inject(DestroyRef);
   private readonly containerRef = viewChild<ElementRef<HTMLDivElement>>('container');
   private readonly paneRef = viewChild(PaneComponent);
@@ -1038,6 +1045,13 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       return;
     }
 
+    // A genuine empty-canvas click cancels a pending click-to-connect (and its
+    // preview line). Placed after the handle/node/edge guard so the first click
+    // that ARMS a handle — which also bubbles here — doesn't immediately cancel it.
+    if (this.store.connectionClickStartHandle()) {
+      this.store.connectionClickStartHandle.set(null);
+    }
+
     // Don't deselect right after a selection drag ended (the click fires from mouseup).
     // Consume the selectionInProgress flag so only THIS synthesised click is swallowed;
     // the next genuine pane click will proceed normally.
@@ -1058,6 +1072,10 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
   onPaneContextMenu(event: MouseEvent): void {
     event.preventDefault();
+    // Right-click also cancels a pending click-to-connect.
+    if (this.store.connectionClickStartHandle()) {
+      this.store.connectionClickStartHandle.set(null);
+    }
     this.paneContextMenu.emit(event);
   }
 

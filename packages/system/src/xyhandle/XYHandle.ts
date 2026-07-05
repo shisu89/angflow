@@ -12,11 +12,12 @@ import {
   oppositePosition,
   ConnectionInProgress,
   type Handle,
+  type HandleType,
   type Connection,
 } from '../types';
 
 import { getClosestHandle, getFloatingDropTarget, isConnectionValid, getHandleType, getHandle } from './utils';
-import { IsValidParams, OnPointerDownParams, Result, XYHandleInstance } from './types';
+import { ClickConnectionStateParams, IsValidParams, OnPointerDownParams, Result, XYHandleInstance } from './types';
 
 const alwaysValid = () => true;
 
@@ -344,7 +345,89 @@ function isValidHandle(
   return result;
 }
 
+/**
+ * Stateless per-move computation for the click-to-connect preview line. Mirrors
+ * `onPointerDown`'s `onPointerMove` (snap to nearest handle within
+ * `connectionRadius`, validity check, build the in-progress connection), but
+ * without the drag lifecycle — the caller drives it from plain cursor moves
+ * while a handle is "armed" (first click) and owns listener teardown.
+ */
+function getClickConnectionState(
+  event: MouseEvent,
+  {
+    connectionMode,
+    connectionRadius,
+    domNode,
+    handleId,
+    nodeId,
+    isTarget,
+    nodeLookup,
+    lib,
+    flowId,
+    isValidConnection = alwaysValid,
+    getTransform,
+    isNodeVisible,
+  }: ClickConnectionStateParams
+): ConnectionInProgress | null {
+  const doc = getHostForElement(event.target);
+  const containerBounds = domNode?.getBoundingClientRect();
+  if (!containerBounds) {
+    return null;
+  }
+
+  const handleType: HandleType = isTarget ? 'target' : 'source';
+  const fromHandleInternal = getHandle(nodeId, handleType, handleId, nodeLookup, connectionMode);
+  const fromInternalNode = nodeLookup.get(nodeId);
+  if (!fromHandleInternal || !fromInternalNode) {
+    return null;
+  }
+
+  const fromHandle: Handle = { ...fromHandleInternal, nodeId, type: handleType, position: fromHandleInternal.position };
+  const from = getHandlePosition(fromInternalNode, fromHandle, Position.Left, true);
+
+  const position = getEventPosition(event, containerBounds);
+  const transform = getTransform();
+  const pointerInRenderer = pointToRendererPoint(position, transform, false, [1, 1]);
+
+  let closestHandle = getClosestHandle(pointerInRenderer, connectionRadius, nodeLookup, fromHandle, isNodeVisible);
+  if (!closestHandle) {
+    closestHandle = getFloatingDropTarget(pointerInRenderer, nodeLookup, fromHandle, isNodeVisible);
+  }
+
+  const result = isValidHandle(event, {
+    handle: closestHandle,
+    connectionMode,
+    fromNodeId: nodeId,
+    fromHandleId: handleId,
+    fromType: handleType,
+    isValidConnection,
+    doc,
+    lib,
+    flowId,
+    nodeLookup,
+  });
+  const isValid = isConnectionValid(!!closestHandle, result.isValid);
+
+  return {
+    inProgress: true,
+    isValid,
+    from,
+    fromHandle,
+    fromPosition: fromHandle.position,
+    fromNode: fromInternalNode,
+    to:
+      result.toHandle && isValid
+        ? rendererPointToPoint({ x: result.toHandle.x, y: result.toHandle.y }, transform)
+        : position,
+    toHandle: result.toHandle,
+    toPosition: isValid && result.toHandle ? result.toHandle.position : oppositePosition[fromHandle.position],
+    toNode: result.toHandle ? nodeLookup.get(result.toHandle.nodeId)! : null,
+    pointer: position,
+  };
+}
+
 export const XYHandle: XYHandleInstance = {
   onPointerDown,
   isValid: isValidHandle,
+  getClickConnectionState,
 };

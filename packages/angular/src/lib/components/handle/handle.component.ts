@@ -266,6 +266,16 @@ export class HandleComponent implements OnDestroy {
         handleId: this.handleId(),
         handleType: this.type(),
       });
+    } else if (
+      startHandle.nodeId === this.nodeId &&
+      (startHandle.handleId ?? null) === this.handleId() &&
+      startHandle.type === this.type()
+    ) {
+      // Re-clicking the armed handle disarms it (cancels the pending
+      // click-to-connect and its preview line) instead of self-connecting.
+      store.connectionClickStartHandle.set(null);
+      store.onClickConnectEnd?.(event);
+      store.onConnectEnd?.(event);
     } else {
       // Second click — validate target handle via XYHandle.isValid, which
       // inspects the handle's CSS classes (`connectable`, `connectableend`)

@@ -196,3 +196,40 @@ describe('XYHandle.onPointerDown — pointer-family teardown (no dangling listen
     expect(startedInProgress(params.updateConnection)).toBe(true);
   });
 });
+
+// ── Click-to-connect preview: stateless per-move connection state ──────────────
+//
+// Powers the click-connect preview line: while a handle is "armed" (first
+// click), each cursor move recomputes a line from that handle to the cursor
+// (snap + validity), with no drag lifecycle or listeners.
+
+describe('XYHandle.getClickConnectionState', () => {
+  beforeEach(() => {
+    if (!document.elementFromPoint) {
+      Object.defineProperty(document, 'elementFromPoint', { value: () => null, writable: true, configurable: true });
+    }
+    vi.mocked(getClosestHandle).mockReturnValue(null);
+    vi.mocked(getFloatingDropTarget).mockReturnValue(null);
+  });
+
+  it('returns an in-progress connection from the armed handle to the cursor', () => {
+    const params = makeParams();
+    const state = XYHandle.getClickConnectionState(makeFakeEvent('pointermove', 250, 175), params);
+
+    expect(state).not.toBeNull();
+    expect(state!.inProgress).toBe(true);
+    expect(state!.fromHandle.nodeId).toBe('N');
+    // No handle under the cursor (mocks return null) → endpoint is the raw cursor
+    // position (relative to the 0,0 container bounds), validity is unknown (null),
+    // and there's no target handle. Same "no target yet" state the drag preview uses.
+    expect(state!.to).toEqual({ x: 250, y: 175 });
+    expect(state!.isValid).toBeNull();
+    expect(state!.toHandle).toBeNull();
+  });
+
+  it('returns null when the armed handle cannot be resolved', () => {
+    const params = { ...makeParams(), nodeId: 'does-not-exist' };
+    const state = XYHandle.getClickConnectionState(makeFakeEvent('pointermove', 10, 10), params);
+    expect(state).toBeNull();
+  });
+});
