@@ -91,7 +91,7 @@ export class ResizableNodeComponent {
         (connect)="onConnect($event)"
       >
         <ng-flow-background variant="dots" [gap]="20" [size]="1" />
-        <ng-flow-controls />
+        <ng-flow-controls [showDelete]="true" />
       </ng-flow>
     </app-example-card>
   `,

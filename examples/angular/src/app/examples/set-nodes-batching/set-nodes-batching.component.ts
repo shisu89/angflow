@@ -44,7 +44,7 @@ const C: Node = { id: 'c', data: { label: 'C' }, position: { x: 400, y: 100 } };
       >
         <ng-flow-background variant="dots" />
         <ng-flow-minimap />
-        <ng-flow-controls />
+        <ng-flow-controls [showDelete]="true" />
         <ng-flow-panel position="top-right">
           <div class="snb-panel">
             <button (click)="queueMultipleSetNodes()">queue multiple setNodes</button>

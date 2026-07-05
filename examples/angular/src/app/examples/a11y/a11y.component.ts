@@ -54,7 +54,7 @@ const ariaLabelConfig: Partial<AriaLabelConfig> = {
       >
         <ng-flow-background variant="dots" />
         <ng-flow-minimap />
-        <ng-flow-controls />
+        <ng-flow-controls [showDelete]="true" />
       </ng-flow>
     </app-example-card>
   `,

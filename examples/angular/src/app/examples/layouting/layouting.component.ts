@@ -64,7 +64,7 @@ const INITIAL_EDGES: Edge[] = [
         (edgesChange)="onEdgesChange($event)"
         (connect)="onConnect($event)"
       >
-        <ng-flow-controls />
+        <ng-flow-controls [showDelete]="true" />
         <ng-flow-panel position="top-right">
           <div class="lo-panel">
             <button (click)="layout('TB')">vertical layout</button>

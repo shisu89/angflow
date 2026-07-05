@@ -43,7 +43,7 @@ const INITIAL_EDGES: Edge[] = [
         (edgesChange)="onEdgesChange($event)"
       >
         <ng-flow-background variant="dots" />
-        <ng-flow-controls />
+        <ng-flow-controls [showDelete]="true" />
         <ng-flow-panel position="top-right">
           <div class="ft-panel">
             <button (click)="addNode()">add node</button>

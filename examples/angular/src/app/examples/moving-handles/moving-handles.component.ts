@@ -88,7 +88,7 @@ export class MovingHandleNodeComponent {
         (connect)="onConnect($event)"
       >
         <ng-flow-background />
-        <ng-flow-controls />
+        <ng-flow-controls [showDelete]="true" />
       </ng-flow>
     </app-example-card>
   `,

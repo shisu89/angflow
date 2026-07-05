@@ -45,7 +45,7 @@ interface PersistedFlow {
         (connect)="onConnect($event)"
       >
         <ng-flow-background variant="dots" [gap]="20" [size]="1" />
-        <ng-flow-controls />
+        <ng-flow-controls [showDelete]="true" />
         <ng-flow-panel position="top-right">
           <div class="save-panel">
             <button class="save-panel__btn save-panel__btn--save" (click)="save()">Save</button>

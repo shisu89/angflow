@@ -36,7 +36,7 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
         (connect)="onConnect($event)"
       >
         <ng-flow-background [variant]="variant()" [gap]="24" [size]="variant() === 'dots' ? 1 : 1.2" />
-        <ng-flow-controls />
+        <ng-flow-controls [showDelete]="true" />
         <ng-flow-panel position="top-right">
           <div class="bg-picker">
             @for (v of variants; track v) {

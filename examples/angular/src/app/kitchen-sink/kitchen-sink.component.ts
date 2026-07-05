@@ -351,7 +351,7 @@ function parseKeyCode(raw: string): string | string[] {
             <ng-flow-background [variant]="settings().backgroundVariant" [gap]="22" [size]="1" />
           }
           @if (settings().showControls) {
-            <ng-flow-controls />
+            <ng-flow-controls [showDelete]="true" />
           }
           @if (settings().showMiniMap) {
             <ng-flow-minimap [position]="settings().miniMapPosition" />

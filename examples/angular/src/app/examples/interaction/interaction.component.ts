@@ -52,7 +52,7 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
         (moveEnd)="onMoveEnd($event.viewport)"
       >
         <ng-flow-minimap />
-        <ng-flow-controls />
+        <ng-flow-controls [showDelete]="true" />
         <ng-flow-panel position="top-left">
           <div class="panel">
             <label for="ix-draggable"><input id="ix-draggable" type="checkbox" [checked]="isDraggable()" (change)="setFlag('isDraggable', $event)" /> nodesDraggable</label>

@@ -58,7 +58,7 @@ const PAN_ON_DRAG = [1, 2];
         (click)="onClick($event)"
       >
         <ng-flow-background variant="cross" />
-        <ng-flow-controls />
+        <ng-flow-controls [showDelete]="true" />
         <ng-flow-panel position="top-right">
           <input type="text" placeholder="name" class="figma-input" />
         </ng-flow-panel>

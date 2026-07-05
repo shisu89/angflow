@@ -42,7 +42,7 @@ const NODE_DEFAULTS = { sourcePosition: Position.Right, targetPosition: Position
       >
         <ng-flow-background />
         <ng-flow-minimap />
-        <ng-flow-controls />
+        <ng-flow-controls [showDelete]="true" />
         <ng-flow-panel position="top-right">
           <label class="zi-label">
             <span>zIndexMode</span>

@@ -46,7 +46,7 @@ const INITIAL = getNodesAndEdges(25, 25);
           (connect)="onConnect($event)"
         >
           <ng-flow-background />
-          <ng-flow-controls />
+          <ng-flow-controls [showDelete]="true" />
           <ng-flow-panel position="top-right">
             <div class="st-panel">
               <button (click)="selectNode()">select node</button>

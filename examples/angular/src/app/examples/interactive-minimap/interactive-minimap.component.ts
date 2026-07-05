@@ -60,7 +60,7 @@ const INITIAL_NODES: Node[] = [
           [zoomable]="true"
           [inversePan]="invertPan()"
         />
-        <ng-flow-controls />
+        <ng-flow-controls [showDelete]="true" />
         <ng-flow-panel position="top-right">
           <div class="im-panel">
             <button (click)="resetViewport()">reset transform</button>

@@ -40,7 +40,7 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
       >
         <ng-flow-background />
         <ng-flow-minimap />
-        <ng-flow-controls />
+        <ng-flow-controls [showDelete]="true" />
         <ng-flow-panel position="top-right">
           <label class="cm-label">
             <span>color mode</span>

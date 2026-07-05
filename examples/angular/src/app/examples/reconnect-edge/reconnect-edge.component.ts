@@ -30,7 +30,7 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
         (reconnectStart)="onReconnectStart($event)"
         (reconnectEnd)="onReconnectEnd($event)"
       >
-        <ng-flow-controls />
+        <ng-flow-controls [showDelete]="true" />
       </ng-flow>
     </app-example-card>
   `,

@@ -182,7 +182,7 @@ export class ThTypedEdgeComponent {
       (connect)="onConnect($event)"
     >
       <ng-flow-background />
-      <ng-flow-controls />
+      <ng-flow-controls [showDelete]="true" />
     </ng-flow>
   `,
   styles: `:host { display: flex; flex: 1; }`,
