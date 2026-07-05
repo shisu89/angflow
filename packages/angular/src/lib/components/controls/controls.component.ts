@@ -74,6 +74,18 @@ import { PanelComponent } from '../panel/panel.component';
             }
           </button>
         }
+        @if (showDelete()) {
+          <button
+            type="button"
+            class="ng-flow__controls-button xy-flow__controls-button"
+            [title]="deleteLabel()"
+            [attr.aria-label]="deleteLabel()"
+            [disabled]="!hasSelection()"
+            (click)="onDelete()"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true"><path d="M12 2.667h8a1.333 1.333 0 011.333 1.333v1.333h6.667a1.333 1.333 0 010 2.667h-1.393l-1.2 19.253A2.667 2.667 0 0122.747 30H9.253a2.667 2.667 0 01-2.66-2.747L5.393 8H4a1.333 1.333 0 010-2.667h6.667V4A1.333 1.333 0 0112 2.667zm-3.933 5.333l1.184 19.013a.007.007 0 00.002.007h13.494L24 8H8.067zM13.333 8v14.667a1.333 1.333 0 002.667 0V8h-2.667zm4.667 0v14.667a1.333 1.333 0 002.667 0V8H18z"/></svg>
+          </button>
+        }
         <ng-content />
       </div>
     </ng-flow-panel>
@@ -89,6 +101,7 @@ export class ControlsComponent {
   readonly zoomOutLabel = computed(() => this.aria()['controls.zoomOut.ariaLabel']);
   readonly fitViewLabel = computed(() => this.aria()['controls.fitView.ariaLabel']);
   readonly interactiveLabel = computed(() => this.aria()['controls.interactive.ariaLabel']);
+  readonly deleteLabel = computed(() => this.aria()['controls.delete.ariaLabel']);
 
   /** Where the panel is anchored. */
   readonly position = input<PanelPosition>('bottom-left');
@@ -98,6 +111,13 @@ export class ControlsComponent {
   readonly showFitView = input(true);
   /** Render the lock-interactivity button. */
   readonly showInteractive = input(true);
+  /**
+   * Render a delete button that removes the current selection. Off by default —
+   * delete is destructive, so opt in with `[showDelete]="true"`. The button is
+   * disabled until nodes or edges are selected. Primarily a touch/mobile
+   * affordance for the Delete key, which has no equivalent without a keyboard.
+   */
+  readonly showDelete = input(false);
   /** Options passed to `fitView` when the button is pressed. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly fitViewOptions = input<FitViewOptionsBase<any>>(); // node-type-agnostic fitView options
@@ -116,6 +136,8 @@ export class ControlsComponent {
   readonly fitViewClick = output<void>();
   /** Fires with the new interactive state after the lock button is toggled. */
   readonly interactiveChange = output<boolean>();
+  /** Fires with the deleted elements after the delete button is clicked. */
+  readonly deleteClick = output<{ nodes: unknown[]; edges: unknown[] }>();
 
   // Derive interactive/locked state directly from the store so external
   // mutations of nodesDraggable/nodesConnectable/elementsSelectable stay
@@ -127,6 +149,11 @@ export class ControlsComponent {
       this.store.elementsSelectable()
   );
   readonly isLocked = computed(() => !this.isInteractive());
+
+  // Enables the delete button only when something deletable is selected.
+  readonly hasSelection = computed(
+    () => this.store.selectedNodes().length > 0 || this.store.selectedEdges().length > 0
+  );
 
   // Disable zoom buttons at min/max extent, matching React Flow's behaviour.
   readonly maxZoomReached = computed(() => this.store.transform()[2] >= this.store.maxZoom());
@@ -158,5 +185,18 @@ export class ControlsComponent {
     this.store.nodesConnectable.set(nextInteractive);
     this.store.elementsSelectable.set(nextInteractive);
     this.interactiveChange.emit(nextInteractive);
+  }
+
+  onDelete() {
+    // Respect per-element `deletable`; deleteElements handles connected edges,
+    // the onBeforeDelete gate, and the (nodesDelete)/(edgesDelete)/(deleteElements)
+    // outputs — the same path the Delete key takes.
+    const nodes = this.store.selectedNodes().filter((n) => n.deletable !== false);
+    const edges = this.store.selectedEdges().filter((e) => e.deletable !== false);
+    if (nodes.length === 0 && edges.length === 0) return;
+
+    void this.ngFlowService.deleteElements({ nodes, edges }).then((deleted) => {
+      this.deleteClick.emit({ nodes: deleted.deletedNodes, edges: deleted.deletedEdges });
+    });
   }
 }

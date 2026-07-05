@@ -53,6 +53,7 @@ export const defaultAriaLabelConfig = {
   'controls.zoomOut.ariaLabel': 'Zoom Out',
   'controls.fitView.ariaLabel': 'Fit View',
   'controls.interactive.ariaLabel': 'Toggle Interactivity',
+  'controls.delete.ariaLabel': 'Delete selected elements',
 
   // Mini map
   'minimap.ariaLabel': 'Mini Map',
