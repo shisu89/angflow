@@ -74,8 +74,8 @@ function makeParams(isNodeVisible?: (n: any) => boolean) {
 
 describe('XYHandle.onPointerDown — isNodeVisible threading', () => {
   beforeEach(() => {
-    // Fire a mouseup to flush any lingering onPointerMove listeners from a prior test.
-    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    // Fire a pointerup to flush any lingering onPointerMove listeners from a prior test.
+    document.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
     vi.mocked(getClosestHandle).mockClear();
     vi.mocked(getFloatingDropTarget).mockClear();
     // jsdom does not implement elementFromPoint — stub it so isValidHandle
@@ -96,7 +96,7 @@ describe('XYHandle.onPointerDown — isNodeVisible threading', () => {
     const downEvt = makeFakeEvent('mousedown');
     XYHandle.onPointerDown(downEvt, params);
 
-    const moveEvt = makeFakeEvent('mousemove', 100, 100);
+    const moveEvt = makeFakeEvent('pointermove', 100, 100);
     document.dispatchEvent(moveEvt);
 
     expect(vi.mocked(getClosestHandle)).toHaveBeenCalled();
@@ -113,7 +113,7 @@ describe('XYHandle.onPointerDown — isNodeVisible threading', () => {
     const downEvt = makeFakeEvent('mousedown');
     XYHandle.onPointerDown(downEvt, params);
 
-    const moveEvt = makeFakeEvent('mousemove', 100, 100);
+    const moveEvt = makeFakeEvent('pointermove', 100, 100);
     document.dispatchEvent(moveEvt);
 
     expect(vi.mocked(getFloatingDropTarget)).toHaveBeenCalled();
@@ -128,11 +128,71 @@ describe('XYHandle.onPointerDown — isNodeVisible threading', () => {
     const downEvt = makeFakeEvent('mousedown');
     XYHandle.onPointerDown(downEvt, params);
 
-    const moveEvt = makeFakeEvent('mousemove', 100, 100);
+    const moveEvt = makeFakeEvent('pointermove', 100, 100);
     document.dispatchEvent(moveEvt);
 
     if (vi.mocked(getClosestHandle).mock.calls.length > 0) {
       expect(vi.mocked(getClosestHandle).mock.calls[0][4]).toBeUndefined();
     }
+  });
+});
+
+// ── Regression: the drag session must tear down on pointerup ───────────────────
+//
+// Bug ("clicking to connect starts a phantom second connection"): the connection
+// trigger is a `pointerdown`, but the session used to tear down on `mouseup`.
+// Chrome suppresses the compatibility `mouseup` for the LEFT button while
+// d3-drag owns the pointer stream (confirmed on real hardware: the click fires
+// `pointerdown, mousedown, pointerup, click` — no `mouseup`), so `onPointerUp`
+// never ran and the document move-listener leaked. The next bare cursor move
+// then crossed the drag threshold and started a phantom connection from the
+// just-clicked handle. Listening on the pointer family fixes it because
+// `pointerup` always fires.
+
+describe('XYHandle.onPointerDown — pointer-family teardown (no dangling listeners)', () => {
+  beforeEach(() => {
+    document.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
+    if (!document.elementFromPoint) {
+      Object.defineProperty(document, 'elementFromPoint', {
+        value: () => null,
+        writable: true,
+        configurable: true,
+      });
+    }
+    vi.mocked(getClosestHandle).mockReturnValue(null);
+    vi.mocked(getFloatingDropTarget).mockReturnValue(null);
+  });
+
+  function startedInProgress(updateConnection: unknown): boolean {
+    return (updateConnection as { mock: { calls: unknown[][] } }).mock.calls.some(
+      (c) => (c[0] as { inProgress?: boolean } | undefined)?.inProgress === true
+    );
+  }
+
+  it('does NOT start a phantom connection after pointerup, even if the compat mouseup never fires', () => {
+    const params = { ...makeParams(), dragThreshold: 1 };
+
+    // Click a handle: pointerdown (threshold 1 → no connection yet).
+    XYHandle.onPointerDown(makeFakeEvent('pointerdown'), params);
+
+    // Real browser on left-click: pointerup fires; the compat mouseup is suppressed.
+    document.dispatchEvent(makeFakeEvent('pointerup'));
+
+    // User moves the cursor toward the next handle (button up). Both events fire.
+    (params.updateConnection as ReturnType<typeof vi.fn>).mockClear();
+    document.dispatchEvent(makeFakeEvent('pointermove', 300, 300));
+    document.dispatchEvent(makeFakeEvent('mousemove', 300, 300));
+
+    expect(startedInProgress(params.updateConnection)).toBe(false);
+  });
+
+  it('still starts a normal drag connection when the pointer moves past the threshold', () => {
+    const params = { ...makeParams(), dragThreshold: 1 };
+
+    XYHandle.onPointerDown(makeFakeEvent('pointerdown'), params);
+    // No pointerup — an ongoing drag. Move past the threshold.
+    document.dispatchEvent(makeFakeEvent('pointermove', 300, 300));
+
+    expect(startedInProgress(params.updateConnection)).toBe(true);
   });
 });

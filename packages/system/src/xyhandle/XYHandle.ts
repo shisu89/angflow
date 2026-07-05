@@ -61,6 +61,14 @@ function onPointerDown(
   const containerBounds = domNode?.getBoundingClientRect();
   let connectionStarted = false;
 
+  // The pointer that initiated this connection. The whole gesture is driven by
+  // pointer events (below) and isolated to this id so a second finger can't
+  // drive or abort the connection — the pointer-model equivalent of the old
+  // multi-touch `touches.length` guard.
+  const initialPointerId = 'pointerId' in event ? (event as PointerEvent).pointerId : null;
+  const isInitiatingPointer = (e: MouseEvent | TouchEvent): boolean =>
+    initialPointerId === null || !('pointerId' in e) || (e as PointerEvent).pointerId === initialPointerId;
+
   if (!containerBounds || !handleType) {
     return;
   }
@@ -125,6 +133,10 @@ function onPointerDown(
   }
 
   function onPointerMove(event: MouseEvent | TouchEvent) {
+    if (!isInitiatingPointer(event)) {
+      return;
+    }
+
     if (!connectionStarted) {
       const { x: evtX, y: evtY } = getEventPosition(event);
       const dx = evtX - x;
@@ -207,8 +219,9 @@ function onPointerDown(
   }
 
   function onPointerUp(event: MouseEvent | TouchEvent) {
-    // Prevent multi-touch aborting connection
-    if ('touches' in event && event.touches.length > 0) {
+    // Only the pointer that started the connection may end it — ignore events
+    // from a different pointer (e.g. a second finger during multi-touch).
+    if (!isInitiatingPointer(event)) {
       return;
     }
 
@@ -243,18 +256,20 @@ function onPointerDown(
     connection = null;
     resultHandleDomNode = null;
 
-    doc.removeEventListener('mousemove', onPointerMove as EventListener);
-    doc.removeEventListener('mouseup', onPointerUp as EventListener);
-
-    doc.removeEventListener('touchmove', onPointerMove as EventListener);
-    doc.removeEventListener('touchend', onPointerUp as EventListener);
+    doc.removeEventListener('pointermove', onPointerMove as EventListener);
+    doc.removeEventListener('pointerup', onPointerUp as EventListener);
+    doc.removeEventListener('pointercancel', onPointerUp as EventListener);
   }
 
-  doc.addEventListener('mousemove', onPointerMove as EventListener);
-  doc.addEventListener('mouseup', onPointerUp as EventListener);
-
-  doc.addEventListener('touchmove', onPointerMove as EventListener);
-  doc.addEventListener('touchend', onPointerUp as EventListener);
+  // Listen on the pointer family — the same family as the `pointerdown` that
+  // triggers a connection. The old mouse/touch listeners could dangle: Chrome
+  // suppresses the compatibility `mouseup` for the left button while d3-drag
+  // owns the pointer stream, so `onPointerUp` never ran and the `mousemove`
+  // listener leaked — a later cursor move then started a phantom connection
+  // from the previous handle. `pointerup`/`pointercancel` always fire.
+  doc.addEventListener('pointermove', onPointerMove as EventListener);
+  doc.addEventListener('pointerup', onPointerUp as EventListener);
+  doc.addEventListener('pointercancel', onPointerUp as EventListener);
 }
 
 // checks if  and returns connection in form of an object { source: 123, target: 312 }
