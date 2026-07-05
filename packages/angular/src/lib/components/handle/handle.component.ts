@@ -38,7 +38,13 @@ import { NODE_ID } from '../../services/tokens';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    'class': 'ng-flow__handle xy-flow__handle',
+    // `nodrag`/`nopan` keep a handle interaction from also starting a node drag
+    // or a pane pan (parity with React Flow's Handle). d3-drag/d3-zoom bind
+    // `mousedown`, but the handle's connection trigger is `pointerdown` and only
+    // stops propagation of that — the separate `mousedown` still bubbles to the
+    // node's d3-drag, so grabbing a handle would drag the whole node. These
+    // classes make the d3 filters reject the gesture regardless of event family.
+    'class': 'ng-flow__handle xy-flow__handle nodrag nopan',
     '[class.xy-flow__handle-top]': 'position() === Position.Top',
     '[class.xy-flow__handle-bottom]': 'position() === Position.Bottom',
     '[class.xy-flow__handle-left]': 'position() === Position.Left',

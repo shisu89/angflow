@@ -317,6 +317,18 @@ describe('HandleComponent — connection trigger uses pointerdown', () => {
       spy.mockRestore();
     }
   });
+
+  // Regression: grabbing a handle must not drag the whole node (or pan the pane).
+  // d3-drag/d3-zoom bind `mousedown`; the handle only stops propagation of its
+  // `pointerdown` trigger, so the `mousedown` still reached the node's d3-drag.
+  // The `nodrag`/`nopan` classes make d3's filters reject the gesture — the same
+  // fix React Flow's Handle uses.
+  it('carries the nodrag and nopan classes so a handle grab does not drag the node or pan', () => {
+    const fixture = mountSourceHandle();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.classList.contains('nodrag')).toBe(true);
+    expect(el.classList.contains('nopan')).toBe(true);
+  });
 });
 
 // ── Connection-start gating & drag threshold ──────────────────────────────────
