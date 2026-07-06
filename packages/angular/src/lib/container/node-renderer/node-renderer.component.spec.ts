@@ -7,7 +7,7 @@
  * the unit tests in `../../utils/inject-ng-flow-node.spec.ts` cannot exercise
  * (those tests provide the context manually via a stub).
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { Component, input, provideZonelessChangeDetection } from '@angular/core';
 import { NodeRendererComponent, computeNodeInputsKey } from './node-renderer.component';
@@ -577,5 +577,56 @@ describe('getNodeInputs short-circuit (zero-input components)', () => {
     const a = component.getNodeInputs(store.nodeLookup.get('n1')!);
     const b = component.getNodeInputs(store.nodeLookup.get('n2')!);
     expect(a).toBe(b);
+  });
+});
+
+// ── Autopan-on-focus is keyboard-only ─────────────────────────────────────────
+//
+// autoPanOnNodeFocus must pan only on keyboard-driven focus (:focus-visible),
+// never on mouse focus — mouse focus fires before the click, so panning there
+// would jarringly recenter an edge-adjacent node the moment it's clicked. This
+// removed the need for consumers to force [autoPanOnNodeFocus]="false".
+
+describe('NodeRendererComponent.onNodeFocus — autopan is keyboard-only', () => {
+  let store: FlowStore;
+  let component: NodeRendererComponent;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NodeRendererComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    store = TestBed.inject(FlowStore);
+    component = TestBed.createComponent(NodeRendererComponent).componentInstance;
+  });
+
+  function offscreenNode(): Node {
+    // Far off-viewport so the "already visible" check can't short-circuit the pan.
+    const node: Node = { id: 'far', position: { x: 5000, y: 5000 }, data: {} };
+    store.setNodes([node]);
+    store.width.set(800);
+    store.height.set(600);
+    return node;
+  }
+
+  function focusEvent(focusVisible: boolean): FocusEvent {
+    return {
+      currentTarget: { matches: (sel: string) => sel === ':focus-visible' && focusVisible },
+    } as unknown as FocusEvent;
+  }
+
+  it('pans on keyboard-driven (:focus-visible) focus', () => {
+    const node = offscreenNode();
+    const spy = vi.spyOn(store, 'panBy').mockResolvedValue(true);
+    component.onNodeFocus(node, focusEvent(true));
+    expect(spy).toHaveBeenCalled();
+  });
+
+  it('does NOT pan on mouse focus (not :focus-visible)', () => {
+    const node = offscreenNode();
+    const spy = vi.spyOn(store, 'panBy').mockResolvedValue(true);
+    component.onNodeFocus(node, focusEvent(false));
+    expect(spy).not.toHaveBeenCalled();
   });
 });

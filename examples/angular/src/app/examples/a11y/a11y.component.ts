@@ -38,7 +38,7 @@ const ariaLabelConfig: Partial<AriaLabelConfig> = {
   template: `
     <app-example-card
       title="Accessibility"
-      description="Custom aria labels for every interactive element. Tab through the flow to interact with nodes and edges via keyboard."
+      description="Custom aria labels for every interactive element. Tab through the flow to interact with nodes and edges via keyboard — the viewport auto-pans to keep the focused node in view (autoPanOnNodeFocus, keyboard-only)."
     >
       <ng-flow
         [nodes]="nodes"

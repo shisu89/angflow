@@ -360,7 +360,11 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
       this.store.addSelectedNodes([node.id]);
     }
 
-    if (!this.store.autoPanOnNodeFocus()) return;
+    // Autopan is a keyboard affordance: pan only on keyboard-driven focus
+    // (:focus-visible). Mouse focus fires before the click, so panning here
+    // would jarringly recenter an edge-adjacent node the moment it's clicked —
+    // the reason consumers previously had to force [autoPanOnNodeFocus]="false".
+    if (!this.store.autoPanOnNodeFocus() || !focusVisible) return;
 
     const internalNode = this.store.nodeLookup.get(node.id);
     if (!internalNode) return;
