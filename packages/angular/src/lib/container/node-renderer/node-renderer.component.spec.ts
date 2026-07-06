@@ -601,8 +601,8 @@ describe('NodeRendererComponent.onNodeFocus — autopan is keyboard-only', () =>
     component = TestBed.createComponent(NodeRendererComponent).componentInstance;
   });
 
-  function offscreenNode(): Node {
-    // Far off-viewport so the "already visible" check can't short-circuit the pan.
+  function focusableNode(): Node {
+    // 150×40 default-sized node; centre is therefore (5075, 5020).
     const node: Node = { id: 'far', position: { x: 5000, y: 5000 }, data: {} };
     store.setNodes([node]);
     store.width.set(800);
@@ -616,16 +616,17 @@ describe('NodeRendererComponent.onNodeFocus — autopan is keyboard-only', () =>
     } as unknown as FocusEvent;
   }
 
-  it('pans on keyboard-driven (:focus-visible) focus', () => {
-    const node = offscreenNode();
-    const spy = vi.spyOn(store, 'panBy').mockResolvedValue(true);
+  it('smoothly recenters on the node on keyboard-driven (:focus-visible) focus', () => {
+    const node = focusableNode();
+    const spy = vi.spyOn(store, 'setCenter').mockResolvedValue(true);
     component.onNodeFocus(node, focusEvent(true));
-    expect(spy).toHaveBeenCalled();
+    // Animated recenter on the node centre — matches the imperative setCenter path.
+    expect(spy).toHaveBeenCalledWith(5075, 5020, expect.objectContaining({ duration: 350 }));
   });
 
   it('does NOT pan on mouse focus (not :focus-visible)', () => {
-    const node = offscreenNode();
-    const spy = vi.spyOn(store, 'panBy').mockResolvedValue(true);
+    const node = focusableNode();
+    const spy = vi.spyOn(store, 'setCenter').mockResolvedValue(true);
     component.onNodeFocus(node, focusEvent(false));
     expect(spy).not.toHaveBeenCalled();
   });

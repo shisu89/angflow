@@ -70,6 +70,9 @@ const builtInNodeTypes: NodeTypes = {
  */
 const EMPTY_INPUTS: Readonly<Record<string, unknown>> = Object.freeze({});
 
+/** Animation duration (ms) for the autoPanOnNodeFocus recenter. */
+const AUTOPAN_FOCUS_DURATION = 350;
+
 @Component({
   selector: 'ng-flow-node-renderer',
   standalone: true,
@@ -374,36 +377,11 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
     const w = internalNode.measured?.width ?? node.width ?? 150;
     const h = internalNode.measured?.height ?? node.height ?? 40;
 
-    // Center the node in the viewport
-    const centerX = x + w / 2;
-    const centerY = y + h / 2;
+    // Smoothly recenter the viewport on the focused node via the same animated
+    // path setCenter() gives imperative callers (e.g. touch Prev/Next controls),
+    // so keyboard Tab navigation glides to each node instead of jumping.
     const zoom = this.store.transform()[2];
-    const viewportCenterX = this.store.width() / 2;
-    const viewportCenterY = this.store.height() / 2;
-
-    const targetX = viewportCenterX - centerX * zoom;
-    const targetY = viewportCenterY - centerY * zoom;
-
-    const currentX = this.store.transform()[0];
-    const currentY = this.store.transform()[1];
-
-    // Only pan if the node is not already reasonably visible
-    const nodeScreenX = x * zoom + currentX;
-    const nodeScreenY = y * zoom + currentY;
-    const nodeScreenRight = nodeScreenX + w * zoom;
-    const nodeScreenBottom = nodeScreenY + h * zoom;
-    const margin = 50;
-
-    if (
-      nodeScreenX > margin &&
-      nodeScreenY > margin &&
-      nodeScreenRight < this.store.width() - margin &&
-      nodeScreenBottom < this.store.height() - margin
-    ) {
-      return; // Node is already visible, no need to pan
-    }
-
-    this.store.panBy({ x: targetX - currentX, y: targetY - currentY });
+    void this.store.setCenter(x + w / 2, y + h / 2, { zoom, duration: AUTOPAN_FOCUS_DURATION });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
