@@ -50,4 +50,16 @@ describe('NgFlowComponent autoPanOnNodeFocus input', () => {
     fixture.detectChanges();
     expect(inst.store.autoPanOnNodeFocus()).toBe(false);
   });
+
+  // Focusing a node outside the viewport (Tab nav / programmatic focus) makes the
+  // browser scroll the wrapper to reveal it, dragging Panels/Controls off-screen.
+  // onWrapperScroll undoes that scroll so only the CSS-transform pan moves things.
+  it('resets wrapper scroll back to the origin on scroll', () => {
+    const fixture = TestBed.createComponent(NgFlowComponent);
+    const inst = fixture.componentInstance;
+    const scrollTo = vi.fn();
+    const target = { scrollTo } as unknown as HTMLElement;
+    inst.onWrapperScroll({ target } as unknown as Event);
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'instant' });
+  });
 });

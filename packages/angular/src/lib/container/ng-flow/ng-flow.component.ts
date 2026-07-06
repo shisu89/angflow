@@ -168,6 +168,7 @@ function viewportsEqual(a: Viewport, b: Viewport): boolean {
   host: {
     'class': 'ng-flow xy-flow',
     'role': 'application',
+    '(scroll)': 'onWrapperScroll($event)',
     '[class.dark]': 'resolvedColorMode() === "dark"',
     '[class.light]': 'resolvedColorMode() === "light"',
     '[style.width.px]': 'widthInput()',
@@ -1027,6 +1028,18 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
   onPanePointerDown(event: PointerEvent): void {
     this.panePointerDownPos = { x: event.clientX, y: event.clientY };
+  }
+
+  /**
+   * Undo native scroll on the flow wrapper. Focusing a node outside the current
+   * viewport — Tab navigation, or a programmatic `focus()` without
+   * `preventScroll` — makes the browser scroll this container to reveal the
+   * node, which shifts the whole pane (Panels, Controls, MiniMap) out of view.
+   * The viewport is panned via CSS transform, so any real scroll here is
+   * unwanted. Mirrors React Flow's `wrapperOnScroll` guard.
+   */
+  onWrapperScroll(event: Event): void {
+    (event.target as HTMLElement).scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }
 
   onPaneClick(event: MouseEvent): void {

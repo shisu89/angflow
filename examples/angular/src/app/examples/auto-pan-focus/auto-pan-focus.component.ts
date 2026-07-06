@@ -137,7 +137,11 @@ export class AutoPanFocusExampleComponent {
     const cy = (internal?.internals?.positionAbsolute?.y ?? node.position.y) + h / 2;
 
     flow.service.setCenter(cx, cy, { zoom: flow.store.transform()[2], duration: 350 });
-    (flow.store.domNode()?.querySelector(`.xy-flow__node[data-id="${node.id}"]`) as HTMLElement | null)?.focus();
+    // `preventScroll: true` is essential: the node is still off-screen when we
+    // focus it (the setCenter pan is a CSS-transform animation), so a plain
+    // focus() would make the browser scroll `.xy-flow` to reveal it — dragging
+    // the whole pane, including this Panel's Prev/Next buttons, out of view.
+    (flow.store.domNode()?.querySelector(`.xy-flow__node[data-id="${node.id}"]`) as HTMLElement | null)?.focus({ preventScroll: true });
   }
 
   onNodesChange(changes: NodeChange[]): void { this.nodes = applyNodeChanges(changes, this.nodes); }
