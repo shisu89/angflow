@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, viewChild } from '@angular/core';
 import {
   NgFlowComponent,
   BackgroundComponent,
@@ -11,10 +11,13 @@ import type { Node, Edge, NodeChange, EdgeChange } from '@angflow/angular';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
 /**
- * Demonstrates `autoPanOnNodeFocus`: the viewport pans to keep the
- * keyboard-focused node in view. The nodes are spread wider than the viewport,
- * so tabbing between them scrolls the canvas. Autopan is keyboard-only — mouse
- * clicks never pan — and the toggle lets you feel the difference.
+ * Demonstrates keeping the "active" node in view. The nodes are spread wider
+ * than the viewport, so moving between them scrolls the canvas.
+ *
+ * - **Keyboard:** `autoPanOnNodeFocus` pans to the Tab-focused node
+ *   (`:focus-visible` only — mouse clicks never pan). Toggle it to compare.
+ * - **Touch:** the Prev / Next buttons step an active node and recenter on it,
+ *   so the same follow-the-node effect works without a keyboard.
  */
 @Component({
   selector: 'app-auto-pan-focus-example',
@@ -29,7 +32,7 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
   template: `
     <app-example-card
       title="Auto-pan on focus"
-      description="Press Tab to move keyboard focus between nodes — with auto-pan on, the viewport follows focus to keep the focused node in view. Mouse clicks never pan. Toggle it to compare."
+      description="Keep the active node in view. On a keyboard, autoPanOnNodeFocus pans to the Tab-focused node (mouse clicks never pan). On touch, tap Prev / Next to step through — the viewport recenters on each."
     >
       <ng-flow
         [nodes]="nodes"
@@ -41,22 +44,33 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
         <ng-flow-background variant="dots" />
         <ng-flow-controls [showDelete]="true" />
         <ng-flow-panel position="top-left">
-          <button
-            type="button"
-            class="autopan-toggle"
-            [attr.aria-pressed]="autoPan()"
-            (click)="autoPan.set(!autoPan())"
-          >
-            Auto-pan on focus: <strong>{{ autoPan() ? 'ON' : 'OFF' }}</strong>
-          </button>
-          <p class="autopan-hint">Click here, then press <kbd>Tab</kbd> to step through the nodes.</p>
+          <div class="autopan-panel">
+            <button
+              type="button"
+              class="autopan-btn"
+              [attr.aria-pressed]="autoPan()"
+              (click)="autoPan.set(!autoPan())"
+            >
+              Auto-pan on focus: <strong>{{ autoPan() ? 'ON' : 'OFF' }}</strong>
+            </button>
+            <div class="autopan-nav">
+              <button type="button" class="autopan-btn" aria-label="Focus previous node" (click)="step(-1)">◀ Prev</button>
+              <button type="button" class="autopan-btn" aria-label="Focus next node" (click)="step(1)">Next ▶</button>
+            </div>
+            <p class="autopan-hint">
+              Keyboard: press <kbd>Tab</kbd>. Touch: use <strong>Prev</strong> / <strong>Next</strong>.
+            </p>
+          </div>
         </ng-flow-panel>
       </ng-flow>
     </app-example-card>
   `,
   styles: [`
     :host { display: flex; flex: 1; min-width: 0; min-height: 0; }
-    .autopan-toggle {
+    .autopan-panel { display: flex; flex-direction: column; gap: 6px; max-width: 220px; }
+    .autopan-nav { display: flex; gap: 6px; }
+    .autopan-nav .autopan-btn { flex: 1; }
+    .autopan-btn {
       font: inherit;
       padding: 6px 10px;
       border: 1px solid var(--xy-controls-button-border-color, #ddd);
@@ -65,9 +79,9 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
       color: inherit;
       cursor: pointer;
     }
-    .autopan-toggle:hover { background: var(--xy-controls-button-background-color-hover, #f4f4f4); }
-    .autopan-toggle strong { font-variant-numeric: tabular-nums; }
-    .autopan-hint { margin: 6px 2px 0; font-size: 12px; opacity: 0.7; max-width: 200px; }
+    .autopan-btn:hover { background: var(--xy-controls-button-background-color-hover, #f4f4f4); }
+    .autopan-btn strong { font-variant-numeric: tabular-nums; }
+    .autopan-hint { margin: 2px 0 0; font-size: 12px; opacity: 0.7; }
     .autopan-hint kbd {
       font: inherit;
       padding: 1px 4px;
@@ -78,12 +92,16 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
   `],
 })
 export class AutoPanFocusExampleComponent {
-  /** Bound to `[autoPanOnNodeFocus]`; the toggle flips it live. */
-  readonly autoPan = signal(true);
+  private readonly flow = viewChild.required(NgFlowComponent);
 
-  // Spread wider than the viewport so Tab-focusing a node actually pans.
+  /** Bound to `[autoPanOnNodeFocus]`; the toggle flips it live (keyboard path). */
+  readonly autoPan = signal(true);
+  /** Index of the node the Prev/Next buttons last revealed. */
+  private readonly activeIndex = signal(-1);
+
+  // Spread wider than the viewport so revealing a node actually pans.
   nodes: Node[] = [
-    { id: '1', type: 'input', data: { label: 'Start — press Tab →' }, position: { x: 0, y: 200 } },
+    { id: '1', type: 'input', data: { label: 'Start' }, position: { x: 0, y: 200 } },
     { id: '2', data: { label: 'Node 2' }, position: { x: 520, y: 320 } },
     { id: '3', data: { label: 'Node 3' }, position: { x: 1040, y: 140 } },
     { id: '4', data: { label: 'Node 4' }, position: { x: 1560, y: 340 } },
@@ -98,6 +116,29 @@ export class AutoPanFocusExampleComponent {
     { id: 'e4-5', source: '4', target: '5' },
     { id: 'e5-6', source: '5', target: '6' },
   ];
+
+  /**
+   * Touch-friendly "focus next/previous node": recenter the viewport on the node
+   * (the pan `autoPanOnNodeFocus` gives keyboard users) and focus it for a11y.
+   * A button tap isn't `:focus-visible`, so we pan explicitly rather than relying
+   * on the keyboard-only autopan.
+   */
+  step(delta: number): void {
+    const n = this.nodes.length;
+    const i = (this.activeIndex() + delta + n) % n;
+    this.activeIndex.set(i);
+
+    const node = this.nodes[i];
+    const flow = this.flow();
+    const internal = flow.store.nodeLookup.get(node.id);
+    const w = internal?.measured?.width ?? 150;
+    const h = internal?.measured?.height ?? 40;
+    const cx = (internal?.internals?.positionAbsolute?.x ?? node.position.x) + w / 2;
+    const cy = (internal?.internals?.positionAbsolute?.y ?? node.position.y) + h / 2;
+
+    flow.service.setCenter(cx, cy, { zoom: flow.store.transform()[2], duration: 350 });
+    (flow.store.domNode()?.querySelector(`.xy-flow__node[data-id="${node.id}"]`) as HTMLElement | null)?.focus();
+  }
 
   onNodesChange(changes: NodeChange[]): void { this.nodes = applyNodeChanges(changes, this.nodes); }
   onEdgesChange(changes: EdgeChange[]): void { this.edges = applyEdgeChanges(changes, this.edges); }
