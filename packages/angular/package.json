@@ -54,7 +54,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@angflow/system": ">=0.1.2"
+    "@angflow/system": "workspace:^"
   },
   "peerDependencies": {
     "@angular/common": ">=19.0.0",
