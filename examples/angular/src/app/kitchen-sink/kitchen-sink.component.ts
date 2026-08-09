@@ -61,6 +61,7 @@ interface KitchenSinkSettings {
   connectOnClick: boolean;
   autoPanOnNodeDrag: boolean;
   autoPanOnConnect: boolean;
+  autoPanOnSelection: boolean;
   autoPanSpeed: number;
   nodeDragThreshold: number;
   connectionDragThreshold: number;
@@ -145,6 +146,7 @@ const DEFAULTS: KitchenSinkSettings = {
   connectOnClick: true,
   autoPanOnNodeDrag: true,
   autoPanOnConnect: true,
+  autoPanOnSelection: true,
   autoPanSpeed: 15,
   nodeDragThreshold: 1,
   connectionDragThreshold: 1,
@@ -211,7 +213,7 @@ const CATEGORY_KEYS: Record<string, (keyof KitchenSinkSettings)[]> = {
   Interaction: [
     'nodesDraggable', 'nodesConnectable', 'nodesFocusable', 'edgesFocusable',
     'edgesReconnectable', 'elementsSelectable', 'selectNodesOnDrag', 'connectOnClick',
-    'autoPanOnNodeDrag', 'autoPanOnConnect', 'autoPanSpeed', 'nodeDragThreshold',
+    'autoPanOnNodeDrag', 'autoPanOnConnect', 'autoPanOnSelection', 'autoPanSpeed', 'nodeDragThreshold',
     'connectionDragThreshold',
   ],
   Viewport: [
@@ -278,6 +280,7 @@ function parseKeyCode(raw: string): string | string[] {
           [connectOnClick]="settings().connectOnClick"
           [autoPanOnNodeDrag]="settings().autoPanOnNodeDrag"
           [autoPanOnConnect]="settings().autoPanOnConnect"
+          [autoPanOnSelection]="settings().autoPanOnSelection"
           [autoPanSpeed]="settings().autoPanSpeed"
           [nodeDragThreshold]="settings().nodeDragThreshold"
           [connectionDragThreshold]="settings().connectionDragThreshold"
@@ -462,6 +465,14 @@ function parseKeyCode(raw: string): string | string[] {
                   <span class="ctrl__label">autoPanOnConnect</span>
                   <input type="checkbox" [checked]="settings().autoPanOnConnect" (change)="set('autoPanOnConnect', $any($event.target).checked)" />
                 </div>
+                <label class="ctrl ctrl--check">
+                  <span class="ctrl__label">autoPanOnSelection</span>
+                  <input
+                    type="checkbox"
+                    [checked]="settings().autoPanOnSelection"
+                    (change)="set('autoPanOnSelection', $any($event.target).checked)"
+                  />
+                </label>
                 <div class="ctrl ctrl--slider">
                   <span class="ctrl__label">autoPanSpeed ({{ settings().autoPanSpeed }})</span>
                   <input type="range" min="1" max="50" [value]="settings().autoPanSpeed" (input)="set('autoPanSpeed', +$any($event.target).value)" />

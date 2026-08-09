@@ -327,11 +327,12 @@ describe('NgFlowComponent interaction wiring', () => {
     setSignalInput(inst, 'panOnDrag', false);
     setSignalInput(inst, 'panOnScroll', false);
     setSignalInput(inst, 'selectionOnDrag', true);
+    setSignalInput(inst, 'panActivationKeyCode', 'KeyP');
     fixture.detectChanges();
     const update = vi.spyOn(inst.store.panZoom()!, 'update');
 
     document.dispatchEvent(new KeyboardEvent('keydown', {
-      key: ' ', code: 'Space', bubbles: true, cancelable: true,
+      key: 'p', code: 'KeyP', bubbles: true, cancelable: true,
     }));
     fixture.detectChanges();
 
@@ -349,16 +350,17 @@ describe('NgFlowComponent interaction wiring', () => {
     const fixture = TestBed.createComponent(NgFlowComponent);
     const inst = fixture.componentInstance;
     setSignalInput(inst, 'zoomOnScroll', false);
+    setSignalInput(inst, 'zoomActivationKeyCode', 'KeyZ');
     fixture.detectChanges();
     const update = vi.spyOn(inst.store.panZoom()!, 'update');
 
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta', bubbles: true }));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', bubbles: true }));
     fixture.detectChanges();
     expect(update).toHaveBeenLastCalledWith(expect.objectContaining({
       zoomActivationKeyPressed: true,
     }));
 
-    document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Meta', bubbles: true }));
+    document.dispatchEvent(new KeyboardEvent('keyup', { key: 'z', code: 'KeyZ', bubbles: true }));
     fixture.detectChanges();
     expect(update).toHaveBeenLastCalledWith(expect.objectContaining({
       zoomActivationKeyPressed: false,
