@@ -154,6 +154,8 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   readonly userSelectionRect = signal<SelectionRect | null>(null);
   readonly multiSelectionActive = signal(false);
   readonly selectionKeyActive = signal(false);
+  readonly panActivationKeyActive = signal(false);
+  readonly zoomActivationKeyActive = signal(false);
 
   readonly panZoom = signal<PanZoomInstance | null>(null);
   readonly minZoom = signal(0.5);
@@ -207,6 +209,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   readonly autoPanOnConnect = signal(true);
   readonly autoPanOnNodeDrag = signal(true);
   readonly autoPanOnNodeFocus = signal(true);
+  readonly autoPanOnSelection = signal(true);
   readonly autoPanSpeed = signal(15);
 
   readonly isValidConnection = signal<((connection: EdgeType | import('@angflow/system').Connection) => boolean) | undefined>(undefined);
@@ -999,6 +1002,8 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     this.userSelectionRect.set(null);
     this.multiSelectionActive.set(false);
     this.selectionKeyActive.set(false);
+    this.panActivationKeyActive.set(false);
+    this.zoomActivationKeyActive.set(false);
     this.fitViewQueued.set(false);
     this._handleData.set(new Map());
   }
@@ -1060,12 +1065,15 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       selectNodesOnDrag: this.selectNodesOnDrag(),
       nodeDragThreshold: this.nodeDragThreshold(),
       multiSelectionActive: this.multiSelectionActive(),
+      panActivationKeyActive: this.panActivationKeyActive(),
+      zoomActivationKeyActive: this.zoomActivationKeyActive(),
       connectionRadius: this.connectionRadius(),
       connectionDragThreshold: this.connectionDragThreshold(),
       isValidConnection: this.isValidConnection(),
       autoPanOnConnect: this.autoPanOnConnect(),
       autoPanOnNodeDrag: this.autoPanOnNodeDrag(),
       autoPanOnNodeFocus: this.autoPanOnNodeFocus(),
+      autoPanOnSelection: this.autoPanOnSelection(),
       autoPanSpeed: this.autoPanSpeed(),
       defaultEdgeOptions: this.defaultEdgeOptions(),
       width: this.width(),

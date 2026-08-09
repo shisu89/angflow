@@ -23,6 +23,26 @@ describe('FlowStore', () => {
     store = new FlowStore();
   });
 
+  it('snapshots activation-key and selection-auto-pan state', () => {
+    store.panActivationKeyActive.set(true);
+    store.zoomActivationKeyActive.set(true);
+    store.autoPanOnSelection.set(false);
+
+    expect(store.getStoreItems()).toMatchObject({
+      panActivationKeyActive: true,
+      zoomActivationKeyActive: true,
+      autoPanOnSelection: false,
+    });
+
+    store.reset();
+
+    expect(store.panActivationKeyActive()).toBe(false);
+    expect(store.zoomActivationKeyActive()).toBe(false);
+    // Configuration is retained across graph reset, matching the other
+    // auto-pan options; the NgFlow input remains its source of truth.
+    expect(store.autoPanOnSelection()).toBe(false);
+  });
+
   // ── setNodes: lookup population & internals ───────────────────────────
 
   describe('setNodes populates nodeLookup with internals', () => {

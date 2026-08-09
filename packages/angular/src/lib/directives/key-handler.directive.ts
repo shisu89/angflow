@@ -6,7 +6,7 @@ import {
   OnInit,
   OnDestroy,
 } from '@angular/core';
-import { isInputDOMNode, type NodeChange, type EdgeChange } from '@angflow/system';
+import { isInputDOMNode, type NodeChange, type EdgeChange, type KeyCode } from '@angflow/system';
 import { FlowStore } from '../services/flow-store.service';
 import { elementToRemoveChange } from '../utils/changes';
 import type { Node, Edge } from '../types';
@@ -23,6 +23,7 @@ import type { Node, Edge } from '../types';
   host: {
     '(document:keydown)': 'onKeyDown($event)',
     '(document:keyup)': 'onKeyUp($event)',
+    '(document:contextmenu)': 'onContextMenu()',
     '(window:blur)': 'onWindowBlur()',
   },
 })
@@ -30,11 +31,15 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
   private store = inject(FlowStore);
 
   /** Key(s) that delete selected elements. `null` disables the shortcut. */
-  readonly deleteKeyCode = input<string | string[] | null>(['Backspace', 'Delete']);
+  readonly deleteKeyCode = input<KeyCode | null>(['Backspace', 'Delete']);
   /** Key held to start box-selection. */
-  readonly selectionKeyCode = input<string | string[] | null>('Shift');
+  readonly selectionKeyCode = input<KeyCode | null>('Shift');
   /** Key held to extend the current selection. */
-  readonly multiSelectionKeyCode = input<string | string[] | null>('Meta');
+  readonly multiSelectionKeyCode = input<KeyCode | null>('Meta');
+  /** Key held to temporarily enable panning. */
+  readonly panActivationKeyCode = input<KeyCode | null>(' ');
+  /** Key held to enable zooming when it is otherwise disabled. */
+  readonly zoomActivationKeyCode = input<KeyCode | null>('Meta');
   /** Disable arrow-key node movement. */
   readonly disableKeyboardA11y = input(false);
 
@@ -55,20 +60,30 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
     if (isInputDOMNode(event)) return;
 
     // Selection key
-    if (this.matchesKey(event.key, this.selectionKeyCode())) {
+    if (this.matchesKey(event, this.selectionKeyCode())) {
       this.selectionKeyPressed = true;
       this.store.selectionKeyActive.set(true);
     }
 
     // Multi-selection key
-    if (this.matchesKey(event.key, this.multiSelectionKeyCode())) {
+    if (this.matchesKey(event, this.multiSelectionKeyCode())) {
       this.multiSelectionKeyPressed = true;
       this.store.multiSelectionActive.set(true);
     }
 
     // Delete key
-    if (this.matchesKey(event.key, this.deleteKeyCode())) {
+    if (this.matchesKey(event, this.deleteKeyCode())) {
       this.handleDelete();
+    }
+
+    if (this.matchesKey(event, this.panActivationKeyCode())) {
+      this.store.panActivationKeyActive.set(true);
+      event.preventDefault();
+    }
+
+    if (this.matchesKey(event, this.zoomActivationKeyCode())) {
+      this.store.zoomActivationKeyActive.set(true);
+      event.preventDefault();
     }
 
     // Select all (Ctrl/Cmd + A)
@@ -90,14 +105,22 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
   }
 
   onKeyUp(event: KeyboardEvent): void {
-    if (this.matchesKey(event.key, this.selectionKeyCode())) {
+    if (this.matchesKey(event, this.selectionKeyCode())) {
       this.selectionKeyPressed = false;
       this.store.selectionKeyActive.set(false);
     }
 
-    if (this.matchesKey(event.key, this.multiSelectionKeyCode())) {
+    if (this.matchesKey(event, this.multiSelectionKeyCode())) {
       this.multiSelectionKeyPressed = false;
       this.store.multiSelectionActive.set(false);
+    }
+
+    if (this.matchesKey(event, this.panActivationKeyCode())) {
+      this.store.panActivationKeyActive.set(false);
+    }
+
+    if (this.matchesKey(event, this.zoomActivationKeyCode())) {
+      this.store.zoomActivationKeyActive.set(false);
     }
   }
 
@@ -108,14 +131,11 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
    * every click keeps extending the selection until the user taps the key again.
    */
   onWindowBlur(): void {
-    if (this.selectionKeyPressed) {
-      this.selectionKeyPressed = false;
-      this.store.selectionKeyActive.set(false);
-    }
-    if (this.multiSelectionKeyPressed) {
-      this.multiSelectionKeyPressed = false;
-      this.store.multiSelectionActive.set(false);
-    }
+    this.resetHeldKeys();
+  }
+
+  onContextMenu(): void {
+    this.resetHeldKeys();
   }
 
   private handleDelete(): void {
@@ -217,9 +237,18 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
     this.store.triggerNodeChanges(changes as NodeChange[]);
   }
 
-  private matchesKey(eventKey: string, keyCode: string | string[] | null): boolean {
+  private resetHeldKeys(): void {
+    this.selectionKeyPressed = false;
+    this.multiSelectionKeyPressed = false;
+    this.store.selectionKeyActive.set(false);
+    this.store.multiSelectionActive.set(false);
+    this.store.panActivationKeyActive.set(false);
+    this.store.zoomActivationKeyActive.set(false);
+  }
+
+  private matchesKey(event: KeyboardEvent, keyCode: KeyCode | null): boolean {
     if (keyCode === null) return false;
-    if (Array.isArray(keyCode)) return keyCode.includes(eventKey);
-    return eventKey === keyCode;
+    const alternatives = Array.isArray(keyCode) ? keyCode : [keyCode];
+    return alternatives.some((value) => value === event.key || value === event.code);
   }
 }

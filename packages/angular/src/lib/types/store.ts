@@ -52,6 +52,8 @@ export interface FlowStoreState<NodeType extends Node = Node, EdgeType extends E
   userSelectionActive: boolean;
   userSelectionRect: SelectionRect | null;
   multiSelectionActive: boolean;
+  panActivationKeyActive: boolean;
+  zoomActivationKeyActive: boolean;
 
   panZoom: PanZoomInstance | null;
   minZoom: number;
@@ -94,6 +96,7 @@ export interface FlowStoreState<NodeType extends Node = Node, EdgeType extends E
   autoPanOnConnect: boolean;
   autoPanOnNodeDrag: boolean;
   autoPanOnNodeFocus: boolean;
+  autoPanOnSelection: boolean;
   autoPanSpeed: number;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

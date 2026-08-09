@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { Component, provideZonelessChangeDetection } from '@angular/core';
+import { Component, provideZonelessChangeDetection, ɵSIGNAL } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { KeyHandlerDirective } from './key-handler.directive';
 import { FlowStore } from '../services/flow-store.service';
@@ -18,6 +18,12 @@ import type { Node, Edge } from '../types';
   template: `<div ngFlowKeyHandler></div>`,
 })
 class HostComponent {}
+
+function setSignalInput<T>(instance: unknown, inputName: string, value: T): void {
+  const sig = (instance as Record<string, unknown>)[inputName];
+  const node = (sig as Record<symbol, { applyValueToInputSignal(n: unknown, v: unknown): void }>)[ɵSIGNAL as unknown as symbol];
+  node.applyValueToInputSignal(node, value);
+}
 
 function makeNode(id: string, overrides: Partial<Node> = {}): Node {
   return { id, position: { x: 0, y: 0 }, data: {}, ...overrides };
@@ -75,5 +81,69 @@ describe('KeyHandlerDirective select-all', () => {
 
     expect(store.selectionKeyActive()).toBe(false);
     expect(store.multiSelectionActive()).toBe(false);
+  });
+
+  it('tracks the default literal-space pan key and prevents page scrolling', () => {
+    const down = new KeyboardEvent('keydown', {
+      key: ' ', code: 'Space', cancelable: true,
+    });
+    directive.onKeyDown(down);
+    expect(store.panActivationKeyActive()).toBe(true);
+    expect(down.defaultPrevented).toBe(true);
+
+    directive.onKeyUp(new KeyboardEvent('keyup', { key: ' ', code: 'Space' }));
+    expect(store.panActivationKeyActive()).toBe(false);
+  });
+
+  it('matches a configured Space value through KeyboardEvent.code', () => {
+    setSignalInput(directive, 'panActivationKeyCode', 'Space');
+    directive.onKeyDown(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
+    expect(store.panActivationKeyActive()).toBe(true);
+  });
+
+  it('treats activation-key arrays as alternatives', () => {
+    setSignalInput(directive, 'panActivationKeyCode', ['Space', 'KeyP']);
+    directive.onKeyDown(new KeyboardEvent('keydown', { key: 'p', code: 'KeyP' }));
+    expect(store.panActivationKeyActive()).toBe(true);
+  });
+
+  it('tracks and releases the zoom activation key', () => {
+    directive.onKeyDown(new KeyboardEvent('keydown', { key: 'Meta', code: 'MetaLeft' }));
+    expect(store.zoomActivationKeyActive()).toBe(true);
+    directive.onKeyUp(new KeyboardEvent('keyup', { key: 'Meta', code: 'MetaLeft' }));
+    expect(store.zoomActivationKeyActive()).toBe(false);
+  });
+
+  it('ignores activation keys from editable targets', () => {
+    const input = document.createElement('input');
+    const event = new KeyboardEvent('keydown', { key: ' ', code: 'Space' });
+    Object.defineProperty(event, 'target', { value: input });
+    directive.onKeyDown(event);
+    expect(store.panActivationKeyActive()).toBe(false);
+  });
+
+  it('honors null activation inputs', () => {
+    setSignalInput(directive, 'panActivationKeyCode', null);
+    setSignalInput(directive, 'zoomActivationKeyCode', null);
+    directive.onKeyDown(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
+    directive.onKeyDown(new KeyboardEvent('keydown', { key: 'Meta', code: 'MetaLeft' }));
+    expect(store.panActivationKeyActive()).toBe(false);
+    expect(store.zoomActivationKeyActive()).toBe(false);
+  });
+
+  it('clears every held modifier on blur and context menu', () => {
+    directive.onKeyDown(new KeyboardEvent('keydown', { key: 'Shift' }));
+    directive.onKeyDown(new KeyboardEvent('keydown', { key: 'Meta' }));
+    directive.onKeyDown(new KeyboardEvent('keydown', { key: ' ' }));
+    directive.onWindowBlur();
+    expect(store.selectionKeyActive()).toBe(false);
+    expect(store.multiSelectionActive()).toBe(false);
+    expect(store.panActivationKeyActive()).toBe(false);
+    expect(store.zoomActivationKeyActive()).toBe(false);
+
+    directive.onKeyDown(new KeyboardEvent('keydown', { key: 'Meta' }));
+    directive.onContextMenu();
+    expect(store.multiSelectionActive()).toBe(false);
+    expect(store.zoomActivationKeyActive()).toBe(false);
   });
 });
