@@ -52,6 +52,8 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
 
   private selectionKeyPressed = false;
   private multiSelectionKeyPressed = false;
+  private readonly panActivationKeys = new Set<string>();
+  private readonly zoomActivationKeys = new Set<string>();
 
   ngOnInit(): void {}
   ngOnDestroy(): void {}
@@ -77,12 +79,14 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
     }
 
     if (this.matchesKey(event, this.panActivationKeyCode())) {
-      this.store.panActivationKeyActive.set(true);
+      this.panActivationKeys.add(this.getPhysicalKeyId(event));
+      this.store.panActivationKeyActive.set(this.panActivationKeys.size > 0);
       event.preventDefault();
     }
 
     if (this.matchesKey(event, this.zoomActivationKeyCode())) {
-      this.store.zoomActivationKeyActive.set(true);
+      this.zoomActivationKeys.add(this.getPhysicalKeyId(event));
+      this.store.zoomActivationKeyActive.set(this.zoomActivationKeys.size > 0);
       event.preventDefault();
     }
 
@@ -115,13 +119,11 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
       this.store.multiSelectionActive.set(false);
     }
 
-    if (this.matchesKey(event, this.panActivationKeyCode())) {
-      this.store.panActivationKeyActive.set(false);
-    }
+    this.panActivationKeys.delete(this.getPhysicalKeyId(event));
+    this.store.panActivationKeyActive.set(this.panActivationKeys.size > 0);
 
-    if (this.matchesKey(event, this.zoomActivationKeyCode())) {
-      this.store.zoomActivationKeyActive.set(false);
-    }
+    this.zoomActivationKeys.delete(this.getPhysicalKeyId(event));
+    this.store.zoomActivationKeyActive.set(this.zoomActivationKeys.size > 0);
   }
 
   /**
@@ -240,6 +242,8 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
   private resetHeldKeys(): void {
     this.selectionKeyPressed = false;
     this.multiSelectionKeyPressed = false;
+    this.panActivationKeys.clear();
+    this.zoomActivationKeys.clear();
     this.store.selectionKeyActive.set(false);
     this.store.multiSelectionActive.set(false);
     this.store.panActivationKeyActive.set(false);
@@ -250,5 +254,9 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
     if (keyCode === null) return false;
     const alternatives = Array.isArray(keyCode) ? keyCode : [keyCode];
     return alternatives.some((value) => value === event.key || value === event.code);
+  }
+
+  private getPhysicalKeyId(event: KeyboardEvent): string {
+    return event.code || event.key;
   }
 }

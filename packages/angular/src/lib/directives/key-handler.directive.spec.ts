@@ -107,10 +107,48 @@ describe('KeyHandlerDirective select-all', () => {
     expect(store.panActivationKeyActive()).toBe(true);
   });
 
+  it('keeps pan activation active until every held alternative key is released', () => {
+    setSignalInput(directive, 'panActivationKeyCode', ['Space', 'KeyP']);
+
+    directive.onKeyDown(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
+    directive.onKeyDown(new KeyboardEvent('keydown', { key: 'p', code: 'KeyP' }));
+    directive.onKeyUp(new KeyboardEvent('keyup', { key: ' ', code: 'Space' }));
+
+    expect(store.panActivationKeyActive()).toBe(true);
+
+    directive.onKeyUp(new KeyboardEvent('keyup', { key: 'p', code: 'KeyP' }));
+    expect(store.panActivationKeyActive()).toBe(false);
+  });
+
+  it('treats repeated pan keydown events as one held physical key', () => {
+    const down = new KeyboardEvent('keydown', { key: ' ', code: 'Space' });
+    directive.onKeyDown(down);
+    directive.onKeyDown(down);
+    directive.onKeyUp(new KeyboardEvent('keyup', { key: ' ', code: 'Space' }));
+
+    expect(store.panActivationKeyActive()).toBe(false);
+  });
+
+  it('clears pan activation when its pressed key is released after configuration changes', () => {
+    directive.onKeyDown(new KeyboardEvent('keydown', { key: ' ', code: 'Space' }));
+    setSignalInput(directive, 'panActivationKeyCode', 'KeyP');
+    directive.onKeyUp(new KeyboardEvent('keyup', { key: ' ', code: 'Space' }));
+
+    expect(store.panActivationKeyActive()).toBe(false);
+  });
+
   it('tracks and releases the zoom activation key', () => {
     directive.onKeyDown(new KeyboardEvent('keydown', { key: 'Meta', code: 'MetaLeft' }));
     expect(store.zoomActivationKeyActive()).toBe(true);
     directive.onKeyUp(new KeyboardEvent('keyup', { key: 'Meta', code: 'MetaLeft' }));
+    expect(store.zoomActivationKeyActive()).toBe(false);
+  });
+
+  it('clears zoom activation when its pressed key is released after configuration changes', () => {
+    directive.onKeyDown(new KeyboardEvent('keydown', { key: 'Meta', code: 'MetaLeft' }));
+    setSignalInput(directive, 'zoomActivationKeyCode', 'Control');
+    directive.onKeyUp(new KeyboardEvent('keyup', { key: 'Meta', code: 'MetaLeft' }));
+
     expect(store.zoomActivationKeyActive()).toBe(false);
   });
 
