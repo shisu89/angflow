@@ -1,5 +1,13 @@
 import { Component, ChangeDetectionStrategy, input, output, inject, OnDestroy, ElementRef } from '@angular/core';
-import { getNodesInside, SelectionMode, type KeyCode } from '@angflow/system';
+import {
+  calcAutoPan,
+  getNodesInside,
+  pointToRendererPoint,
+  rendererPointToPoint,
+  SelectionMode,
+  type KeyCode,
+  type XYPosition,
+} from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 
 @Component({
@@ -34,10 +42,12 @@ export class PaneComponent implements OnDestroy {
   private isSelecting = false;
   private moved = false;
   private activePointerId: number | null = null;
-  private startX = 0;
-  private startY = 0;
+  private selectionOrigin: XYPosition | null = null;
+  private pointerPosition: XYPosition | null = null;
+  private autoPanFrameId: number | null = null;
   private boundOnPointerMove: ((e: PointerEvent) => void) | null = null;
   private boundOnPointerUp: ((e: PointerEvent) => void) | null = null;
+  private boundOnPointerCancel: ((e: PointerEvent) => void) | null = null;
   private nativePointerDownHandler: ((e: Event) => void) | null = null;
   private nativeTouchStartHandler: ((e: Event) => void) | null = null;
 
@@ -123,9 +133,12 @@ export class PaneComponent implements OnDestroy {
     const containerEl = this.store.domNode();
     if (!containerEl) return;
 
-    const rect = containerEl.getBoundingClientRect();
-    this.startX = event.clientX - rect.left;
-    this.startY = event.clientY - rect.top;
+    const bounds = containerEl.getBoundingClientRect();
+    this.pointerPosition = {
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top,
+    };
+    this.selectionOrigin = pointToRendererPoint(this.pointerPosition, this.store.transform());
     this.isSelecting = true;
     this.moved = false;
     this.activePointerId = event.pointerId;
@@ -138,21 +151,23 @@ export class PaneComponent implements OnDestroy {
 
     this.store.userSelectionActive.set(true);
     this.store.userSelectionRect.set({
-      x: this.startX,
-      y: this.startY,
+      x: this.pointerPosition.x,
+      y: this.pointerPosition.y,
       width: 0,
       height: 0,
-      startX: this.startX,
-      startY: this.startY,
+      startX: this.pointerPosition.x,
+      startY: this.pointerPosition.y,
     });
 
     this.selectionStart.emit(event);
 
     this.boundOnPointerMove = (e: PointerEvent) => this.onPointerMove(e);
     this.boundOnPointerUp = (e: PointerEvent) => this.onPointerUp(e);
+    this.boundOnPointerCancel = (e: PointerEvent) => this.onPointerEnd(e);
 
-    document.addEventListener('pointermove', this.boundOnPointerMove!);
-    document.addEventListener('pointerup', this.boundOnPointerUp!);
+    document.addEventListener('pointermove', this.boundOnPointerMove);
+    document.addEventListener('pointerup', this.boundOnPointerUp);
+    document.addEventListener('pointercancel', this.boundOnPointerCancel);
   }
 
   private onPointerMove(event: PointerEvent): void {
@@ -171,49 +186,98 @@ export class PaneComponent implements OnDestroy {
     const containerEl = this.store.domNode();
     if (!containerEl) return;
 
-    const rect = containerEl.getBoundingClientRect();
-    const currentX = event.clientX - rect.left;
-    const currentY = event.clientY - rect.top;
-
-    const selectionRect = {
-      x: Math.min(this.startX, currentX),
-      y: Math.min(this.startY, currentY),
-      width: Math.abs(currentX - this.startX),
-      height: Math.abs(currentY - this.startY),
-      startX: this.startX,
-      startY: this.startY,
+    const bounds = containerEl.getBoundingClientRect();
+    this.pointerPosition = {
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top,
     };
+    this.updateSelectionFromPointer();
+    this.scheduleAutoPan();
+  }
 
+  private updateSelectionFromPointer(): void {
+    if (!this.selectionOrigin || !this.pointerPosition) return;
+    const start = rendererPointToPoint(this.selectionOrigin, this.store.transform());
+    const current = this.pointerPosition;
+    const selectionRect = {
+      x: Math.min(start.x, current.x),
+      y: Math.min(start.y, current.y),
+      width: Math.abs(current.x - start.x),
+      height: Math.abs(current.y - start.y),
+      startX: start.x,
+      startY: start.y,
+    };
     this.store.userSelectionRect.set(selectionRect);
-
-    const transform = this.store.transform();
-    const partially = this.selectionMode() === SelectionMode.Partial;
     const nodesInside = getNodesInside(
       this.store.nodeLookup,
       selectionRect,
-      transform,
-      partially,
-      true  // excludeNonSelectableNodes: honour node.selectable === false
+      this.store.transform(),
+      this.selectionMode() === SelectionMode.Partial,
+      true
     );
+    this.store.addSelectedNodes(nodesInside.map(({ id }) => id));
+  }
 
-    // Always dispatch — passing an empty list through addSelectedNodes is how
-    // we deselect nodes that fell outside the shrinking box.
-    const nodeIds = nodesInside.map(n => n.id);
-    this.store.addSelectedNodes(nodeIds);
+  private scheduleAutoPan(): void {
+    if (
+      this.autoPanFrameId !== null ||
+      !this.isSelecting ||
+      !this.moved ||
+      !this.autoPanOnSelection()
+    ) {
+      return;
+    }
+    this.autoPanFrameId = requestAnimationFrame(() => {
+      void this.runAutoPanFrame();
+    });
+  }
+
+  private async runAutoPanFrame(): Promise<void> {
+    if (!this.isSelecting || !this.pointerPosition || !this.autoPanOnSelection()) {
+      this.autoPanFrameId = null;
+      return;
+    }
+    const container = this.store.domNode();
+    if (!container) {
+      this.autoPanFrameId = null;
+      return;
+    }
+    const [x, y] = calcAutoPan(
+      this.pointerPosition,
+      container.getBoundingClientRect(),
+      this.autoPanSpeed()
+    );
+    const moved = await this.store.panBy({ x, y });
+    if (!this.isSelecting) return;
+    if (moved) this.updateSelectionFromPointer();
+    this.autoPanFrameId = null;
+    this.scheduleAutoPan();
+  }
+
+  private onPointerEnd(event: PointerEvent): void {
+    if (!this.isSelecting) return;
+    if (this.activePointerId !== null && event.pointerId !== this.activePointerId) return;
+    this.finishSelection(event, true);
   }
 
   private onPointerUp(event: PointerEvent): void {
-    if (!this.isSelecting) return;
-    if (this.activePointerId !== null && event.pointerId !== this.activePointerId) return;
+    this.onPointerEnd(event);
+  }
 
+  private finishSelection(event: PointerEvent | null, emitEnd: boolean): void {
+    if (!this.isSelecting && this.activePointerId === null) return;
+    const moved = this.moved;
     this.isSelecting = false;
+    if (this.autoPanFrameId !== null) {
+      cancelAnimationFrame(this.autoPanFrameId);
+      this.autoPanFrameId = null;
+    }
     if (this.activePointerId !== null) {
       try {
         this.el.nativeElement.releasePointerCapture(this.activePointerId);
       } catch {
-        // already released
+        // Pointer capture may already have been released by the browser.
       }
-      this.activePointerId = null;
     }
 
     if (this.boundOnPointerMove) {
@@ -224,7 +288,14 @@ export class PaneComponent implements OnDestroy {
       document.removeEventListener('pointerup', this.boundOnPointerUp);
       this.boundOnPointerUp = null;
     }
+    if (this.boundOnPointerCancel) {
+      document.removeEventListener('pointercancel', this.boundOnPointerCancel);
+      this.boundOnPointerCancel = null;
+    }
 
+    this.activePointerId = null;
+    this.selectionOrigin = null;
+    this.pointerPosition = null;
     this.store.userSelectionActive.set(false);
     this.store.userSelectionRect.set(null);
     // selectionInProgress (set in onPointerMove on the first real movement)
@@ -233,28 +304,23 @@ export class PaneComponent implements OnDestroy {
     // flag would otherwise stay stuck and swallow the next genuine pane tap —
     // clear it here for those pointer types. For mouse, leave it for onPaneClick
     // to consume. (A zero-movement gesture never set the flag.)
-    if (this.moved && event.pointerType !== 'mouse') {
+    if (moved && (!event || event.type === 'pointercancel' || event.pointerType !== 'mouse')) {
       this.store.selectionInProgress.set(false);
     }
     // Mark nodes selection active only if nodes were selected.
     if (this.store.selectedNodes().length > 0) {
       this.store.nodesSelectionActive.set(true);
     }
-    this.selectionEnd.emit(event);
+    if (event && emitEnd) this.selectionEnd.emit(event);
   }
 
   ngOnDestroy(): void {
+    this.finishSelection(null, false);
     if (this.nativePointerDownHandler) {
       this.el.nativeElement.removeEventListener('pointerdown', this.nativePointerDownHandler, true);
     }
     if (this.nativeTouchStartHandler) {
       this.el.nativeElement.removeEventListener('touchstart', this.nativeTouchStartHandler, true);
-    }
-    if (this.boundOnPointerMove) {
-      document.removeEventListener('pointermove', this.boundOnPointerMove);
-    }
-    if (this.boundOnPointerUp) {
-      document.removeEventListener('pointerup', this.boundOnPointerUp);
     }
   }
 }
