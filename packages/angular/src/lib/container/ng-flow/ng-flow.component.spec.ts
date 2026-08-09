@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection, ɵSIGNAL } from '@angular/core';
+import { By } from '@angular/platform-browser';
 import type { Viewport } from '@angflow/system';
 import { NgFlowComponent } from './ng-flow.component';
+import { PaneComponent } from '../pane/pane.component';
 
 /** Set an input() signal's value directly without going through the template. */
 function setSignalInput<T>(instance: unknown, inputName: string, value: T): void {
@@ -15,6 +17,10 @@ class FakeResizeObserver {
   observe(): void {}
   unobserve(): void {}
   disconnect(): void {}
+}
+
+function getPane(fixture: ReturnType<typeof TestBed.createComponent>): PaneComponent {
+  return fixture.debugElement.query(By.directive(PaneComponent)).componentInstance as PaneComponent;
 }
 
 describe('NgFlowComponent fitView startup', () => {
@@ -294,5 +300,109 @@ describe('NgFlowComponent selectionChange output', () => {
     const last = events[events.length - 1];
     expect(last.nodes.length).toBe(1);
     expect((last.nodes[0] as { id: string }).id).toBe('a');
+  });
+});
+
+describe('NgFlowComponent interaction wiring', () => {
+  beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NgFlowComponent],
+      providers: [provideZonelessChangeDetection()],
+    });
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('uses the held pan key for the next pan gesture instead of box selection', () => {
+    const fixture = TestBed.createComponent(NgFlowComponent);
+    const inst = fixture.componentInstance;
+    setSignalInput(inst, 'panOnDrag', false);
+    setSignalInput(inst, 'panOnScroll', false);
+    setSignalInput(inst, 'selectionOnDrag', true);
+    fixture.detectChanges();
+    const update = vi.spyOn(inst.store.panZoom()!, 'update');
+
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      key: ' ', code: 'Space', bubbles: true, cancelable: true,
+    }));
+    fixture.detectChanges();
+
+    const pane = getPane(fixture);
+    expect(pane.panOnDrag()).toBe(true);
+    expect(pane.selectionOnDrag()).toBe(false);
+    expect(update).toHaveBeenLastCalledWith(expect.objectContaining({
+      panOnDrag: true,
+      panOnScroll: true,
+      selectionOnDrag: false,
+    }));
+  });
+
+  it('forwards zoom activation and restores configured options on keyup', () => {
+    const fixture = TestBed.createComponent(NgFlowComponent);
+    const inst = fixture.componentInstance;
+    setSignalInput(inst, 'zoomOnScroll', false);
+    fixture.detectChanges();
+    const update = vi.spyOn(inst.store.panZoom()!, 'update');
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta', bubbles: true }));
+    fixture.detectChanges();
+    expect(update).toHaveBeenLastCalledWith(expect.objectContaining({
+      zoomActivationKeyPressed: true,
+    }));
+
+    document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Meta', bubbles: true }));
+    fixture.detectChanges();
+    expect(update).toHaveBeenLastCalledWith(expect.objectContaining({
+      zoomActivationKeyPressed: false,
+    }));
+  });
+
+  it('syncs and forwards selection auto-pan configuration', () => {
+    const fixture = TestBed.createComponent(NgFlowComponent);
+    const inst = fixture.componentInstance;
+    setSignalInput(inst, 'autoPanOnSelection', false);
+    setSignalInput(inst, 'autoPanSpeed', 9);
+    fixture.detectChanges();
+
+    const pane = getPane(fixture);
+    expect(inst.store.autoPanOnSelection()).toBe(false);
+    expect(pane.autoPanOnSelection()).toBe(false);
+    expect(pane.autoPanSpeed()).toBe(9);
+  });
+
+  it('does not switch ownership of a box selection already in progress', () => {
+    const fixture = TestBed.createComponent(NgFlowComponent);
+    const inst = fixture.componentInstance;
+    setSignalInput(inst, 'panOnDrag', false);
+    setSignalInput(inst, 'selectionOnDrag', true);
+    fixture.detectChanges();
+    const pane = fixture.debugElement.query(By.directive(PaneComponent));
+
+    pane.nativeElement.dispatchEvent(new MouseEvent('pointerdown', {
+      button: 0, clientX: 40, clientY: 40, bubbles: true, cancelable: true,
+    }));
+    expect(inst.store.userSelectionActive()).toBe(true);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      key: ' ', code: 'Space', bubbles: true, cancelable: true,
+    }));
+    fixture.detectChanges();
+    expect(inst.store.userSelectionActive()).toBe(true);
+
+    document.dispatchEvent(new MouseEvent('pointerup', {
+      button: 0, clientX: 60, clientY: 60, bubbles: true,
+    }));
+    pane.nativeElement.dispatchEvent(new MouseEvent('pointerdown', {
+      button: 0, clientX: 70, clientY: 70, bubbles: true, cancelable: true,
+    }));
+    expect(inst.store.userSelectionActive()).toBe(false);
   });
 });

@@ -183,16 +183,20 @@ function viewportsEqual(a: Viewport, b: Viewport): boolean {
       [deleteKeyCode]="deleteKeyCode()"
       [selectionKeyCode]="selectionKeyCode()"
       [multiSelectionKeyCode]="multiSelectionKeyCode()"
+      [panActivationKeyCode]="panActivationKeyCode()"
+      [zoomActivationKeyCode]="zoomActivationKeyCode()"
       [disableKeyboardA11y]="disableKeyboardA11y()"
       (nodesDelete)="nodesDelete.emit($event)"
       (edgesDelete)="edgesDelete.emit($event)"
       (deleteElements)="deleteEvent.emit($event)"
     >
       <ng-flow-pane
-        [panOnDrag]="panOnDrag()"
-        [selectionOnDrag]="selectionOnDrag()"
+        [panOnDrag]="effectivePanOnDrag()"
+        [selectionOnDrag]="effectiveSelectionOnDrag()"
         [selectionKeyCode]="selectionKeyCode()"
         [selectionMode]="selectionMode()"
+        [autoPanOnSelection]="autoPanOnSelection()"
+        [autoPanSpeed]="autoPanSpeed()"
         (pointerdown)="onPanePointerDown($event)"
         (click)="onPaneClick($event)"
         (contextmenu)="onPaneContextMenu($event)"
@@ -405,6 +409,18 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   /** Start a box-selection on plain drag (without holding the selection key). */
   readonly selectionOnDrag = input(false);
 
+  protected readonly effectivePanOnDrag = computed<boolean | number[]>(
+    () => this.store.panActivationKeyActive() || this.panOnDrag()
+  );
+
+  protected readonly effectivePanOnScroll = computed(
+    () => this.store.panActivationKeyActive() || this.panOnScroll()
+  );
+
+  protected readonly effectiveSelectionOnDrag = computed(
+    () => !this.store.panActivationKeyActive() && this.selectionOnDrag()
+  );
+
   /** Selection geometry: `Full` only selects fully contained nodes; `Partial` also selects those that overlap. */
   readonly selectionMode = input<SelectionMode>(SelectionMode.Full);
 
@@ -462,6 +478,9 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
   /** Pan the viewport automatically when dragging a connection near the edge. */
   readonly autoPanOnConnect = input(true);
+
+  /** Pan the viewport automatically when extending a box selection near the edge. */
+  readonly autoPanOnSelection = input(true);
 
   /** Pixels-per-frame speed for auto-pan. */
   readonly autoPanSpeed = input(15);
@@ -772,6 +791,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       this.store.nodeClickDistance.set(this.nodeClickDistance());
       this.store.autoPanOnConnect.set(this.autoPanOnConnect());
       this.store.autoPanOnNodeDrag.set(this.autoPanOnNodeDrag());
+      this.store.autoPanOnSelection.set(this.autoPanOnSelection());
       this.store.autoPanSpeed.set(this.autoPanSpeed());
       this.store.autoPanOnNodeFocus.set(this.autoPanOnNodeFocus());
       this.store.noDragClassName.set(this.noDragClassName());
@@ -838,13 +858,15 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     // Re-sync pan/zoom options whenever the relevant inputs change
     effect(() => {
       // Read all pan/zoom inputs to establish signal dependencies
-      this.panOnDrag();
-      this.panOnScroll();
+      this.effectivePanOnDrag();
+      this.effectivePanOnScroll();
       this.panOnScrollMode();
       this.panOnScrollSpeed();
       this.zoomOnScroll();
       this.zoomOnPinch();
       this.zoomOnDoubleClick();
+      this.effectiveSelectionOnDrag();
+      this.store.zoomActivationKeyActive();
       this.preventScrolling();
       this.noPanClassName();
       this.noWheelClassName();
@@ -1142,13 +1164,15 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
   private updatePanZoomOptions(): void {
     this.panZoomInstance?.update({
-      panOnDrag: this.panOnDrag(),
-      panOnScroll: this.panOnScroll(),
+      panOnDrag: this.effectivePanOnDrag(),
+      panOnScroll: this.effectivePanOnScroll(),
       panOnScrollMode: this.panOnScrollMode(),
       panOnScrollSpeed: this.panOnScrollSpeed(),
       zoomOnScroll: this.zoomOnScroll(),
       zoomOnPinch: this.zoomOnPinch(),
       zoomOnDoubleClick: this.zoomOnDoubleClick(),
+      selectionOnDrag: this.effectiveSelectionOnDrag(),
+      zoomActivationKeyPressed: this.store.zoomActivationKeyActive(),
       preventScrolling: this.preventScrolling(),
       noPanClassName: this.noPanClassName(),
       noWheelClassName: this.noWheelClassName(),

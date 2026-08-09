@@ -24,6 +24,8 @@ export class PaneComponent implements OnDestroy {
   readonly selectionOnDrag = input(false);
   readonly selectionKeyCode = input<KeyCode | null>(null);
   readonly selectionMode = input<SelectionMode>(SelectionMode.Full);
+  readonly autoPanOnSelection = input(true);
+  readonly autoPanSpeed = input(15);
 
   readonly selectionStart = output<MouseEvent>();
   readonly selectionEnd = output<MouseEvent>();
