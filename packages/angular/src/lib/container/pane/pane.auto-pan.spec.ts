@@ -34,6 +34,13 @@ function installFrameHarness(): void {
   vi.stubGlobal('cancelAnimationFrame', vi.fn((id: number) => frames.delete(id)));
 }
 
+function flushFrameworkFrames(): void {
+  for (const [id, callback] of [...frames]) {
+    frames.delete(id);
+    callback(performance.now());
+  }
+}
+
 async function flushFrame(): Promise<void> {
   const entry = frames.entries().next().value as [number, FrameRequestCallback] | undefined;
   if (!entry) throw new Error('Expected a scheduled animation frame');
@@ -67,10 +74,11 @@ describe('PaneComponent box selection auto-pan', () => {
 
   function startSelectionAt(x: number, y: number, pointerType = 'mouse'): void {
     paneElement.dispatchEvent(pointerEvent('pointerdown', { x, y, pointerType }));
-    // Angular's zoneless scheduler also uses requestAnimationFrame after a host-
-    // bound signal write. Keep its already-pending render callback out of this
-    // harness so subsequent frames represent pane-owned auto-pan work only.
-    frames.clear();
+    // Box selection has not scheduled auto-pan yet, so callbacks queued by the
+    // pointerdown signal writes belong to Angular's zoneless render scheduler.
+    // Execute them so Angular resets its scheduler state instead of stranding it.
+    flushFrameworkFrames();
+    vi.mocked(cancelAnimationFrame).mockClear();
   }
 
   function moveSelectionTo(x: number, y: number, pointerType = 'mouse'): void {
@@ -164,6 +172,29 @@ describe('PaneComponent box selection auto-pan', () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(frames.size).toBe(1);
+  });
+
+  it('ignores a stale pan completion after a new box selection starts', async () => {
+    let resolveOldPan!: (moved: boolean) => void;
+    vi.mocked(store.panBy).mockImplementationOnce(
+      () => new Promise<boolean>((resolve) => (resolveOldPan = resolve))
+    );
+    startSelectionAt(100, 100);
+    moveSelectionTo(198, 100);
+    await flushFrame();
+
+    document.dispatchEvent(pointerEvent('pointercancel', { x: 198, y: 100 }));
+    startSelectionAt(50, 50);
+    moveSelectionTo(60, 60);
+    const newSelectionRect = store.userSelectionRect();
+    const newFrameId = frames.keys().next().value as number;
+
+    resolveOldPan(true);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(store.userSelectionRect()).toBe(newSelectionRect);
+    expect([...frames.keys()]).toEqual([newFrameId]);
   });
 
   it('keeps the origin fixed in flow space while the viewport pans', async () => {

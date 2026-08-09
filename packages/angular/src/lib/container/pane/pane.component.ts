@@ -44,6 +44,7 @@ export class PaneComponent implements OnDestroy {
   private activePointerId: number | null = null;
   private selectionOrigin: XYPosition | null = null;
   private pointerPosition: XYPosition | null = null;
+  private selectionGeneration = 0;
   private autoPanFrameId: number | null = null;
   private boundOnPointerMove: ((e: PointerEvent) => void) | null = null;
   private boundOnPointerUp: ((e: PointerEvent) => void) | null = null;
@@ -139,6 +140,7 @@ export class PaneComponent implements OnDestroy {
       y: event.clientY - bounds.top,
     };
     this.selectionOrigin = pointToRendererPoint(this.pointerPosition, this.store.transform());
+    this.selectionGeneration += 1;
     this.isSelecting = true;
     this.moved = false;
     this.activePointerId = event.pointerId;
@@ -227,19 +229,31 @@ export class PaneComponent implements OnDestroy {
     ) {
       return;
     }
-    this.autoPanFrameId = requestAnimationFrame(() => {
-      void this.runAutoPanFrame();
+    const generation = this.selectionGeneration;
+    let frameId = 0;
+    frameId = requestAnimationFrame(() => {
+      void this.runAutoPanFrame(generation, frameId);
     });
+    this.autoPanFrameId = frameId;
   }
 
-  private async runAutoPanFrame(): Promise<void> {
-    if (!this.isSelecting || !this.pointerPosition || !this.autoPanOnSelection()) {
-      this.autoPanFrameId = null;
+  private async runAutoPanFrame(generation: number, frameId: number): Promise<void> {
+    if (
+      generation !== this.selectionGeneration ||
+      !this.isSelecting ||
+      !this.pointerPosition ||
+      !this.autoPanOnSelection()
+    ) {
+      if (generation === this.selectionGeneration && this.autoPanFrameId === frameId) {
+        this.autoPanFrameId = null;
+      }
       return;
     }
     const container = this.store.domNode();
     if (!container) {
-      this.autoPanFrameId = null;
+      if (generation === this.selectionGeneration && this.autoPanFrameId === frameId) {
+        this.autoPanFrameId = null;
+      }
       return;
     }
     const [x, y] = calcAutoPan(
@@ -248,8 +262,9 @@ export class PaneComponent implements OnDestroy {
       this.autoPanSpeed()
     );
     const moved = await this.store.panBy({ x, y });
-    if (!this.isSelecting) return;
+    if (generation !== this.selectionGeneration || !this.isSelecting) return;
     if (moved) this.updateSelectionFromPointer();
+    if (this.autoPanFrameId !== frameId) return;
     this.autoPanFrameId = null;
     this.scheduleAutoPan();
   }
@@ -268,6 +283,7 @@ export class PaneComponent implements OnDestroy {
     if (!this.isSelecting && this.activePointerId === null) return;
     const moved = this.moved;
     this.isSelecting = false;
+    this.moved = false;
     if (this.autoPanFrameId !== null) {
       cancelAnimationFrame(this.autoPanFrameId);
       this.autoPanFrameId = null;
