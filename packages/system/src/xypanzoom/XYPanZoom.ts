@@ -108,10 +108,6 @@ export function XYPanZoom({
     paneClickDistance,
     selectionOnDrag,
   }: PanZoomUpdateOptions) {
-    if (userSelectionActive && !zoomPanValues.isZoomingOrPanning) {
-      destroy();
-    }
-
     const isPanOnScroll = panOnScroll && !zoomActivationKeyPressed && !userSelectionActive;
 
     d3ZoomInstance.clickDistance(
