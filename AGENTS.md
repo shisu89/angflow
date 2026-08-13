@@ -1,0 +1,154 @@
+# angflow — Angular Port of xyflow/ReactFlow
+
+Published as `@angflow/system`, `@angflow/angular`, and `@angflow/mcp` on npm.
+
+## Project Structure
+
+```
+angflow/
+  packages/
+    system/                # Framework-agnostic core (D3-based)
+    angular/               # Angular wrapper library
+    mcp/                   # MCP server exposing the agent bridge to MCP clients
+    react/                 # Original React wrapper (reference)
+    svelte/                # Original Svelte wrapper (reference)
+  examples/
+    angular/               # Angular dev example (uses workspace packages)
+    react/                 # React example (reference)
+    svelte/                # Svelte example (reference)
+    astro-xyflow/          # Astro example (reference)
+  openspec/                # Change tracking artifacts
+```
+
+## Build & Local Dev Flow
+
+### 1. Build the system package (if changed)
+
+```bash
+cd packages/system
+npm run build        # rollup → dist/esm/ + dist/umd/
+npm pack             # → angflow-system-x.x.x.tgz
+```
+
+### 2. Build the Angular package
+
+```bash
+cd packages/angular
+npm run build        # ngc + CSS bundle → dist/esm/ + dist/style.css
+pnpm pack            # → angflow-angular-x.x.x.tgz — pnpm, NOT npm (see below)
+```
+
+### CI
+
+`.github/workflows/ci.yml` runs on pushes/PRs to main: `pnpm install --frozen-lockfile`,
+builds system → angular → mcp, then `pnpm typecheck`, `pnpm lint`, and vitest in all
+three packages. The mcp schema-drift test runs in CI as part of the mcp test suite —
+regenerate the snapshot (`pnpm -F @angflow/mcp run generate:schemas`) when the agent
+tool catalog changes.
+
+## Publish to npm
+
+### First-time setup
+- npm org: `angflow` (owner: `sjs89`)
+- 2FA is enabled — each publish prompts for browser approval
+
+### Publish flow
+
+System must be published before angular (angular depends on it).
+
+```bash
+# System (if changed)
+cd packages/system
+npm version patch          # bump 0.0.76 → 0.0.77
+npm run build
+npm publish --access public
+
+# Angular
+cd packages/angular
+# @angflow/system is a workspace:^ dependency — pnpm rewrites it to ^<system version>
+# on publish, so no manual version sync is needed. MUST publish with pnpm (not npm):
+# a raw `npm publish` would ship a literal, unresolvable "workspace:^" specifier.
+# This bit us for real in 0.3.18, which shipped `"@angflow/system": "workspace:^"` and
+# broke every clean install with ERR_PNPM_WORKSPACE_PKG_NOT_FOUND. The `prepack` guard
+# (scripts/check-publish-tool.js) now aborts any non-pnpm pack/publish of this package.
+npm version patch          # bump 0.0.1 → 0.0.2
+npm run build
+pnpm publish --access public
+```
+
+Verify before publishing — the packed manifest must show a real semver range:
+
+```bash
+pnpm pack && tar -xzOf angflow-angular-*.tgz package/package.json | grep angflow/system
+# expect: "@angflow/system": "^0.1.12"   (never "workspace:^")
+```
+
+### @angflow/mcp
+
+`@angflow/mcp` contains a build-time snapshot of the agent tool catalog. Republish it (patch bump) whenever `AGENT_TOOL_SCHEMAS` in `@angflow/angular` changes — its drift test will fail until the snapshot is regenerated (`pnpm -F @angflow/mcp run generate:schemas`).
+
+```bash
+cd packages/mcp
+npm version patch
+npm run build
+npm publish --access public
+```
+
+### Version bumps
+- `npm version patch` — bug fixes (0.0.1 → 0.0.2)
+- `npm version minor` — new features (0.0.1 → 0.1.0)
+- `npm version major` — breaking changes (0.0.1 → 1.0.0)
+
+## Consumer Apps
+
+### examples/angular
+- Angular dev example at `examples/angular/`
+- Consumes `@angflow/angular` and `@angflow/system` via pnpm `workspace:*` dependencies
+- **Initial setup requires building both packages** — `dist/` is gitignored, and the packages' `exports` point at `dist/`, so `ng serve` will fail with `TS2307: Cannot find module '@angflow/angular'` on a fresh clone until you run `pnpm -F @angflow/system build && pnpm -F @angflow/angular build`
+- After the initial build, ongoing changes still require a rebuild of the affected package — `packages/system` has a `npm run dev` watch script; `packages/angular` does not, so run `npm run build` in `packages/angular` after each change, then restart `ng serve` if it doesn't hot-reload
+
+## Key Commands
+
+| Task | Command | Directory |
+|------|---------|-----------|
+| Type-check angular | `npx tsc --noEmit` | `packages/angular` |
+| Build angular | `npm run build` | `packages/angular` |
+| Pack angular | `pnpm pack` | `packages/angular` |
+| Build system | `npm run build` | `packages/system` |
+| Pack system | `npm pack` | `packages/system` |
+| Publish system | `npm publish --access public` | `packages/system` |
+| Publish angular | `pnpm publish --access public` | `packages/angular` |
+| Build mcp | `npm run build` | `packages/mcp` |
+| Test mcp | `npm run test` | `packages/mcp` |
+| Publish mcp | `npm publish --access public` | `packages/mcp` |
+| Run angular example | `npm run dev` | `examples/angular` |
+| Build angular example | `npm run build` | `examples/angular` |
+
+## Architecture
+
+- **@angflow/system**: Framework-agnostic core. XYDrag, XYHandle, XYPanZoom, XYResizer, XYMinimap classes. Graph utils, path generators, types.
+- **@angflow/angular**: Angular signals-based wrapper. FlowStore (state), NgFlowService (API), NgFlowComponent (main), node/edge renderers, plugin components (Background, Controls, MiniMap, etc.).
+- System package should rarely need changes — most work happens in the Angular package.
+
+## Zoneless-first contributor rules
+
+The Angular package assumes no Zone.js. These rules preserve that invariant:
+
+1. **Never inject `NgZone`.** If you think you need it, you're mixing Zone.js assumptions into zoneless-native code. Drive view updates via signal writes instead.
+2. **Event handlers from outside Angular (D3 bindings, native listeners, `requestAnimationFrame` callbacks) must drive view updates via signal writes.** Never rely on Zone to tick change detection. Writing to a signal the template reads is sufficient.
+3. **Timers are fine.** `setTimeout` / `setInterval` / `requestAnimationFrame` used to schedule logic are framework-agnostic and work in both zoneless and zonal modes. Only the *purpose* matters — using them to force CD is forbidden (rule 2); using them to delay work is allowed.
+
+Library builds and examples must keep the zonal example suite passing (`examples/angular/`) and meet the zoneless example validation bar documented in `docs/superpowers/specs/2026-04-18-angular-19-zoneless-upgrade-design.md`.
+
+## Agent Bridge
+
+The `AngflowAgentBridge` (in `packages/angular/src/lib/agent/`) exposes flows to AI agents over JSON-RPC. **Reference doc: [`packages/angular/AGENT_BRIDGE.md`](packages/angular/AGENT_BRIDGE.md)** — covers wiring, the full tool catalog, events, error codes, and how to add a new tool.
+
+**When making changes in this area, update `AGENT_BRIDGE.md` in the same commit.** That includes:
+- Adding, removing, or renaming a tool in `tool-schemas.ts` / `installHandlers()`
+- Changing a tool's params, return shape, or error behavior
+- Adding or modifying a transport (`transports/*.ts`)
+- Adding or changing a push event in `watchFlow()`
+- Changing the `register` / `unregister` / `callTool` public surface on `AngflowAgentBridge`
+- Adding/changing a tool also requires regenerating the `@angflow/mcp` schema snapshot (`pnpm -F @angflow/mcp run generate:schemas`) — its drift test fails otherwise.
+- The in-browser chat harness (`src/lib/agent/chat/`) consumes `AGENT_TOOL_SCHEMAS` directly at runtime — no snapshot regeneration needed for it.

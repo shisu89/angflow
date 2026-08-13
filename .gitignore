@@ -26,3 +26,5 @@ openspec
 /screenshots/
 # agent-session verification screenshots land in the repo root
 /*.png
+# local pnpm content-addressable store
+.pnpm-store
