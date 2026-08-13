@@ -324,15 +324,27 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
     };
     const keepAspectRatio = this.keepAspectRatio();
     const shouldResize = this.shouldResize();
-    const onResizeStart = this.onResizeStartCb() ?? ((event: ResizeDragEvent, params: ResizeParams) => {
+    const userOnResizeStart = this.onResizeStartCb() ?? ((event: ResizeDragEvent, params: ResizeParams) => {
       this.resizeStart.emit({ event, ...params });
     });
+    // Wrap rather than fold the store write into the default: a consumer-supplied
+    // [onResizeStart] replaces the default entirely, and the gesture flag must be
+    // set either way or paneMouseLeave suppression silently stops working for
+    // anyone using the callback inputs.
+    const onResizeStart = (event: ResizeDragEvent, params: ResizeParams) => {
+      this.store.nodeResizing.set(true);
+      userOnResizeStart(event, params);
+    };
     const onResize = this.onResizeCb() ?? ((event: ResizeDragEvent, params: ResizeParams) => {
       this.resize.emit({ event, ...params });
     });
-    const onResizeEnd = this.onResizeEndCb() ?? ((event: ResizeDragEvent, params: ResizeParams) => {
+    const userOnResizeEnd = this.onResizeEndCb() ?? ((event: ResizeDragEvent, params: ResizeParams) => {
       this.resizeEnd.emit({ event, ...params });
     });
+    const onResizeEnd = (event: ResizeDragEvent, params: ResizeParams) => {
+      this.store.nodeResizing.set(false);
+      userOnResizeEnd(event, params);
+    };
 
     this.resizerInstances.forEach((resizer, index) => {
       resizer.update({
@@ -348,6 +360,7 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.store.nodeResizing.set(false);
     this.destroyResizers();
   }
 }

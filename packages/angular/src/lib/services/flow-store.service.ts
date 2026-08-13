@@ -141,6 +141,31 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   readonly userSelectionActive = signal(false);
 
   /**
+   * True while a node drag is in flight. Written from `updateNodePositions`,
+   * which XYDrag calls with `true` per frame during a drag and with `false`
+   * exactly once at drag end — the only choke point that sees both edges.
+   */
+  readonly nodeDragging = signal(false);
+
+  /** True while a node resize is in flight. Written by NodeResizerComponent. */
+  readonly nodeResizing = signal(false);
+
+  /**
+   * Any pointer gesture the flow owns is in progress. Used to suppress pane
+   * hover events that would otherwise fire when the pointer crosses onto
+   * content projected via `<ng-content/>` (minimap, panels), which sits as a
+   * sibling of the pane rather than inside it.
+   */
+  readonly gestureActive = computed(
+    () =>
+      this.paneDragging() ||
+      this.userSelectionActive() ||
+      this.nodeDragging() ||
+      this.nodeResizing() ||
+      this.connection().inProgress
+  );
+
+  /**
    * Transient flag set by PaneComponent.onMouseUp after a completed marquee
    * drag. Consumed (and reset to false) by NgFlowComponent.onPaneClick so the
    * click synthesised from the same mouseup does not clear the selection box.
@@ -474,6 +499,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   updateNodePositions(nodeDragItems: Map<string, any>, dragging = false): void { // store drag-callback boundary mirrors xyflow's untyped signature
+    this.nodeDragging.set(dragging);
     const parentExpandChildren: ParentExpandChild[] = [];
     const changes: NodeChange[] = [];
     const conn = this.connection();
