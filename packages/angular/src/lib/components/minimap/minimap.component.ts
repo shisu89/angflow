@@ -145,6 +145,18 @@ export class MiniMapComponent {
   readonly inversePan = input(false);
 
   /**
+   * Draw nodes whose `hidden` flag is `true`. `hidden` conflates two things —
+   * "skip this node's DOM" and "drop it from the minimap" — which forces a
+   * consumer doing viewport culling to give up the cheap DOM skip just to keep
+   * off-screen elements navigable on the minimap. Set this to `true` to get
+   * both. Mirrors `fitView`'s option of the same name.
+   *
+   * Collapse-hidden nodes are unaffected: they stay excluded regardless,
+   * because their collapsed ancestor's rect already covers that region.
+   */
+  readonly includeHiddenNodes = input(false);
+
+  /**
    * Node fill color, or function mapping node → color. Unset → falls back to
    * the `--xy-minimap-node-background-color` theme variable via the stylesheet.
    */
@@ -246,12 +258,14 @@ export class MiniMapComponent {
 
   readonly minimapNodes = computed(() => {
     this.store.version(); // react to node changes
-    const hidden = this.store.collapsedHiddenIds();
-    // Exclude collapse-hidden AND node.hidden nodes: the node renderer skips
-    // `hidden` nodes, so the minimap must too (otherwise they show as ghost
-    // rects and inflate the computed viewBox).
+    const collapsed = this.store.collapsedHiddenIds();
+    const includeHidden = this.includeHiddenNodes();
+    // Collapse-hidden nodes are always excluded — the collapsed ancestor's own
+    // rect stands in for them. `node.hidden` is opt-in via [includeHiddenNodes]:
+    // the node renderer skips those nodes' DOM, but a consumer culling by
+    // viewport still wants them as navigable dots.
     const nodes = Array.from(this.store.nodeLookup.values()).filter(
-      (node) => !hidden.has(node.id) && !node.hidden,
+      (node) => !collapsed.has(node.id) && (includeHidden || !node.hidden),
     );
     return nodes.map((node) => ({
       id: node.id,
