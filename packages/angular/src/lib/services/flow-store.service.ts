@@ -14,7 +14,6 @@ import {
   isCoordinateExtent,
   ConnectionMode,
   initialConnection,
-  devWarn,
   defaultAriaLabelConfig,
   Position,
   getNodesInside,
@@ -45,6 +44,7 @@ import {
 
 import type { Node, Edge } from '../types';
 import type { NodeTemplateSpec } from '../types/node-template';
+import { ngDevWarn } from '../utils/dev-warn';
 
 /**
  * Animation options accepted by the viewport helpers (zoomIn/zoomOut/zoomTo/
@@ -213,7 +213,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   readonly autoPanSpeed = signal(15);
 
   readonly isValidConnection = signal<((connection: EdgeType | import('@angflow/system').Connection) => boolean) | undefined>(undefined);
-  readonly onError = signal<OnError>(devWarn);
+  readonly onError = signal<OnError>(ngDevWarn);
 
   readonly lib = signal('ng');
   readonly debug = signal(false);
