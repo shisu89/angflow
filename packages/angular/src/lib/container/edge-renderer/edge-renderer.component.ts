@@ -411,17 +411,31 @@ export class EdgeRendererComponent {
    */
   private warnedEdgeTypes = new Set<string>();
 
+  /**
+   * Reports `error011` once per unknown type.
+   *
+   * Called from `buildEdgeInputs` as well as `getEdgeComponent`, because only
+   * *custom* (registered) edge types render through `ngComponentOutlet` — an
+   * unknown type is not custom, so it takes the built-in `@else` branch and
+   * never resolves a component. Without this second call site the warning was
+   * unreachable in a real render and only the unit tests ever saw it.
+   */
+  private reportUnknownEdgeType(type?: string): void {
+    const resolvedType = type || 'default';
+    if (this.customEdgeTypes()[resolvedType] ?? builtInEdgeTypes[resolvedType]) return;
+    if (this.warnedEdgeTypes.has(resolvedType)) return;
+    this.warnedEdgeTypes.add(resolvedType);
+    // Deferred: see the node renderer's equivalent. This runs inside a
+    // template binding and onError emits the public (error) output.
+    queueMicrotask(() => this.store.onError()?.('011', errorMessages.error011(resolvedType)));
+  }
+
   getEdgeComponent(type?: string): Type<unknown> {
     const resolvedType = type || 'default';
     const resolved = this.customEdgeTypes()[resolvedType] ?? builtInEdgeTypes[resolvedType];
     if (resolved) return resolved;
 
-    if (!this.warnedEdgeTypes.has(resolvedType)) {
-      this.warnedEdgeTypes.add(resolvedType);
-      // Deferred: see the node renderer's equivalent. This runs inside a
-      // template binding and onError emits the public (error) output.
-      queueMicrotask(() => this.store.onError()?.('011', errorMessages.error011(resolvedType)));
-    }
+    this.reportUnknownEdgeType(type);
     return BezierEdgeComponent;
   }
 
@@ -451,6 +465,10 @@ export class EdgeRendererComponent {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private buildEdgeInputs(edge: Edge): Record<string, any> { // dynamic component input bag
+    // Runs on memo miss only — i.e. once per edge per geometry change — which
+    // is the cheapest render-reachable hook for the unknown-type diagnostic.
+    this.reportUnknownEdgeType(edge.type);
+
     const sourceNode = this.store.nodeLookup.get(edge.source);
     const targetNode = this.store.nodeLookup.get(edge.target);
 
