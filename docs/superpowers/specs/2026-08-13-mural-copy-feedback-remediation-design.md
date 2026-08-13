@@ -93,8 +93,9 @@ export const isDevEnv = (): boolean =>
 ```
 
 `@angular/build:application` (esbuild) never defines `process.env.NODE_ENV` for browser
-bundles and nothing here polyfills it. Verified empirically in this repo's own committed
-example bundle — `examples/angular/dist/zoneless/browser/main-SHBTXAG3.js` carries
+bundles and nothing here polyfills it. Verified empirically in a local production build of
+this repo's own example app — `examples/angular/dist/zoneless/browser/main-SHBTXAG3.js`
+(gitignored, not tracked in git) carries
 `globalThis.process?.env?.NODE_ENV==="development"` verbatim, unsubstituted. In a browser
 `globalThis.process` is `undefined`, so `isDevEnv()` is permanently `false` and `devWarn`
 has never logged for any Angular consumer, in dev or prod.
