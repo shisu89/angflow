@@ -35,7 +35,7 @@ npm pack             # → angflow-system-x.x.x.tgz
 ```bash
 cd packages/angular
 npm run build        # ngc + CSS bundle → dist/esm/ + dist/style.css
-npm pack             # → angflow-angular-x.x.x.tgz
+pnpm pack            # → angflow-angular-x.x.x.tgz — pnpm, NOT npm (see below)
 ```
 
 ### CI
@@ -68,9 +68,19 @@ cd packages/angular
 # @angflow/system is a workspace:^ dependency — pnpm rewrites it to ^<system version>
 # on publish, so no manual version sync is needed. MUST publish with pnpm (not npm):
 # a raw `npm publish` would ship a literal, unresolvable "workspace:^" specifier.
+# This bit us for real in 0.3.18, which shipped `"@angflow/system": "workspace:^"` and
+# broke every clean install with ERR_PNPM_WORKSPACE_PKG_NOT_FOUND. The `prepack` guard
+# (scripts/check-publish-tool.js) now aborts any non-pnpm pack/publish of this package.
 npm version patch          # bump 0.0.1 → 0.0.2
 npm run build
 pnpm publish --access public
+```
+
+Verify before publishing — the packed manifest must show a real semver range:
+
+```bash
+pnpm pack && tar -xzOf angflow-angular-*.tgz package/package.json | grep angflow/system
+# expect: "@angflow/system": "^0.1.12"   (never "workspace:^")
 ```
 
 ### @angflow/mcp
@@ -103,7 +113,7 @@ npm publish --access public
 |------|---------|-----------|
 | Type-check angular | `npx tsc --noEmit` | `packages/angular` |
 | Build angular | `npm run build` | `packages/angular` |
-| Pack angular | `npm pack` | `packages/angular` |
+| Pack angular | `pnpm pack` | `packages/angular` |
 | Build system | `npm run build` | `packages/system` |
 | Pack system | `npm pack` | `packages/system` |
 | Publish system | `npm publish --access public` | `packages/system` |

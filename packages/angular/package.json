@@ -1,6 +1,6 @@
 {
   "name": "@angflow/angular",
-  "version": "0.3.17",
+  "version": "0.3.19",
   "type": "module",
   "description": "Angular Flow - A highly customizable Angular library for building node-based editors and interactive flow charts.",
   "keywords": [
@@ -48,6 +48,7 @@
   },
   "scripts": {
     "build": "ngc -p tsconfig.lib.json && node scripts/bundle-css.js",
+    "prepack": "node scripts/check-publish-tool.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src",
