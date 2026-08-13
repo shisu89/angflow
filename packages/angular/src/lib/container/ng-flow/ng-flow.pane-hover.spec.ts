@@ -112,6 +112,60 @@ describe('NgFlowComponent pane hover during gestures', () => {
     expect(leaves).toEqual([leaveEvent]);
   });
 
+  // ── Template wiring ────────────────────────────────────────────────────
+  // Everything above calls onPaneMouseEnter/onPaneMouseLeave directly, which
+  // would still pass if the bindings in the template were reverted to
+  // `paneMouseLeave.emit($event)`. These dispatch real DOM events on the pane
+  // element so the wiring itself is covered.
+
+  const paneEl = (): HTMLElement => {
+    const el = (fixture.nativeElement as HTMLElement).querySelector('ng-flow-pane');
+    expect(el, '<ng-flow-pane> must be rendered').toBeTruthy();
+    return el as HTMLElement;
+  };
+
+  it('routes a real mouseleave through the latch instead of emitting directly', () => {
+    const pane = paneEl();
+    const realLeave = new MouseEvent('mouseleave');
+
+    store.nodeDragging.set(true);
+    fixture.detectChanges();
+
+    pane.dispatchEvent(realLeave);
+    expect(leaves, 'a real mouseleave must be latched, not emitted').toEqual([]);
+
+    store.nodeDragging.set(false);
+    fixture.detectChanges();
+    expect(leaves).toEqual([realLeave]);
+  });
+
+  it('emits a real mouseleave immediately when no gesture is active', () => {
+    const realLeave = new MouseEvent('mouseleave');
+    paneEl().dispatchEvent(realLeave);
+    expect(leaves).toEqual([realLeave]);
+  });
+
+  it('routes a real mouseenter through the latch check', () => {
+    const pane = paneEl();
+
+    store.nodeDragging.set(true);
+    fixture.detectChanges();
+
+    pane.dispatchEvent(new MouseEvent('mouseleave'));
+    pane.dispatchEvent(new MouseEvent('mouseenter'));
+    expect(enters, 'the enter pairing a suppressed leave must be swallowed').toEqual([]);
+
+    store.nodeDragging.set(false);
+    fixture.detectChanges();
+    expect(leaves, 'the latch was consumed by the re-entry').toEqual([]);
+  });
+
+  it('emits a real mouseenter when no latch is pending', () => {
+    const realEnter = new MouseEvent('mouseenter');
+    paneEl().dispatchEvent(realEnter);
+    expect(enters).toEqual([realEnter]);
+  });
+
   it('latches for every gesture source', () => {
     const sources: Array<[string, () => void, () => void]> = [
       ['paneDragging', () => store.paneDragging.set(true), () => store.paneDragging.set(false)],

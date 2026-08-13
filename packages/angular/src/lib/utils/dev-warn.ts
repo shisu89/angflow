@@ -20,8 +20,11 @@ import type { OnError } from '@angflow/system';
 const seen = new Set<string>();
 
 export const ngDevWarn: OnError = (id: string, message: string): void => {
+  // Guard before building the key: production callers on hot paths (error005
+  // fires once per drag frame) must not allocate a template string per call.
+  if (!isDevMode()) return;
   const key = `${id}::${message}`;
-  if (!isDevMode() || seen.has(key)) return;
+  if (seen.has(key)) return;
   seen.add(key);
   console.warn(`[angflow]: ${message} Help: https://reactflow.dev/error#${id}`);
 };
