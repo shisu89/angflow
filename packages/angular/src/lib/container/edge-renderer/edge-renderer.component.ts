@@ -23,6 +23,7 @@ import {
   getFloatingEndpoint,
   inferSide,
   isEdgeVisible,
+  errorMessages,
   type EdgeMarker,
   type HandleType,
   type Connection,
@@ -403,9 +404,25 @@ export class EdgeRendererComponent {
     return computeEdgePathFromInputs(ei);
   }
 
+  /**
+   * Types already reported through `onError`. Local to the renderer because
+   * `getEdgeComponent` runs on every change-detection pass — and is called twice
+   * per edge per pass (once for the outlet, once from getEdgeComponentInputs).
+   */
+  private warnedEdgeTypes = new Set<string>();
+
   getEdgeComponent(type?: string): Type<unknown> {
     const resolvedType = type || 'default';
-    return this.customEdgeTypes()[resolvedType] ?? builtInEdgeTypes[resolvedType] ?? BezierEdgeComponent;
+    const resolved = this.customEdgeTypes()[resolvedType] ?? builtInEdgeTypes[resolvedType];
+    if (resolved) return resolved;
+
+    if (!this.warnedEdgeTypes.has(resolvedType)) {
+      this.warnedEdgeTypes.add(resolvedType);
+      // Deferred: see the node renderer's equivalent. This runs inside a
+      // template binding and onError emits the public (error) output.
+      queueMicrotask(() => this.store.onError()?.('011', errorMessages.error011(resolvedType)));
+    }
+    return BezierEdgeComponent;
   }
 
   private declaredInputsCache = new WeakMap<Type<unknown>, Set<string> | null>();
