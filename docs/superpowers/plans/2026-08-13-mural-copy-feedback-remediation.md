@@ -582,7 +582,11 @@ describe('FlowStore.gestureActive', () => {
   });
 
   it('is true while a connection is in progress', () => {
-    store.connection.set({ ...store.connection(), inProgress: true } as never);
+    // ConnectionState is a discriminated union: NoConnection has
+    // `inProgress: false`, ConnectionInProgress has `inProgress: true` plus
+    // several required fields. Spreading the initial value does NOT produce a
+    // valid ConnectionInProgress, so cast the whole literal.
+    store.connection.set({ inProgress: true } as unknown as ReturnType<typeof store.connection>);
     expect(store.gestureActive()).toBe(true);
   });
 
@@ -757,17 +761,23 @@ describe('NodeResizerComponent nodeResizing flag', () => {
     fixture.detectChanges();
 
     expect(store.nodeResizing()).toBe(false);
+
+    // The real scenario: proximity-gated chrome unmounts the resizer WHILE a
+    // resize is in flight. Without the ngOnDestroy clear, the flag strands at
+    // true and every later paneMouseLeave is suppressed forever.
+    store.nodeResizing.set(true);
     fixture.destroy();
     expect(store.nodeResizing()).toBe(false);
   });
 });
 ```
 
-> This asserts only the destroy path and the default, because driving a real
-> `XYResizer` drag needs a laid-out DOM. The start/end wrapping is covered
-> end-to-end by Task 5's `paneMouseLeave` tests, which set `nodeResizing`
-> directly. If the component requires inputs beyond `nodeId`, read its input
-> declarations and supply them.
+> This covers the default and the destroy-while-resizing path — the one that
+> can permanently wedge `gestureActive`. It deliberately does not drive a real
+> `XYResizer` drag, which needs a laid-out DOM; the start/end wrapping is
+> covered end-to-end by Task 5's tests, which set `nodeResizing` directly. If
+> the component requires inputs beyond `nodeId`, read its input declarations
+> and supply them.
 
 - [ ] **Step 8: Run the full suite and type-check**
 
@@ -896,30 +906,30 @@ describe('NgFlowComponent pane hover during gestures', () => {
   });
 
   it('latches for every gesture source', () => {
-    const sources: Array<[() => void, () => void]> = [
-      [() => store.paneDragging.set(true), () => store.paneDragging.set(false)],
-      [() => store.userSelectionActive.set(true), () => store.userSelectionActive.set(false)],
-      [() => store.nodeResizing.set(true), () => store.nodeResizing.set(false)],
+    const sources: Array<[string, () => void, () => void]> = [
+      ['paneDragging', () => store.paneDragging.set(true), () => store.paneDragging.set(false)],
+      ['userSelectionActive', () => store.userSelectionActive.set(true), () => store.userSelectionActive.set(false)],
+      ['nodeResizing', () => store.nodeResizing.set(true), () => store.nodeResizing.set(false)],
     ];
 
-    for (const [start, end] of sources) {
-      leaves = [];
-      component.paneMouseLeave.subscribe;
+    // Never reassign `leaves` — the subscription above closes over the original
+    // array, so a fresh array would silently stop receiving emissions and every
+    // assertion after it would pass vacuously. Compare counts instead.
+    for (const [name, start, end] of sources) {
+      const before = leaves.length;
+
       start();
       fixture.detectChanges();
       component.onPaneMouseLeave(leaveEvent);
-      const duringGesture = leaves.length;
+      expect(leaves.length, `${name}: leave must be suppressed mid-gesture`).toBe(before);
+
       end();
       fixture.detectChanges();
-      expect(duringGesture).toBe(0);
+      expect(leaves.length, `${name}: leave must be delivered at gesture end`).toBe(before + 1);
     }
   });
 });
 ```
-
-> `leaves` is reassigned inside the last test's loop while the subscription
-> still pushes to the original array. Capture per-iteration counts as shown
-> (`duringGesture`) rather than asserting on `leaves` after reassignment.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -1097,17 +1107,27 @@ describe('MinimapComponent includeHiddenNodes', () => {
   it('still excludes collapse-hidden nodes when the input is set', () => {
     // A collapsed group's own rect already represents its descendants; drawing
     // them too would double-draw the region and inflate the viewBox.
-    store.collapsedHiddenIds.set(new Set(['visible']));
+    //
+    // `collapsedHiddenIds` is a COMPUTED (flow-store.service.ts:345) derived
+    // from getCollapsedHiddenIds(nodeLookup) — it has no .set(). Drive it the
+    // only way the real feature does: a parent marked `collapsed: true` hides
+    // every descendant that points at it via `parentId`.
+    store.setNodes([
+      makeNode('group', { collapsed: true } as Partial<Node>),
+      makeNode('child', { parentId: 'group' } as Partial<Node>),
+      makeNode('domHidden', { hidden: true, position: { x: 500, y: 500 } }),
+    ]);
+    expect(store.collapsedHiddenIds().has('child')).toBe(true);
+
     fixture.componentRef.setInput('includeHiddenNodes', true);
     fixture.detectChanges();
-    expect(component.minimapNodes().map((n) => n.id)).toEqual(['domHidden']);
+
+    const ids = component.minimapNodes().map((n) => n.id).sort();
+    expect(ids).toContain('domHidden'); // node.hidden revealed by the input
+    expect(ids).not.toContain('child'); // collapse-hidden stays excluded
   });
 });
 ```
-
-> If `collapsedHiddenIds` is a computed rather than a writable signal, drive it
-> the way the collapse feature does (search `collapsedHiddenIds` in
-> `flow-store.service.ts`). The assertion does not change.
 
 - [ ] **Step 2: Run test to verify it fails**
 

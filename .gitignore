@@ -28,3 +28,6 @@ openspec
 /*.png
 # local pnpm content-addressable store
 .pnpm-store
+
+# Superpowers SDD scratch (ledger, briefs, review packages)
+.superpowers/
