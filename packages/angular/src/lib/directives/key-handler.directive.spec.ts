@@ -160,6 +160,34 @@ describe('KeyHandlerDirective select-all', () => {
     expect(store.panActivationKeyActive()).toBe(false);
   });
 
+  it('does not swallow Space on a focused button or link, but still tracks the key', () => {
+    for (const tag of ['button', 'a']) {
+      const el = document.createElement(tag);
+      const event = new KeyboardEvent('keydown', { key: ' ', code: 'Space', cancelable: true });
+      Object.defineProperty(event, 'target', { value: el });
+
+      directive.onKeyDown(event);
+
+      // The button/link must still activate on Space...
+      expect(event.defaultPrevented).toBe(false);
+      // ...while pan activation tracks the held key exactly as it would elsewhere.
+      expect(store.panActivationKeyActive()).toBe(true);
+
+      directive.onKeyUp(new KeyboardEvent('keyup', { key: ' ', code: 'Space' }));
+    }
+  });
+
+  it('still prevents the default for a modifier-qualified activation key on a button', () => {
+    const button = document.createElement('button');
+    const event = new KeyboardEvent('keydown', { key: 'Meta', code: 'MetaLeft', metaKey: true, cancelable: true });
+    Object.defineProperty(event, 'target', { value: button });
+
+    directive.onKeyDown(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(store.zoomActivationKeyActive()).toBe(true);
+  });
+
   it('honors null activation inputs', () => {
     setSignalInput(directive, 'panActivationKeyCode', null);
     setSignalInput(directive, 'zoomActivationKeyCode', null);

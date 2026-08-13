@@ -81,13 +81,13 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
     if (this.matchesKey(event, this.panActivationKeyCode())) {
       this.panActivationKeys.add(this.getPhysicalKeyId(event));
       this.store.panActivationKeyActive.set(this.panActivationKeys.size > 0);
-      event.preventDefault();
+      if (this.canPreventDefault(event)) event.preventDefault();
     }
 
     if (this.matchesKey(event, this.zoomActivationKeyCode())) {
       this.zoomActivationKeys.add(this.getPhysicalKeyId(event));
       this.store.zoomActivationKeyActive.set(this.zoomActivationKeys.size > 0);
-      event.preventDefault();
+      if (this.canPreventDefault(event)) event.preventDefault();
     }
 
     // Select all (Ctrl/Cmd + A)
@@ -258,5 +258,27 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
 
   private getPhysicalKeyId(event: KeyboardEvent): string {
     return event.code || event.key;
+  }
+
+  /**
+   * Whether swallowing the browser default for an activation keydown is safe.
+   *
+   * These listeners are on `document`, and `panActivationKeyCode` defaults to
+   * Space — which is also how a keyboard user activates a focused `<button>` or
+   * `<a>`, including this library's own `<ng-flow-controls>` buttons. Calling
+   * preventDefault() unconditionally would make those inert page-wide for any
+   * app that mounts a flow. A modifier-qualified press is never a native
+   * activation, so it still prevents (matters for `zoomActivationKeyCode`,
+   * which defaults to Meta).
+   *
+   * React parity: `useKeyPress`'s `isInteractiveElement` guard. The key is
+   * still tracked as held either way — only the default action is spared.
+   */
+  private canPreventDefault(event: KeyboardEvent): boolean {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return true;
+    // composedPath() pierces shadow DOM; falls back to target for synthetic events.
+    const target = (event.composedPath?.()?.[0] || event.target) as Element | null;
+    const nodeName = target?.nodeName;
+    return nodeName !== 'BUTTON' && nodeName !== 'A';
   }
 }
