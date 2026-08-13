@@ -24,6 +24,7 @@ import { InputNodeComponent } from '../../components/nodes/input-node.component'
 import { OutputNodeComponent } from '../../components/nodes/output-node.component';
 import { GroupNodeComponent } from '../../components/nodes/group-node.component';
 import { TemplateNodeComponent } from '../../components/nodes/template-node.component';
+import { errorMessages } from '@angflow/system';
 import type { Node, InternalNode, NodeTypes, NgFlowNodeContext } from '../../types';
 
 /**
@@ -403,6 +404,13 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
     };
   }
 
+  /**
+   * Types already reported through `onError`. Local to the renderer because
+   * `getNodeComponent` runs on every change-detection pass — without this, a
+   * single bad type would emit the public (error) output on every frame.
+   */
+  private warnedNodeTypes = new Set<string>();
+
   getNodeComponent(type?: string): Type<unknown> {
     const resolvedType = type || 'default';
     const hostOrBuiltIn = this.customNodeTypes()[resolvedType] ?? builtInNodeTypes[resolvedType];
@@ -411,6 +419,14 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
     // makes the template binding reactive — registering/unregistering a
     // template re-renders affected nodes with no host involvement.
     if (this.store.nodeTemplates().has(resolvedType)) return TemplateNodeComponent;
+
+    if (!this.warnedNodeTypes.has(resolvedType)) {
+      this.warnedNodeTypes.add(resolvedType);
+      // Deferred: this method runs inside an *ngComponentOutlet binding, and
+      // onError emits the public (error) output. Emitting mid-template would
+      // risk ExpressionChangedAfterItHasBeenChecked in consumers reacting to it.
+      queueMicrotask(() => this.store.onError()?.('003', errorMessages.error003(resolvedType)));
+    }
     return DefaultNodeComponent;
   }
 
