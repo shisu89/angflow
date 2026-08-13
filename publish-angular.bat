@@ -14,7 +14,8 @@ if /i not "%BUMP%"=="patch" if /i not "%BUMP%"=="minor" if /i not "%BUMP%"=="maj
 
 echo This will bump, build, and publish @angflow/angular ONLY to npm with bump "%BUMP%".
 echo @angflow/system will NOT be rebuilt, bumped, or republished.
-echo The existing "@angflow/system" dependency in packages\angular\package.json will be left as-is.
+echo The "@angflow/system" dependency stays "workspace:^" in the repo; pnpm
+echo substitutes it with a real semver range inside the published tarball.
 echo npm 2FA will prompt for browser approval on publish.
 set /p CONFIRM=Continue? (y/N):
 if /i not "%CONFIRM%"=="y" (
@@ -47,7 +48,17 @@ echo @angflow/angular is now !ANGULAR_VERSION!
 
 echo.
 echo [3/4] Publishing @angflow/angular@!ANGULAR_VERSION!...
-call npm publish --access public
+rem MUST be pnpm, not npm: "@angflow/system" is declared "workspace:^" and only
+rem pnpm rewrites that to a real semver range when packing. A raw `npm publish`
+rem ships the literal string and breaks every clean install -- that is how
+rem 0.3.18 shipped broken. scripts/check-publish-tool.js runs as `prepack` and
+rem refuses any non-pnpm pack, so npm cannot get past this line anyway.
+rem
+rem --no-git-checks: step [2/4] just bumped package.json, so the tree is dirty by
+rem design and pnpm would otherwise abort. This only waives pnpm's tidiness
+rem check; the prepack guard above still runs and is what actually protects the
+rem published manifest.
+call pnpm publish --access public --no-git-checks
 if errorlevel 1 (
     echo.
     echo ERROR: angular publish failed.
