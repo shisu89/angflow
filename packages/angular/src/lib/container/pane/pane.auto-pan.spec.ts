@@ -115,6 +115,11 @@ describe('PaneComponent box selection auto-pan', () => {
       value: () => ({ left: 0, top: 0, right: 200, bottom: 200, width: 200, height: 200 }),
     });
     store.domNode.set(container as HTMLDivElement);
+    // Auto-pan sizes the edge bands off the store's ResizeObserver-backed
+    // dimensions, which NgFlowComponent seeds before the pane can start a
+    // selection. Match the fake container's 200x200 box.
+    store.width.set(200);
+    store.height.set(200);
 
     nextFrameId = 1;
     frames = new Map();
@@ -303,14 +308,35 @@ describe('PaneComponent box selection auto-pan', () => {
     expect(store.selectedNodes()).toHaveLength(0);
   });
 
-  it('stops viewport movement when the pointer returns to the center', async () => {
+  it('stops the auto-pan loop when the pointer returns to the center', async () => {
     startSelectionAt(100, 100);
     moveSelectionTo(198, 100);
     await flushFrame();
     vi.mocked(store.panBy).mockClear();
     moveSelectionTo(100, 100);
     await flushFrame();
-    expect(store.panBy).toHaveBeenLastCalledWith({ x: 0, y: 0 });
+    // Clear of every edge there is nothing to pan, so the frame neither calls
+    // panBy nor re-arms itself. Re-arming would spin a frame callback for the
+    // rest of the gesture to compute a zero delta.
+    expect(store.panBy).not.toHaveBeenCalled();
+    expect(frames.size).toBe(0);
+  });
+
+  it('resumes auto-pan on the next pointermove back to an edge', async () => {
+    startSelectionAt(100, 100);
+    moveSelectionTo(198, 100);
+    await flushFrame();
+    moveSelectionTo(100, 100);
+    await flushFrame();
+    expect(frames.size).toBe(0);
+
+    // The loop stopped, so pointermove is the only thing that can restart it.
+    vi.mocked(store.panBy).mockClear();
+    moveSelectionTo(198, 100);
+    expect(frames.size).toBe(1);
+    await flushFrame();
+    expect(store.panBy).toHaveBeenCalledOnce();
+    expect(vi.mocked(store.panBy).mock.lastCall?.[0].x).toBeLessThan(0);
   });
 
   it.each(['mouse', 'touch', 'pen'])('uses the same box selection path for %s', (pointerType) => {

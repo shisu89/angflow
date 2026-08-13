@@ -249,18 +249,24 @@ export class PaneComponent implements OnDestroy {
       }
       return;
     }
-    const container = this.store.domNode();
-    if (!container) {
-      if (generation === this.selectionGeneration && this.autoPanFrameId === frameId) {
-        this.autoPanFrameId = null;
-      }
-      return;
-    }
+    // Container size comes from the store's ResizeObserver-backed signals rather
+    // than getBoundingClientRect(): calcAutoPan only needs width/height, and a
+    // layout read on every animation frame of every box selection is a cost this
+    // loop should not be paying.
     const [x, y] = calcAutoPan(
       this.pointerPosition,
-      container.getBoundingClientRect(),
+      { width: this.store.width(), height: this.store.height() },
       this.autoPanSpeed()
     );
+    if (x === 0 && y === 0) {
+      // Pointer is clear of every edge, so there is nothing to pan. Stop the loop
+      // instead of re-arming it: with no pan there is no viewport movement, so
+      // the only thing that can bring the pointer back into an auto-pan band is
+      // another pointermove — and that re-arms via scheduleAutoPan(). Re-arming
+      // here would spin a frame callback for the whole gesture to do nothing.
+      if (this.autoPanFrameId === frameId) this.autoPanFrameId = null;
+      return;
+    }
     const moved = await this.store.panBy({ x, y });
     if (generation !== this.selectionGeneration || !this.isSelecting) return;
     if (moved) this.updateSelectionFromPointer();
