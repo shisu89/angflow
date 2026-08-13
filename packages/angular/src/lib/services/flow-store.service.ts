@@ -144,6 +144,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
    * True while a node drag is in flight. Written from `updateNodePositions`,
    * which XYDrag calls with `true` per frame during a drag and with `false`
    * exactly once at drag end — the only choke point that sees both edges.
+   * Callers that omit the `dragging` argument leave this signal untouched.
    */
   readonly nodeDragging = signal(false);
 
@@ -498,8 +499,14 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  updateNodePositions(nodeDragItems: Map<string, any>, dragging = false): void { // store drag-callback boundary mirrors xyflow's untyped signature
-    this.nodeDragging.set(dragging);
+  updateNodePositions(nodeDragItems: Map<string, any>, dragging?: boolean): void { // store drag-callback boundary mirrors xyflow's untyped signature
+    // Only a caller that actually knows the gesture state may touch the flag.
+    // XYDrag always passes an explicit boolean (true per frame, false once at
+    // drag end), so drag end still clears it. Programmatic movers — arrow-key
+    // nudges from the selection box, agent-driven position writes — omit it and
+    // must not clear a pointer drag that is still in flight.
+    if (dragging !== undefined) this.nodeDragging.set(dragging);
+    const isDragging = dragging ?? false;
     const parentExpandChildren: ParentExpandChild[] = [];
     const changes: NodeChange[] = [];
     const conn = this.connection();
@@ -518,7 +525,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
         position: expandParent
           ? { x: Math.max(0, dragItem.position.x), y: Math.max(0, dragItem.position.y) }
           : dragItem.position,
-        dragging,
+        dragging: isDragging,
       };
 
       if (node && conn.inProgress && conn.fromNode?.id === node.id) {

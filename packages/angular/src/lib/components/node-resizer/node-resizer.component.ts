@@ -187,6 +187,16 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
   private resizerInstances: ReturnType<typeof XYResizer>[] = [];
 
   /**
+   * True between this instance's own resize start and end. `FlowStore.nodeResizing`
+   * is a single global flag but there is one resizer per node, so `ngOnDestroy`
+   * must only clear it when *this* instance is the one holding it — otherwise an
+   * unrelated node's resizer unmounting (proximity-gated chrome does this
+   * constantly) would drop `gestureActive()` in the middle of a live resize and
+   * un-suppress `paneMouseLeave`.
+   */
+  private ownsResizeGesture = false;
+
+  /**
    * Control size in flow-space px. With `autoScale` (default) the size is
    * divided by the current zoom so handles/lines stay a constant *screen* size
    * — otherwise they'd shrink to a few px when zoomed out and become ungrabbable.
@@ -332,6 +342,7 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
     // set either way or paneMouseLeave suppression silently stops working for
     // anyone using the callback inputs.
     const onResizeStart = (event: ResizeDragEvent, params: ResizeParams) => {
+      this.ownsResizeGesture = true;
       this.store.nodeResizing.set(true);
       userOnResizeStart(event, params);
     };
@@ -342,6 +353,7 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
       this.resizeEnd.emit({ event, ...params });
     });
     const onResizeEnd = (event: ResizeDragEvent, params: ResizeParams) => {
+      this.ownsResizeGesture = false;
       this.store.nodeResizing.set(false);
       userOnResizeEnd(event, params);
     };
@@ -360,7 +372,13 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.store.nodeResizing.set(false);
+    // Only release the global flag if this instance is the one that raised it.
+    // A resizer torn down mid-gesture would otherwise strand `nodeResizing` at
+    // true forever; a sibling torn down mid-gesture must leave it alone.
+    if (this.ownsResizeGesture) {
+      this.ownsResizeGesture = false;
+      this.store.nodeResizing.set(false);
+    }
     this.destroyResizers();
   }
 }

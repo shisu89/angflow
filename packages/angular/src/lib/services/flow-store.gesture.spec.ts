@@ -86,33 +86,27 @@ describe('FlowStore.nodeDragging via updateNodePositions', () => {
     expect(store.nodeDragging()).toBe(false);
   });
 
-  it('defaults to not-dragging when the flag is omitted', () => {
+  it('leaves the flag untouched when the dragging argument is omitted', () => {
+    // Programmatic movers (SelectionBox arrow-key nudge, agent position writes)
+    // omit the flag. An arrow press mid-drag must not clear a live pointer drag.
     store.nodeDragging.set(true);
+    store.updateNodePositions(new Map());
+    expect(store.nodeDragging()).toBe(true);
+
+    store.nodeDragging.set(false);
     store.updateNodePositions(new Map());
     expect(store.nodeDragging()).toBe(false);
   });
-});
 
-describe('NodeResizerComponent nodeResizing flag', () => {
-  it('sets the flag on resize start and clears it on resize end', async () => {
-    const { NodeResizerComponent } = await import('../components/node-resizer/node-resizer.component');
-    TestBed.resetTestingModule();
-    TestBed.configureTestingModule({
-      imports: [NodeResizerComponent],
-      providers: [provideZonelessChangeDetection(), FlowStore],
-    });
-    const store = TestBed.inject(FlowStore);
-    const fixture = TestBed.createComponent(NodeResizerComponent);
-    fixture.componentRef.setInput('nodeId', 'n1');
-    fixture.detectChanges();
+  it('still marks the emitted changes as not-dragging when the flag is omitted', () => {
+    const seen: Array<{ dragging?: boolean }> = [];
+    store.setNodes([{ id: 'a', position: { x: 0, y: 0 }, data: {} } as never]);
+    store.onNodesChange = (changes) => seen.push(...(changes as Array<{ dragging?: boolean }>));
 
-    expect(store.nodeResizing()).toBe(false);
+    store.updateNodePositions(
+      new Map([['a', { id: 'a', position: { x: 5, y: 5 }, internals: {}, measured: {} }]]),
+    );
 
-    // The real scenario: proximity-gated chrome unmounts the resizer WHILE a
-    // resize is in flight. Without the ngOnDestroy clear, the flag strands at
-    // true and every later paneMouseLeave is suppressed forever.
-    store.nodeResizing.set(true);
-    fixture.destroy();
-    expect(store.nodeResizing()).toBe(false);
+    expect(seen.some((c) => c.dragging === true)).toBe(false);
   });
 });

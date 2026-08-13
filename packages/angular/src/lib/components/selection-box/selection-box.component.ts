@@ -166,6 +166,11 @@ export class SelectionBoxComponent {
    * Ports React's useMoveSelectedNodes: shift every selected & draggable node
    * by a snap-grid-aware velocity, then push the batch through the same
    * updateNodePositions path a drag uses.
+   *
+   * The `dragging` argument is deliberately omitted: this is a keyboard nudge,
+   * not a pointer gesture, so it must neither raise nor clear
+   * `FlowStore.nodeDragging` (an arrow press during a live drag would otherwise
+   * drop `gestureActive()` mid-drag).
    */
   private moveSelectedNodes(direction: XYPosition, factor: number): void {
     const store = this.store;
