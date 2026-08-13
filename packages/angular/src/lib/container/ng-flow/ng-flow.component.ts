@@ -660,11 +660,21 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   readonly paneClick = output<MouseEvent>({ alias: 'paneClick' });
   /** Right-click on the empty pane. */
   readonly paneContextMenu = output<MouseEvent>({ alias: 'paneContextMenu' });
-  /** Pointer entered the pane. */
+  /**
+   * Pointer entered the pane. Suppressed when it pairs with a leave that was
+   * itself suppressed mid-gesture — the consumer never learned the pointer had
+   * left, so this enter would be an unpaired duplicate.
+   */
   readonly paneMouseEnter = output<MouseEvent>({ alias: 'paneMouseEnter' });
   /** Pointer moved over the pane. */
   readonly paneMouseMove = output<MouseEvent>({ alias: 'paneMouseMove' });
-  /** Pointer left the pane. */
+  /**
+   * Pointer left the pane. While a pan/box-select/node-drag/resize/connection
+   * gesture is in flight the leave is latched instead of emitted: it is
+   * delivered when the gesture ends if the pointer is still outside, and
+   * dropped entirely if the pointer returned first. Enter/leave therefore stay
+   * paired, at the cost of a leave arriving later than the DOM event.
+   */
   readonly paneMouseLeave = output<MouseEvent>({ alias: 'paneMouseLeave' });
   /** Scroll wheel on the pane (only fires when `panOnScroll` is enabled). */
   readonly paneScroll = output<WheelEvent | undefined>({ alias: 'paneScroll' });
@@ -972,7 +982,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     }
 
     // Bridge store errors to the (error) output. Preserve the default handler
-    // (devWarn) so unbound consumers still see console warnings.
+    // (ngDevWarn) so unbound consumers still see console warnings in dev mode.
     const previousOnError = this.store.onError();
     const onErrorWrapper = (id: string, message: string) => {
       previousOnError?.(id, message);

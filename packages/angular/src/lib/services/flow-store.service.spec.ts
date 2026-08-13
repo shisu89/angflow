@@ -752,7 +752,7 @@ describe('FlowStore', () => {
 
   // Mirrors the pattern NgFlowComponent.ngOnInit installs to bridge store
   // errors to the component's (error) output while preserving the default
-  // devWarn handler.
+  // ngDevWarn handler.
   describe('onError wrapping preserves previous handler and forwards to emitter', () => {
     it('invokes the previous handler and the new emitter in order', () => {
       const calls: string[] = [];
@@ -775,10 +775,11 @@ describe('FlowStore', () => {
       expect(emittedEvents).toEqual([{ id: '001', message: 'something went wrong' }]);
     });
 
-    it('does not throw when wrapping the default devWarn handler', () => {
-      // A freshly constructed store starts with devWarn as its default handler.
-      // Wrapping it using the ngOnInit pattern must not throw, even though
-      // devWarn is a no-op outside NODE_ENV=development.
+    it('does not throw when wrapping the default ngDevWarn handler', () => {
+      // A freshly constructed store starts with ngDevWarn as its default
+      // handler. Wrapping it using the ngOnInit pattern must not throw — under
+      // vitest `isDevMode()` is true, so this really does run ngDevWarn's
+      // console.warn path rather than a no-op.
       const captured = store.onError();
       expect(captured).toBeDefined();
 
