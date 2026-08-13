@@ -200,9 +200,9 @@ function viewportsEqual(a: Viewport, b: Viewport): boolean {
         (pointerdown)="onPanePointerDown($event)"
         (click)="onPaneClick($event)"
         (contextmenu)="onPaneContextMenu($event)"
-        (mouseenter)="paneMouseEnter.emit($event)"
+        (mouseenter)="onPaneMouseEnter($event)"
         (mousemove)="paneMouseMove.emit($event)"
-        (mouseleave)="paneMouseLeave.emit($event)"
+        (mouseleave)="onPaneMouseLeave($event)"
         (selectionStart)="selectionStart.emit($event)"
         (selectionEnd)="selectionEnd.emit($event)"
         (paneScroll)="paneScroll.emit($event)"
@@ -751,6 +751,17 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       });
     });
 
+    // Flush a latched pane leave when the gesture that suppressed it ends.
+    // Signal-driven, no NgZone — see onPaneMouseLeave for why the latch exists.
+    effect(() => {
+      if (this.store.gestureActive()) return;
+      const latched = this.latchedPaneLeave;
+      if (latched) {
+        this.latchedPaneLeave = null;
+        this.paneMouseLeave.emit(latched);
+      }
+    });
+
     // Emit (selectionChange) when the set of selected node/edge ids changes.
     // selectedNodes/selectedEdges recompute on any nodes/edges change, so key on
     // the id-set to avoid re-emitting when unrelated data changed. The initial
@@ -1050,6 +1061,39 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
   onPanePointerDown(event: PointerEvent): void {
     this.panePointerDownPos = { x: event.clientX, y: event.clientY };
+  }
+
+  /**
+   * `<ng-content/>` is projected as a SIBLING of `.xy-flow__pane` (see the
+   * template), so a pointer crossing from the canvas onto a projected minimap
+   * or panel fires a real `mouseleave` on the pane — indistinguishable from
+   * leaving onto unrelated page chrome. Mid-gesture that is a lie: the gesture
+   * is still tracking the pointer. Consumers using `paneMouseLeave` to tear
+   * down hover chrome would tear down chrome that owns the live gesture.
+   *
+   * So while a gesture is active the leave is latched, not emitted, and:
+   *  - if the pointer returns first, the latch is dropped and the paired enter
+   *    is swallowed too (the consumer never learned the pointer left, so an
+   *    enter would be an unpaired duplicate);
+   *  - if the gesture ends with the pointer still outside, the latched leave is
+   *    delivered then, preserving the enter/leave pairing.
+   */
+  private latchedPaneLeave: MouseEvent | null = null;
+
+  onPaneMouseEnter(event: MouseEvent): void {
+    if (this.latchedPaneLeave) {
+      this.latchedPaneLeave = null;
+      return;
+    }
+    this.paneMouseEnter.emit(event);
+  }
+
+  onPaneMouseLeave(event: MouseEvent): void {
+    if (this.store.gestureActive()) {
+      this.latchedPaneLeave = event;
+      return;
+    }
+    this.paneMouseLeave.emit(event);
   }
 
   /**
