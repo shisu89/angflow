@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PanOnScrollMode, type CoordinateExtent, type PanZoomUpdateOptions } from '../types';
 import { XYPanZoom } from './XYPanZoom';
+import { createFilter } from './filter';
 
 const extent: CoordinateExtent = [
   [-Infinity, -Infinity],
@@ -85,5 +86,40 @@ describe('XYPanZoom selection lifecycle', () => {
     const { domNode, panZoom } = setup();
     panZoom.destroy();
     expect(zoomListenerTypes(domNode)).toEqual([]);
+  });
+});
+
+describe('createFilter middle-click pan', () => {
+  function middleClickOnNode() {
+    const node = document.createElement('div');
+    node.className = 'ng-flow__node';
+    return { type: 'mousedown', button: 1, target: node, composedPath: () => [node] };
+  }
+
+  function filterFor(userSelectionActive: boolean) {
+    return createFilter({
+      zoomOnScroll: true,
+      zoomOnPinch: true,
+      // Left-button only, so the middle-click-on-node branch is the ONLY thing
+      // that can return true here — every later check rejects button 1.
+      panOnDrag: [0],
+      panOnScroll: false,
+      zoomOnDoubleClick: true,
+      userSelectionActive,
+      noWheelClassName: 'nowheel',
+      noPanClassName: 'nopan',
+      lib: 'ng',
+    });
+  }
+
+  it('allows a middle-click pan that starts on a node', () => {
+    expect(filterFor(false)(middleClickOnNode())).toBe(true);
+  });
+
+  it('blocks it while a box selection is active', () => {
+    // Regression guard for the branch that returns true ahead of the blanket
+    // userSelectionActive check — mousedown.zoom is no longer torn down during a
+    // selection, so the filter is the only thing stopping a competing d3 pan.
+    expect(filterFor(true)(middleClickOnNode())).toBe(false);
   });
 });

@@ -108,6 +108,27 @@ export function XYPanZoom({
     paneClickDistance,
     selectionOnDrag,
   }: PanZoomUpdateOptions) {
+    /*
+     * DELIBERATE DIVERGENCE FROM xyflow UPSTREAM — do not "restore" this.
+     *
+     * Upstream opens update() with `if (userSelectionActive &&
+     * !zoomPanValues.isZoomingOrPanning) destroy();`. That is a one-way door:
+     * d3-zoom registers wheel.zoom / mousedown.zoom / dblclick.zoom /
+     * touchstart.zoom exactly once, in `zoom(selection)` at construction, and
+     * destroy()'s `d3Selection.on('.zoom', null)` strips all four — but update()
+     * only ever re-adds wheel.zoom and dblclick.zoom. So the first box selection
+     * of a page load permanently kills mouse- and touch-drag panning; only a
+     * remount brings them back.
+     *
+     * Suppressing input during a selection does not need the listeners gone: the
+     * filter below already returns false for every event while
+     * userSelectionActive. Dropping the teardown also lets programmatic viewport
+     * moves (auto-pan while box-selecting) still reach onTransformChange, which
+     * the destroy() path swallowed. The real lifecycle destroy() is untouched and
+     * still removes everything on unmount.
+     *
+     * See XYPanZoom.spec.ts 'XYPanZoom selection lifecycle'.
+     */
     const isPanOnScroll = panOnScroll && !zoomActivationKeyPressed && !userSelectionActive;
 
     d3ZoomInstance.clickDistance(

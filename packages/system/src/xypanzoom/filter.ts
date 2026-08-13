@@ -33,9 +33,17 @@ export function createFilter({
     const pinchZoom = zoomOnPinch && event.ctrlKey;
     const isWheelEvent = event.type === 'wheel';
 
+    /*
+     * Middle-click on a node/edge pans instead of being swallowed by the element.
+     * `!userSelectionActive` is load-bearing: this is the one branch that returns
+     * true before the blanket selection check below, and since XYPanZoom.update()
+     * no longer tears down mousedown.zoom during a selection (see the note there),
+     * without it a middle-press mid-marquee would start a competing d3 pan.
+     */
     if (
       event.button === 1 &&
       event.type === 'mousedown' &&
+      !userSelectionActive &&
       (isWrappedWithClass(event, `${lib}-flow__node`) || isWrappedWithClass(event, `${lib}-flow__edge`))
     ) {
       return true;
