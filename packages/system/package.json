@@ -1,6 +1,6 @@
 {
   "name": "@angflow/system",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "xyflow core system that powers React Flow and Svelte Flow.",
   "keywords": [
     "node-based UI",
