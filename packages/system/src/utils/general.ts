@@ -12,6 +12,7 @@ import type {
   NodeLookup,
   Padding,
   PaddingWithUnit,
+  OnError,
 } from '../types';
 import { type Viewport } from '../types';
 import { getNodePositionWithOrigin, isInternalNodeBase } from './graph';
@@ -146,11 +147,33 @@ export const isNumeric = (n: any): n is number => !isNaN(n) && isFinite(n);
 export const isDevEnv = (): boolean =>
   (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV === 'development';
 
-export const devWarn = (id: string, message: string) => {
+const defaultDevWarn: OnError = (id, message) => {
   if (isDevEnv()) {
     console.warn(`[React Flow]: ${message} Help: https://reactflow.dev/error#${id}`);
   }
 };
+
+let devWarnSink: OnError = defaultDevWarn;
+
+/**
+ * DELIBERATE DIVERGENCE FROM xyflow UPSTREAM — do not "restore" this.
+ *
+ * Installs the dev-warning channel used by every `devWarn` call in this
+ * package. The default is `isDevEnv()`-gated, and `isDevEnv()` tests
+ * `process.env.NODE_ENV`, which Angular's esbuild-based builder never defines
+ * for browser bundles — so under `@angflow/angular` the default sink is
+ * permanently silent and warnings like error006/error007 from `addEdge` and
+ * `reconnectEdge` never reach anyone. `@angflow/angular` installs its own
+ * `isDevMode()`-gated sink here.
+ *
+ * Pass `null` to restore the default (tests must do this — the sink is module
+ * state and outlives a single test).
+ */
+export const setDevWarnSink = (fn: OnError | null): void => {
+  devWarnSink = fn ?? defaultDevWarn;
+};
+
+export const devWarn: OnError = (id, message) => devWarnSink(id, message);
 
 export const snapPosition = (position: XYPosition, snapGrid: SnapGrid = [1, 1]): XYPosition => {
   return {
