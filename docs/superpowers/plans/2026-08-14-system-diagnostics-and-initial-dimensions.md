@@ -40,6 +40,7 @@ Create `packages/system/src/utils/general.spec.ts`:
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { devWarn, setDevWarnSink } from './general';
 import { addEdge, reconnectEdge } from './edges/general';
+import type { Connection, EdgeBase } from '../types';
 
 describe('setDevWarnSink', () => {
   // The sink is module state and outlives a single test.
@@ -67,9 +68,12 @@ describe('setDevWarnSink', () => {
   it('routes addEdge error006 through the sink', () => {
     const sink = vi.fn();
     setDevWarnSink(sink);
+    // A connection with an empty source is the error006 case. `Connection` is
+    // a real exported type — build a valid literal rather than casting, so a
+    // signature change breaks this test instead of silently passing.
+    const conn: Connection = { source: '', target: 'b', sourceHandle: null, targetHandle: null };
 
-    // A connection with no source is the error006 case.
-    const result = addEdge({ source: '', target: 'b' } as never, []);
+    const result = addEdge(conn, [] as EdgeBase[]);
 
     expect(result).toEqual([]);
     expect(sink).toHaveBeenCalledWith('006', expect.stringContaining('source and a target'));
@@ -184,6 +188,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { devWarn, setDevWarnSink, addEdge } from '@angflow/system';
+import type { Connection, EdgeBase } from '@angflow/system';
 import { FlowStore } from './flow-store.service';
 import { resetDevWarnDedupe } from '../utils/dev-warn';
 
@@ -227,8 +232,9 @@ describe('FlowStore installs the @angflow/system dev-warn sink', () => {
 
   it('makes addEdge report a missing source', () => {
     TestBed.inject(FlowStore);
+    const conn: Connection = { source: '', target: 'b', sourceHandle: null, targetHandle: null };
 
-    const result = addEdge({ source: '', target: 'b' } as never, []);
+    const result = addEdge(conn, [] as EdgeBase[]);
 
     expect(result).toEqual([]);
     expect(warn).toHaveBeenCalledTimes(1);
@@ -608,11 +614,11 @@ describe('initial dimensions flag reaches Angular consumers', () => {
     expect(first).toHaveLength(1);
     expect(first[0]).toMatchObject({ initial: true });
 
-    captured = [];
-    store.nodesChangeMiddleware.set('capture', (changes) => {
-      captured.push(...changes);
-      return changes;
-    });
+    // Emptying in place, NOT reassigning: the middleware closure registered in
+    // beforeEach pushes into whatever `captured` refers to, so a fresh array
+    // would still be written to — but clearing in place keeps that obvious and
+    // needs no re-registration.
+    captured.length = 0;
 
     measure(300, 200);
     const second = captured.filter((c) => c.type === 'dimensions');
