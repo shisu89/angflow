@@ -492,6 +492,14 @@ export function updateNodeInternals<NodeType extends InternalNodeBase>(
           id: node.id,
           type: 'dimensions',
           dimensions,
+          // `node` still holds the PRE-update measurement here (the replacement
+          // is built as `newNode`), so an absent width/height means this is the
+          // node's first measurement. Safe to dereference without `?.`:
+          // InternalNodeBase.measured is a required object, and the
+          // `dimensionChanged` line just above already reads it unguarded.
+          // Adding `?.` would yield `undefined` instead of `true` and silently
+          // drop the flag.
+          initial: node.measured.width === undefined || node.measured.height === undefined,
         });
 
         if (node.expandParent && node.parentId) {

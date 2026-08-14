@@ -8,6 +8,19 @@ export type NodeDimensionChange = {
   resizing?: boolean;
   /* if this is true, we will set width and height of the node and not just the measured dimensions */
   setAttributes?: boolean | 'width' | 'height';
+  /**
+   * DELIBERATE DIVERGENCE FROM xyflow UPSTREAM — do not "restore" this.
+   *
+   * True on the first dimensions change after a node mounts: the measurement
+   * that populates `measured` for the first time, rather than a real size
+   * change. Consumers mirroring changes into external state (Yjs, an undo
+   * stack, a server) can skip or coalesce it — it represents no user-visible
+   * resize, and writing it back has been observed to fragment undo history.
+   *
+   * The change still fires. It is the only thing that populates `measured`, so
+   * suppressing it would leave that field permanently unset.
+   */
+  initial?: boolean;
 };
 
 export type NodePositionChange = {
