@@ -19,6 +19,11 @@ export type NodeDimensionChange = {
    *
    * The change still fires. It is the only thing that populates `measured`, so
    * suppressing it would leave that field permanently unset.
+   *
+   * The key is always present on a dimensions change emitted by
+   * `updateNodeInternals` — `false` for a genuine resize, not merely absent.
+   * Consumers must test the value (`change.initial === true`), not the key's
+   * presence (`'initial' in change`).
    */
   initial?: boolean;
 };

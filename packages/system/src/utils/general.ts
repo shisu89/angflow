@@ -168,6 +168,14 @@ let devWarnSink: OnError = defaultDevWarn;
  *
  * Pass `null` to restore the default (tests must do this — the sink is module
  * state and outlives a single test).
+ *
+ * Not a stable extension point for application code: a framework wrapper may
+ * reinstall its own sink at any time and silently clobber whatever was here
+ * before. Concretely, `@angflow/angular` reinstalls `ngDevWarn` on every
+ * `FlowStore` construction — `FlowStore` is component-scoped (`@Injectable()`
+ * with no `providedIn`), so a second `<ng-flow>` or an `*ngIf` remount
+ * overwrites a previously installed sink with no signal to the caller that
+ * installed it.
  */
 export const setDevWarnSink = (fn: OnError | null): void => {
   devWarnSink = fn ?? defaultDevWarn;
