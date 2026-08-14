@@ -40,6 +40,7 @@ import {
   type FitViewOptionsBase,
   type FitViewResult,
   type HandleType,
+  setDevWarnSink,
 } from '@angflow/system';
 
 import type { Node, Edge } from '../types';
@@ -91,6 +92,23 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
   /** Internal read-only accessor for reactive consumers (edge renderer, connection line). */
   readonly handleDataRegistry: Signal<Map<string, unknown>> = this._handleData.asReadonly();
+
+  constructor() {
+    // @angflow/system's own diagnostics (error006/error007 from addEdge and
+    // reconnectEdge) go through its `devWarn`, whose default gate is
+    // `process.env.NODE_ENV` — never defined by Angular's esbuild builder, so
+    // those warnings were unreachable for every Angular consumer. Redirect
+    // them into the same Angular-native channel this store's `onError` uses.
+    //
+    // Installed here rather than as a module-level side effect on purpose:
+    // this package declares `"sideEffects": ["*.css"]`, so a bundler is
+    // permitted to drop a top-level call it cannot prove is needed — and a
+    // diagnostic channel that silently vanishes under production bundling is
+    // the exact failure this change exists to remove.
+    //
+    // Idempotent: every FlowStore installs the same function.
+    setDevWarnSink(ngDevWarn);
+  }
 
   private handleKey(nodeId: string, handleId: string | null, type: HandleType): string {
     return `${nodeId}:${handleId === null ? '\u0000' : handleId}:${type}`;
