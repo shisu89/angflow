@@ -106,7 +106,10 @@ The server binds to `127.0.0.1` by default, and two checks guard every canvas co
    or legacy `?token=<secret>`) or it is closed with code `4401`. Tokens are compared in
    constant time. Without `--token`, an **ephemeral token** is generated at startup and
    printed to stderr: allowlisted-origin browser canvases connect without it (their
-   unforgeable `Origin` is the credential), while non-browser clients must present it.
+   unforgeable `Origin` is the credential), while clients that send no `Origin` must present
+   it. Note that `Origin` is only unforgeable *inside a browser*: a local non-browser process
+   can send an allowlisted `Origin` header and skip the ephemeral token, so this mode guards
+   against web pages, not against other local processes — pin `--token` for that.
    Pass `--no-token` to opt out of token auth entirely.
 
 ```bash
@@ -118,6 +121,10 @@ new WebSocketTransport({ url: 'ws://localhost:8765', token: 'mysecret' })
 ```
 
 Frames larger than 5 MB are rejected at the WebSocket layer (close code `1009`).
+
+**Provenance.** Every request the server forwards to the canvas carries `source: 'agent:mcp'`.
+The bridge passes it to your `canMutate(op, source)` guard, the op-log and `flow.history`
+events — so the app can, for example, ask the user before an MCP agent deletes content.
 
 **Localhost-origin residual risk.** In default (ephemeral-token) mode, _any_ page served from
 an allowlisted origin — that is, any local dev server or app on `http://localhost:<any port>` or
@@ -141,6 +148,6 @@ listener.
 |---------|-------------|-----|
 | Tool returns `isError: No canvas connected` | The browser app has not dialed in yet, or `WebSocketTransport` is not wired | Open the app, check the transport URL matches the server's `--port`, confirm `provideAgentBridge` includes a `WebSocketTransport` |
 | Server fails to start: `EADDRINUSE` / port in use | Another process is already using port 8765 | Pass `--port <other>` and update the transport URL to match |
-| Agent edits the wrong browser tab | Two tabs of the app are open; the second connection replaces the first (close code `4000`) | Watch stderr for the takeover warning. Close the extra tab — the last canvas to connect is always the active one |
+| Agent edits the wrong browser tab | Two tabs of the app are open; the second connection replaces the first (close code `4000`) | Watch stderr for the takeover warning. The last canvas to connect is the active one; the replaced tab stops reconnecting (so two tabs can't evict each other in a loop) — reload a tab to make it active again |
 | Canvas connection closes with code `4403` | The page's origin is not in the allowlist | Pass `--allow-origin` with your app's origin (e.g. `--allow-origin https://app.example.com`) |
 | Tool returns `[-32601] Unknown method: <tool>` | The canvas is running an older version of `@angflow/angular` whose tool catalog does not include that tool | Run `npx @angflow/mcp --version` to see which `@angflow/angular` version the server's snapshot was generated from, then update the app |

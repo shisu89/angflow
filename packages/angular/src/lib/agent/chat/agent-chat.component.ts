@@ -32,7 +32,13 @@ import { AgentChatService } from './agent-chat.service';
         }
       </div>
 
-      <div class="ng-flow__agent-chat__messages" #scroller>
+      <div
+        class="ng-flow__agent-chat__messages"
+        #scroller
+        role="log"
+        aria-live="polite"
+        [attr.aria-busy]="chat.busy()"
+      >
         @for (m of chat.messages(); track m.id) {
           <div
             [class]="'ng-flow__agent-chat__bubble ng-flow__agent-chat__bubble--' + m.role"
@@ -46,6 +52,7 @@ import { AgentChatService } from './agent-chat.service';
                   <span
                     [class]="'ng-flow__agent-chat__chip ng-flow__agent-chat__chip--' + a.status"
                     [title]="a.summary"
+                    [attr.aria-label]="a.name + ': ' + a.status"
                   >
                     {{ a.status === 'running' ? '⏳' : a.status === 'ok' ? '✓' : '✗' }}
                     {{ a.name }}
@@ -56,18 +63,19 @@ import { AgentChatService } from './agent-chat.service';
           </div>
         }
         @if (chat.busy()) {
-          <div class="ng-flow__agent-chat__busy">…</div>
+          <div class="ng-flow__agent-chat__busy" aria-label="Working">…</div>
         }
       </div>
 
       @if (chat.error(); as err) {
-        <div class="ng-flow__agent-chat__error">{{ err }}</div>
+        <div class="ng-flow__agent-chat__error" role="alert">{{ err }}</div>
       }
 
       <div class="ng-flow__agent-chat__composer">
         <textarea
           rows="2"
           [placeholder]="placeholder()"
+          [attr.aria-label]="placeholder()"
           [disabled]="chat.busy()"
           [value]="draft()"
           (input)="draft.set($any($event.target).value)"
@@ -78,6 +86,7 @@ import { AgentChatService } from './agent-chat.service';
           class="ng-flow__agent-chat__send"
           [disabled]="chat.busy() || draft().trim().length === 0"
           (click)="submit()"
+          aria-label="Send"
         >▶</button>
       </div>
     </div>

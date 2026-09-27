@@ -365,7 +365,7 @@ export class AngflowAgentBridge {
           this.history.capture(flowId, snapshot);
           this.emitHistory(flowId, source);
         }
-        this.recordOp(flowId, req.method, params, source);
+        this.recordOp(flowId, req.method, effectiveParams(req.method, params, result), source);
       }
       // Template-registry mutations are op-logged (for get_changes_since
       // visibility) but not history-snapshotted.
@@ -627,6 +627,7 @@ export class AngflowAgentBridge {
         raw['id'] = this.mintId(flow, 'node');
       }
       const node = validateNodeShape(raw, 'add_node');
+      assertNewNodeIds(flow, [node], 'add_node');
       flow.addNodes(node);
       return flow.getNode(node.id) ?? null;
     });
@@ -695,6 +696,7 @@ export class AngflowAgentBridge {
 
     this.handlers.set('add_edge', (flow, params) => {
       const edge = validateEdgeShape(requireObject(params, 'edge'), 'add_edge');
+      assertNewEdges(flow, [edge], 'add_edge');
       flow.addEdges(edge);
       return flow.getEdge(edge.id) ?? null;
     });
@@ -702,7 +704,8 @@ export class AngflowAgentBridge {
     this.handlers.set('update_node', (flow, params) => {
       const id = requireString(params, 'id');
       const patch = requireObject(params, 'patch') as Partial<Node>;
-      validateStylePatch(patch, 'update_node/patch', 'node');
+      requireNode(flow, id, 'update_node');
+      validateNodePatch(flow, id, patch, 'update_node/patch');
       flow.updateNode(id, patch);
       return flow.getNode(id) ?? null;
     });
@@ -710,17 +713,21 @@ export class AngflowAgentBridge {
     this.handlers.set('update_edge', (flow, params) => {
       const id = requireString(params, 'id');
       const patch = requireObject(params, 'patch') as Partial<Edge>;
-      validateStylePatch(patch, 'update_edge/patch', 'edge');
+      requireEdge(flow, id, 'update_edge');
+      validateEdgePatch(flow, id, patch, 'update_edge/patch');
       flow.updateEdge(id, patch);
       return flow.getEdge(id) ?? null;
     });
 
     this.handlers.set('delete_elements', async (flow, params) => {
-      const nodeIds = optionalStringArray(params, 'nodeIds');
-      const edgeIds = optionalStringArray(params, 'edgeIds');
+      const { nodeIds, edgeIds } = resolveDeletion(
+        flow,
+        optionalStringArray(params, 'nodeIds') ?? [],
+        optionalStringArray(params, 'edgeIds') ?? [],
+      );
       const result = await flow.deleteElements({
-        nodes: nodeIds?.map((id) => ({ id })) ?? [],
-        edges: edgeIds?.map((id) => ({ id })) ?? [],
+        nodes: nodeIds.map((id) => ({ id })),
+        edges: edgeIds.map((id) => ({ id })),
       });
       return {
         deletedNodeIds: result.deletedNodes.map((n: Node) => n.id),
@@ -732,6 +739,7 @@ export class AngflowAgentBridge {
       const nodes = requireArray(params, 'nodes').map((n, i) =>
         validateNodeShape(n, `set_nodes[${i}]`),
       );
+      assertUniqueIds(nodes, 'set_nodes', 'node');
       flow.setNodes(nodes);
     });
 
@@ -739,6 +747,8 @@ export class AngflowAgentBridge {
       const edges = requireArray(params, 'edges').map((e, i) =>
         validateEdgeShape(e, `set_edges[${i}]`),
       );
+      assertUniqueIds(edges, 'set_edges', 'edge');
+      assertEdgeEndpoints(flow, edges, 'set_edges');
       flow.setEdges(edges);
     });
 
@@ -758,6 +768,14 @@ export class AngflowAgentBridge {
 
     this.handlers.set('set_viewport', (flow, params) => {
       const viewport = requireObject(params, 'viewport') as { x: number; y: number; zoom: number };
+      if (
+        !Number.isFinite(viewport.x) ||
+        !Number.isFinite(viewport.y) ||
+        !Number.isFinite(viewport.zoom) ||
+        viewport.zoom <= 0
+      ) {
+        throw new InvalidParamsError('Param "viewport" must be { x, y, zoom } with finite numbers and zoom > 0.');
+      }
       const duration = typeof params['duration'] === 'number' ? (params['duration'] as number) : undefined;
       flow.setViewport(viewport, { duration });
     });
@@ -897,6 +915,7 @@ export class AngflowAgentBridge {
       const nodes = requireArray(params, 'nodes').map((n, i) =>
         validateNodeShape(n, `add_nodes[${i}]`),
       );
+      assertNewNodeIds(flow, nodes, 'add_nodes');
       flow.addNodes(nodes);
       return nodes.map((n) => flow.getNode(n.id)).filter((n): n is Node => !!n);
     });
@@ -905,6 +924,7 @@ export class AngflowAgentBridge {
       const edges = requireArray(params, 'edges').map((e, i) =>
         validateEdgeShape(e, `add_edges[${i}]`),
       );
+      assertNewEdges(flow, edges, 'add_edges');
       flow.addEdges(edges);
       return edges.map((e) => flow.getEdge(e.id)).filter((e): e is Edge => !!e);
     });
@@ -912,6 +932,7 @@ export class AngflowAgentBridge {
     this.handlers.set('update_node_data', (flow, params) => {
       const id = requireString(params, 'id');
       const dataPatch = requireObject(params, 'dataPatch');
+      requireNode(flow, id, 'update_node_data');
       flow.updateNodeData(id, dataPatch);
       return flow.getNode(id) ?? null;
     });
@@ -919,6 +940,7 @@ export class AngflowAgentBridge {
     this.handlers.set('update_edge_data', (flow, params) => {
       const id = requireString(params, 'id');
       const dataPatch = requireObject(params, 'dataPatch');
+      requireEdge(flow, id, 'update_edge_data');
       flow.updateEdgeData(id, dataPatch);
       return flow.getEdge(id) ?? null;
     });
@@ -1251,36 +1273,15 @@ function signatureOf(params: {
   viewport: { x: number; y: number; zoom: number };
   selection: { nodeIds: string[]; edgeIds: string[] };
 }): string {
-  // Curated subset of node/edge fields that surface in `flow.state` consumers
-  // (renderers, history, agents). Order is fixed by the literal so JSON.stringify
-  // produces a deterministic string.
-  const n = params.nodes.map((node) => ({
-    id: node.id,
-    p: [node.position.x, node.position.y],
-    m: node.measured ? [node.measured.width ?? null, node.measured.height ?? null] : null,
-    t: node.type ?? null,
-    h: node.hidden === true,
-    d: node.data ?? null,
-    s: node.style ?? null,
-  }));
-  const e = params.edges.map((edge) => ({
-    id: edge.id,
-    src: edge.source,
-    tgt: edge.target,
-    sh: edge.sourceHandle ?? null,
-    th: edge.targetHandle ?? null,
-    t: edge.type ?? null,
-    h: edge.hidden === true,
-    a: edge.animated === true,
-    l: edge.label ?? null,
-    d: edge.data ?? null,
-    s: edge.style ?? null,
-  }));
+  // Hash the full user-facing node/edge objects (the same data the event
+  // carries). A curated field subset silently dropped real changes — e.g.
+  // set_group_collapsed (`collapsed`), reparenting (`parentId`), and
+  // `className` / `zIndex` / `width` patches produced no flow.state at all.
   try {
-    return JSON.stringify({ n, e, v: params.viewport, sel: params.selection });
+    return JSON.stringify({ n: params.nodes, e: params.edges, v: params.viewport, sel: params.selection });
   } catch {
     // Defensive: if any field is non-serializable (e.g. cyclic data), fall back
-    // to a coarser signature so dedup never silently swallows updates.
+    // to a unique signature so dedup never silently swallows updates.
     return `__nonserializable__:${Date.now()}:${Math.random()}`;
   }
 }
@@ -1290,6 +1291,7 @@ function executeOp(flow: NgFlowService, op: Record<string, unknown>): unknown {
   switch (kind) {
     case 'add_node': {
       const node = validateNodeShape(op['node'], 'apply_changes/add_node');
+      assertNewNodeIds(flow, [node], 'apply_changes/add_node');
       flow.addNodes(node);
       return flow.getNode(node.id) ?? null;
     }
@@ -1304,11 +1306,13 @@ function executeOp(flow: NgFlowService, op: Record<string, unknown>): unknown {
       const validated = nodes.map((n, i) =>
         validateNodeShape(n, `apply_changes/add_nodes[${i}]`),
       );
+      assertNewNodeIds(flow, validated, 'apply_changes/add_nodes');
       flow.addNodes(validated);
       return validated.map((n) => flow.getNode(n.id)).filter((n): n is Node => !!n);
     }
     case 'add_edge': {
       const edge = validateEdgeShape(op['edge'], 'apply_changes/add_edge');
+      assertNewEdges(flow, [edge], 'apply_changes/add_edge');
       flow.addEdges(edge);
       return flow.getEdge(edge.id) ?? null;
     }
@@ -1323,6 +1327,7 @@ function executeOp(flow: NgFlowService, op: Record<string, unknown>): unknown {
       const validated = edges.map((e, i) =>
         validateEdgeShape(e, `apply_changes/add_edges[${i}]`),
       );
+      assertNewEdges(flow, validated, 'apply_changes/add_edges');
       flow.addEdges(validated);
       return validated.map((e) => flow.getEdge(e.id)).filter((e): e is Edge => !!e);
     }
@@ -1332,7 +1337,7 @@ function executeOp(flow: NgFlowService, op: Record<string, unknown>): unknown {
       if (typeof id !== 'string') throw new InvalidParamsError('update_node: "id" must be a string.');
       if (!patch || typeof patch !== 'object') throw new InvalidParamsError('update_node: "patch" must be an object.');
       if (!flow.getNode(id)) throw new InvalidParamsError(`update_node: node "${id}" not found.`);
-      validateStylePatch(patch, 'apply_changes/update_node', 'node');
+      validateNodePatch(flow, id, patch, 'apply_changes/update_node');
       flow.updateNode(id, patch as Partial<Node>);
       return flow.getNode(id) ?? null;
     }
@@ -1351,7 +1356,7 @@ function executeOp(flow: NgFlowService, op: Record<string, unknown>): unknown {
       if (typeof id !== 'string') throw new InvalidParamsError('update_edge: "id" must be a string.');
       if (!patch || typeof patch !== 'object') throw new InvalidParamsError('update_edge: "patch" must be an object.');
       if (!flow.getEdge(id)) throw new InvalidParamsError(`update_edge: edge "${id}" not found.`);
-      validateStylePatch(patch, 'apply_changes/update_edge', 'edge');
+      validateEdgePatch(flow, id, patch, 'apply_changes/update_edge');
       flow.updateEdge(id, patch as Partial<Edge>);
       return flow.getEdge(id) ?? null;
     }
@@ -1365,17 +1370,21 @@ function executeOp(flow: NgFlowService, op: Record<string, unknown>): unknown {
       return flow.getEdge(id) ?? null;
     }
     case 'delete_elements': {
-      const nodeIds = Array.isArray(op['nodeIds']) ? (op['nodeIds'] as string[]) : [];
-      const edgeIds = Array.isArray(op['edgeIds']) ? (op['edgeIds'] as string[]) : [];
+      const { nodeIds, edgeIds } = resolveDeletion(
+        flow,
+        Array.isArray(op['nodeIds']) ? (op['nodeIds'] as string[]) : [],
+        Array.isArray(op['edgeIds']) ? (op['edgeIds'] as string[]) : [],
+      );
       // deleteElements is async because of onBeforeDelete; inside apply_changes we
       // intentionally do not await — the synchronous setNodes/setEdges paths are
       // what we need for rollback semantics. Skip onBeforeDelete hooks inside batches.
+      const nodeIdSet = new Set(nodeIds);
       const allEdgeIds = new Set(edgeIds);
       for (const e of flow.getEdges()) {
-        if (nodeIds.includes(e.source) || nodeIds.includes(e.target)) allEdgeIds.add(e.id);
+        if (nodeIdSet.has(e.source) || nodeIdSet.has(e.target)) allEdgeIds.add(e.id);
       }
-      if (nodeIds.length > 0) {
-        flow.setNodes(flow.getNodes().filter((n) => !nodeIds.includes(n.id)));
+      if (nodeIdSet.size > 0) {
+        flow.setNodes(flow.getNodes().filter((n) => !nodeIdSet.has(n.id)));
       }
       if (allEdgeIds.size > 0) {
         flow.setEdges(flow.getEdges().filter((e) => !allEdgeIds.has(e.id)));
@@ -1505,6 +1514,156 @@ function descendantIdsOf(groupId: string, childrenByParent: ReadonlyMap<string, 
 /** Edges whose source AND target are both in the id set. */
 function inducedEdges(edges: readonly Edge[], nodeIds: ReadonlySet<string>): Edge[] {
   return edges.filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target));
+}
+
+function requireNode(flow: NgFlowService, id: string, ctx: string): Node {
+  const node = flow.getNode(id);
+  if (!node) throw new InvalidParamsError(`${ctx}: node "${id}" not found.`);
+  return node;
+}
+
+function requireEdge(flow: NgFlowService, id: string, ctx: string): Edge {
+  const edge = flow.getEdge(id);
+  if (!edge) throw new InvalidParamsError(`${ctx}: edge "${id}" not found.`);
+  return edge;
+}
+
+/** Reject ids repeated within one payload (the store would keep both copies). */
+function assertUniqueIds(items: ReadonlyArray<{ id: string }>, ctx: string, kind: 'node' | 'edge'): void {
+  const seen = new Set<string>();
+  for (const item of items) {
+    if (seen.has(item.id)) throw new InvalidParamsError(`${ctx}: duplicate ${kind} id "${item.id}" in payload.`);
+    seen.add(item.id);
+  }
+}
+
+/**
+ * Reject node ids that already exist on the flow or repeat within the payload.
+ * The store appends `add` changes unconditionally, so a reused id would
+ * silently produce two nodes sharing one id (a corrupt graph).
+ */
+function assertNewNodeIds(flow: NgFlowService, nodes: readonly Node[], ctx: string): void {
+  assertUniqueIds(nodes, ctx, 'node');
+  for (const n of nodes) {
+    if (flow.getNode(n.id)) {
+      throw new InvalidParamsError(
+        `${ctx}: a node with id "${n.id}" already exists. Use update_node to modify it, or omit/choose a new id.`,
+      );
+    }
+  }
+}
+
+/** Reject edges whose source/target is not a node on the flow (they would never render). */
+function assertEdgeEndpoints(flow: NgFlowService, edges: readonly Edge[], ctx: string): void {
+  for (const e of edges) {
+    for (const end of ['source', 'target'] as const) {
+      if (!flow.getNode(e[end])) {
+        throw new InvalidParamsError(`${ctx}: edge "${e.id}" ${end} node "${e[end]}" does not exist.`);
+      }
+    }
+  }
+}
+
+/** Reject reused edge ids and dangling endpoints for add_* paths. */
+function assertNewEdges(flow: NgFlowService, edges: readonly Edge[], ctx: string): void {
+  assertUniqueIds(edges, ctx, 'edge');
+  for (const e of edges) {
+    if (flow.getEdge(e.id)) {
+      throw new InvalidParamsError(`${ctx}: an edge with id "${e.id}" already exists. Use update_edge to modify it.`);
+    }
+  }
+  assertEdgeEndpoints(flow, edges, ctx);
+}
+
+/**
+ * Validate a node patch: style/className guard, no id rewrite (it would alias
+ * another node), finite position, and a parentId that exists and doesn't
+ * create a cycle (same rule as set_node_group).
+ */
+function validateNodePatch(flow: NgFlowService, id: string, patch: unknown, ctx: string): void {
+  validateStylePatch(patch, ctx, 'node');
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return;
+  const p = patch as Record<string, unknown>;
+  if ('id' in p && p['id'] !== id) {
+    throw new InvalidParamsError(`${ctx}: changing a node's id is not supported.`);
+  }
+  if ('position' in p) {
+    const pos = p['position'] as Record<string, unknown> | null;
+    if (!pos || typeof pos !== 'object' || !Number.isFinite(pos['x']) || !Number.isFinite(pos['y'])) {
+      throw new InvalidParamsError(`${ctx}: position must be { x, y } with finite numbers.`);
+    }
+  }
+  const parentId = p['parentId'];
+  if (parentId != null) {
+    if (typeof parentId !== 'string' || !flow.getNode(parentId)) {
+      throw new InvalidParamsError(`${ctx}: parentId "${String(parentId)}" is not an existing node.`);
+    }
+    if (parentId === id || descendantIdsOf(id, buildChildMap(flow.getNodes())).has(parentId)) {
+      throw new InvalidParamsError(`${ctx}: parentId would create a cycle (it is the node or a descendant).`);
+    }
+  }
+}
+
+/** Validate an edge patch: style/className guard, no id rewrite, endpoints must exist. */
+function validateEdgePatch(flow: NgFlowService, id: string, patch: unknown, ctx: string): void {
+  validateStylePatch(patch, ctx, 'edge');
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return;
+  const p = patch as Record<string, unknown>;
+  if ('id' in p && p['id'] !== id) {
+    throw new InvalidParamsError(`${ctx}: changing an edge's id is not supported.`);
+  }
+  for (const end of ['source', 'target'] as const) {
+    if (end in p && (typeof p[end] !== 'string' || !flow.getNode(p[end] as string))) {
+      throw new InvalidParamsError(`${ctx}: ${end} "${String(p[end])}" is not an existing node.`);
+    }
+  }
+}
+
+/**
+ * Expand an agent deletion request the way React Flow's getElementsToRemove
+ * does: descendants of deleted nodes go too (otherwise they are left with a
+ * dangling parentId), and elements marked `deletable: false` are kept.
+ * Unknown ids are dropped so the result reports what was actually removed.
+ */
+function resolveDeletion(
+  flow: NgFlowService,
+  requestedNodeIds: readonly string[],
+  requestedEdgeIds: readonly string[],
+): { nodeIds: string[]; edgeIds: string[] } {
+  const nodes = flow.getNodes();
+  const childMap = buildChildMap(nodes);
+  const candidates = new Set<string>();
+  for (const id of requestedNodeIds) {
+    if (!flow.getNode(id)) continue;
+    candidates.add(id);
+    for (const d of descendantIdsOf(id, childMap)) candidates.add(d);
+  }
+  const nodeIds = nodes.filter((n) => candidates.has(n.id) && n.deletable !== false).map((n) => n.id);
+  const edgeIds = requestedEdgeIds.filter((id) => {
+    const e = flow.getEdge(id);
+    return e !== undefined && e.deletable !== false;
+  });
+  return { nodeIds, edgeIds };
+}
+
+/**
+ * Params as they should be recorded in the op-log: fill in ids the bridge
+ * minted so an `onOp` / get_changes_since consumer can replay the op and get
+ * the same ids back (later ops reference them).
+ */
+function effectiveParams(method: string, params: Record<string, unknown>, result: unknown): Record<string, unknown> {
+  if (method === 'add_node') {
+    const node = params['node'] as Record<string, unknown> | undefined;
+    const id = (result as { id?: unknown } | null)?.id;
+    if (node && (node['id'] == null || node['id'] === '') && typeof id === 'string') {
+      return { ...params, node: { ...node, id } };
+    }
+  }
+  if (method === 'group_nodes' && !params['groupId']) {
+    const groupId = (result as { groupId?: unknown } | null)?.groupId;
+    if (typeof groupId === 'string') return { ...params, groupId };
+  }
+  return { ...params };
 }
 
 /** Best-effort display title for a node: data.label/title/name, else type, else id. */

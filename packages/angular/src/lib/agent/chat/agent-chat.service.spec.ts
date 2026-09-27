@@ -336,3 +336,60 @@ describe('AgentChatService — tool loop', () => {
     expect(chat.error()).toBeNull();
   });
 });
+
+describe('AgentChatService — truncated tool calls and provenance', () => {
+  it('answers tool_use blocks cut off by max_tokens with error results, without executing them', async () => {
+    const { chat, flow, requests } = setup([
+      {
+        content: [
+          { type: 'text', text: 'Adding' },
+          { type: 'tool_use', id: 'tu1', name: 'add_node', input: { node: { id: 'a', position: { x: 0, y: 0 }, data: {} } } },
+        ],
+        stop_reason: 'max_tokens',
+      },
+      textTurn('retried'),
+    ]);
+    await chat.send('add a node');
+
+    expect(flow.getNodes()).toHaveLength(0);
+    // The follow-up request must pair the tool_use with a tool_result, or the
+    // Messages API rejects it (and every later request in the conversation).
+    const followUp = requests[1].messages;
+    const last = followUp[followUp.length - 1];
+    expect(last.role).toBe('user');
+    expect(last.content[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'tu1', is_error: true });
+    expect(chat.messages()[1].activity[0].status).toBe('error');
+  });
+
+  it('tags bridge calls with the configured source (default agent:chat)', async () => {
+    const seen: Array<string | undefined> = [];
+    const fake = makeFakeComplete([
+      {
+        content: [{ type: 'tool_use', id: 'tu1', name: 'add_node', input: { node: { position: { x: 0, y: 0 }, data: {} } } }],
+        stop_reason: 'tool_use',
+      },
+      textTurn('done'),
+    ]);
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideAgentBridge({
+          transports: [],
+          canMutate: (_op, source) => {
+            seen.push(source);
+            return true;
+          },
+        }),
+        provideAgentChat({ complete: fake.fn }),
+      ],
+    });
+    const bridge = TestBed.inject(AngflowAgentBridge);
+    const flow = Injector.create({ providers: [FlowStore, NgFlowService], parent: TestBed.inject(Injector) }).get(
+      NgFlowService,
+    );
+    bridge.register('main', flow);
+    await TestBed.inject(AgentChatService).send('add one');
+    expect(seen).toEqual(['agent:chat']);
+  });
+});

@@ -23,7 +23,7 @@ import {
   type EdgeChange,
 } from '@angflow/system';
 
-import { elementToRemoveChange } from '../utils/changes';
+import { elementToRemoveChange, getElementsDiffChanges } from '../utils/changes';
 import { injectFlowStore } from '../utils/inject-flow-store';
 import type { ViewportAnimationOptions } from './flow-store.service';
 import type { Node, Edge, InternalNode, DeleteElementsOptions } from '../types';
@@ -244,9 +244,16 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     return { x, y };
   }
 
-  /** Replace the full `nodes` array. Triggers `(nodesChange)` through the store. */
+  /**
+   * Replace the full `nodes` array. Emits the equivalent add/replace/remove
+   * diff through `(nodesChange)` (like React Flow's `setNodes`), so a
+   * controlled parent that applies changes to its own `[nodes]` model stays in
+   * sync instead of reverting the replacement on its next change.
+   */
   setNodes(nodes: NodeType[]): void {
+    const changes = getElementsDiffChanges({ items: nodes, lookup: this.store.nodeLookup }) as NodeChange<NodeType>[];
     this.store.setNodes(nodes);
+    if (changes.length > 0) this.store.onNodesChange?.(changes);
   }
 
   /** Append one or more nodes to the current array. */
@@ -349,17 +356,25 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
       padding: opts?.padding ?? 20,
       headerHeight: opts?.headerHeight ?? 40,
     });
+    const groupNode = {
+      id: groupId,
+      type: 'group',
+      position: box.position,
+      width: box.width,
+      height: box.height,
+      data: opts?.label != null ? { label: opts.label } : {},
+      ...(opts?.collapsed != null ? { collapsed: opts.collapsed } : {}),
+    } as unknown as NodeType;
+    // Parents must precede their children in the nodes array (xyflow resolves
+    // child positions in array order and warns "Parent node … not found"
+    // otherwise), so insert the group just before its first member rather than
+    // appending it. The indexed add change keeps controlled parents in order too.
+    const currentIds = this.getNodes().map((n) => n.id);
+    const memberIndexes = members.map((m) => currentIds.indexOf(m.id)).filter((i) => i >= 0);
+    const index = memberIndexes.length > 0 ? Math.min(...memberIndexes) : undefined;
     // One atomic emission: add the group node and reparent members together.
     this.store.batch(() => {
-      this.addNodes({
-        id: groupId,
-        type: 'group',
-        position: box.position,
-        width: box.width,
-        height: box.height,
-        data: opts?.label != null ? { label: opts.label } : {},
-        ...(opts?.collapsed != null ? { collapsed: opts.collapsed } : {}),
-      } as unknown as NodeType);
+      this.store.triggerNodeChanges([{ type: 'add', item: groupNode, ...(index !== undefined ? { index } : {}) }]);
       for (const m of members) this.updateNode(m.id, { parentId: groupId } as Partial<NodeType>);
     });
     await this.setNodePositions(
@@ -644,9 +659,14 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     return this.store.edges();
   }
 
-  /** Replace the full `edges` array. */
+  /**
+   * Replace the full `edges` array. Emits the equivalent diff through
+   * `(edgesChange)` so a controlled parent's `[edges]` model stays in sync.
+   */
   setEdges(edges: EdgeType[]): void {
+    const changes = getElementsDiffChanges({ items: edges, lookup: this.store.edgeLookup }) as EdgeChange<EdgeType>[];
     this.store.setEdges(edges);
+    if (changes.length > 0) this.store.onEdgesChange?.(changes);
   }
 
   /** Append one or more edges to the current array. */

@@ -131,6 +131,16 @@ export class WebSocketTransport implements AgentTransport {
         );
         return;
       }
+      if (code === 4000) {
+        // The server's single-canvas policy handed the session to a newer
+        // canvas (another tab). Reconnecting would evict that canvas, which
+        // would reconnect and evict us — an endless ~1 s ping-pong in which
+        // the agent's calls alternate between tabs and half of them fail.
+        console.info(
+          'angflow WebSocketTransport: replaced by a newer canvas (4000) — not reconnecting; reload this page to take over',
+        );
+        return;
+      }
       this.scheduleReconnect();
     });
   }

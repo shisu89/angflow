@@ -19,7 +19,7 @@
 ```
 
 - **Bridge** — root-scoped service. Holds a registry of `flowId → NgFlowService`, routes inbound tool calls to the right service, and emits `flow.state` events when any registered flow's signals change (coalesced via microtask). Each flow also carries a per-flow node-template registry (see `register_node_template`) and supports an optional host-pluggable layout function (see `layout_nodes`).
-- **Transport** — anything implementing `AgentTransport`. Bundled: `WindowTransport` (exposes `window.angflow`), `WebSocketTransport`. Add custom ones for postMessage, CDP, MCP servers, etc. The bridge calls `stop()` on every transport when its injector is destroyed (e.g. `ApplicationRef.destroy()`), so `stop()` must be idempotent and must cancel any reconnect timers. `WebSocketTransport` reconnects with exponential backoff on most close codes (including `1006` network drops and `1009` frame-too-big), but treats close codes `4401` (bad token) and `4403` (origin rejected) as terminal — it logs a `console.error` and does not retry, since retrying would never succeed without a configuration change.
+- **Transport** — anything implementing `AgentTransport`. Bundled: `WindowTransport` (exposes `window.angflow`), `WebSocketTransport`. Add custom ones for postMessage, CDP, MCP servers, etc. The bridge calls `stop()` on every transport when its injector is destroyed (e.g. `ApplicationRef.destroy()`), so `stop()` must be idempotent and must cancel any reconnect timers. `WebSocketTransport` reconnects with exponential backoff on most close codes (including `1006` network drops and `1009` frame-too-big), but treats close codes `4401` (bad token) and `4403` (origin rejected) as terminal — it logs a `console.error` and does not retry, since retrying would never succeed without a configuration change. Close code `4000` (the `@angflow/mcp` server handed the session to a newer canvas, e.g. another tab) is also terminal: reconnecting would evict the newer canvas, which would reconnect in turn — an endless tab ping-pong. The evicted page logs a `console.info`; reload it to take the session back.
 - **Tool schemas** — `AGENT_TOOL_SCHEMAS` is a JSON-Schema array suitable for direct use as Anthropic/OpenAI `tools`.
 
 ## Wiring
@@ -41,8 +41,8 @@ export const appConfig: ApplicationConfig = {
       onError: (err, ctx) => console.warn('[agent-bridge]', ctx.kind, err),
       // Optional provenance config:
       canMutate: (op, source) => true,  // return false/string to deny with -32001
-      // canMutate gates every graph mutation (add/update/delete/set/group/
-      // apply_changes/layout_nodes) AND the node-template registry tools
+      // canMutate gates every graph mutation (add/update/delete/set/group
+      // tools/apply_changes/layout_nodes) AND the node-template registry tools
       // (register_node_template / unregister_node_template). Read tools are NOT
       // gated — see "Transport trust model" below.
       onOp: (entry) => {},              // called after each applied mutating op (host persistence)
@@ -84,6 +84,14 @@ Prompt-injection note: tool results and any external content are surfaced to the
 Every tool takes an optional `flowId` (omit when only one flow is registered; required otherwise). All payloads use the `Node` / `Edge` types from `@angflow/angular`.
 
 **Payload validation.** `add_nodes`, `set_nodes`, and the `add_node` / `add_nodes` ops inside `apply_changes` require each node to have a non-empty string `id` and a `position: { x: number, y: number }`. The standalone `add_node` tool requires only `position` — its `id` is optional and minted (and returned) when omitted (batch minting is not available inside `apply_changes`). The edge variants require non-empty string `id`, `source`, and `target`. Malformed payloads fail with `-32602` *before* reaching `NgFlowService`. Additionally, `style` (when present) must be a plain object whose values are strings or numbers, and neither the values **nor the property names** may contain `url(`, `expression(`, a `\` escape (which would defeat the substring match via CSS unicode-escapes like `\75 rl(`), or (for keys) `:` / `;` (CSS-redressing / remote-fetch guard); `className` (when present) must be a string — violations fail with `-32602`. This guard runs on **every style-setting path**: `add_*`, `set_*`, the `update_node` / `update_edge` patches, and the corresponding `apply_changes` update ops. Inside `apply_changes`, the same violations surface as the batch's `-32603` rollback error with `data.failedIndex`. Bulk array parameters (`add_nodes`, `add_edges`, `set_nodes`, `set_edges`, and `apply_changes`' `ops`) are capped at 5000 elements per call; larger payloads fail with `-32602` before any mutation. `apply_changes` additionally caps the **aggregate** element count across all its ops (sum of `add_node`/`add_edge`/`add_nodes`/`add_edges`) at 5000, rejecting the whole batch upfront with `-32602` — this prevents a multiplicative payload (many `add_nodes` ops) from bypassing the per-op cap. Id-array parameters (`delete_elements` nodeIds/edgeIds, `select_nodes` nodeIds, `select_edges` edgeIds, `get_connected_edges` nodeIds, `layout_nodes` nodeIds) are similarly capped at 5000 elements.
+
+**Graph integrity.** Agents routinely reuse, typo, or invent ids, so the bridge rejects (with `-32602`, or the `-32603` + `failedIndex` rollback inside `apply_changes`) anything that would corrupt the graph or silently do nothing:
+
+- **Duplicate ids** — adding a node/edge whose id already exists on the flow, or repeats within one payload (`add_*`, `set_*`, `apply_changes` add ops). The store would otherwise keep two elements under one id.
+- **Dangling edges** — an edge whose `source`/`target` is not an existing node (`add_*`, `set_edges`, and `source`/`target` in edge patches). Inside `apply_changes`, nodes added by earlier ops in the same batch count as existing.
+- **Unknown ids on update** — `update_node`, `update_node_data`, `update_edge`, `update_edge_data` fail on an id that doesn't exist (previously they returned `null` and still recorded an undo entry).
+- **Unsafe patches** — a `patch.id` that differs from the target id, a non-finite `patch.position`, or a `patch.parentId` that doesn't exist or would create a cycle (same rule as `set_node_group`).
+- **Bad viewports** — `set_viewport` requires finite `x`/`y` and `zoom > 0`.
 
 ### Discovery / read
 
@@ -145,7 +153,7 @@ Every tool takes an optional `flowId` (omit when only one flow is registered; re
 | `update_node_data` | `id: string`, `dataPatch: Record<string, unknown>` | Shallow-merges only the `data` property; returns updated `Node` |
 | `update_edge` | `id: string`, `patch: Partial<Edge>` | Shallow merge; returns updated `Edge` |
 | `update_edge_data` | `id: string`, `dataPatch: Record<string, unknown>` | Shallow-merges only the `data` property; returns updated `Edge` |
-| `delete_elements` | `nodeIds?: string[]`, `edgeIds?: string[]` | Edges to deleted nodes auto-removed. Returns `{ deletedNodeIds, deletedEdgeIds }` |
+| `delete_elements` | `nodeIds?: string[]`, `edgeIds?: string[]` | Edges to deleted nodes auto-removed. Descendants of a deleted node (group children, recursively) are deleted too, as in React Flow — otherwise they would be left with a dangling `parentId`. Elements with `deletable: false` and unknown ids are skipped. Returns `{ deletedNodeIds, deletedEdgeIds }` — what was actually removed |
 
 ### Mutate — bulk (prefer incremental ops above)
 
@@ -222,7 +230,7 @@ Subscribers (`angflow.subscribe(h)`) receive:
 - `flow.registered` — `{ flowId }`
 - `flow.unregistered` — `{ flowId }`
 - `flow.history` — `{ flowId, canUndo, canRedo, pastDepth, futureDepth, source?: string }`. Emitted **synchronously inside `dispatch`** immediately after a history-capturing mutation completes (or after `undo`/`redo`/`clear_history`). `source` is the origin string passed by the caller (e.g. `"agent:claude"`) — present only when a source was supplied for a bridge-initiated mutation (absent for undo/redo/clear_history and unsourced calls).
-- `flow.state` — `{ flowId, nodes, edges, viewport, selection: { nodeIds, edgeIds } }`. Coalesced per microtask; duplicates suppressed via a cheap signature. Emitted in the **next microtask** via the `watchFlow` effect. While any node is mid-drag (`dragging: true`), emissions are additionally throttled to at most one per 100ms, with a trailing emission that guarantees the latest drag state is always delivered; drag end emits promptly.
+- `flow.state` — `{ flowId, nodes, edges, viewport, selection: { nodeIds, edgeIds } }`. Coalesced per microtask; exact duplicates (e.g. a controlled-mode round-trip bouncing identical state) are suppressed by comparing the serialized payload, so any change to a node/edge field — including `collapsed`, `parentId`, `className`, `zIndex`, size — produces an event. Emitted in the **next microtask** via the `watchFlow` effect. While any node is mid-drag (`dragging: true`), emissions are additionally throttled to at most one per 100ms, with a trailing emission that guarantees the latest drag state is always delivered; drag end emits promptly.
 
 **Ordering note:** When a mutating tool fires, consumers receive `flow.history` first (synchronously), then `flow.state` (next microtask). This ordering is reliable — useful when a consumer wants to update UI affordances before rendering the new graph state. During an active node drag, the throttle may delay flow.state past the next microtask (up to ~100ms); the synchronous flow.history ordering is unaffected.
 
@@ -433,6 +441,8 @@ bridge.callTool('add_node', { node: { … } }, { source: 'agent:claude' });
 
 For transport-based calls, inject a default source at the transport level by attaching a `source` field to the inbound JSON-RPC request frame before dispatching. The bridge threads `source` through to the `canMutate` guard, the op-log entry, and the `flow.history` push event. `source` is always optional — callers that omit it are not rejected.
 
+Bundled callers tag themselves: the in-browser chat harness calls with `source: 'agent:chat'` (configurable via `provideAgentChat({ source })`), and the `@angflow/mcp` server stamps every request frame with `source: 'agent:mcp'`.
+
 ### `canMutate` guard
 
 Provide a `canMutate` predicate to gate mutating tool calls:
@@ -452,8 +462,9 @@ provideAgentBridge({
 - `source` — the caller's source string (may be `undefined`).
 - Return `true` to allow the call. Return `false` or a non-empty string (used as the deny reason) to deny it — the call fails immediately with JSON-RPC error `-32001` and no mutation occurs.
 - `canMutate` may be async; a thrown error is treated as a deny and routed to `onError` (isolated — does not crash the bridge).
-- **Gated tools** — all tools that mutate graph state: `add_node`, `add_nodes`, `add_edge`, `add_edges`, `update_node`, `update_node_data`, `update_edge`, `update_edge_data`, `delete_elements`, `set_nodes`, `set_edges`, `apply_changes`, `layout_nodes`, `group_nodes`, `set_node_group`, `set_group_collapsed`, `dissolve_group`.
-- **Not gated** — reads, selection tools (`select_nodes`, `select_edges`, `deselect_all`), viewport tools, undo/redo, and template management. These proceed unconditionally.
+- **Gated tools** — all tools that mutate graph state: `add_node`, `add_nodes`, `add_edge`, `add_edges`, `update_node`, `update_node_data`, `update_edge`, `update_edge_data`, `delete_elements`, `set_nodes`, `set_edges`, `apply_changes`, `layout_nodes`, `group_nodes`, `set_node_group`, `set_group_collapsed`, `dissolve_group` — plus the template-registry writers `register_node_template` and `unregister_node_template`.
+- **Not gated** — reads (including `list_node_templates`), selection tools (`select_nodes`, `select_edges`, `deselect_all`), viewport tools, and undo/redo/clear_history. These proceed unconditionally.
+- **Confirming destructive agent edits.** Because `canMutate` may be async and receives the caller's `source`, it is the place to ask the user before an agent deletes or replaces content: e.g. `canMutate: async (op, source) => source?.startsWith('agent:') && ['delete_elements', 'set_nodes', 'set_edges'].includes(op.method) ? confirmWithUser(op) : true`.
 
 ### Op-log, `onOp`, and `get_changes_since`
 
@@ -491,6 +502,8 @@ if (truncated) {
 }
 cursor = next;
 ```
+
+**Replayable params:** ids the bridge mints are written back into the logged params — an `add_node` without an `id` is logged with the minted `node.id`, and a `group_nodes` without a `groupId` is logged with the minted `groupId` — so replaying the log reproduces the same ids that later ops reference.
 
 **Bridge-only scope:** like the undo history, the op-log records only bridge-initiated mutations — user-driven edits (drag, connect, resize via the UI), `undo`, and `redo` are not recorded. `get_changes_since` is therefore a faithful audit trail of *agent* actions, not a universal change feed.
 
@@ -549,6 +562,14 @@ from `AGENT_TOOL_SCHEMAS` at runtime — no snapshot, no regeneration step.
 See the `agent-chat` example and `examples/angular/server/agent-proxy.mjs`
 for the reference wiring.
 
+Every chat tool call carries `source: 'agent:chat'` (override with
+`provideAgentChat({ source })`), so the bridge's `canMutate` can tell chat edits
+apart — e.g. to confirm destructive ones with the user. If a model response is
+cut off (`stop_reason` other than `tool_use`, typically `max_tokens`) while it
+contains `tool_use` blocks, those calls are **not** executed (their input may be
+truncated); each gets an `is_error` tool_result asking the model to retry in
+smaller steps, which keeps the conversation valid for the Messages API.
+
 ### Provider proxies (reference implementations in `examples/angular/server/`)
 
 | Provider | File | Key env | Default model (June 2026) | Notes |
@@ -579,9 +600,9 @@ Practical consequences:
 
 - **Gate destructive tools behind user confirmation** in deployments where the canvas
   can contain content the current user did not author (shared boards, imported files).
-  The bridge does not do this for you: wrap `complete()` or intercept tool execution in
-  your host UI and require confirmation for `delete_elements`, `set_nodes`, `set_edges`,
-  `apply_changes`, and `clear_history` before letting the loop proceed. `undo` exists,
+  The bridge does not do this for you: use an async `canMutate` that checks the call's
+  `source` (`'agent:chat'` / `'agent:mcp'`) and asks the user before `delete_elements`,
+  `set_nodes`, `set_edges`, and `apply_changes` proceed. `undo` exists,
   but bridge history only covers bridge-initiated mutations and is bounded.
 - **System prompts should state that canvas text is untrusted** so the model is less
   likely to follow instructions embedded in node labels. The bundled chat harness

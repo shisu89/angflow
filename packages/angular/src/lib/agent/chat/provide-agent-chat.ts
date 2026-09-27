@@ -39,6 +39,7 @@ export function provideAgentChat(config: AgentChatConfig): EnvironmentProviders 
     maxTurns: config.maxTurns ?? 12,
     maxTokens: config.maxTokens ?? 2048,
     maxHistory: config.maxHistory ?? 40,
+    source: config.source ?? 'agent:chat',
   };
   return makeEnvironmentProviders([
     { provide: AGENT_CHAT_CONFIG, useValue: resolved },

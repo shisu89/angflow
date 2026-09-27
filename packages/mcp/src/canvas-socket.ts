@@ -128,6 +128,12 @@ export interface CanvasSocketOptions {
   maxPayloadBytes?: number;
   /** Per-request timeout in ms. */
   timeoutMs: number;
+  /**
+   * Provenance tag attached to every request frame. The canvas bridge threads
+   * it to the host's `canMutate(op, source)` guard, op-log and `flow.history`
+   * events, so a host can tell MCP-agent edits apart. Defaults to `'agent:mcp'`.
+   */
+  source?: string;
   log: Logger;
   /** Push events (flow.state, flow.registered, …) from the canvas. */
   onEvent?: (event: string, params: Record<string, unknown> | undefined) => void;
@@ -228,7 +234,7 @@ export class CanvasSocket {
       // serialization failure). An OPEN→CLOSING race does not throw here —
       // ws queues the frame and the close handler rejects the pending call.
       try {
-        this.socket!.send(JSON.stringify({ id, method, params }));
+        this.socket!.send(JSON.stringify({ id, method, params, source: this.options.source ?? 'agent:mcp' }));
       } catch (err) {
         clearTimeout(timer);
         this.pending.delete(id);

@@ -117,8 +117,26 @@ async function shutdown(): Promise<void> {
 }
 process.on('SIGINT', () => void shutdown());
 process.on('SIGTERM', () => void shutdown());
+// The stdio transport doesn't watch for EOF, and the canvas WebSocket server
+// keeps the event loop alive — without this, a client that just closes stdin
+// leaves an orphaned process holding the port, and every later launch fails.
+process.stdin.on('end', () => void shutdown());
+process.stdin.on('close', () => void shutdown());
 
-await server.start();
+try {
+  await server.start();
+} catch (err) {
+  if ((err as NodeJS.ErrnoException)?.code === 'EADDRINUSE') {
+    console.error(
+      `[angflow-mcp] port ${port} on ${values.host} is already in use — most likely another ` +
+        `angflow-mcp instance (e.g. a second MCP client session) owns it.\n` +
+        `[angflow-mcp] stop that instance, or start this one on another port with --port <n> ` +
+        `and point the canvas WebSocketTransport at it.`,
+    );
+    process.exit(1);
+  }
+  throw err;
+}
 if (ephemeralToken && logLevel !== 'silent') {
   console.error(
     `[angflow-mcp] no --token provided — generated an ephemeral canvas token: ${token}\n` +

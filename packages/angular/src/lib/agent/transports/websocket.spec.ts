@@ -94,6 +94,19 @@ describe('WebSocketTransport terminal close codes', () => {
     transport.stop();
   });
 
+  it('does NOT reconnect when replaced by a newer canvas (4000), avoiding a tab ping-pong', () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const transport = new WebSocketTransport({ url: 'ws://localhost:8765', reconnect: true });
+    transport.start(async () => ({ id: 1, result: null }));
+
+    CapturingFakeWebSocket.instances[0].fireClose(4000);
+
+    vi.advanceTimersByTime(60_000);
+    expect(CapturingFakeWebSocket.instances).toHaveLength(1);
+    info.mockRestore();
+    transport.stop();
+  });
+
   it('DOES schedule a reconnect for non-terminal close codes (e.g. 1006 network drop)', () => {
     const transport = new WebSocketTransport({
       url: 'ws://localhost:8765',

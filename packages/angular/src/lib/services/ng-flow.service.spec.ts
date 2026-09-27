@@ -28,6 +28,40 @@ describe('NgFlowService', () => {
     service = TestBed.inject(NgFlowService);
   });
 
+  // ── setNodes / setEdges notify controlled parents ───────────────────
+
+  describe('setNodes / setEdges emit a diff through (nodesChange)/(edgesChange)', () => {
+    it('emits add / replace / remove node changes against the previous array', () => {
+      const a = makeNode('a');
+      service.setNodes([a, makeNode('b')]);
+      const spy = vi.fn();
+      store.onNodesChange = spy;
+
+      const c = makeNode('c');
+      service.setNodes([a, c]);
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy.mock.calls[0][0]).toEqual([
+        { item: c, type: 'add', index: 1 },
+        { id: 'b', type: 'remove' },
+      ]);
+      expect(service.getNodes()).toEqual([a, c]);
+    });
+
+    it('emits edge replace/remove changes and stays silent when nothing changed', () => {
+      const e1 = makeEdge('e1', 'a', 'b');
+      service.setEdges([e1, makeEdge('e2', 'a', 'b')]);
+      const spy = vi.fn();
+      store.onEdgesChange = spy;
+
+      service.setEdges([e1]);
+      service.setEdges([e1]);
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy.mock.calls[0][0]).toEqual([{ id: 'e2', type: 'remove' }]);
+    });
+  });
+
   // ── getEdge uses edgeLookup (O(1)) not edges().find() (O(n)) ─────────
 
   describe('getEdge uses edgeLookup', () => {
@@ -985,6 +1019,21 @@ describe('groupNodes', () => {
     expect(service.getNode('b')?.parentId).toBe('g');
     expect(service.getAbsolutePosition('a')).toEqual({ x: 100, y: 100 });
     expect(service.getAbsolutePosition('b')).toEqual({ x: 300, y: 200 });
+  });
+
+  it('inserts the group before its first member so parents precede children', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    service.setNodes([
+      makeNode('x'),
+      makeNode('a', { position: { x: 100, y: 100 }, width: 50, height: 50 }),
+      makeNode('y'),
+      makeNode('b', { position: { x: 300, y: 200 }, width: 50, height: 50 }),
+    ]);
+    await service.groupNodes(['b', 'a'], { groupId: 'g' });
+    expect(service.getNodes().map((n) => n.id)).toEqual(['x', 'g', 'a', 'y', 'b']);
+    service.updateNode('a', { data: { touched: true } });
+    expect(warn.mock.calls.filter((c) => String(c[0]).includes('Parent node'))).toEqual([]);
+    warn.mockRestore();
   });
 });
 

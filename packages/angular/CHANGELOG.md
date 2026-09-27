@@ -1,5 +1,42 @@
 # @angflow/angular
 
+## Unreleased
+
+### Fixed
+
+- Agent bridge: reject graph-corrupting or no-op agent calls with `-32602` —
+  duplicate node/edge ids, edges whose `source`/`target` node doesn't exist,
+  updates to unknown ids (previously `null` + a spurious undo entry), and patches
+  that rewrite `id`, set a non-finite `position`, or create a `parentId` cycle.
+  `set_viewport` now requires finite values and `zoom > 0`.
+- Agent bridge: `delete_elements` (standalone and inside `apply_changes`) now
+  deletes descendants of deleted group nodes instead of leaving them with a
+  dangling `parentId`, and skips elements marked `deletable: false`.
+- Agent bridge: `flow.state` is no longer suppressed for changes outside a
+  curated field list (`collapsed`, `parentId`, `className`, `zIndex`, size, …).
+- Agent bridge: op-log entries now contain bridge-minted ids (`add_node` without
+  `id`, `group_nodes` without `groupId`) so logged ops can be replayed.
+- Agent chat: a response cut off by `max_tokens` mid tool call no longer leaves
+  an unanswered `tool_use` in history (which made every later request fail); the
+  truncated calls are skipped and reported to the model as errors.
+- `NgFlowService.setNodes` / `setEdges` now emit the equivalent diff through
+  `(nodesChange)` / `(edgesChange)`, as documented. Controlled parents previously
+  never heard about full replacements (including agent `set_nodes`, undo and
+  redo) and reverted them on their next change.
+- `NgFlowService.groupNodes` (and the `group_nodes` agent tool) now inserts the
+  group node before its first member instead of appending it. Parents must
+  precede children in the nodes array; the old order logged "Parent node … not
+  found" on every subsequent update and resolved child positions late.
+- `WebSocketTransport` no longer reconnects after close code `4000` (replaced by
+  a newer canvas), which made two open tabs evict each other forever.
+
+### Added
+
+- `provideAgentChat({ source })` — provenance tag on every chat tool call
+  (default `'agent:chat'`), visible to `canMutate`, the op-log and `flow.history`.
+- Agent chat panel accessibility: live-region message log, labelled composer
+  and send button, `role="alert"` errors.
+
 ## 0.3.2
 
 ### Changed

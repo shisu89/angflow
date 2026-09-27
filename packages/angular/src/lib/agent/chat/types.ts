@@ -92,6 +92,13 @@ export interface AgentChatConfig {
   maxTokens?: number;
   /** Max wire-history entries kept (oldest dropped first). Default 40. */
   maxHistory?: number;
+  /**
+   * Provenance tag passed to every bridge call the chat makes. It reaches the
+   * bridge's `canMutate(op, source)` guard, the op-log and `flow.history`
+   * events — so a host can, e.g., ask the user to confirm destructive chat
+   * edits inside an async `canMutate`. Default `'agent:chat'`.
+   */
+  source?: string;
 }
 
 /** Map the bridge catalog to Anthropic's wire tool format. Pure; no mutation. */

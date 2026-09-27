@@ -103,6 +103,20 @@ describe('CanvasSocket calls', () => {
     expect(canvas.received[0]).toMatchObject({ method: 'add_node', params: { node: { id: 'n1' } } });
   });
 
+  it('tags request frames with a provenance source (default agent:mcp)', async () => {
+    const cs = await makeSocket();
+    const canvas = makeCanvas({ handlers: { get_nodes: () => [] } });
+    await canvas.connect(`ws://127.0.0.1:${cs.port}`);
+    await cs.call('get_nodes', {});
+    expect(canvas.received[0]).toMatchObject({ method: 'get_nodes', source: 'agent:mcp' });
+
+    const custom = await makeSocket({ source: 'agent:cursor' });
+    const canvas2 = makeCanvas({ handlers: { get_nodes: () => [] } });
+    await canvas2.connect(`ws://127.0.0.1:${custom.port}`);
+    await custom.call('get_nodes', {});
+    expect(canvas2.received[0]).toMatchObject({ source: 'agent:cursor' });
+  });
+
   it('maps bridge {id, error} frames to BridgeToolError with code/data', async () => {
     const cs = await makeSocket();
     const canvas = makeCanvas(); // no handlers → FakeCanvas answers -32601

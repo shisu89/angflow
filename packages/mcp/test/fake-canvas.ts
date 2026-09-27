@@ -15,7 +15,7 @@ export interface FakeCanvasOptions {
 }
 
 export class FakeCanvas {
-  readonly received: Array<{ id: number | string; method: string; params?: Record<string, unknown> }> = [];
+  readonly received: Array<{ id: number | string; method: string; params?: Record<string, unknown>; source?: string }> = [];
   private socket: WebSocket | null = null;
   private readonly handlers: Record<string, Handler>;
   private readonly mode: 'normal' | 'silent' | 'wrong-id';

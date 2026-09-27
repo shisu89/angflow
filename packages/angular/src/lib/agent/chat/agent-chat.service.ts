@@ -111,15 +111,36 @@ export class AgentChatService {
         });
         this.history.push({ role: 'assistant', content: response.content });
 
-        if (toolUses.length === 0 || response.stop_reason !== 'tool_use') {
+        if (toolUses.length === 0) {
           return; // end_turn / max_tokens: the text shown is the final answer
+        }
+        if (response.stop_reason !== 'tool_use') {
+          // Typically max_tokens cutting the response off mid tool call: the
+          // tool_use input may be truncated, so never execute it. But the
+          // assistant turn is already in history, and Anthropic rejects any
+          // request whose tool_use blocks lack matching tool_results — so
+          // answer each one with an error and let the model retry smaller.
+          const reason = `[not executed] the response ended (stop_reason: ${response.stop_reason}) before this tool call was complete; retry it, splitting large payloads across several calls`;
+          toolUses.forEach((_, i) => this.updateActivity(message.id, i, { status: 'error', summary: reason }));
+          this.history.push({
+            role: 'user',
+            content: toolUses.map((tu) => ({
+              type: 'tool_result' as const,
+              tool_use_id: tu.id,
+              content: reason,
+              is_error: true,
+            })),
+          });
+          continue;
         }
 
         const results: AgentChatToolResultBlock[] = [];
         for (let i = 0; i < toolUses.length; i++) {
           const tu = toolUses[i];
           try {
-            const result = await this.bridge.callTool(tu.name, tu.input);
+            const result = await this.bridge.callTool(tu.name, tu.input ?? {}, {
+              source: this.config.source,
+            });
             this.updateActivity(message.id, i, {
               status: 'ok',
               summary: truncate(JSON.stringify(result ?? null)),
