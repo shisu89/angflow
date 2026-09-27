@@ -190,3 +190,19 @@ test('gemini stop_reason: MAX_TOKENS maps; plain text is end_turn', () => {
   const plain = tr.fromGeminiResponse({ candidates: [{ content: { parts: [{ text: 'x' }] }, finishReason: 'STOP' }] });
   assert.equal(plain.stop_reason, 'end_turn');
 });
+
+import { isOriginAllowed, corsHeaders } from './cors.mjs';
+
+test('isOriginAllowed: localhost origins and no-origin requests pass; others are rejected', () => {
+  assert.equal(isOriginAllowed(undefined, ''), true);
+  assert.equal(isOriginAllowed('http://localhost:4200', ''), true);
+  assert.equal(isOriginAllowed('https://127.0.0.1:8443', ''), true);
+  assert.equal(isOriginAllowed('https://evil.example', ''), false);
+  assert.equal(isOriginAllowed('http://localhost.evil.example', ''), false);
+  assert.equal(isOriginAllowed('https://app.example', 'https://app.example, https://b.example'), true);
+});
+
+test('corsHeaders echoes the origin and never uses a wildcard', () => {
+  assert.equal(corsHeaders('http://localhost:4200')['Access-Control-Allow-Origin'], 'http://localhost:4200');
+  assert.equal(corsHeaders(undefined)['Access-Control-Allow-Origin'], undefined);
+});

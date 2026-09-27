@@ -393,3 +393,31 @@ describe('AgentChatService — truncated tool calls and provenance', () => {
     expect(seen).toEqual(['agent:chat']);
   });
 });
+
+describe('AgentChatService — stop cancels the in-flight completion', () => {
+  it('aborts the signal passed to complete() and does not report an error', async () => {
+    let seenSignal: AbortSignal | undefined;
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideAgentBridge({ transports: [] }),
+        provideAgentChat({
+          complete: (_req, opts) =>
+            new Promise((_resolve, reject) => {
+              seenSignal = opts?.signal;
+              opts?.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+            }),
+        }),
+      ],
+    });
+    const chat = TestBed.inject(AgentChatService);
+    const pending = chat.send('hi');
+    await Promise.resolve();
+    chat.stop();
+    await pending;
+    expect(seenSignal?.aborted).toBe(true);
+    expect(chat.error()).toBeNull();
+    expect(chat.busy()).toBe(false);
+  });
+});

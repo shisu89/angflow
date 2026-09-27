@@ -2,9 +2,8 @@
  * GENERATED FILE — DO NOT EDIT.
  *
  * Snapshot of AGENT_TOOL_SCHEMAS from @angflow/angular@0.3.21.
- * Regenerate with `npm run generate:schemas` (runs automatically in
- * `npm run build`). The drift test in test/schema-snapshot.spec.ts compares
- * this file against the workspace source.
+ * Regenerate with `npm run generate:schemas`. `npm run build` and the
+ * drift test in test/schema-snapshot.spec.ts fail while this file is stale.
  */
 export interface AgentToolSchema {
   name: string;

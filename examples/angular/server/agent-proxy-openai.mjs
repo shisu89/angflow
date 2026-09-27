@@ -24,6 +24,7 @@
  */
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
+import { corsHeaders, isOriginAllowed } from './cors.mjs';
 
 const DEFAULT_MODEL = 'gpt-5.2';
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
@@ -116,11 +117,6 @@ export function fromOpenAiResponse(data) {
   return { content, stop_reason };
 }
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'content-type, x-angflow-model',
-};
 
 function main() {
   if (!process.env.OPENAI_API_KEY) {
@@ -132,6 +128,12 @@ function main() {
   const MODEL = process.env.ANGFLOW_AGENT_MODEL ?? DEFAULT_MODEL;
 
   createServer(async (req, res) => {
+    const origin = typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
+    if (!isOriginAllowed(origin)) {
+      res.writeHead(403, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ error: `origin ${origin} not allowed (set ANGFLOW_ALLOWED_ORIGINS)` }));
+    }
+    const CORS = corsHeaders(origin);
     if (req.method === 'OPTIONS') {
       res.writeHead(204, CORS);
       return res.end();

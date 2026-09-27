@@ -14,7 +14,20 @@ function envOr(name: string, fallback: string): string {
   return process.env[name] ?? fallback;
 }
 
-const { values } = parseArgs({
+const USAGE_HINT = 'Run `npx @angflow/mcp --help` for usage.';
+
+let parsed: ReturnType<typeof parseCliArgs>;
+try {
+  parsed = parseCliArgs();
+} catch (err) {
+  // parseArgs throws on unknown flags / missing values — print a one-liner, not a stack.
+  console.error(`[angflow-mcp] ${err instanceof Error ? err.message : String(err)}\n[angflow-mcp] ${USAGE_HINT}`);
+  process.exit(1);
+}
+const { values } = parsed;
+
+function parseCliArgs() {
+  return parseArgs({
   options: {
     port: { type: 'string', default: envOr('ANGFLOW_MCP_PORT', '8765') },
     host: { type: 'string', default: envOr('ANGFLOW_MCP_HOST', '127.0.0.1') },
@@ -26,7 +39,8 @@ const { values } = parseArgs({
     version: { type: 'boolean', default: false },
     help: { type: 'boolean', default: false },
   },
-});
+  });
+}
 
 if (values.help) {
   console.error(`angflow-mcp — MCP server for a live angflow canvas
@@ -74,7 +88,7 @@ if (!['debug', 'info', 'silent'].includes(logLevel)) {
 // Only treat --token + --no-token as a conflict when --token was explicitly passed
 // on the command line. If the token value came only from ANGFLOW_MCP_TOKEN and the
 // user passed --no-token, let --no-token win (clear the env token silently).
-const tokenOnCli = process.argv.includes('--token');
+const tokenOnCli = process.argv.some((a) => a === '--token' || a.startsWith('--token='));
 if (values['no-token'] && values.token) {
   if (tokenOnCli) {
     console.error('[angflow-mcp] --token and --no-token are mutually exclusive');

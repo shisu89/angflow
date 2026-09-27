@@ -21,15 +21,17 @@ export const appConfig: ApplicationConfig = {
       layout: dagreLayout,
     }),
     provideAgentChat({
-      complete: async (req) => {
+      complete: async (req, opts) => {
         let res: Response;
         try {
           res = await fetch('http://localhost:8787/api/agent', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify(req),
+            signal: opts?.signal,
           });
-        } catch {
+        } catch (err) {
+          if (opts?.signal.aborted) throw err; // user pressed Stop
           throw new Error(
             'Agent proxy unreachable. Start it with: ANTHROPIC_API_KEY=... node server/agent-proxy.mjs',
           );

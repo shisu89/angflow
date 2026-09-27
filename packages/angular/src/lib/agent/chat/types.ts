@@ -61,8 +61,14 @@ export interface AgentChatResponse {
 /**
  * Host-supplied completion function — typically a fetch to the host's own
  * backend proxy. Must reject (throw) on transport/HTTP failure.
+ *
+ * `opts.signal` aborts when the user presses Stop — pass it to `fetch` so the
+ * in-flight model request is cancelled instead of running to completion.
  */
-export type CompleteFn = (req: AgentChatRequest) => Promise<AgentChatResponse>;
+export type CompleteFn = (
+  req: AgentChatRequest,
+  opts?: { signal: AbortSignal },
+) => Promise<AgentChatResponse>;
 
 // ── UI-facing state ─────────────────────────────────────────────────────
 

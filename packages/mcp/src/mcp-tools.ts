@@ -40,6 +40,49 @@ const CANVAS_STATUS_TOOL = {
   inputSchema: { type: 'object' as const, properties: {}, additionalProperties: false },
 };
 
+/**
+ * MCP tool annotations (hints for clients, e.g. auto-approving read-only calls
+ * and confirming destructive ones). Derived from the tool name so newly added
+ * bridge tools get sensible defaults: get_/list_ reads are read-only.
+ */
+const READ_ONLY_EXTRA = new Set([
+  'is_node_in_area',
+  'screen_to_flow_position',
+  'flow_to_screen_position',
+  'history_status',
+]);
+const DESTRUCTIVE = new Set([
+  'delete_elements',
+  'set_nodes',
+  'set_edges',
+  'apply_changes',
+  'dissolve_group',
+  'undo',
+  'redo',
+  'clear_history',
+  'unregister_node_template',
+]);
+// UI-state tools: they change what's selected/visible but never graph content,
+// and repeating them with the same arguments has no additional effect.
+const IDEMPOTENT_UI = /^(fit_view|fit_bounds|set_viewport|zoom_to|set_center|select_nodes|select_edges|deselect_all|set_group_collapsed)$/;
+
+export function toolAnnotations(name: string): {
+  readOnlyHint: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint: boolean;
+} {
+  const readOnly =
+    name === 'canvas_status' || /^(get_|list_)/.test(name) || READ_ONLY_EXTRA.has(name);
+  if (readOnly) return { readOnlyHint: true, openWorldHint: false };
+  return {
+    readOnlyHint: false,
+    destructiveHint: DESTRUCTIVE.has(name),
+    idempotentHint: IDEMPOTENT_UI.test(name),
+    openWorldHint: false,
+  };
+}
+
 function ok(value: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(value) }] };
 }
@@ -83,8 +126,9 @@ export function installTools(server: Server, schemas: AgentToolSchema[], deps: I
         name: s.name,
         description: s.description,
         inputSchema: s.inputSchema,
+        annotations: toolAnnotations(s.name),
       })),
-      CANVAS_STATUS_TOOL,
+      { ...CANVAS_STATUS_TOOL, annotations: toolAnnotations(CANVAS_STATUS_TOOL.name) },
     ],
   }));
 

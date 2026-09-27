@@ -94,7 +94,9 @@ export class NoCanvasError extends Error {
 /** The canvas did not answer within the configured timeout. */
 export class CanvasTimeoutError extends Error {
   constructor(method: string, timeoutMs: number) {
-    super(`Canvas did not answer "${method}" within ${timeoutMs}ms`);
+    super(
+      `Canvas did not answer "${method}" within ${timeoutMs}ms. The call may still complete on the canvas (e.g. a host confirmation prompt is pending) — check get_state before retrying a mutation.`,
+    );
   }
 }
 
@@ -284,9 +286,16 @@ export class CanvasSocket {
     this.options.log.info('canvas connected');
 
     socket.on('message', (data) => this.onMessage(String(data)));
-    socket.on('close', () => {
+    socket.on('close', (code: number) => {
       if (this.socket !== socket) return; // already replaced
       this.socket = null;
+      if (code === 1009) {
+        this.options.log.warn(
+          `canvas disconnected: a frame exceeded the ${this.options.maxPayloadBytes ?? 5 * 1024 * 1024}-byte limit ` +
+            '(close 1009). The graph is too large to push whole — agents should use get_summary / scoped ' +
+            'get_state (groupId or bounds) instead of get_state/get_nodes on the full board.',
+        );
+      }
       this.options.log.info('canvas disconnected');
       this.rejectAllPending('disconnect');
       this.options.onDisconnect?.();

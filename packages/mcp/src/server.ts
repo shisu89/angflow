@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import { CanvasSocket } from './canvas-socket.js';
 import { createLogger, type LogLevel } from './log.js';
 import { installTools } from './mcp-tools.js';
+import { installResources, type FlowResources } from './mcp-resources.js';
 import { SessionMirror } from './session.js';
 import { AGENT_TOOL_SCHEMAS, GENERATED_FROM_ANGULAR_VERSION } from './generated/tool-schemas.js';
 
@@ -38,7 +39,9 @@ export const SCHEMAS_FROM = GENERATED_FROM_ANGULAR_VERSION;
 
 export function createAngflowMcpServer(options: AngflowMcpServerOptions): AngflowMcpServer {
   const log = createLogger(options.logLevel);
-  const session = new SessionMirror();
+  // Assigned below once the MCP server exists; the mirror only fires on events.
+  let resources: FlowResources | null = null;
+  const session = new SessionMirror(() => resources?.flowsChanged());
 
   const canvasSocket = new CanvasSocket({
     port: options.port,
@@ -51,6 +54,8 @@ export function createAngflowMcpServer(options: AngflowMcpServerOptions): Angflo
     onEvent: (event, params) => {
       session.handleConnect();
       session.handleEvent(event, params);
+      const flowId = params?.['flowId'];
+      if (event === 'flow.state' && typeof flowId === 'string') resources?.flowStateChanged(flowId);
     },
     onConnect: () => {
       session.handleConnect();
@@ -74,8 +79,13 @@ export function createAngflowMcpServer(options: AngflowMcpServerOptions): Angflo
 
   const mcpServer = new Server(
     { name: 'angflow-mcp', version: pkg.version },
-    { capabilities: { tools: {} } },
+    { capabilities: { tools: {}, resources: { subscribe: true, listChanged: true } } },
   );
+
+  resources = installResources(mcpServer, {
+    callTool: (name, args) => canvasSocket.call(name, args),
+    flowIds: () => session.flowIds(),
+  });
 
   installTools(mcpServer, AGENT_TOOL_SCHEMAS, {
     callTool: (name, args) => canvasSocket.call(name, args),
@@ -96,6 +106,7 @@ export function createAngflowMcpServer(options: AngflowMcpServerOptions): Angflo
       await canvasSocket.start();
     },
     async stop() {
+      resources?.dispose();
       await canvasSocket.stop();
       try {
         await mcpServer.close();

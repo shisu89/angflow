@@ -21,6 +21,7 @@
  */
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
+import { corsHeaders, isOriginAllowed } from './cors.mjs';
 
 const DEFAULT_MODEL = 'gemini-3.5-flash';
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
@@ -117,11 +118,6 @@ export function createGeminiTranslator() {
   };
 }
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'content-type, x-angflow-model',
-};
 
 function main() {
   if (!process.env.GEMINI_API_KEY) {
@@ -133,6 +129,12 @@ function main() {
   const translator = createGeminiTranslator();
 
   createServer(async (req, res) => {
+    const origin = typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
+    if (!isOriginAllowed(origin)) {
+      res.writeHead(403, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ error: `origin ${origin} not allowed (set ANGFLOW_ALLOWED_ORIGINS)` }));
+    }
+    const CORS = corsHeaders(origin);
     if (req.method === 'OPTIONS') {
       res.writeHead(204, CORS);
       return res.end();

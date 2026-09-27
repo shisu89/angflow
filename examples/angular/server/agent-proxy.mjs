@@ -8,7 +8,8 @@
  *
  * Run:  ANTHROPIC_API_KEY=sk-ant-... node server/agent-proxy.mjs
  * Env:  PORT (default 8787)
- *       ANGFLOW_AGENT_MODEL (default claude-sonnet-4-6 — current as of June 2026)
+ *       ANGFLOW_AGENT_MODEL (default claude-opus-5)
+ *       ANGFLOW_ALLOWED_ORIGINS (comma-separated extra browser origins; localhost is always allowed)
  *       ANGFLOW_ALLOWED_MODELS (comma-separated; enables the x-angflow-model
  *         request header so an app can let END USERS pick a model at runtime.
  *         Unset = header ignored. Never trust client strings into your bill.)
@@ -21,8 +22,9 @@
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
+import { corsHeaders, isOriginAllowed } from './cors.mjs';
 
-const DEFAULT_MODEL = 'claude-sonnet-4-6';
+const DEFAULT_MODEL = 'claude-opus-5';
 
 /**
  * Pick the model for a request: the x-angflow-model header is honored only
@@ -34,11 +36,6 @@ export function resolveModel(headerValue, allowlistEnv, defaultModel) {
   return allowed.includes(headerValue) ? headerValue : defaultModel;
 }
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'content-type, x-angflow-model',
-};
 
 function main() {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -50,6 +47,12 @@ function main() {
   const client = new Anthropic();
 
   createServer(async (req, res) => {
+    const origin = typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
+    if (!isOriginAllowed(origin)) {
+      res.writeHead(403, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ error: `origin ${origin} not allowed (set ANGFLOW_ALLOWED_ORIGINS)` }));
+    }
+    const CORS = corsHeaders(origin);
     if (req.method === 'OPTIONS') {
       res.writeHead(204, CORS);
       return res.end();
@@ -79,13 +82,18 @@ function main() {
         system,
         messages,
         tools,
-        max_tokens: max_tokens ?? 2048,
+        max_tokens: Math.min(Number(max_tokens) || 4096, 16000),
+        // Top-level auto-caching: caches the last cacheable block, so the large
+        // tool catalog + system prompt + growing tool-use history are read from
+        // cache on every round of the loop instead of re-billed in full.
+        cache_control: { type: 'ephemeral' },
       });
       res.writeHead(200, { ...CORS, 'content-type': 'application/json' });
       res.end(JSON.stringify({ content: response.content, stop_reason: response.stop_reason }));
     } catch (err) {
       console.error('[agent-proxy] upstream error:', err?.message ?? err);
-      res.writeHead(502, { ...CORS, 'content-type': 'application/json' });
+      const status = err instanceof Anthropic.RateLimitError ? 429 : err instanceof Anthropic.BadRequestError ? 400 : 502;
+      res.writeHead(status, { ...CORS, 'content-type': 'application/json' });
       res.end(JSON.stringify({ error: String(err?.message ?? err) }));
     }
   }).listen(PORT, '127.0.0.1', () => {

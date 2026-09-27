@@ -62,12 +62,17 @@ export class AgentChatService {
   /** Wire-format history sent to complete(). */
   private history: AgentChatMessageParam[] = [];
   private stopped = false;
+  private abort: AbortController | null = null;
   private nextMessageId = 1;
   private readonly tools = toAgentChatTools(AGENT_TOOL_SCHEMAS);
 
-  /** Abort after the current step; in-flight complete() results are discarded. */
+  /**
+   * Abort after the current step. The in-flight complete() call is signalled
+   * to cancel (see CompleteFn `opts.signal`); its result is discarded either way.
+   */
   stop(): void {
     this.stopped = true;
+    this.abort?.abort();
   }
 
   /** Reset the conversation. No-op while busy. */
@@ -83,6 +88,7 @@ export class AgentChatService {
     this._busy.set(true);
     this._error.set(null);
     this.stopped = false;
+    this.abort = new AbortController();
 
     this.appendMessage({ role: 'user', text, activity: [] });
     this.history.push({ role: 'user', content: [{ type: 'text', text }] });
@@ -91,12 +97,15 @@ export class AgentChatService {
       for (let turn = 0; turn < this.config.maxTurns; turn++) {
         if (this.stopped) return;
 
-        const response = await this.config.complete({
-          system: this.config.systemPrompt,
-          messages: this.trimmedHistory(),
-          tools: this.tools,
-          max_tokens: this.config.maxTokens,
-        });
+        const response = await this.config.complete(
+          {
+            system: this.config.systemPrompt,
+            messages: this.trimmedHistory(),
+            tools: this.tools,
+            max_tokens: this.config.maxTokens,
+          },
+          { signal: this.abort.signal },
+        );
         if (this.stopped) return; // discard in-flight results
 
         const { assistantText, toolUses } = splitContent(response);
@@ -187,11 +196,14 @@ export class AgentChatService {
         activity: [],
       });
     } catch (err) {
+      // A user-initiated stop surfaces as an abort rejection — not an error.
+      if (this.stopped) return;
       // complete() failed: abort the turn, keep history retry-safe (the
       // user message stays; no partial assistant turn was recorded for
       // the failed round because history.push happens after complete()).
       this._error.set(err instanceof Error ? err.message : String(err));
     } finally {
+      this.abort = null;
       this._busy.set(false);
     }
   }

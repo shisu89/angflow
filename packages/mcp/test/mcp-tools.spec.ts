@@ -44,6 +44,21 @@ describe('installTools', () => {
     expect(names).toContain('canvas_status');
   });
 
+  it('annotates read-only and destructive tools for client approval policies', async () => {
+    const { client } = await makePair(async () => null);
+    const byName = new Map((await client.listTools()).tools.map((t) => [t.name, t.annotations]));
+    for (const name of ['get_state', 'get_summary', 'list_flows', 'canvas_status', 'history_status']) {
+      expect(byName.get(name)?.readOnlyHint, name).toBe(true);
+    }
+    for (const name of ['delete_elements', 'set_nodes', 'apply_changes', 'undo']) {
+      expect(byName.get(name), name).toMatchObject({ readOnlyHint: false, destructiveHint: true });
+    }
+    expect(byName.get('add_node')).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+    expect(byName.get('fit_view')).toMatchObject({ idempotentHint: true });
+    // Every tool is annotated.
+    expect([...byName.values()].every((a) => a !== undefined)).toBe(true);
+  });
+
   it('passes the schema through verbatim', async () => {
     const { client } = await makePair(async () => null);
     const tools = await client.listTools();

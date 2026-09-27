@@ -1,12 +1,16 @@
 /**
- * Event-fed mirror of the connected canvas: which flows exist and their
- * last-known state. Consumed by canvas_status and logging — agents read live
- * state via the passthrough tools, not from this mirror.
+ * Event-fed mirror of the connected canvas: which flows exist. Consumed by
+ * canvas_status and the flow resources. It deliberately does NOT retain
+ * flow.state payloads (whole graphs, pushed on every edit) — agents read live
+ * state via the passthrough tools / resources instead.
  */
 export class SessionMirror {
   /** Informational only — canvas_status reads CanvasSocket.isConnected() as the authority; this flag exists for logging/diagnostics and future use. */
   connected = false;
-  private readonly flows = new Map<string, unknown>();
+  private readonly flows = new Set<string>();
+
+  /** Called whenever the set of flow ids changes. */
+  constructor(private readonly onFlowsChanged: () => void = () => {}) {}
 
   handleConnect(): void {
     this.connected = true;
@@ -14,7 +18,9 @@ export class SessionMirror {
 
   handleDisconnect(): void {
     this.connected = false;
+    const had = this.flows.size > 0;
     this.flows.clear();
+    if (had) this.onFlowsChanged();
   }
 
   handleEvent(event: string, params?: Record<string, unknown>): void {
@@ -22,13 +28,14 @@ export class SessionMirror {
     if (typeof flowId !== 'string' || flowId.length === 0) return;
     switch (event) {
       case 'flow.registered':
-        if (!this.flows.has(flowId)) this.flows.set(flowId, undefined);
+      case 'flow.state': // a state push implies the flow exists
+        if (!this.flows.has(flowId)) {
+          this.flows.add(flowId);
+          this.onFlowsChanged();
+        }
         break;
       case 'flow.unregistered':
-        this.flows.delete(flowId);
-        break;
-      case 'flow.state':
-        this.flows.set(flowId, params);
+        if (this.flows.delete(flowId)) this.onFlowsChanged();
         break;
       default:
         // flow.history and future events: nothing to mirror yet.
@@ -38,9 +45,5 @@ export class SessionMirror {
 
   flowIds(): string[] {
     return Array.from(this.flows.keys());
-  }
-
-  lastState(flowId: string): unknown {
-    return this.flows.get(flowId);
   }
 }

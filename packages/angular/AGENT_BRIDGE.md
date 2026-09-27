@@ -537,7 +537,9 @@ cursor = next;
 `@angflow/mcp` (in `packages/mcp/`) exposes this entire tool catalog to MCP
 clients (Claude Code, Claude Desktop, Cursor): it hosts the WebSocket endpoint
 a `WebSocketTransport` dials and re-publishes every tool above 1:1, plus a
-server-local `canvas_status` tool. Tool schemas are snapshotted from
+server-local `canvas_status` tool. It also exposes each flow as MCP resources
+(`angflow://flows/{id}/summary|state`, subscribable) and annotates tools with
+`readOnlyHint` / `destructiveHint` for client approval policies. Tool schemas are snapshotted from
 `AGENT_TOOL_SCHEMAS` at build time — when you add or change a tool here,
 rebuild/republish `@angflow/mcp` (its drift test fails until regenerated).
 See [`packages/mcp/README.md`](../mcp/README.md) for setup.
@@ -562,6 +564,9 @@ from `AGENT_TOOL_SCHEMAS` at runtime — no snapshot, no regeneration step.
 See the `agent-chat` example and `examples/angular/server/agent-proxy.mjs`
 for the reference wiring.
 
+`complete(req, { signal })` receives an `AbortSignal` that fires when the user
+presses Stop — forward it to `fetch` so the model request is actually cancelled.
+
 Every chat tool call carries `source: 'agent:chat'` (override with
 `provideAgentChat({ source })`), so the bridge's `canMutate` can tell chat edits
 apart — e.g. to confirm destructive ones with the user. If a model response is
@@ -572,12 +577,16 @@ smaller steps, which keeps the conversation valid for the Messages API.
 
 ### Provider proxies (reference implementations in `examples/angular/server/`)
 
-| Provider | File | Key env | Default model (June 2026) | Notes |
+| Provider | File | Key env | Default model | Notes |
 |---|---|---|---|---|
-| Anthropic | `agent-proxy.mjs` | `ANTHROPIC_API_KEY` | `claude-sonnet-4-6` | Near-passthrough (the wire shape is Anthropic's) |
+| Anthropic | `agent-proxy.mjs` | `ANTHROPIC_API_KEY` | `claude-opus-5` | Near-passthrough (the wire shape is Anthropic's); prompt caching on, so the tool catalog and loop history are read from cache each round |
 | OpenAI | `agent-proxy-openai.mjs` | `OPENAI_API_KEY` | `gpt-5.2` | Tool-call/finish-reason translation |
 | Ollama / OpenRouter / any OpenAI-compatible gateway | `agent-proxy-openai.mjs` + `OPENAI_BASE_URL` | `OPENAI_API_KEY` (dummy for Ollama) | set `ANGFLOW_AGENT_MODEL` (e.g. `qwen3`) | Local models: pick a tools-capable one; small models can degrade with the 52-tool catalog |
 | Gemini | `agent-proxy-gemini.mjs` | `GEMINI_API_KEY` | `gemini-3.5-flash` | Synthesizes tool-call ids; strips `additionalProperties` from schemas |
+
+All proxies reject browser requests whose `Origin` is not localhost/127.0.0.1
+(extend with `ANGFLOW_ALLOWED_ORIGINS`) — CORS headers alone would not stop a
+visited website from *sending* requests that spend the key.
 
 All proxies accept an optional `x-angflow-model` request header for end-user
 runtime model switching, honored only when `ANGFLOW_ALLOWED_MODELS`

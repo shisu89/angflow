@@ -92,6 +92,27 @@ One additional server-local tool is registered:
 |------|---------|-------|
 | `canvas_status` | `{ connected, flows, port, host }` | Reports whether a canvas is connected and which flow ids it has registered. Call this first when other tools fail. |
 
+**Annotations.** Every tool carries MCP annotations so clients can set approval policies:
+reads (`get_*`, `list_*`, coordinate conversions, `history_status`, `canvas_status`) are
+`readOnlyHint: true`; content-removing tools (`delete_elements`, `set_nodes`, `set_edges`,
+`apply_changes`, `dissolve_group`, `undo`, `redo`, `clear_history`,
+`unregister_node_template`) are `destructiveHint: true`; viewport/selection tools are
+`idempotentHint: true`.
+
+## Resources
+
+Each registered flow is also exposed as MCP resources, read live from the canvas:
+
+| URI | Content |
+|-----|---------|
+| `angflow://flows/{flowId}/summary` | `get_summary` — counts, groups, node titles, viewport, bounds |
+| `angflow://flows/{flowId}/state` | `get_state` — full nodes, edges, viewport (large on big boards) |
+
+The server sends `notifications/resources/list_changed` when flows register or unregister,
+and supports `resources/subscribe`: subscribers get a (500 ms-throttled)
+`notifications/resources/updated` whenever the canvas changes — including edits the user
+makes by hand, so an agent can notice them without polling.
+
 ## Security
 
 The server binds to `127.0.0.1` by default, and two checks guard every canvas connection:

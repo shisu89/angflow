@@ -38,9 +38,11 @@ export class NgFlowDropZoneDirective implements OnInit, OnDestroy {
       y: event.clientY,
     });
 
+    // getData() returns '' (not null) for a missing type, so `||` — not `??` —
+    // is what makes the text/plain fallback reachable.
     const data = event.dataTransfer?.getData('application/json')
-      ?? event.dataTransfer?.getData('text/plain')
-      ?? null;
+      || event.dataTransfer?.getData('text/plain')
+      || null;
 
     this.nodeDrop.emit({ event, flowPosition, data });
   };

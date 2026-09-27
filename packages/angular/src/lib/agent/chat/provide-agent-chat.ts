@@ -20,11 +20,12 @@ export const AGENT_CHAT_CONFIG = new InjectionToken<ResolvedAgentChatConfig>(
  * @example
  * ```ts
  * provideAgentChat({
- *   complete: (req) =>
+ *   complete: (req, { signal }) =>
  *     fetch('/api/agent', {
  *       method: 'POST',
  *       headers: { 'content-type': 'application/json' },
  *       body: JSON.stringify(req),
+ *       signal, // lets the chat's Stop button cancel the request
  *     }).then((r) => {
  *       if (!r.ok) throw new Error(`agent proxy responded ${r.status}`);
  *       return r.json();

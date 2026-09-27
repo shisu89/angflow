@@ -18,12 +18,16 @@ describe('SessionMirror', () => {
     expect(s.flowIds()).toEqual(['b']);
   });
 
-  it('records last-known state per flow', () => {
-    const s = new SessionMirror();
-    s.handleConnect();
-    s.handleEvent('flow.state', { flowId: 'a', nodes: [{ id: 'n1' }], edges: [] });
-    expect(s.lastState('a')).toMatchObject({ nodes: [{ id: 'n1' }] });
-    expect(s.lastState('missing')).toBeUndefined();
+  it('notifies when the flow set changes, but not on repeat events', () => {
+    let changes = 0;
+    const s = new SessionMirror(() => changes++);
+    s.handleEvent('flow.registered', { flowId: 'a' });
+    s.handleEvent('flow.registered', { flowId: 'a' });
+    s.handleEvent('flow.state', { flowId: 'a', nodes: [], edges: [] });
+    expect(changes).toBe(1);
+    s.handleEvent('flow.unregistered', { flowId: 'a' });
+    s.handleEvent('flow.unregistered', { flowId: 'a' });
+    expect(changes).toBe(2);
   });
 
   it('flow.state implies the flow exists even without flow.registered', () => {
