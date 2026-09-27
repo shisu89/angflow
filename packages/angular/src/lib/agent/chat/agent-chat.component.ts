@@ -19,6 +19,10 @@ import { AgentChatService } from './agent-chat.service';
   selector: 'ng-flow-agent-chat',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[class.dark]': "colorMode() === 'dark'",
+    '[class.system]': "colorMode() === 'system'",
+  },
   template: `
     <div class="ng-flow__agent-chat">
       <div class="ng-flow__agent-chat__header">
@@ -93,6 +97,47 @@ import { AgentChatService } from './agent-chat.service';
   `,
   styles: [
     `
+      /* Dark palette: inside a dark flow/page (.dark ancestor), via
+         [colorMode]="'dark'", or 'system' + OS dark preference. Override any
+         --ngf-chat-* variable to theme it further. */
+      :host(.dark), :host-context(.dark) {
+        --ngf-chat-bg: #1e1e1e;
+        --ngf-chat-fg: #f1f5f9;
+        --ngf-chat-border: #3c3c3c;
+        --ngf-chat-assistant-bg: #2b2b2b;
+        --ngf-chat-input-bg: #141414;
+        --ngf-chat-chip-bg: #3e3e3e;
+        --ngf-chat-chip-fg: #e2e8f0;
+        --ngf-chat-ok-bg: #064e3b;
+        --ngf-chat-ok-fg: #a7f3d0;
+        --ngf-chat-err-bg: #4c0519;
+        --ngf-chat-err-fg: #fecdd3;
+        --ngf-chat-muted: #94a3b8;
+        --ngf-chat-danger-bg: #450a0a;
+        --ngf-chat-danger-fg: #fecaca;
+        --ngf-chat-danger-border: #7f1d1d;
+        --ngf-chat-accent: #6366f1;
+      }
+      @media (prefers-color-scheme: dark) {
+        :host(.system) {
+          --ngf-chat-bg: #1e1e1e;
+          --ngf-chat-fg: #f1f5f9;
+          --ngf-chat-border: #3c3c3c;
+          --ngf-chat-assistant-bg: #2b2b2b;
+          --ngf-chat-input-bg: #141414;
+          --ngf-chat-chip-bg: #3e3e3e;
+          --ngf-chat-chip-fg: #e2e8f0;
+          --ngf-chat-ok-bg: #064e3b;
+          --ngf-chat-ok-fg: #a7f3d0;
+          --ngf-chat-err-bg: #4c0519;
+          --ngf-chat-err-fg: #fecdd3;
+          --ngf-chat-muted: #94a3b8;
+          --ngf-chat-danger-bg: #450a0a;
+          --ngf-chat-danger-fg: #fecaca;
+          --ngf-chat-danger-border: #7f1d1d;
+          --ngf-chat-accent: #6366f1;
+        }
+      }
       .ng-flow__agent-chat {
         display: flex;
         flex-direction: column;
@@ -102,7 +147,7 @@ import { AgentChatService } from './agent-chat.service';
         border: 1px solid var(--ngf-chat-border, #d4d4d8);
         border-radius: 8px;
         font-size: 13px;
-        color: #1e293b;
+        color: var(--ngf-chat-fg, #1e293b);
         overflow: hidden;
       }
       .ng-flow__agent-chat__header {
@@ -116,9 +161,9 @@ import { AgentChatService } from './agent-chat.service';
       .ng-flow__agent-chat__stop {
         font-size: 11px;
         padding: 2px 8px;
-        border: 1px solid #fca5a5;
-        background: #fef2f2;
-        color: #b91c1c;
+        border: 1px solid var(--ngf-chat-danger-border, #fca5a5);
+        background: var(--ngf-chat-danger-bg, #fef2f2);
+        color: var(--ngf-chat-danger-fg, #b91c1c);
         border-radius: 4px;
         cursor: pointer;
       }
@@ -157,18 +202,18 @@ import { AgentChatService } from './agent-chat.service';
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         padding: 1px 6px;
         border-radius: 999px;
-        background: #e2e8f0;
-        color: #334155;
+        background: var(--ngf-chat-chip-bg, #e2e8f0);
+        color: var(--ngf-chat-chip-fg, #334155);
       }
-      .ng-flow__agent-chat__chip--ok { background: #d1fae5; color: #047857; }
-      .ng-flow__agent-chat__chip--error { background: #ffe4e6; color: #be123c; }
-      .ng-flow__agent-chat__busy { color: #94a3b8; }
+      .ng-flow__agent-chat__chip--ok { background: var(--ngf-chat-ok-bg, #d1fae5); color: var(--ngf-chat-ok-fg, #047857); }
+      .ng-flow__agent-chat__chip--error { background: var(--ngf-chat-err-bg, #ffe4e6); color: var(--ngf-chat-err-fg, #be123c); }
+      .ng-flow__agent-chat__busy { color: var(--ngf-chat-muted, #64748b); }
       .ng-flow__agent-chat__error {
         padding: 6px 10px;
-        background: #fef2f2;
-        color: #b91c1c;
+        background: var(--ngf-chat-danger-bg, #fef2f2);
+        color: var(--ngf-chat-danger-fg, #b91c1c);
         font-size: 12px;
-        border-top: 1px solid #fecaca;
+        border-top: 1px solid var(--ngf-chat-danger-border, #fecaca);
       }
       .ng-flow__agent-chat__composer {
         display: flex;
@@ -179,10 +224,12 @@ import { AgentChatService } from './agent-chat.service';
       .ng-flow__agent-chat__composer textarea {
         flex: 1;
         resize: none;
-        border: 1px solid #d4d4d8;
+        border: 1px solid var(--ngf-chat-border, #d4d4d8);
         border-radius: 6px;
         padding: 6px 8px;
         font: inherit;
+        color: inherit;
+        background: var(--ngf-chat-input-bg, #ffffff);
       }
       .ng-flow__agent-chat__send {
         align-self: flex-end;
@@ -205,6 +252,12 @@ export class AgentChatComponent {
 
   readonly title = input('Canvas copilot');
   readonly placeholder = input('Ask the copilot to edit the canvas…');
+  /**
+   * 'light' (default) also turns dark automatically inside a `.dark` ancestor
+   * (e.g. `<ng-flow colorMode="dark">`); 'dark' forces it; 'system' follows the
+   * OS preference.
+   */
+  readonly colorMode = input<'light' | 'dark' | 'system'>('light');
 
   readonly draft = signal('');
 

@@ -42,6 +42,27 @@ describe('AgentChatComponent', () => {
     expect(el.querySelector('.ng-flow__agent-chat__title')?.textContent).toContain('My copilot');
   });
 
+  it('labels its controls and announces messages (a11y)', () => {
+    const { el } = mount(echo);
+    expect(el.querySelector('textarea')?.getAttribute('aria-label')).toBeTruthy();
+    expect(el.querySelector('.ng-flow__agent-chat__send')?.getAttribute('aria-label')).toBe('Send');
+    const log = el.querySelector('.ng-flow__agent-chat__messages');
+    expect(log?.getAttribute('role')).toBe('log');
+    expect(log?.getAttribute('aria-live')).toBe('polite');
+  });
+
+  it('applies dark / system colour modes as host classes', () => {
+    const { el, fixture } = mount(echo);
+    expect(el.classList.contains('dark')).toBe(false);
+    fixture.componentRef.setInput('colorMode', 'dark');
+    fixture.detectChanges();
+    expect(el.classList.contains('dark')).toBe(true);
+    fixture.componentRef.setInput('colorMode', 'system');
+    fixture.detectChanges();
+    expect(el.classList.contains('dark')).toBe(false);
+    expect(el.classList.contains('system')).toBe(true);
+  });
+
   it('sends input text through the service and renders both bubbles', async () => {
     const { el, fixture, chat } = mount(echo);
     const input = el.querySelector('textarea')!;

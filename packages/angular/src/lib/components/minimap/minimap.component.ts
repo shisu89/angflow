@@ -47,6 +47,7 @@ export type GetMiniMapNodeAttribute<NodeType extends Node = Node> = (node: NodeT
     <ng-flow-panel [position]="position()">
       <div
         class="ng-flow__minimap xy-flow__minimap"
+        role="img"
         [attr.aria-label]="ariaLabel()"
         [style.width.px]="mmWidth()"
         [style.height.px]="mmHeight()"

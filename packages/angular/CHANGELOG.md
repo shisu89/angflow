@@ -47,6 +47,12 @@
 
 ### Changed
 
+- **Accessibility (React Flow parity, axe-clean):** nodes render as
+  `role="group"` + `aria-roledescription="node"` (was `role="button"` with a
+  disallowed `aria-selected`), edges as `role="group"` + `aria-roledescription="edge"`
+  (was `role="img"` while focusable). Per-element `ariaRole` and `focusable` props,
+  previously declared but ignored, are honoured. The minimap's labelled container
+  gets `role="img"`.
 - **Keyboard actions are scoped to their flow.** Delete, Ctrl/Cmd+A, Escape and
   arrow-key moves act only when the key event comes from inside the flow (or focus
   is on `<body>` and this flow was the last one clicked/focused). Previously the
@@ -71,6 +77,9 @@
 
 - `provideAgentChat({ source })` — provenance tag on every chat tool call
   (default `'agent:chat'`), visible to `canMutate`, the op-log and `flow.history`.
+- `<ng-flow-agent-chat [colorMode]>` (`'light' | 'dark' | 'system'`); every colour is
+  a `--ngf-chat-*` variable, and the panel turns dark automatically inside a `.dark`
+  ancestor such as `<ng-flow colorMode="dark">`.
 - `CompleteFn` receives `{ signal }`; the chat's Stop button aborts it, so the
   in-flight model request is cancelled (pass it to `fetch`). Not reported as an error.
 - Agent chat panel accessibility: live-region message log, labelled composer
