@@ -693,9 +693,9 @@ describe('setNodePositions / applyLayout', () => {
     it('escapes hostile node ids before querySelector', () => {
       const selectors: string[] = [];
       store.domNode.set({
-        querySelector(selector: string): null {
+        querySelectorAll(selector: string): Element[] {
           selectors.push(selector);
-          return null;
+          return [];
         },
       } as unknown as HTMLDivElement);
 
@@ -707,7 +707,31 @@ describe('setNodePositions / applyLayout', () => {
         typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
           ? CSS.escape(hostileId)
           : hostileId.replace(/["\\]/g, '\\$&');
-      expect(selectors).toEqual([`[data-id="${escaped}"]`]);
+      expect(selectors).toEqual([`.xy-flow__node[data-id="${escaped}"]`]);
+    });
+
+    it('targets the node element, not an edge or a nested flow\'s node sharing the id', () => {
+      const container = document.createElement('div');
+      container.className = 'ng-flow__container';
+      container.innerHTML = `
+        <svg><g class="xy-flow__edge" data-id="x"></g></svg>
+        <div class="xy-flow__nodes">
+          <div class="xy-flow__node" data-id="host">
+            <div class="ng-flow__container">
+              <div class="xy-flow__node" data-id="x" id="nested"></div>
+            </div>
+          </div>
+          <div class="xy-flow__node" data-id="x" id="mine"></div>
+        </div>`;
+      store.domNode.set(container as HTMLDivElement);
+      store.setNodes([makeNode('x'), makeNode('host')]);
+      const spy = vi.spyOn(store, 'updateNodeInternals').mockImplementation(() => {});
+
+      service.updateNodeInternals('x');
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      const updates = spy.mock.calls[0][0] as Map<string, { nodeElement: Element }>;
+      expect(updates.get('x')!.nodeElement.id).toBe('mine');
     });
   });
 

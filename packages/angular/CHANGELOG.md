@@ -4,6 +4,22 @@
 
 ### Fixed
 
+- **Dragging no longer mutates the app's node objects.** The drag fast path used to
+  assign `position`/`dragging` onto user-supplied objects, which threw on frozen state
+  (NgRx / `@ngrx/signals` dev-mode freezing) and made controlled vetoes impossible.
+  Moved nodes are now new objects (still O(changes) per frame), and
+  `selectInternalNode` consumers update during a drag.
+- **SSR-safe:** `<ng-flow>`, the node renderer, drag and resizer skip browser-only
+  setup (ResizeObserver, MutationObserver, d3-zoom, XYDrag, matchMedia) on the server
+  instead of throwing; position tweens jump to the target without
+  `requestAnimationFrame`.
+- Edges whose source/target node doesn't exist are no longer drawn to (0,0); edges
+  naming an unknown handle id are skipped with error008 (React parity).
+- Removed node elements are always unobserved by the ResizeObserver (leak).
+- `updateNodeInternals` resolves only node elements inside its own flow (it could hit
+  an edge `<g data-id>` or a nested flow's node with the same id).
+- Box selection skips nodes hidden inside collapsed groups and selects edges connected
+  to the swept nodes (React parity) instead of clearing edge selection.
 - **`<ng-flow>` inputs that were accepted but ignored now work:**
   `defaultEdgeOptions` (merged into every rendered edge and its markers; applied to
   user-completed connections), `ariaLabelConfig`, `reconnectRadius`,

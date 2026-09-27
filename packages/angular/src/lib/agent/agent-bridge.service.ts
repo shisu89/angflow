@@ -330,9 +330,9 @@ export class AngflowAgentBridge {
       }
 
       // Pre-mutation snapshot for history capture. Skipped for non-mutating tools.
-      // Shallow-clone each element so subsequent in-place mutations (notably
-      // the drag fast-path in FlowStore) can't retroactively corrupt the
-      // snapshot we already captured.
+      // Shallow-clone each element defensively so a later in-place mutation by
+      // host code can't retroactively corrupt the snapshot we already captured
+      // (FlowStore itself never mutates node objects in place).
       let snapshot: { nodes: readonly Node[]; edges: readonly Edge[] } | null = null;
       if (this.history && (MUTATING_TOOLS.has(req.method) || isApplyChanges || isLayout)) {
         snapshot = {

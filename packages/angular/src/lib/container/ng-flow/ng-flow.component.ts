@@ -17,8 +17,9 @@ import {
   signal,
   computed,
   TemplateRef,
+  PLATFORM_ID,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import {
   ConnectionMode,
   ConnectionLineType,
@@ -263,6 +264,12 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   // Instantiated for its side effects: draws the click-to-connect preview line.
   private readonly clickConnectPreview = inject(ClickConnectPreview);
   private readonly destroyRef = inject(DestroyRef);
+  /**
+   * False under Angular SSR. Lifecycle hooks (incl. ngAfterViewInit) run on the
+   * server, where ResizeObserver / matchMedia / d3-zoom have no meaning — all
+   * browser-only wiring is gated on this.
+   */
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   private readonly containerRef = viewChild<ElementRef<HTMLDivElement>>('container');
   private readonly paneRef = viewChild(PaneComponent);
 
@@ -286,7 +293,9 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
   /** Resolves 'system' color mode to 'light' or 'dark' based on prefers-color-scheme. */
   private readonly systemPrefersDark = signal(
-    typeof window !== 'undefined' ? window.matchMedia('(prefers-color-scheme: dark)').matches : false
+    this.isBrowser && typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-color-scheme: dark)').matches
+      : false
   );
 
   readonly resolvedColorMode = computed(() => {
@@ -1022,7 +1031,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     }
 
     // Set up system color mode listener
-    if (typeof window !== 'undefined') {
+    if (this.isBrowser && typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
       this.colorSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
       this.colorSchemeHandler = (e: MediaQueryListEvent) => {
         this.systemPrefersDark.set(e.matches);
@@ -1032,6 +1041,10 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   }
 
   ngAfterViewInit(): void {
+    // SSR: no measuring, no ResizeObserver, no d3-zoom and no (init) — React
+    // likewise only wires these in effects, which never run on the server. The
+    // browser hydrates/bootstraps and runs this hook for real.
+    if (!this.isBrowser) return;
     const containerEl = this.containerRef()?.nativeElement;
     if (!containerEl) return;
 

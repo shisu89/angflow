@@ -24,6 +24,8 @@ import {
   inferSide,
   isEdgeVisible,
   errorMessages,
+  ConnectionMode,
+  type Handle,
   type EdgeMarker,
   type EdgeMarkerType,
   type HandleType,
@@ -432,7 +434,7 @@ export class EdgeRendererComponent {
   private mergeCacheOptions: DefaultEdgeOptions | undefined;
 
   readonly renderedEdges = computed<Edge[]>(() => {
-    const edges = this.visibleEdges() as Edge[];
+    const edges = (this.visibleEdges() as Edge[]).filter((e) => this.isEdgeRenderable(e));
     const defaults = this.store.defaultEdgeOptions();
     if (!defaults) return edges;
     if (defaults !== this.mergeCacheOptions) {
@@ -448,6 +450,68 @@ export class EdgeRendererComponent {
       return merged;
     });
   });
+
+  /** Edge ids already reported via error008 (warn once per edge id). */
+  private warnedMissingHandleEdges = new Set<string>();
+
+  /**
+   * React parity (EdgeWrapper → getEdgePosition returning null): an edge is not
+   * rendered when an endpoint node doesn't exist, or when it names a
+   * `sourceHandle` / `targetHandle` id that the (measured) node doesn't have —
+   * the latter also reports error008 once per edge id. Nodes whose handles
+   * haven't been measured yet keep rendering against the node box, as before.
+   */
+  private isEdgeRenderable(edge: Edge): boolean {
+    const sourceNode = this.store.nodeLookup.get(edge.source);
+    const targetNode = this.store.nodeLookup.get(edge.target);
+    if (!sourceNode || !targetNode) return false;
+
+    const source = this.resolveHandle(sourceNode, 'source', edge.sourceHandle);
+    const target = this.resolveHandle(targetNode, 'target', edge.targetHandle);
+    if (!source.missing && !target.missing) {
+      this.warnedMissingHandleEdges.delete(edge.id);
+      return true;
+    }
+
+    if (!this.warnedMissingHandleEdges.has(edge.id)) {
+      this.warnedMissingHandleEdges.add(edge.id);
+      const message = errorMessages.error008(source.missing ? 'source' : 'target', {
+        id: edge.id,
+        sourceHandle: edge.sourceHandle ?? null,
+        targetHandle: edge.targetHandle ?? null,
+      });
+      // Deferred: this runs inside a computed read by the template, and
+      // onError emits the public (error) output.
+      queueMicrotask(() => this.store.onError()?.('008', message));
+    }
+    return false;
+  }
+
+  /**
+   * Resolve the handle an edge endpoint attaches to. `missing` is true only when
+   * the edge names a handle id and the node's measured handles don't include it.
+   * Without a handle id, the null-id handle (or the first one) is used; when no
+   * handles are known the caller anchors to the node box.
+   */
+  private resolveHandle(
+    node: InternalNode,
+    type: HandleType,
+    handleId: string | null | undefined,
+  ): { handle: Handle | null; missing: boolean } {
+    const bounds = node.internals?.handleBounds;
+    if (!bounds) return { handle: null, missing: false };
+    let list: Handle[] = (type === 'source' ? bounds.source : bounds.target) ?? [];
+    // Loose mode: a target endpoint may attach to a source handle (React's
+    // getEdgePosition concatenates the two lists the same way).
+    if (type === 'target' && this.store.connectionMode() === ConnectionMode.Loose) {
+      list = list.concat(bounds.source ?? []);
+    }
+    if (!handleId) {
+      return { handle: list.find((h) => h.id === null) ?? list[0] ?? null, missing: false };
+    }
+    const handle = list.find((h) => h.id === handleId) ?? null;
+    return { handle, missing: !handle };
+  }
 
   readonly markers = computed(() => {
     const edges = this.store.edges();
@@ -593,13 +657,11 @@ export class EdgeRendererComponent {
     const sourceNode = this.store.nodeLookup.get(edge.source);
     const targetNode = this.store.nodeLookup.get(edge.target);
 
-    const sourceHandle = sourceNode?.internals?.handleBounds?.source?.find(
-      (h) => h.id === edge.sourceHandle || (!edge.sourceHandle && h.id === null)
-    ) ?? sourceNode?.internals?.handleBounds?.source?.[0];
-
-    const targetHandle = targetNode?.internals?.handleBounds?.target?.find(
-      (h) => h.id === edge.targetHandle || (!edge.targetHandle && h.id === null)
-    ) ?? targetNode?.internals?.handleBounds?.target?.[0];
+    // renderedEdges only lets through edges whose nodes exist and whose named
+    // handles resolve (isEdgeRenderable), so these lookups match React's
+    // getEdgePosition: named handle → exact match; unnamed → first handle.
+    const sourceHandle = sourceNode ? this.resolveHandle(sourceNode, 'source', edge.sourceHandle).handle : null;
+    const targetHandle = targetNode ? this.resolveHandle(targetNode, 'target', edge.targetHandle).handle : null;
 
     const enrichedSourceHandle = sourceHandle
       ? { ...sourceHandle, data: this.store.getHandleData(edge.source, sourceHandle.id ?? null, 'source') }

@@ -7,7 +7,9 @@ import {
   OnChanges,
   OnDestroy,
   SimpleChanges,
+  PLATFORM_ID,
 } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { XYDrag, type XYDragInstance } from '@angflow/system';
 import { FlowStore } from '../services/flow-store.service';
 
@@ -29,6 +31,8 @@ import { FlowStore } from '../services/flow-store.service';
 export class DragDirective implements OnInit, OnChanges, OnDestroy {
   private store = inject(FlowStore);
   private el = inject(ElementRef<HTMLDivElement>);
+  /** d3-drag binding is browser-only; skipped under Angular SSR. */
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
   /** Id of the node being dragged. Required; used as the directive's primary input. */
   readonly nodeId = input.required<string>({ alias: 'ngFlowDrag' });
@@ -46,6 +50,7 @@ export class DragDirective implements OnInit, OnChanges, OnDestroy {
   private dragInstance: XYDragInstance | null = null;
 
   ngOnInit(): void {
+    if (!this.isBrowser) return;
     this.dragInstance = XYDrag({
       getStoreItems: () => this.store.getStoreItems(),
       onNodeMouseDown: (id: string) => {

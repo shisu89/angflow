@@ -44,8 +44,9 @@ export class FlowHistoryService<NodeType extends Node = Node, EdgeType extends E
   readonly canRedo = this._canRedo.asReadonly();
 
   private snapshot(): HistorySnapshot<NodeType, EdgeType> {
-    // Shallow-clone each element so later in-place mutations (e.g. the drag
-    // fast-path writing node.position) can't corrupt a captured checkpoint.
+    // Shallow-clone each element defensively so a later in-place mutation by
+    // host code can't corrupt a captured checkpoint. (The store itself never
+    // mutates node objects — its drag fast path swaps in fresh ones.)
     return {
       nodes: this.store.nodes().map((n) => ({ ...n })),
       edges: this.store.edges().map((e) => ({ ...e })),

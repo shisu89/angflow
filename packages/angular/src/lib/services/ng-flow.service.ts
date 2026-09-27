@@ -614,6 +614,23 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * element (hidden / SSR / not-yet-rendered) or zero size pass through unchanged
    * so `layoutNodes`' measured→width→initial→default fallback still applies.
    */
+  /**
+   * The rendered element of node `id` belonging to THIS flow. Scoped to node
+   * elements (edges and edge labels carry `data-id` too) and to this flow's
+   * container (a sub-flow rendered inside a node has its own nodes, possibly
+   * with colliding ids).
+   */
+  private static findNodeElement(container: HTMLElement, id: string): HTMLDivElement | null {
+    const candidates = container.querySelectorAll<HTMLDivElement>(
+      `.xy-flow__node[data-id="${NgFlowService.cssEscapeId(id)}"]`,
+    );
+    for (const el of Array.from(candidates)) {
+      const owner = el.closest('.ng-flow__container');
+      if (!owner || owner === container) return el;
+    }
+    return null;
+  }
+
   private withLiveMeasurements(nodes: InternalNode<NodeType>[]): InternalNode<NodeType>[] {
     const container = this.store.domNode();
     if (!container) return nodes;
@@ -1056,9 +1073,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
     const updates = new Map<string, InternalNodeUpdate>();
     for (const id of ids) {
-      const nodeEl = domNode.querySelector(
-        `[data-id="${NgFlowService.cssEscapeId(id)}"]`,
-      ) as HTMLDivElement | null;
+      const nodeEl = NgFlowService.findNodeElement(domNode, id);
       if (nodeEl) {
         updates.set(id, { id, nodeElement: nodeEl, force: true });
       }

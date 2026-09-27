@@ -14,8 +14,9 @@ import {
   TemplateRef,
   signal,
   effect,
+  PLATFORM_ID,
 } from '@angular/core';
-import { CommonModule, NgComponentOutlet, NgTemplateOutlet, NgStyle } from '@angular/common';
+import { CommonModule, NgComponentOutlet, NgTemplateOutlet, NgStyle, isPlatformBrowser } from '@angular/common';
 import { FlowStore } from '../../services/flow-store.service';
 import { NODE_ID, NG_FLOW_NODE_CONTEXT } from '../../services/tokens';
 import { DragDirective } from '../../directives/drag.directive';
@@ -184,7 +185,10 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
             this.nodeInjectorCache.delete(id);
             this.nodeContextCache.delete(id);
             this.nodeInputsCache.delete(id);
-            this.observedNodeIds.delete(id);
+            // Unobserve here too: once this effect has dropped the id, the
+            // MutationObserver's cleanupRemovedNodes can no longer map the
+            // detached element back to a tracked entry.
+            this.unobserveNode(id);
           }
         }
       }
@@ -225,9 +229,14 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
   private resizeObserver: ResizeObserver | null = null;
 
   private mutationObserver: MutationObserver | null = null;
-  private observedNodeIds = new Set<string>();
+  /** Node id → the element currently registered with the ResizeObserver. */
+  private observedNodeEls = new Map<string, Element>();
+  /** False under Angular SSR, where lifecycle hooks run but DOM observers don't exist. */
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
   ngAfterViewInit(): void {
+    if (!this.isBrowser || typeof ResizeObserver === 'undefined') return;
+
     // Set up ResizeObserver — fires when node dimensions change
     this.resizeObserver = new ResizeObserver((entries) => {
       const updates = new Map<string, { id: string; nodeElement: HTMLDivElement; force?: boolean }>();
@@ -246,11 +255,13 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
     });
 
     // Use MutationObserver to detect when nodes are added/removed from the DOM
-    this.mutationObserver = new MutationObserver((mutations) => {
-      this.observeNewNodes();
-      this.cleanupRemovedNodes(mutations);
-    });
-    this.mutationObserver.observe(this.el.nativeElement, { childList: true, subtree: false });
+    if (typeof MutationObserver !== 'undefined') {
+      this.mutationObserver = new MutationObserver((mutations) => {
+        this.cleanupRemovedNodes(mutations);
+        this.observeNewNodes();
+      });
+      this.mutationObserver.observe(this.el.nativeElement, { childList: true, subtree: false });
+    }
 
     // Initial observation after a microtask (nodes may not be in DOM yet)
     Promise.resolve().then(() => this.observeNewNodes());
@@ -259,30 +270,46 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     this.resizeObserver?.disconnect();
     this.mutationObserver?.disconnect();
+    this.observedNodeEls.clear();
   }
 
   private observeNewNodes(): void {
-    if (!this.resizeObserver) return;
+    const resizeObserver = this.resizeObserver;
+    if (!resizeObserver) return;
 
     const container = this.el.nativeElement;
-    const nodeElements = container.querySelectorAll('.xy-flow__node');
+    const nodeElements = container.querySelectorAll(':scope > .xy-flow__node');
     nodeElements.forEach((el: Element) => {
       const id = el.getAttribute('data-id');
-      if (id && !this.observedNodeIds.has(id)) {
-        this.observedNodeIds.add(id);
-        this.resizeObserver!.observe(el);
-      }
+      if (!id) return;
+      const prev = this.observedNodeEls.get(id);
+      if (prev === el) return;
+      // Same id, new element (node re-created): release the stale element.
+      if (prev) resizeObserver.unobserve(prev);
+      this.observedNodeEls.set(id, el);
+      resizeObserver.observe(el);
     });
+  }
+
+  private unobserveNode(id: string): void {
+    const el = this.observedNodeEls.get(id);
+    if (!el) return;
+    this.observedNodeEls.delete(id);
+    this.resizeObserver?.unobserve(el);
   }
 
   private cleanupRemovedNodes(mutations: MutationRecord[]): void {
     for (const mutation of mutations) {
       for (const removedNode of Array.from(mutation.removedNodes)) {
-        if (!(removedNode instanceof HTMLElement)) continue;
+        if (!(removedNode instanceof Element)) continue;
+        // Always unobserve the detached element — whether or not the nodes()
+        // effect already dropped its id — so the ResizeObserver never retains
+        // (and keeps alive) removed node elements. unobserve() of an element
+        // that isn't observed is a no-op.
+        this.resizeObserver?.unobserve(removedNode);
         const id = removedNode.getAttribute('data-id');
-        if (id && this.observedNodeIds.has(id)) {
-          this.observedNodeIds.delete(id);
-          this.resizeObserver?.unobserve(removedNode);
+        if (id && this.observedNodeEls.get(id) === removedNode) {
+          this.observedNodeEls.delete(id);
           this.nodeInjectorCache.delete(id);
           this.nodeContextCache.delete(id);
           this.nodeInputsCache.delete(id);

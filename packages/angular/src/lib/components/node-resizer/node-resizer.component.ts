@@ -12,8 +12,9 @@ import {
   OnDestroy,
   Optional,
   Inject,
+  PLATFORM_ID,
 } from '@angular/core';
-import { NgStyle } from '@angular/common';
+import { NgStyle, isPlatformBrowser } from '@angular/common';
 import {
   XYResizer,
   type ControlPosition,
@@ -135,6 +136,8 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
   private store = inject(FlowStore);
   private el = inject(ElementRef<HTMLElement>);
   private injector = inject(Injector);
+  /** d3-drag (XYResizer) binding is browser-only; skipped under Angular SSR. */
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
   /** Node to resize. Defaults to the host node when placed inside a node template. Aliased as `nodeId`. */
   readonly nodeIdInput = input<string | undefined>(undefined, { alias: 'nodeId' });
@@ -226,6 +229,7 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
   private currentResolvedNodeId: string | undefined;
 
   ngAfterViewInit(): void {
+    if (!this.isBrowser) return;
     this.buildResizers();
 
     // Apply config now, then re-apply reactively whenever any config input

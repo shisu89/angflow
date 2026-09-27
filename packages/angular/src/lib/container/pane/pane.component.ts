@@ -9,6 +9,9 @@ import {
   type XYPosition,
 } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
+import { createSelectionChange, getSelectionChanges } from '../../utils/changes';
+import type { Edge, Node } from '../../types';
+import type { EdgeChange, NodeChange } from '@angflow/system';
 
 @Component({
   selector: 'ng-flow-pane',
@@ -210,14 +213,48 @@ export class PaneComponent implements OnDestroy {
       startY: start.y,
     };
     this.store.userSelectionRect.set(selectionRect);
-    const nodesInside = getNodesInside(
+    // getNodesInside already skips `hidden` and non-selectable nodes; nodes
+    // folded away inside a collapsed group aren't rendered either, so they
+    // must not be swept up by the marquee.
+    const collapsedHidden = this.store.collapsedHiddenIds();
+    const nodeIds = getNodesInside(
       this.store.nodeLookup,
       selectionRect,
       this.store.transform(),
       this.selectionMode() === SelectionMode.Partial,
       true
+    )
+      .map(({ id }) => id)
+      .filter((id) => !collapsedHidden.has(id));
+
+    // React parity (Pane onPointerMove): every selectable edge connected to a
+    // marquee-selected node is selected along with it.
+    const edgeIds = new Set<string>();
+    const edgesSelectable = this.store.defaultEdgeOptions()?.selectable ?? true;
+    for (const nodeId of nodeIds) {
+      const connections = this.store.connectionLookup.get(nodeId);
+      if (!connections) continue;
+      for (const { edgeId } of connections.values()) {
+        const edge = this.store.edgeLookup.get(edgeId);
+        if (edge && (edge.selectable ?? edgesSelectable)) edgeIds.add(edgeId);
+      }
+    }
+
+    if (this.store.multiSelectionActive()) {
+      // Additive: keep the existing selection, add the swept nodes + edges.
+      this.store.addSelectedNodes(nodeIds);
+      const edgeChanges: EdgeChange<Edge>[] = [];
+      for (const id of edgeIds) {
+        if (!this.store.edgeLookup.get(id)?.selected) edgeChanges.push(createSelectionChange(id, true) as EdgeChange<Edge>);
+      }
+      this.store.triggerEdgeChanges(edgeChanges);
+      return;
+    }
+
+    this.store.triggerNodeChanges(
+      getSelectionChanges(this.store.nodeLookup, new Set(nodeIds), true) as NodeChange<Node>[]
     );
-    this.store.addSelectedNodes(nodesInside.map(({ id }) => id));
+    this.store.triggerEdgeChanges(getSelectionChanges(this.store.edgeLookup, edgeIds) as EdgeChange<Edge>[]);
   }
 
   private scheduleAutoPan(): void {

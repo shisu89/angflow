@@ -7,7 +7,7 @@
  * the unit tests in `../../utils/inject-ng-flow-node.spec.ts` cannot exercise
  * (those tests provide the context manually via a stub).
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { Component, input, provideZonelessChangeDetection } from '@angular/core';
 import { NodeRendererComponent, computeNodeInputsKey } from './node-renderer.component';
@@ -629,5 +629,73 @@ describe('NodeRendererComponent.onNodeFocus — autopan is keyboard-only', () =>
     const spy = vi.spyOn(store, 'setCenter').mockResolvedValue(true);
     component.onNodeFocus(node, focusEvent(false));
     expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe('ResizeObserver bookkeeping for removed nodes', () => {
+  let store: FlowStore;
+  let fixture: ComponentFixture<NodeRendererComponent>;
+  const observed = new Set<Element>();
+
+  class SpyResizeObserver {
+    observe(el: Element) { observed.add(el); }
+    unobserve(el: Element) { observed.delete(el); }
+    disconnect() { observed.clear(); }
+  }
+
+  beforeEach(() => {
+    observed.clear();
+    vi.stubGlobal('ResizeObserver', SpyResizeObserver);
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NodeRendererComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    store = TestBed.inject(FlowStore);
+    fixture = TestBed.createComponent(NodeRendererComponent);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const node = (id: string) => ({ id, data: { label: id }, position: { x: 0, y: 0 } });
+  const flush = async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 0)); // MutationObserver + observe microtasks
+  };
+  const ids = () => [...observed].map((el) => el.getAttribute('data-id')).sort();
+
+  it('unobserves the element of a node removed from the graph', async () => {
+    store.setNodes([node('a'), node('b')]);
+    await flush();
+    expect(ids()).toEqual(['a', 'b']);
+    const bEl = [...observed].find((el) => el.getAttribute('data-id') === 'b')!;
+
+    store.setNodes([node('a')]);
+    await flush();
+    expect(ids()).toEqual(['a']);
+    expect(observed.has(bEl)).toBe(false);
+  });
+
+  it('observes the fresh element when a removed node id comes back', async () => {
+    store.setNodes([node('a'), node('b')]);
+    await flush();
+    store.setNodes([node('a')]);
+    await flush();
+    store.setNodes([node('a'), node('b')]);
+    await flush();
+    expect(ids()).toEqual(['a', 'b']);
+    const bEl = [...observed].find((el) => el.getAttribute('data-id') === 'b')!;
+    expect(bEl.isConnected).toBe(true);
+  });
+
+  it('unobserves a node element hidden via node.hidden', async () => {
+    store.setNodes([node('a'), node('b')]);
+    await flush();
+    store.setNodes([node('a'), { ...node('b'), hidden: true }]);
+    await flush();
+    expect(ids()).toEqual(['a']);
   });
 });

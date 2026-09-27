@@ -662,6 +662,14 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       this.settleTweenWaiters();
       return Promise.resolve();
     }
+    if (typeof requestAnimationFrame !== 'function') {
+      // No frame clock (SSR / non-browser runtime): jump straight to the end.
+      const changes: NodeChange[] = ids.map((id) => ({ id, type: 'position', position: this.positionTweens.get(id)!.to }));
+      for (const id of ids) this.positionTweens.delete(id);
+      this.triggerNodeChanges(changes as NodeChange<NodeType>[]);
+      this.settleTweenWaiters();
+      return Promise.resolve();
+    }
     this.ensureTweenLoop();
     return new Promise((resolve) => {
       this.tweenWaiters.push({ ids: new Set(ids), resolve });
@@ -718,6 +726,21 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     this.settleTweenWaiters();
   }
 
+  /**
+   * id → index map for a `nodes()` array, cached per array reference so the
+   * position fast path can swap moved nodes in O(1) each. Rebuilt (O(N)) only
+   * when the array identity changes outside the fast path.
+   */
+  private nodeIndexCache: { nodes: readonly NodeType[]; index: Map<string, number> } | null = null;
+
+  private getNodeIndex(nodes: readonly NodeType[]): Map<string, number> {
+    if (this.nodeIndexCache?.nodes === nodes) return this.nodeIndexCache.index;
+    const index = new Map<string, number>();
+    for (let i = 0; i < nodes.length; i++) index.set(nodes[i].id, i);
+    this.nodeIndexCache = { nodes, index };
+    return index;
+  }
+
   triggerNodeChanges(changes: NodeChange<NodeType>[]): void {
     // Writes read store signals (nodes(), nodeOrigin(), …). Run them untracked
     // so a host calling the API from inside an effect() doesn't subscribe that
@@ -734,26 +757,33 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       if (!changes?.length) return;
     }
 
-    // Fast path: if all changes are position-only, update nodeLookup in-place
-    // instead of rebuilding everything via setNodes
+    // Fast path: if all changes are position-only, swap the moved nodes into
+    // nodeLookup + the nodes array instead of rebuilding everything via setNodes
     const allPosition = changes.every(c => c.type === 'position');
 
     if (allPosition) {
-      // Update user nodes array with new positions (cheap shallow copy)
+      // User-owned node objects are NEVER mutated here: apps may hand us
+      // frozen state (NgRx / @ngrx/signals dev-mode deep-freeze,
+      // Object.freeze), and a controlled app must be able to rely on its own
+      // objects staying untouched. Each moved node gets a fresh user object and
+      // a fresh internal node, swapped into the nodes array and nodeLookup by
+      // index — O(changes) plus one array copy, no adoptUserNodes rebuild.
       const currentNodes = this.nodes();
+      const nodeIndex = this.getNodeIndex(currentNodes);
       const storeOrigin = this.nodeOrigin();
       const storeExtent = this.nodeExtent();
-      let nodesChanged = false;
+      let nextNodes: NodeType[] | null = null;
       let needsAbsoluteRecompute = false;
 
       for (const change of changes) {
         if (change.type !== 'position') continue;
         const internalNode = this.nodeLookup.get(change.id);
         if (!internalNode) continue;
+        if (!change.position && change.dragging === undefined) continue;
 
-        let mutated = false;
+        let nextPosition = internalNode.position;
+        let nextPositionAbsolute = internalNode.internals.positionAbsolute;
 
-        // Update internal node position in-place (fast)
         if (change.position) {
           // The verbatim `position = positionAbsolute = change.position`
           // assignment is only correct for a top-level, origin-[0,0], childless
@@ -780,39 +810,42 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
             // the common case is unaffected.
             const extent = isCoordinateExtent(internalNode.extent) ? internalNode.extent : storeExtent;
             pos = clampPosition(pos, extent, getNodeDimensions(internalNode));
+            nextPositionAbsolute = { x: pos.x, y: pos.y };
           }
 
-          // Assign fresh {x,y} copies per target so position, positionAbsolute
-          // and userNode.position are not aliased to one shared object (an
-          // in-place mutation of one would otherwise silently mutate the others).
-          internalNode.position = { x: pos.x, y: pos.y };
-          if (internalNode.internals) {
-            internalNode.internals.positionAbsolute = { x: pos.x, y: pos.y };
-          }
+          // Fresh {x,y} copies per target so position, positionAbsolute and
+          // the user node's position are never aliased to one shared object.
+          nextPosition = { x: pos.x, y: pos.y };
           change.position = pos;
-          mutated = true;
-        }
-        if (change.dragging !== undefined) {
-          internalNode.dragging = change.dragging;
-          mutated = true;
         }
 
-        // Mirror the mutation onto the user-facing node reference so that
-        // external consumers observing `nodes()` see consistent state.
-        const userNode = internalNode.internals?.userNode as
-          | Pick<NodeType, 'position' | 'dragging'>
-          | undefined;
-        if (userNode) {
-          if (change.position) {
-            userNode.position = { x: change.position.x, y: change.position.y };
-          }
-          if (change.dragging !== undefined) {
-            userNode.dragging = change.dragging;
-          }
+        const userNode = internalNode.internals.userNode;
+        const nextUserNode = { ...userNode } as NodeType;
+        if (change.position) nextUserNode.position = { x: nextPosition.x, y: nextPosition.y };
+        if (change.dragging !== undefined) nextUserNode.dragging = change.dragging;
+
+        // A fresh internal node (rather than an in-place write) so identity-
+        // based consumers — selectInternalNode(), computed()s over the lookup —
+        // observe the move.
+        const nextInternal: InternalNodeBase<NodeType> = {
+          ...internalNode,
+          position: nextPosition,
+          internals: {
+            ...internalNode.internals,
+            positionAbsolute: nextPositionAbsolute,
+            userNode: nextUserNode,
+          },
+        };
+        if (change.dragging !== undefined) nextInternal.dragging = change.dragging;
+        this.nodeLookup.set(change.id, nextInternal);
+        if (internalNode.parentId) {
+          this.parentLookup.get(internalNode.parentId)?.set(change.id, nextInternal);
         }
 
-        if (mutated) {
-          nodesChanged = true;
+        const index = nodeIndex.get(change.id);
+        if (index !== undefined && currentNodes[index]?.id === change.id) {
+          nextNodes ??= [...currentNodes];
+          nextNodes[index] = nextUserNode;
         }
       }
 
@@ -828,16 +861,17 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
         });
       }
 
-      if (nodesChanged) {
+      if (nextNodes) {
+        // Same indices as currentNodes — carry the id→index map forward so the
+        // next drag frame doesn't rebuild it.
+        this.nodeIndexCache = { nodes: nextNodes, index: nodeIndex };
         // Bump version to trigger template re-render without full rebuild
         this.bumpVersion();
-        // Re-emit the nodes signal so any downstream effect (e.g. the agent
-        // bridge watcher) that depends on `nodes()` observes the drag. Objects
-        // are mutated in place above so identity is preserved for templates;
-        // parented nodes are the exception (updateAbsolutePositions swaps a fresh
-        // lookup entry), but templates re-read the lookup so that churn is fine.
-        // We only swap the array reference.
-        this.nodes.set([...currentNodes]);
+        // Re-emit the nodes signal so downstream effects (e.g. the agent bridge
+        // watcher, history) that depend on `nodes()` observe the move.
+        this.nodes.set(nextNodes);
+      } else if (needsAbsoluteRecompute) {
+        this.bumpVersion();
       }
     } else {
       // Full path: apply all change types (add, remove, select, dimensions, etc.)
