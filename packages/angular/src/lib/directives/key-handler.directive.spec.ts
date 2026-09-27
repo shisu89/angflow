@@ -35,6 +35,7 @@ function makeEdge(id: string, overrides: Partial<Edge> = {}): Edge {
 describe('KeyHandlerDirective select-all', () => {
   let store: FlowStore;
   let directive: KeyHandlerDirective;
+  let hostEl: HTMLElement;
 
   beforeEach(() => {
     TestBed.resetTestingModule();
@@ -45,16 +46,17 @@ describe('KeyHandlerDirective select-all', () => {
     store = TestBed.inject(FlowStore);
     const fixture = TestBed.createComponent(HostComponent);
     fixture.detectChanges();
-    directive = fixture.debugElement
-      .query(By.directive(KeyHandlerDirective))
-      .injector.get(KeyHandlerDirective);
+    const debugEl = fixture.debugElement.query(By.directive(KeyHandlerDirective));
+    directive = debugEl.injector.get(KeyHandlerDirective);
+    hostEl = debugEl.nativeElement as HTMLElement;
   });
 
   it('Ctrl+A selects all nodes and edges when none have selectable: false (control)', () => {
     store.setNodes([makeNode('n1'), makeNode('n2')]);
     store.setEdges([makeEdge('e1'), makeEdge('e2')]);
 
-    directive.onKeyDown(new KeyboardEvent('keydown', { key: 'a', ctrlKey: true }));
+    // Actions are scoped to the flow: the event must originate inside its root.
+    hostEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true }));
 
     expect(store.selectedNodes().map((n) => n.id).sort()).toEqual(['n1', 'n2']);
     expect(store.selectedEdges().map((e) => e.id).sort()).toEqual(['e1', 'e2']);
@@ -64,7 +66,8 @@ describe('KeyHandlerDirective select-all', () => {
     store.setNodes([makeNode('n1'), makeNode('n2', { selectable: false })]);
     store.setEdges([makeEdge('e1'), makeEdge('e2', { selectable: false })]);
 
-    directive.onKeyDown(new KeyboardEvent('keydown', { key: 'a', ctrlKey: true }));
+    // Actions are scoped to the flow: the event must originate inside its root.
+    hostEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true }));
 
     expect(store.selectedNodes().map((n) => n.id)).toEqual(['n1']);
     expect(store.selectedEdges().map((e) => e.id)).toEqual(['e1']);

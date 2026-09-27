@@ -1,9 +1,11 @@
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input } from '@angular/core';
+import type { PanelPosition } from '@angflow/system';
 import { PanelComponent } from '../panel/panel.component';
 
 /**
- * Small library-attribution badge rendered in the bottom-right corner.
- * Rendered internally by `<ng-flow>`; hide via `[hideAttribution]="true"`.
+ * Small library-attribution badge (bottom-right by default).
+ * Rendered internally by `<ng-flow>`; place it via `[attributionPosition]`,
+ * hide via `[hideAttribution]="true"`.
  */
 @Component({
   selector: 'ng-flow-attribution',
@@ -11,7 +13,7 @@ import { PanelComponent } from '../panel/panel.component';
   imports: [PanelComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <ng-flow-panel position="bottom-right">
+    <ng-flow-panel [position]="position()">
       <span
         class="ng-flow__attribution xy-flow__attribution"
         style="font-size: 10px; color: #999; pointer-events: all;"
@@ -21,4 +23,7 @@ import { PanelComponent } from '../panel/panel.component';
     </ng-flow-panel>
   `,
 })
-export class AttributionComponent {}
+export class AttributionComponent {
+  /** Panel slot for the badge; bound from `<ng-flow [attributionPosition]>`. */
+  readonly position = input<PanelPosition>('bottom-right');
+}

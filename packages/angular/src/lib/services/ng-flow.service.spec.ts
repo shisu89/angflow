@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { provideZonelessChangeDetection, DOCUMENT } from '@angular/core';
+import { provideZonelessChangeDetection, DOCUMENT, Injector, effect, runInInjectionContext, signal } from '@angular/core';
 import { FlowStore } from './flow-store.service';
 import { NgFlowService } from './ng-flow.service';
 import { layoutNodes } from '../layout/layout-nodes';
@@ -26,6 +26,39 @@ describe('NgFlowService', () => {
 
     store = TestBed.inject(FlowStore);
     service = TestBed.inject(NgFlowService);
+  });
+
+  // ── Calling the API from an effect must not subscribe it ────────────
+
+  describe('write methods called inside an effect', () => {
+    it('do not make the effect re-run on the state they write (no infinite loop)', async () => {
+      service.setNodes([makeNode('1', { data: { label: 'a' } }), makeNode('2')]);
+      service.setEdges([makeEdge('e', '1', '2')]);
+      const label = signal('x');
+      let runs = 0;
+      const injector = TestBed.inject(Injector);
+      runInInjectionContext(injector, () =>
+        effect(() => {
+          runs++;
+          const l = label();
+          service.updateNode('1', (n) => ({ data: { ...n.data, label: l } }));
+          service.updateNodeData('2', { l });
+          service.updateEdge('e', { label: l });
+          service.updateEdgeData('e', { l });
+          service.setSelection({ nodeIds: ['1'] });
+          service.setNodes([makeNode('1', { data: { label: l } }), makeNode('2')]);
+          service.addEdges([]);
+        }),
+      );
+      TestBed.tick();
+      TestBed.tick();
+      expect(runs).toBe(1);
+      label.set('y');
+      TestBed.tick();
+      TestBed.tick();
+      expect(runs).toBe(2);
+      expect(service.getNode('1')?.data?.['label']).toBe('y');
+    });
   });
 
   // ── setNodes / setEdges notify controlled parents ───────────────────
@@ -180,6 +213,61 @@ describe('NgFlowService', () => {
       );
       expect(store.nodes().map((n) => n.id).sort()).toEqual(['a', 'c']);
       expect(store.edges().map((e) => e.id)).toEqual(['ac']);
+    });
+
+    it('cascades to descendants of a deleted parent (getElementsToRemove parity)', async () => {
+      // Children listed BEFORE the parent: the cascade must not depend on order.
+      service.setNodes([
+        makeNode('grandchild', { parentId: 'child' }),
+        makeNode('child', { parentId: 'g' }),
+        makeNode('g', { type: 'group' }),
+        makeNode('other'),
+      ]);
+      service.setEdges([makeEdge('e1', 'grandchild', 'other'), makeEdge('e2', 'other', 'other')]);
+
+      const result = await service.deleteElements({ nodes: [{ id: 'g' }] });
+
+      expect(result.deletedNodes.map((n) => n.id).sort()).toEqual(['child', 'g', 'grandchild']);
+      expect(result.deletedEdges.map((e) => e.id)).toEqual(['e1']);
+      expect(store.nodes().map((n) => n.id)).toEqual(['other']);
+    });
+
+    it('honors deletable: false on nodes and edges', async () => {
+      service.setNodes([makeNode('a', { deletable: false }), makeNode('b'), makeNode('c')]);
+      service.setEdges([
+        makeEdge('ab', 'a', 'b', { deletable: false }),
+        makeEdge('bc', 'b', 'c'),
+      ]);
+
+      const result = await service.deleteElements({
+        nodes: [{ id: 'a' }, { id: 'b' }],
+        edges: [{ id: 'ab' }],
+      });
+
+      expect(result.deletedNodes.map((n) => n.id)).toEqual(['b']);
+      expect(result.deletedEdges.map((e) => e.id)).toEqual(['bc']);
+      expect(store.nodes().map((n) => n.id).sort()).toEqual(['a', 'c']);
+      expect(store.edges().map((e) => e.id)).toEqual(['ab']);
+    });
+
+    it('onBeforeDelete may return a reduced { nodes, edges } set', async () => {
+      store.onBeforeDelete = async ({ edges }) => ({
+        nodes: [],
+        edges: edges.filter((e) => e.id === 'ab'),
+      });
+
+      const result = await service.deleteElements({ nodes: [{ id: 'b' }] });
+
+      expect(result.deletedNodes).toEqual([]);
+      expect(result.deletedEdges.map((e) => e.id)).toEqual(['ab']);
+      expect(store.nodes().map((n) => n.id).sort()).toEqual(['a', 'b', 'c']);
+      expect(store.edges().map((e) => e.id).sort()).toEqual(['ac', 'bc']);
+    });
+
+    it('accepts a synchronous boolean onBeforeDelete', async () => {
+      store.onBeforeDelete = () => true;
+      const result = await service.deleteElements({ edges: [{ id: 'ab' }] });
+      expect(result.deletedEdges.map((e) => e.id)).toEqual(['ab']);
     });
 
     it('change middleware can intercept deleteElements removals', async () => {
@@ -1129,6 +1217,28 @@ describe('dissolveGroup', () => {
     expect(service.getNode('inner')).toBeUndefined();
     expect(service.getNode('a')?.parentId).toBe('outer'); // lands in the grandparent
     expect(service.getAbsolutePosition('a')).toEqual(absA); // still pinned
+  });
+
+  it('keeps grandchildren attached to surviving children (no cascade)', async () => {
+    service.setNodes([
+      makeNode('g', { type: 'group', position: { x: 50, y: 50 }, width: 400, height: 400 }),
+      makeNode('sub', { type: 'group', parentId: 'g', position: { x: 10, y: 10 }, width: 200, height: 200 }),
+      makeNode('leaf', { parentId: 'sub', position: { x: 5, y: 5 }, width: 50, height: 50 }),
+    ]);
+    const freed = await service.dissolveGroup('g');
+    expect(freed).toEqual(['sub']);
+    expect(service.getNode('g')).toBeUndefined();
+    expect(service.getNode('sub')?.parentId).toBeUndefined();
+    expect(service.getNode('leaf')?.parentId).toBe('sub');
+  });
+
+  it('is a no-op for a group marked deletable: false', async () => {
+    service.setNodes([
+      makeNode('g', { type: 'group', deletable: false, width: 400, height: 400 }),
+      makeNode('a', { parentId: 'g', position: { x: 100, y: 100 }, width: 50, height: 50 }),
+    ]);
+    expect(await service.dissolveGroup('g')).toEqual([]);
+    expect(service.getNode('a')?.parentId).toBe('g');
   });
 
   it('leaves everything untouched when onBeforeDelete vetoes', async () => {

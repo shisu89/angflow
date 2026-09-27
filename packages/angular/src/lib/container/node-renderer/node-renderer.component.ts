@@ -101,6 +101,7 @@ const AUTOPAN_FOCUS_DURATION = 350;
         [ngFlowDragSelectable]="node.selectable !== false && store.elementsSelectable()"
         [ngFlowDragHandleSelector]="node.dragHandle"
         [ngFlowDragNoDragClass]="store.noDragClassName()"
+        [ngFlowDragClickDistance]="store.nodeClickDistance()"
         role="button"
         [attr.aria-label]="getNodeAriaLabel(node)"
         [attr.aria-describedby]="store.rfId() + '-node-desc'"

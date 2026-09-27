@@ -1,4 +1,4 @@
-import { Injectable, OnDestroy, signal, computed, type WritableSignal, type Signal } from '@angular/core';
+import { Injectable, OnDestroy, signal, computed, untracked, type WritableSignal, type Signal } from '@angular/core';
 import {
   adoptUserNodes,
   updateAbsolutePositions,
@@ -17,6 +17,8 @@ import {
   defaultAriaLabelConfig,
   Position,
   getNodesInside,
+  addEdge,
+  type Connection,
   type NodeChange,
   type EdgeChange,
   type EdgeSelectionChange,
@@ -297,6 +299,22 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   // ── Default edge options ───────────────────────────────────────────
   readonly defaultEdgeOptions = signal<import('../types').DefaultEdgeOptions | undefined>(undefined);
 
+  /**
+   * Finalizes a user-completed connection, mirroring React Flow's Handle
+   * `onConnectExtended`: merges `defaultEdgeOptions` under the connection and,
+   * in uncontrolled mode (`defaultEdges` was supplied), appends the resulting
+   * edge to the internal edges directly. In controlled mode nothing is added —
+   * the host appends it from `(connect)`. Returns the merged params, which are
+   * what `(connect)` / the handle's `(onConnect)` should receive.
+   */
+  completeConnection(connection: Connection): Connection {
+    const edgeParams = { ...this.defaultEdgeOptions(), ...connection } as Connection;
+    if (this.hasDefaultEdges()) {
+      this.setEdges(addEdge(edgeParams as unknown as EdgeType, this.edges()) as EdgeType[]);
+    }
+    return edgeParams;
+  }
+
   // ── Connection callbacks (set by NgFlowComponent) ──────────────────
   onConnect: ((connection: import('@angflow/system').Connection) => void) | null = null;
   onConnectStart: ((event: MouseEvent | TouchEvent, params: import('@angflow/system').OnConnectStartParams) => void) | null = null;
@@ -305,7 +323,12 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   onClickConnectEnd: ((event: MouseEvent) => void) | null = null;
 
   // ── Delete validation callback ────────────────────────────────────
-  onBeforeDelete: ((params: { nodes: NodeType[]; edges: EdgeType[] }) => boolean | Promise<boolean>) | null = null;
+  // Return `false` to veto, `true` to allow, or a reduced `{ nodes, edges }`
+  // set to delete only that (React parity), optionally as a Promise.
+  onBeforeDelete: ((params: { nodes: NodeType[]; edges: EdgeType[] }) =>
+    | boolean
+    | { nodes: NodeType[]; edges: EdgeType[] }
+    | Promise<boolean | { nodes: NodeType[]; edges: EdgeType[] }>) | null = null;
 
   // ── Node drag callbacks (set by NgFlowComponent, consumed by XYDrag) ──
   onNodeDragStart: ((event: MouseEvent, node: NodeType, nodes: NodeType[]) => void) | null = null;
@@ -438,6 +461,13 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   // ── Actions ───────────────────────────────────────────────────────────
 
   setNodes(nodes: NodeType[]): void {
+    // Writes read store signals (nodes(), nodeOrigin(), …). Run them untracked
+    // so a host calling the API from inside an effect() doesn't subscribe that
+    // effect to the very state it writes — an infinite re-run loop.
+    untracked(() => this.setNodesImpl(nodes));
+  }
+
+  private setNodesImpl(nodes: NodeType[]): void {
     const { nodesInitialized, hasSelectedNodes } = adoptUserNodes(nodes, this.nodeLookup, this.parentLookup, {
       nodeOrigin: this.nodeOrigin(),
       nodeExtent: this.nodeExtent(),
@@ -464,6 +494,13 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   }
 
   setEdges(edges: EdgeType[]): void {
+    // Writes read store signals (nodes(), nodeOrigin(), …). Run them untracked
+    // so a host calling the API from inside an effect() doesn't subscribe that
+    // effect to the very state it writes — an infinite re-run loop.
+    untracked(() => this.setEdgesImpl(edges));
+  }
+
+  private setEdgesImpl(edges: EdgeType[]): void {
     updateConnectionLookup(this.connectionLookup, this.edgeLookup, edges);
     this.edges.set(edges);
     this.bumpVersion();
@@ -682,6 +719,13 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   }
 
   triggerNodeChanges(changes: NodeChange<NodeType>[]): void {
+    // Writes read store signals (nodes(), nodeOrigin(), …). Run them untracked
+    // so a host calling the API from inside an effect() doesn't subscribe that
+    // effect to the very state it writes — an infinite re-run loop.
+    untracked(() => this.triggerNodeChangesImpl(changes));
+  }
+
+  private triggerNodeChangesImpl(changes: NodeChange<NodeType>[]): void {
     if (!changes?.length) return;
 
     // Apply middleware pipeline
@@ -809,6 +853,13 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   }
 
   triggerEdgeChanges(changes: EdgeChange<EdgeType>[]): void {
+    // Writes read store signals (nodes(), nodeOrigin(), …). Run them untracked
+    // so a host calling the API from inside an effect() doesn't subscribe that
+    // effect to the very state it writes — an infinite re-run loop.
+    untracked(() => this.triggerEdgeChangesImpl(changes));
+  }
+
+  private triggerEdgeChangesImpl(changes: EdgeChange<EdgeType>[]): void {
     if (!changes?.length) return;
 
     // Apply middleware pipeline

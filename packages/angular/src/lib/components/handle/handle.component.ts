@@ -209,8 +209,9 @@ export class HandleComponent implements OnDestroy {
       panBy: (delta: { x: number; y: number }) => store.panBy(delta),
       cancelConnection: () => store.cancelConnection(),
       onConnect: (connection: Connection) => {
-        this.handleConnect.emit(connection);
-        store.onConnect?.(connection);
+        const params = store.completeConnection(connection);
+        this.handleConnect.emit(params);
+        store.onConnect?.(params);
       },
       onConnectStart: (event: MouseEvent | TouchEvent, params: { nodeId: string | null; handleId: string | null; handleType: HandleType | null }) => store.onConnectStart?.(event, params),
       onConnectEnd: (event: MouseEvent | TouchEvent) => store.onConnectEnd?.(event),
@@ -299,8 +300,9 @@ export class HandleComponent implements OnDestroy {
       });
 
       if (isValid && connection) {
-        this.handleConnect.emit(connection);
-        store.onConnect?.(connection);
+        const params = store.completeConnection(connection);
+        this.handleConnect.emit(params);
+        store.onConnect?.(params);
       }
 
       store.connectionClickStartHandle.set(null);

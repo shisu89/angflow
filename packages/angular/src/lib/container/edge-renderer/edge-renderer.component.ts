@@ -25,6 +25,7 @@ import {
   isEdgeVisible,
   errorMessages,
   type EdgeMarker,
+  type EdgeMarkerType,
   type HandleType,
   type Connection,
   type ConnectionState,
@@ -37,7 +38,8 @@ import { StraightEdgeComponent } from '../../components/edges/straight-edge.comp
 import { StepEdgeComponent } from '../../components/edges/step-edge.component';
 import { SmoothStepEdgeComponent } from '../../components/edges/smooth-step-edge.component';
 import { SimpleBezierEdgeComponent } from '../../components/edges/simple-bezier-edge.component';
-import type { Edge, EdgeTypes, InternalNode } from '../../types';
+import type { DefaultEdgeOptions, Edge, EdgeTypes, InternalNode } from '../../types';
+import { toCssText } from '../../utils/css-style';
 
 const builtInEdgeTypes: EdgeTypes = {
   default: BezierEdgeComponent,
@@ -93,6 +95,7 @@ export function computeEdgePathData(ei: Record<string, unknown>): {
   labelY: number;
 } {
   const type = ei['type'] || 'default';
+  const pathOptions = (ei['pathOptions'] ?? undefined) as Record<string, unknown> | undefined;
   const params = {
     sourceX: ei['sourceX'] as number,
     sourceY: ei['sourceY'] as number,
@@ -108,10 +111,20 @@ export function computeEdgePathData(ei: Record<string, unknown>): {
       result = getStraightPath(params);
       break;
     case 'step':
-      result = getSmoothStepPath({ ...params, borderRadius: 0 });
+      result = getSmoothStepPath({
+        ...params,
+        offset: numberOption(pathOptions, 'offset'),
+        stepPosition: numberOption(pathOptions, 'stepPosition'),
+        borderRadius: 0,
+      });
       break;
     case 'smoothstep':
-      result = getSmoothStepPath(params);
+      result = getSmoothStepPath({
+        ...params,
+        offset: numberOption(pathOptions, 'offset'),
+        borderRadius: numberOption(pathOptions, 'borderRadius'),
+        stepPosition: numberOption(pathOptions, 'stepPosition'),
+      });
       break;
     case 'simplebezier':
       result = getSimpleBezierPath(params);
@@ -119,10 +132,64 @@ export function computeEdgePathData(ei: Record<string, unknown>): {
     case 'default':
     case 'bezier':
     default:
-      result = getBezierPath(params);
+      result = getBezierPath({ ...params, curvature: numberOption(pathOptions, 'curvature') });
       break;
   }
   return { path: result[0], labelX: result[1], labelY: result[2] };
+}
+
+/** Reads a finite numeric path option; `undefined` lets the path generator apply its default. */
+function numberOption(opts: Record<string, unknown> | undefined, key: string): number | undefined {
+  const v = opts?.[key];
+  return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+}
+
+/**
+ * Applies `<ng-flow [defaultEdgeOptions]>` to an edge, React Flow style
+ * (`{ ...defaultEdgeOptions, ...edge }`): every prop set on the edge wins.
+ * Edge keys that are present but `undefined` fall back to the default instead
+ * of erasing it. Returns the edge itself when there is nothing to merge.
+ */
+export function mergeDefaultEdgeOptions<E extends Edge>(edge: E, defaults: DefaultEdgeOptions | undefined): E {
+  if (!defaults) return edge;
+  const merged: Record<string, unknown> = { ...defaults };
+  for (const [k, v] of Object.entries(edge)) {
+    if (v !== undefined) merged[k] = v;
+  }
+  return merged as E;
+}
+
+/** `[x, y]` padding tuple → CSS `padding` shorthand (y is vertical). */
+function paddingCss(p: unknown): string | null {
+  if (!Array.isArray(p) || p.length < 2) return null;
+  const [x, y] = p as unknown[];
+  if (typeof x !== 'number' || typeof y !== 'number' || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return `padding: ${y}px ${x}px`;
+}
+
+/**
+ * Inline style for the HTML edge label: `labelStyle`, `labelShowBg`,
+ * `labelBgStyle`, `labelBgPadding`, `labelBgBorderRadius`. Defaults (themed
+ * background, padding `[2, 4]`, radius 2) live in the stylesheet under
+ * `.xy-flow__edge-label`; this only emits the per-edge overrides. Labels are
+ * HTML, so the SVG-oriented `fill` key maps to `background-color` for the
+ * background and to `color` for the text.
+ */
+export function computeEdgeLabelStyle(edge: Edge): string | null {
+  const parts: string[] = [];
+  if (edge.labelShowBg === false) {
+    parts.push('background: transparent', 'padding: 0', 'border-radius: 0');
+  } else {
+    const pad = paddingCss(edge.labelBgPadding);
+    if (pad) parts.push(pad);
+    const r = edge.labelBgBorderRadius;
+    if (typeof r === 'number' && Number.isFinite(r)) parts.push(`border-radius: ${r}px`);
+    const bg = toCssText(edge.labelBgStyle, { fill: 'background-color' });
+    if (bg) parts.push(bg);
+  }
+  const text = toCssText(edge.labelStyle, { fill: 'color' });
+  if (text) parts.push(text);
+  return parts.length ? parts.join('; ') : null;
 }
 
 export function computeEdgePathFromInputs(ei: Record<string, unknown>): string {
@@ -160,14 +227,14 @@ export function computeEdgePathFromInputs(ei: Record<string, unknown>): string {
               [attr.fill]="marker.type === 'arrowclosed' ? (marker.color || 'currentColor') : 'none'"
               stroke-linecap="round"
               stroke-linejoin="round"
-              stroke-width="1"
+              [attr.stroke-width]="marker.strokeWidth ?? 1"
               points="-5,-4 0,0 -5,4"
             />
           </marker>
         }
       </defs>
     </svg>
-    @for (edge of visibleEdges(); track edge.id) {
+    @for (edge of renderedEdges(); track edge.id) {
       @if (!edge.hidden) {
       @let ei = getEdgeInputs(edge);
       <svg
@@ -272,7 +339,7 @@ export function computeEdgePathFromInputs(ei: Record<string, unknown>): string {
       are still handled on the SVG <g> layer above via a transparent
       interaction path, so this overlay is pointer-events: none.
     -->
-    @for (edge of visibleEdges(); track edge.id) {
+    @for (edge of renderedEdges(); track edge.id) {
       @if (!edge.hidden && isCustomEdge(edge.type) && reconnectingEdgeId() !== edge.id) {
         @let ei = getEdgeInputs(edge);
         <div
@@ -292,7 +359,7 @@ export function computeEdgePathFromInputs(ei: Record<string, unknown>): string {
       }
     }
     <div class="xy-flow__edgelabel-renderer" style="position: absolute; width: 100%; height: 100%; pointer-events: none; top: 0; left: 0;">
-      @for (edge of visibleEdges(); track edge.id) {
+      @for (edge of renderedEdges(); track edge.id) {
         @if (edge.label && !edge.hidden) {
           @let ei = getEdgeInputs(edge);
           <div
@@ -301,6 +368,7 @@ export function computeEdgePathFromInputs(ei: Record<string, unknown>): string {
             [style.position]="'absolute'"
             [style.transform]="'translate(-50%, -50%) translate(' + getEdgeCenterX(ei) + 'px, ' + getEdgeCenterY(ei) + 'px)'"
             [style.pointer-events]="'all'"
+            [style]="getEdgeLabelStyle(edge)"
           >
             {{ edge.label }}
           </div>
@@ -312,7 +380,11 @@ export function computeEdgePathFromInputs(ei: Record<string, unknown>): string {
 export class EdgeRendererComponent {
   readonly store = inject(FlowStore);
 
+  /** Radius (px) of the reconnect anchors at each edge end. Bound from `<ng-flow [reconnectRadius]>`. */
   readonly reconnectRadius = input(10);
+
+  /** Fallback marker color for markers that don't set `color`. Bound from `<ng-flow [defaultMarkerColor]>`. */
+  readonly defaultMarkerColor = input<string | null>('#b1b1b7');
 
   /** Edge id whose reconnect anchor is currently hovered. Drives the `updating` style. */
   readonly hoveredAnchorEdgeId = signal<string | null>(null);
@@ -350,13 +422,44 @@ export class EdgeRendererComponent {
     });
   });
 
+  /**
+   * Visible edges with `defaultEdgeOptions` applied. Merged objects are cached
+   * per source-edge identity (reset whenever the options object changes) so the
+   * per-edge input memo — which keys on edge identity — keeps hitting.
+   */
+  private mergeCache = new WeakMap<Edge, Edge>();
+  private mergeCacheOptions: DefaultEdgeOptions | undefined;
+
+  readonly renderedEdges = computed<Edge[]>(() => {
+    const edges = this.visibleEdges() as Edge[];
+    const defaults = this.store.defaultEdgeOptions();
+    if (!defaults) return edges;
+    if (defaults !== this.mergeCacheOptions) {
+      this.mergeCache = new WeakMap();
+      this.mergeCacheOptions = defaults;
+    }
+    return edges.map((e) => {
+      let merged = this.mergeCache.get(e);
+      if (!merged) {
+        merged = mergeDefaultEdgeOptions(e, defaults);
+        this.mergeCache.set(e, merged);
+      }
+      return merged;
+    });
+  });
+
   readonly markers = computed(() => {
     const edges = this.store.edges();
+    const defaults = this.store.defaultEdgeOptions();
+    const defaultColor = this.defaultMarkerColor();
     const markerMap = new Map<string, Record<string, unknown>>();
 
+    // Mirrors React's createMarkerIds: an edge without its own marker falls
+    // back to defaultEdgeOptions' marker; markers without a color get
+    // defaultMarkerColor.
     for (const edge of edges) {
-      this.addMarker(markerMap, edge.markerStart as EdgeMarker | undefined);
-      this.addMarker(markerMap, edge.markerEnd as EdgeMarker | undefined);
+      this.addMarker(markerMap, (edge.markerStart || defaults?.markerStart) as EdgeMarkerType | undefined, defaultColor);
+      this.addMarker(markerMap, (edge.markerEnd || defaults?.markerEnd) as EdgeMarkerType | undefined, defaultColor);
     }
 
     return Array.from(markerMap.values());
@@ -383,17 +486,34 @@ export class EdgeRendererComponent {
     return cls;
   }
 
+  /**
+   * Serializes `edge.style` for the path's `[attr.style]`: camelCase keys become
+   * kebab-case and unitless numbers get `px` where the property needs a length
+   * (`{ strokeWidth: 3 }` → `stroke-width: 3px`). Agent-supplied styles are
+   * validated (no `url(`, `expression(`, escapes, or `:`/`;` in keys) before
+   * they ever reach the store.
+   */
   getEdgePathStyle(edge: Edge): string | null {
-    const style = edge.style as Record<string, string> | undefined;
-    if (!style) return null;
-    return Object.entries(style).map(([k, v]) => `${k}: ${v}`).join('; ');
+    return toCssText(edge.style);
+  }
+
+  getEdgeLabelStyle(edge: Edge): string | null {
+    return computeEdgeLabelStyle(edge);
   }
 
   getEdgeZIndex(edge: Edge): number {
-    if (edge.zIndex !== undefined) return edge.zIndex;
-    const sourceZ = this.store.nodeLookup.get(edge.source)?.internals?.z ?? 0;
-    const targetZ = this.store.nodeLookup.get(edge.target)?.internals?.z ?? 0;
-    return Math.max(sourceZ, targetZ);
+    let z: number;
+    if (edge.zIndex !== undefined) {
+      z = edge.zIndex;
+    } else {
+      const sourceZ = this.store.nodeLookup.get(edge.source)?.internals?.z ?? 0;
+      const targetZ = this.store.nodeLookup.get(edge.target)?.internals?.z ?? 0;
+      z = Math.max(sourceZ, targetZ);
+    }
+    // React's getElevatedEdgeZIndex: a selected edge is lifted by 1000 when
+    // elevateEdgesOnSelect is on, so it renders above its unselected peers.
+    if (edge.selected && this.store.elevateEdgesOnSelect()) z += 1000;
+    return z;
   }
 
   getEdgePath(ei: Record<string, unknown>): string {
@@ -557,6 +677,12 @@ export class EdgeRendererComponent {
       selected: edge.selected ?? false,
       animated: edge.animated ?? false,
       label: edge.label,
+      style: edge.style,
+      labelStyle: edge.labelStyle,
+      labelShowBg: edge.labelShowBg,
+      labelBgStyle: edge.labelBgStyle,
+      labelBgPadding: edge.labelBgPadding,
+      labelBgBorderRadius: edge.labelBgBorderRadius,
       selectable: edge.selectable,
       deletable: edge.deletable,
       sourceX,
@@ -803,11 +929,15 @@ export class EdgeRendererComponent {
     });
   }
 
-  private addMarker(map: Map<string, Record<string, unknown>>, marker: EdgeMarker | undefined): void {
+  private addMarker(
+    map: Map<string, Record<string, unknown>>,
+    marker: EdgeMarkerType | undefined,
+    defaultColor: string | null,
+  ): void {
     if (!marker || typeof marker === 'string') return;
     const id = getMarkerId(marker, this.store.rfId());
     if (!map.has(id)) {
-      map.set(id, { ...marker, id });
+      map.set(id, { ...marker, id, color: marker.color || defaultColor || undefined });
     }
   }
 

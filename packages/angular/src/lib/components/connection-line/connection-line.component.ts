@@ -2,6 +2,7 @@ import { Component, ChangeDetectionStrategy, inject, computed, input, Type } fro
 import { CommonModule, NgComponentOutlet } from '@angular/common';
 import { getBezierPath, getSmoothStepPath, getStraightPath, ConnectionLineType, Position, type ConnectionInProgress } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
+import { toCssText } from '../../utils/css-style';
 
 /**
  * Renders the in-progress connection line while the user drags from a handle.
@@ -24,12 +25,14 @@ import { FlowStore } from '../../services/flow-store.service';
         />
       } @else {
         <svg class="ng-flow__connectionline xy-flow__connectionline"
-             style="overflow: visible; position: absolute; width: 100%; height: 100%; pointer-events: none;">
+             style="overflow: visible; position: absolute; width: 100%; height: 100%; pointer-events: none;"
+             [style]="containerStyleText()">
           <g>
             <path
               class="ng-flow__connection-path xy-flow__connection-path"
               [attr.d]="connectionPath()"
               fill="none"
+              [attr.style]="connectionLineStyleText()"
             />
           </g>
         </svg>
@@ -44,6 +47,17 @@ export class ConnectionLineComponent {
   readonly customComponent = input<Type<unknown> | null>(null);
   /** Path shape when the default renderer is used. */
   readonly connectionLineType = input<ConnectionLineType>(ConnectionLineType.Bezier);
+  /** Inline styles for the default connection-line path (`<ng-flow [connectionLineStyle]>`). */
+  readonly connectionLineStyle = input<Partial<CSSStyleDeclaration> | Record<string, unknown>>();
+  /** Inline styles for the default connection-line `<svg>` wrapper (`<ng-flow [connectionLineContainerStyle]>`). */
+  readonly containerStyle = input<Partial<CSSStyleDeclaration> | Record<string, unknown>>();
+
+  readonly connectionLineStyleText = computed(() =>
+    toCssText(this.connectionLineStyle() as Record<string, unknown> | undefined),
+  );
+  readonly containerStyleText = computed(() =>
+    toCssText(this.containerStyle() as Record<string, unknown> | undefined),
+  );
 
   readonly isConnecting = computed(() => {
     this.store.version();

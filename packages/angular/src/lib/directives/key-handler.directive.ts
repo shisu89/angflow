@@ -1,21 +1,39 @@
 import {
   Directive,
+  ElementRef,
   inject,
   input,
   output,
   OnInit,
   OnDestroy,
 } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import { isInputDOMNode, type NodeChange, type EdgeChange, type KeyCode } from '@angflow/system';
 import { FlowStore } from '../services/flow-store.service';
 import { elementToRemoveChange } from '../utils/changes';
+import { collectElementsToRemove, resolveBeforeDeleteResult } from '../utils/elements-to-remove';
+import { ARROW_KEY_DIFFS, moveSelectedNodes } from '../utils/move-selected-nodes';
 import type { Node, Edge } from '../types';
+
+/**
+ * The flow root the user last pointer-downed / focused into. Shared across all
+ * `<ng-flow>` instances on the page so a key press while focus sits on
+ * `<body>` (e.g. after clicking the non-focusable pane) is routed to exactly
+ * one flow.
+ */
+let lastInteractedFlowRoot: HTMLElement | null = null;
 
 /**
  * Listens for document-level key events and dispatches Delete/Select-All/
  * Escape/arrow-key behavior plus selection and multi-select key tracking.
  * Attached internally by `<ng-flow>`; emits `(nodesDelete)`, `(edgesDelete)`,
  * and `(deleteElements)` when the user presses the configured delete key.
+ *
+ * Modifier/activation key *state* is tracked page-wide (a held Shift must count
+ * no matter where it was pressed), but the *actions* (delete, select-all,
+ * Escape, arrow moves) only run for the flow the key event belongs to: the
+ * event target is inside this flow's root element, or focus is on
+ * `<body>`/`<html>` and this flow was the last one interacted with.
  */
 @Directive({
   selector: '[ngFlowKeyHandler]',
@@ -29,6 +47,8 @@ import type { Node, Edge } from '../types';
 })
 export class KeyHandlerDirective implements OnInit, OnDestroy {
   private store = inject(FlowStore);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly document = inject(DOCUMENT);
 
   /** Key(s) that delete selected elements. `null` disables the shortcut. */
   readonly deleteKeyCode = input<KeyCode | null>(['Backspace', 'Delete']);
@@ -55,8 +75,41 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
   private readonly panActivationKeys = new Set<string>();
   private readonly zoomActivationKeys = new Set<string>();
 
-  ngOnInit(): void {}
-  ngOnDestroy(): void {}
+  // Capture phase so a child calling stopPropagation() (node drag, pane
+  // gestures) can't hide the interaction from us.
+  private readonly onDocumentPointerDown = (event: Event): void => {
+    const target = event.target;
+    if (target instanceof globalThis.Node && this.host.contains(target)) {
+      lastInteractedFlowRoot = this.host;
+    } else if (lastInteractedFlowRoot === this.host) {
+      lastInteractedFlowRoot = null;
+    }
+  };
+
+  ngOnInit(): void {
+    this.document.addEventListener('pointerdown', this.onDocumentPointerDown, true);
+    this.document.addEventListener('focusin', this.onDocumentPointerDown, true);
+  }
+
+  ngOnDestroy(): void {
+    this.document.removeEventListener('pointerdown', this.onDocumentPointerDown, true);
+    this.document.removeEventListener('focusin', this.onDocumentPointerDown, true);
+    if (lastInteractedFlowRoot === this.host) lastInteractedFlowRoot = null;
+  }
+
+  /**
+   * Whether a key event belongs to this flow (see class doc). Only these may
+   * trigger delete / select-all / Escape / arrow moves.
+   */
+  private isEventForThisFlow(event: KeyboardEvent): boolean {
+    // composedPath() pierces shadow DOM; falls back to target.
+    const target = (event.composedPath?.()?.[0] ?? event.target) as EventTarget | null;
+    if (target instanceof globalThis.Node && this.host.contains(target)) return true;
+    const doc = this.document;
+    const unfocused =
+      !target || target === doc || target === doc.body || target === doc.documentElement;
+    return unfocused && lastInteractedFlowRoot === this.host;
+  }
 
   onKeyDown(event: KeyboardEvent): void {
     if (isInputDOMNode(event)) return;
@@ -73,8 +126,10 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
       this.store.multiSelectionActive.set(true);
     }
 
+    const scoped = this.isEventForThisFlow(event);
+
     // Delete key
-    if (this.matchesKey(event, this.deleteKeyCode())) {
+    if (scoped && this.matchesKey(event, this.deleteKeyCode())) {
       this.handleDelete();
     }
 
@@ -91,19 +146,19 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
     }
 
     // Select all (Ctrl/Cmd + A)
-    if (event.key === 'a' && (event.metaKey || event.ctrlKey)) {
+    if (scoped && event.key === 'a' && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       this.handleSelectAll();
     }
 
     // Escape — deselect all
-    if (event.key === 'Escape') {
+    if (scoped && event.key === 'Escape') {
       this.store.unselectNodesAndEdges();
       this.store.connectionClickStartHandle.set(null);
     }
 
-    // Arrow key movement for focused nodes
-    if (!this.disableKeyboardA11y() && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+    // Arrow key movement for selected nodes
+    if (scoped && !this.disableKeyboardA11y() && ARROW_KEY_DIFFS[event.key]) {
       this.handleArrowKey(event);
     }
   }
@@ -146,97 +201,71 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
 
     if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
 
-    // Filter to only deletable elements
-    const deletableNodes = selectedNodes.filter((n) => n.deletable !== false);
-    const deletableEdges = selectedEdges.filter((e) => e.deletable !== false);
+    // System getElementsToRemove semantics: honor `deletable: false`, cascade
+    // to descendants of deleted parents, include connected edges.
+    const matching = collectElementsToRemove({
+      nodesToRemove: selectedNodes,
+      edgesToRemove: selectedEdges,
+      nodes: this.store.nodes(),
+      edges: this.store.edges(),
+    });
 
-    // Collect edges connected to deleted nodes
-    const nodeIds = new Set(deletableNodes.map((n) => n.id));
-    const connectedEdges = this.store.edges().filter(
-      (e) => (nodeIds.has(e.source) || nodeIds.has(e.target)) && e.deletable !== false
-    );
-    const allEdgesToDelete = [...deletableEdges, ...connectedEdges.filter((e) => !deletableEdges.some((se) => se.id === e.id))];
+    if (matching.nodes.length === 0 && matching.edges.length === 0) return;
 
-    if (deletableNodes.length === 0 && allEdgesToDelete.length === 0) return;
+    const performDelete = (toDelete: { nodes: Node[]; edges: Edge[] }) => {
+      const { nodes, edges } = toDelete;
+      if (nodes.length === 0 && edges.length === 0) return;
+      if (nodes.length > 0) this.nodesDelete.emit(nodes);
+      if (edges.length > 0) this.edgesDelete.emit(edges);
+      this.deleteElements.emit({ nodes, edges });
 
-    const performDelete = () => {
-      // Emit delete events
-      if (deletableNodes.length > 0) {
-        this.nodesDelete.emit(deletableNodes);
+      if (edges.length > 0) {
+        this.store.triggerEdgeChanges(edges.map((e) => elementToRemoveChange(e)) as EdgeChange[]);
       }
-      if (allEdgesToDelete.length > 0) {
-        this.edgesDelete.emit(allEdgesToDelete);
+      if (nodes.length > 0) {
+        this.store.triggerNodeChanges(nodes.map((n) => elementToRemoveChange(n)) as NodeChange[]);
       }
-      this.deleteElements.emit({ nodes: deletableNodes, edges: allEdgesToDelete });
-
-      // Apply changes
-      const nodeChanges = deletableNodes.map((n) => elementToRemoveChange(n));
-      const edgeChanges = allEdgesToDelete.map((e) => elementToRemoveChange(e));
-
-      this.store.triggerNodeChanges(nodeChanges as NodeChange[]);
-      this.store.triggerEdgeChanges(edgeChanges as EdgeChange[]);
     };
 
-    // Check beforeDelete callback
     const beforeDelete = this.store.onBeforeDelete;
-    if (beforeDelete) {
-      const result = beforeDelete({ nodes: deletableNodes, edges: allEdgesToDelete });
-      if (result instanceof Promise) {
-        result.then((allowed) => { if (allowed) performDelete(); });
-      } else if (result) {
-        performDelete();
-      }
+    if (!beforeDelete) {
+      performDelete(matching);
+      return;
+    }
+    // Keep a synchronous path for synchronous hooks; `boolean` vetoes/approves,
+    // an object replaces the set (React parity).
+    const result = beforeDelete(matching);
+    if (result instanceof Promise) {
+      result.then((r) => performDelete(resolveBeforeDeleteResult(r, matching)));
     } else {
-      performDelete();
+      performDelete(resolveBeforeDeleteResult(result, matching));
     }
   }
 
   private handleSelectAll(): void {
-    const nodeChanges = this.store.nodes()
-      .filter((n) => n.selectable !== false)
-      .map((n) => ({
-        id: n.id,
-        type: 'select' as const,
-        selected: true,
-      }));
-    const edgeChanges = this.store.edges()
-      .filter((e) => e.selectable !== false)
-      .map((e) => ({
-        id: e.id,
-        type: 'select' as const,
-        selected: true,
-      }));
+    const elementsSelectable = this.store.elementsSelectable();
+    // React isSelectable semantics: an explicit per-element flag wins, else the
+    // flow-level elementsSelectable applies.
+    const isSelectable = (selectable: boolean | undefined) =>
+      selectable || (elementsSelectable && typeof selectable === 'undefined');
+    const hidden = this.store.collapsedHiddenIds();
 
-    this.store.triggerNodeChanges(nodeChanges as NodeChange[]);
-    this.store.triggerEdgeChanges(edgeChanges as EdgeChange[]);
+    const nodeChanges = this.store.nodes()
+      .filter((n) => !n.selected && isSelectable(n.selectable) && !hidden.has(n.id))
+      .map((n) => ({ id: n.id, type: 'select' as const, selected: true }));
+    const edgeChanges = this.store.edges()
+      .filter((e) => !e.selected && isSelectable(e.selectable))
+      .map((e) => ({ id: e.id, type: 'select' as const, selected: true }));
+
+    if (nodeChanges.length > 0) this.store.triggerNodeChanges(nodeChanges as NodeChange[]);
+    if (edgeChanges.length > 0) this.store.triggerEdgeChanges(edgeChanges as EdgeChange[]);
   }
 
   private handleArrowKey(event: KeyboardEvent): void {
-    const selectedNodes = this.store.selectedNodes();
-    if (selectedNodes.length === 0) return;
-
+    if (this.store.selectedNodes().length === 0) return;
+    // Only swallow the key (page scroll) when there is a selection to move.
     event.preventDefault();
-
-    const step = this.store.snapToGrid() ? this.store.snapGrid()[0] : 1;
-    let dx = 0, dy = 0;
-
-    switch (event.key) {
-      case 'ArrowUp': dy = -step; break;
-      case 'ArrowDown': dy = step; break;
-      case 'ArrowLeft': dx = -step; break;
-      case 'ArrowRight': dx = step; break;
-    }
-
-    const changes = selectedNodes.map((node) => ({
-      id: node.id,
-      type: 'position' as const,
-      position: {
-        x: node.position.x + dx,
-        y: node.position.y + dy,
-      },
-    }));
-
-    this.store.triggerNodeChanges(changes as NodeChange[]);
+    moveSelectedNodes(this.store, ARROW_KEY_DIFFS[event.key], event.shiftKey ? 4 : 1);
   }
 
   private resetHeldKeys(): void {

@@ -388,6 +388,15 @@ svg.xy-flow__connectionline {
 .ng-flow__edge-text {
   fill: var(--xy-edge-label-color, var(--xy-edge-label-color-default));
 }
+/* Built-in `edge.label` defaults — React Flow's EdgeText parity
+   (labelShowBg: true, labelBgPadding: [2, 4], labelBgBorderRadius: 2).
+   Per-edge label* props override these inline. */
+.xy-flow__edgelabel-renderer > .xy-flow__edge-label {
+  background: var(--xy-edge-label-background-color, var(--xy-edge-label-background-color-default));
+  color: var(--xy-edge-label-color, var(--xy-edge-label-color-default));
+  padding: 4px 2px;
+  border-radius: 2px;
+}
 
 .xy-flow__edgelabel-renderer {
   position: absolute;

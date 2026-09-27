@@ -1,4 +1,4 @@
-import { Injectable, inject, computed, signal, DestroyRef, type Signal } from '@angular/core';
+import { Injectable, inject, computed, signal, untracked, DestroyRef, type Signal } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import {
   pointToRendererPoint,
@@ -24,6 +24,7 @@ import {
 } from '@angflow/system';
 
 import { elementToRemoveChange, getElementsDiffChanges } from '../utils/changes';
+import { collectElementsToRemove, resolveBeforeDeleteResult } from '../utils/elements-to-remove';
 import { injectFlowStore } from '../utils/inject-flow-store';
 import type { ViewportAnimationOptions } from './flow-store.service';
 import type { Node, Edge, InternalNode, DeleteElementsOptions } from '../types';
@@ -269,6 +270,10 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * Other nodes are left untouched.
    */
   updateNode(id: string, nodeUpdate: Partial<NodeType> | ((node: NodeType) => Partial<NodeType>)): void {
+    untracked(() => this.updateNodeImpl(id, nodeUpdate));
+  }
+
+  private updateNodeImpl(id: string, nodeUpdate: Partial<NodeType> | ((node: NodeType) => Partial<NodeType>)): void {
     const current = this.store.nodes().find((n) => n.id === id);
     if (!current) return;
     const update = typeof nodeUpdate === 'function' ? nodeUpdate(current) : nodeUpdate;
@@ -281,6 +286,10 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * `updateNode(id, n => ({ data: { ...n.data, ...dataUpdate } }))`.
    */
   updateNodeData(id: string, dataUpdate: Record<string, unknown> | ((data: NodeType['data']) => Record<string, unknown>)): void {
+    untracked(() => this.updateNodeDataImpl(id, dataUpdate));
+  }
+
+  private updateNodeDataImpl(id: string, dataUpdate: Record<string, unknown> | ((data: NodeType['data']) => Record<string, unknown>)): void {
     const current = this.store.nodes().find((n) => n.id === id);
     if (!current) return;
     const update = typeof dataUpdate === 'function' ? dataUpdate(current.data) : dataUpdate;
@@ -415,10 +424,11 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     }
     // Gate on the (vetoable) deletion FIRST: if a host onBeforeDelete vetoes,
     // leave everything untouched rather than detaching children from a group
-    // that still exists. deleteElements does not cascade child nodes, only the
-    // group node + its connected edges, so the children survive regardless.
-    const { deletedNodes } = await this.deleteElements({ nodes: [{ id: groupId } as NodeType] });
-    if (deletedNodes.length === 0) return [];
+    // that still exists. The public deleteElements cascades to descendants, so
+    // use the non-cascading internal path: only the group node + its connected
+    // edges go, and the children survive.
+    const { deletedNodes } = await this.deleteElementsInternal({ nodes: [{ id: groupId }] }, false);
+    if (!deletedNodes.some((n) => n.id === groupId)) return [];
     this.store.batch(() => {
       for (const c of children) this.updateNode(c.id, { parentId: newParent } as Partial<NodeType>);
     });
@@ -448,6 +458,10 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * crossing-edge rerouting from this flag.
    */
   setNodeCollapsed(id: string, collapsed: boolean): void {
+    untracked(() => this.setNodeCollapsedImpl(id, collapsed));
+  }
+
+  private setNodeCollapsedImpl(id: string, collapsed: boolean): void {
     const current = this.store.nodes().find((n) => n.id === id);
     if (!current) return;
     const next = { ...current, collapsed } as NodeType;
@@ -456,7 +470,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
   /** Flip a node's `collapsed` state. No-op for unknown ids. */
   toggleNodeCollapsed(id: string): void {
-    const current = this.store.nodes().find((n) => n.id === id);
+    const current = untracked(() => this.store.nodes().find((n) => n.id === id));
     if (!current) return;
     this.setNodeCollapsed(id, !current.collapsed);
   }
@@ -679,6 +693,10 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
   /** Apply a shallow merge (or updater function) to a single edge. */
   updateEdge(id: string, edgeUpdate: Partial<EdgeType> | ((edge: EdgeType) => Partial<EdgeType>)): void {
+    untracked(() => this.updateEdgeImpl(id, edgeUpdate));
+  }
+
+  private updateEdgeImpl(id: string, edgeUpdate: Partial<EdgeType> | ((edge: EdgeType) => Partial<EdgeType>)): void {
     const current = this.store.edges().find((e) => e.id === id);
     if (!current) return;
     const update = typeof edgeUpdate === 'function' ? edgeUpdate(current) : edgeUpdate;
@@ -688,6 +706,10 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
   /** Merge `dataUpdate` into a single edge's `data` object. */
   updateEdgeData(id: string, dataUpdate: Record<string, unknown> | ((data: EdgeType['data']) => Record<string, unknown>)): void {
+    untracked(() => this.updateEdgeDataImpl(id, dataUpdate));
+  }
+
+  private updateEdgeDataImpl(id: string, dataUpdate: Record<string, unknown> | ((data: EdgeType['data']) => Record<string, unknown>)): void {
     const current = this.store.edges().find((e) => e.id === id);
     if (!current) return;
     const update = typeof dataUpdate === 'function' ? dataUpdate(current.data) : dataUpdate;
@@ -709,6 +731,10 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * the entire selection.
    */
   setSelection(params: { nodeIds?: string[]; edgeIds?: string[]; additive?: boolean }): void {
+    untracked(() => this.setSelectionImpl(params));
+  }
+
+  private setSelectionImpl(params: { nodeIds?: string[]; edgeIds?: string[]; additive?: boolean }): void {
     const additive = params.additive ?? false;
     const nodeIds = params.nodeIds;
     const edgeIds = params.edgeIds;
@@ -752,33 +778,39 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   }
 
   /**
-   * Delete the specified nodes and/or edges. Edges connected to deleted nodes
-   * are also removed. If an `onBeforeDelete` hook is set, it runs first and
-   * can veto the deletion.
+   * Delete the specified nodes and/or edges, following system
+   * `getElementsToRemove` semantics: descendants of deleted nodes are deleted
+   * too, elements with `deletable: false` are kept, and edges connected to
+   * deleted nodes are removed. If an `onBeforeDelete` hook is set, it runs
+   * first and can veto (`false`) or narrow (return `{ nodes, edges }`) the
+   * deletion.
    *
    * @returns The nodes and edges that were actually deleted (empty arrays if
    *          `onBeforeDelete` returned `false`).
    */
   async deleteElements(params: DeleteElementsOptions): Promise<{ deletedNodes: NodeType[]; deletedEdges: EdgeType[] }> {
-    const nodeIdsToDelete = new Set((params.nodes ?? []).map((n) => n.id));
-    const edgeIdsToDelete = new Set((params.edges ?? []).map((e) => e.id));
+    // untracked: the synchronous prefix reads store signals (see updateNode).
+    return untracked(() => this.deleteElementsInternal(params, true));
+  }
 
-    // Also delete edges connected to deleted nodes
-    for (const edge of this.store.edges()) {
-      if (nodeIdsToDelete.has(edge.source) || nodeIdsToDelete.has(edge.target)) {
-        edgeIdsToDelete.add(edge.id);
-      }
-    }
+  private async deleteElementsInternal(
+    params: DeleteElementsOptions,
+    cascadeChildren: boolean,
+  ): Promise<{ deletedNodes: NodeType[]; deletedEdges: EdgeType[] }> {
+    const matching = collectElementsToRemove({
+      nodesToRemove: params.nodes ?? [],
+      edgesToRemove: params.edges ?? [],
+      nodes: this.store.nodes(),
+      edges: this.store.edges(),
+      cascadeChildren,
+    });
 
-    const nodesToDelete = this.store.nodes().filter((n) => nodeIdsToDelete.has(n.id));
-    const edgesToDelete = this.store.edges().filter((e) => edgeIdsToDelete.has(e.id));
+    let nodesToDelete = matching.nodes;
+    let edgesToDelete = matching.edges;
 
-    // Check onBeforeDelete callback
     if (this.store.onBeforeDelete && (nodesToDelete.length > 0 || edgesToDelete.length > 0)) {
-      const shouldDelete = await this.store.onBeforeDelete({ nodes: nodesToDelete, edges: edgesToDelete });
-      if (!shouldDelete) {
-        return { deletedNodes: [], deletedEdges: [] };
-      }
+      const result = await this.store.onBeforeDelete({ nodes: nodesToDelete, edges: edgesToDelete });
+      ({ nodes: nodesToDelete, edges: edgesToDelete } = resolveBeforeDeleteResult(result, matching));
     }
 
     if (edgesToDelete.length > 0) {

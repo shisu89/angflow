@@ -4,6 +4,21 @@
 
 ### Fixed
 
+- **`<ng-flow>` inputs that were accepted but ignored now work:**
+  `defaultEdgeOptions` (merged into every rendered edge and its markers; applied to
+  user-completed connections), `ariaLabelConfig`, `reconnectRadius`,
+  `elevateEdgesOnSelect`, `nodeClickDistance`, `defaultMarkerColor`,
+  `connectionLineStyle`, `connectionLineContainerStyle`, `attributionPosition`.
+  In uncontrolled mode (`defaultEdges`) a completed connection now adds its edge.
+- Edge `style` objects use React semantics: camelCase keys become kebab-case and
+  unitless numbers get `px` where CSS needs it (`{ strokeWidth: 3 }` previously
+  produced invalid CSS). Built-in edges honour `pathOptions`; `labelStyle`,
+  `labelShowBg`, `labelBgStyle`, `labelBgPadding`, `labelBgBorderRadius` render.
+  Edge labels get a themed background by default (`labelShowBg: false` removes it).
+- Calling `updateNode` / `updateNodeData` / `updateEdge*` / `setNodes` /
+  `setSelection` / `deleteElements` from inside an `effect()` no longer
+  subscribes the effect to the state it writes — the `update-node` example
+  froze the page in an infinite loop. Store write paths now run `untracked`.
 - Agent bridge: reject graph-corrupting or no-op agent calls with `-32602` —
   duplicate node/edge ids, edges whose `source`/`target` node doesn't exist,
   updates to unknown ids (previously `null` + a spurious undo entry), and patches
@@ -32,6 +47,21 @@
 
 ### Changed
 
+- **Keyboard actions are scoped to their flow.** Delete, Ctrl/Cmd+A, Escape and
+  arrow-key moves act only when the key event comes from inside the flow (or focus
+  is on `<body>` and this flow was the last one clicked/focused). Previously the
+  handler acted page-wide: arrow keys moved selected nodes and blocked page scroll
+  from anywhere, Ctrl+A was hijacked everywhere, and every flow on the page reacted
+  at once. Modifier/activation-key tracking stays page-wide.
+- Arrow-key moves skip `draggable: false` nodes, respect `nodesDraggable`, and
+  step 5px (Shift ×4) like React Flow — previously 1px.
+- Select-all honours `selectable` / `elementsSelectable` and skips nodes hidden by
+  a collapsed group.
+- **`deleteElements` and the Delete key cascade to child nodes and honour
+  `deletable: false`** (React Flow `getElementsToRemove` semantics); deleting a
+  group no longer leaves children with a dangling `parentId`. `onBeforeDelete` may
+  return a reduced `{ nodes, edges }` set as well as a boolean. `dissolveGroup`
+  still keeps the children.
 - Example agent proxies (`examples/angular/server/`) reject browser requests from
   non-localhost origins (extend with `ANGFLOW_ALLOWED_ORIGINS`) instead of sending
   wildcard CORS — a visited website could otherwise spend the developer's key. The

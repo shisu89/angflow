@@ -12,19 +12,9 @@ import {
 import {
   XYDrag,
   type XYDragInstance,
-  type XYPosition,
-  calculateNodePosition,
-  snapPosition,
 } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
-
-/** Per-key unit direction vectors for arrow-key node movement (React parity). */
-const arrowKeyDiffs: Record<string, XYPosition> = {
-  ArrowUp: { x: 0, y: -1 },
-  ArrowDown: { x: 0, y: 1 },
-  ArrowLeft: { x: -1, y: 0 },
-  ArrowRight: { x: 1, y: 0 },
-};
+import { ARROW_KEY_DIFFS, moveSelectedNodes } from '../../utils/move-selected-nodes';
 
 @Component({
   selector: 'ng-flow-selection-box',
@@ -152,74 +142,13 @@ export class SelectionBoxComponent {
       return;
     }
 
-    const direction = arrowKeyDiffs[event.key];
+    const direction = ARROW_KEY_DIFFS[event.key];
     if (!direction) return;
 
     event.preventDefault();
     // Without this, the event bubbles to the document KeyHandlerDirective, which
-    // moves the selected nodes a second time (6px instead of 5, or two grid cells).
+    // would move the selected nodes a second time.
     event.stopPropagation();
-    this.moveSelectedNodes(direction, event.shiftKey ? 4 : 1);
-  }
-
-  /**
-   * Ports React's useMoveSelectedNodes: shift every selected & draggable node
-   * by a snap-grid-aware velocity, then push the batch through the same
-   * updateNodePositions path a drag uses.
-   *
-   * The `dragging` argument is deliberately omitted: this is a keyboard nudge,
-   * not a pointer gesture, so it must neither raise nor clear
-   * `FlowStore.nodeDragging` (an arrow press during a live drag would otherwise
-   * drop `gestureActive()` mid-drag).
-   */
-  private moveSelectedNodes(direction: XYPosition, factor: number): void {
-    const store = this.store;
-    const snapToGrid = store.snapToGrid();
-    const snapGrid = store.snapGrid();
-    const nodeExtent = store.nodeExtent();
-    const nodeOrigin = store.nodeOrigin();
-    const nodesDraggable = store.nodesDraggable();
-    const onError = store.onError();
-    const nodeLookup = store.nodeLookup;
-
-    // By default a node moves 5px per press; snap grid overrides the velocity.
-    const xVelo = snapToGrid ? snapGrid[0] : 5;
-    const yVelo = snapToGrid ? snapGrid[1] : 5;
-    const xDiff = direction.x * xVelo * factor;
-    const yDiff = direction.y * yVelo * factor;
-
-    const nodeUpdates = new Map<string, unknown>();
-
-    for (const [, node] of nodeLookup) {
-      const userDraggable = node.draggable;
-      const isSelectedDraggable =
-        node.selected && (userDraggable || (nodesDraggable && typeof userDraggable === 'undefined'));
-      if (!isSelectedDraggable) continue;
-
-      let nextPosition = {
-        x: node.internals.positionAbsolute.x + xDiff,
-        y: node.internals.positionAbsolute.y + yDiff,
-      };
-      if (snapToGrid) {
-        nextPosition = snapPosition(nextPosition, snapGrid);
-      }
-
-      const { position, positionAbsolute } = calculateNodePosition({
-        nodeId: node.id,
-        nextPosition,
-        nodeLookup,
-        nodeExtent,
-        nodeOrigin,
-        onError,
-      });
-
-      node.position = position;
-      node.internals.positionAbsolute = positionAbsolute;
-      nodeUpdates.set(node.id, node);
-    }
-
-    if (nodeUpdates.size > 0) {
-      store.updateNodePositions(nodeUpdates as Map<string, never>);
-    }
+    moveSelectedNodes(this.store, direction, event.shiftKey ? 4 : 1);
   }
 }

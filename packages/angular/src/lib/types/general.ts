@@ -111,9 +111,16 @@ export type ViewportHelperFunctions = {
   flowToScreenPosition: (flowPosition: XYPosition) => XYPosition;
 };
 
+/**
+ * Gate run before any deletion. Return `false` to veto, `true` to allow, or a
+ * reduced `{ nodes, edges }` set to delete only those elements (React parity).
+ */
 export type OnBeforeDelete<NodeType extends Node = Node, EdgeType extends Edge = Edge> = (
   params: { nodes: NodeType[]; edges: EdgeType[] }
-) => boolean | Promise<boolean>;
+) =>
+  | boolean
+  | { nodes: NodeType[]; edges: EdgeType[] }
+  | Promise<boolean | { nodes: NodeType[]; edges: EdgeType[] }>;
 
 export type IsValidConnection<EdgeType extends Edge = Edge> = (edge: EdgeType | Connection) => boolean;
 

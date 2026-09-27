@@ -27,6 +27,7 @@ import {
   infiniteExtent,
   XYPanZoom,
   getDimensions,
+  mergeAriaLabelConfig,
   type Viewport,
   type CoordinateExtent,
   type NodeOrigin,
@@ -69,6 +70,7 @@ import type {
   DefaultEdgeOptions,
   FitViewOptions,
   IsValidConnection,
+  OnBeforeDelete,
 } from '../../types';
 
 const VIEWPORT_EPSILON = 1e-4;
@@ -210,6 +212,8 @@ function viewportsEqual(a: Viewport, b: Viewport): boolean {
         <ng-flow-viewport [transform]="store.transform()">
           <ng-flow-edge-renderer
             [customEdgeTypes]="edgeTypes()"
+            [reconnectRadius]="reconnectRadius()"
+            [defaultMarkerColor]="defaultMarkerColor()"
             (edgeClick)="edgeClick.emit($event)"
             (edgeDoubleClick)="edgeDoubleClick.emit($event)"
             (edgeContextMenu)="edgeContextMenu.emit($event)"
@@ -220,7 +224,12 @@ function viewportsEqual(a: Viewport, b: Viewport): boolean {
             (reconnectStart)="reconnectStart.emit($event)"
             (reconnectEnd)="reconnectEnd.emit($event)"
           />
-          <ng-flow-connection-line [customComponent]="connectionLineComponent()" [connectionLineType]="connectionLineType()" />
+          <ng-flow-connection-line
+            [customComponent]="connectionLineComponent()"
+            [connectionLineType]="connectionLineType()"
+            [connectionLineStyle]="connectionLineStyle()"
+            [containerStyle]="connectionLineContainerStyle()"
+          />
           <ng-flow-node-renderer
             [customNodeTypes]="nodeTypes()"
             [nodeTemplateMap]="nodeTemplateMap()"
@@ -237,7 +246,7 @@ function viewportsEqual(a: Viewport, b: Viewport): boolean {
       <ng-content />
       <ng-flow-a11y-descriptions />
       @if (!hideAttribution()) {
-        <ng-flow-attribution />
+        <ng-flow-attribution [position]="attributionPosition()" />
       }
       <div class="xy-flow__a11y-descriptions" aria-live="assertive" aria-atomic="true"
            style="position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); border: 0;">
@@ -712,9 +721,10 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
   /**
    * Callback invoked before elements are deleted.
-   * Return `false` (or a Promise resolving to `false`) to cancel the deletion.
+   * Return `false` (or a Promise resolving to `false`) to cancel the deletion,
+   * or a reduced `{ nodes, edges }` set to delete only those elements.
    */
-  readonly onBeforeDelete = input<((params: { nodes: NodeType[]; edges: EdgeType[] }) => boolean | Promise<boolean>) | undefined>(undefined);
+  readonly onBeforeDelete = input<OnBeforeDelete<NodeType, EdgeType> | undefined>(undefined);
 
   /** Fires when the store reports an internal validation or consistency error. */
   readonly error = output<{ id: string; message: string }>({ alias: 'error' });
@@ -841,11 +851,18 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       untracked(() => this.store.setNodeExtentAndOrigin(origin, extent));
     });
 
+    // Read by the edge renderer (merged under every edge + marker defs) and by
+    // the store's connect path (new edges in uncontrolled mode / the (connect)
+    // payload). Written unconditionally so unbinding clears it.
     effect(() => {
-      const opts = this.defaultEdgeOptions();
-      if (opts !== undefined) {
-        this.store.defaultEdgeOptions.set(opts);
-      }
+      this.store.defaultEdgeOptions.set(this.defaultEdgeOptions());
+    });
+
+    // Partial overrides merged over the library defaults, like React's
+    // StoreUpdater (mergeAriaLabelConfig). Consumed by Controls, the a11y
+    // descriptions, and keyboard live-region announcements.
+    effect(() => {
+      this.store.ariaLabelConfig.set(mergeAriaLabelConfig(this.ariaLabelConfig()));
     });
 
     effect(() => {
