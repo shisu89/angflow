@@ -87,7 +87,8 @@
 - Example agent proxies (`examples/angular/server/`) reject browser requests from
   non-localhost origins (extend with `ANGFLOW_ALLOWED_ORIGINS`) instead of sending
   wildcard CORS — a visited website could otherwise spend the developer's key. The
-  Anthropic proxy enables prompt caching and defaults to `claude-opus-5`.
+  Anthropic proxy enables prompt caching and defaults to `claude-opus-5`; the OpenAI
+  proxy defaults to `gpt-5.6-luna`.
 
 ### Added
 
