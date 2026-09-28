@@ -48,6 +48,23 @@ tool catalog changes.
 
 ## Publish to npm
 
+### Preferred: GitHub Actions release (no local credentials)
+
+`.github/workflows/release.yml` publishes with npm **trusted publishing** (OIDC) —
+no npm token is stored anywhere, and each release gets a provenance attestation.
+
+1. Bump the `version` (and date the changelog section) of each package to release,
+   merge to `main`.
+2. Actions → **Release** → Run workflow (tick `dry_run` first to rehearse).
+3. It builds, typechecks, lints and tests, then for system → angular → mcp: skips
+   versions already on npm, packs with **pnpm** (rewrites `workspace:` ranges),
+   verifies no `workspace:` specifier survived, and `npm publish`es the tarball.
+
+One-time setup: on npmjs.com, each package → Settings → Trusted publishing →
+GitHub Actions, repository `shisu89/angflow`, workflow `release.yml`.
+
+### Manual publish (fallback)
+
 ### First-time setup
 - npm org: `angflow` (owner: `sjs89`)
 - 2FA is enabled — each publish prompts for browser approval

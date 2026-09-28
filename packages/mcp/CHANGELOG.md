@@ -1,6 +1,6 @@
 # @angflow/mcp
 
-## Unreleased
+## 0.1.0 — 2026-09-28
 
 - MCP resources: `angflow://flows/{id}/summary` and `.../state` per registered flow,
   read live, with `list_changed` notifications and throttled `resources/updated` for

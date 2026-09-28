@@ -1,7 +1,7 @@
 /**
  * GENERATED FILE — DO NOT EDIT.
  *
- * Snapshot of AGENT_TOOL_SCHEMAS from @angflow/angular@0.3.21.
+ * Snapshot of AGENT_TOOL_SCHEMAS from @angflow/angular@0.4.0.
  * Regenerate with `npm run generate:schemas`. `npm run build` and the
  * drift test in test/schema-snapshot.spec.ts fail while this file is stale.
  */
@@ -16,7 +16,7 @@ export interface AgentToolSchema {
   };
 }
 
-export const GENERATED_FROM_ANGULAR_VERSION = "0.3.21";
+export const GENERATED_FROM_ANGULAR_VERSION = "0.4.0";
 
 export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
   {

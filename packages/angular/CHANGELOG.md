@@ -1,6 +1,6 @@
 # @angflow/angular
 
-## Unreleased
+## 0.4.0 — 2026-09-28
 
 ### Fixed
 

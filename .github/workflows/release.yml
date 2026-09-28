@@ -1,0 +1,112 @@
+name: Release
+
+# Publishes @angflow/system, @angflow/angular and @angflow/mcp to npm using
+# npm trusted publishing (OIDC) — no npm token is stored anywhere. Each
+# package must list this repository + this workflow file (release.yml) as a
+# trusted publisher on npmjs.com (package → Settings → Trusted publishing).
+#
+# Run it from the Actions tab ("Run workflow") on main. Packages whose
+# package.json version is already on npm are skipped, so bump the version
+# (and changelog) of each package you want released first.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build, test and pack, but do not publish
+        type: boolean
+        default: false
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Build, test, publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write # OIDC token for npm trusted publishing + provenance
+    steps:
+      - name: Require main for a real publish
+        if: ${{ !inputs.dry_run && github.ref != 'refs/heads/main' }}
+        run: |
+          echo "::error::Publishing is only allowed from main (got ${GITHUB_REF}). Re-run with dry_run to test another branch."
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          # Trusted publishing needs Node >= 22.14 and npm >= 11.5.1.
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@^11.5.1 && npm --version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      # Order matters: @angflow/angular depends on @angflow/system.
+      - name: Pack, verify and publish
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/packs"
+          for pkg in system angular mcp; do
+            dir="packages/$pkg"
+            name=$(node -p "require('./$dir/package.json').name")
+            version=$(node -p "require('./$dir/package.json').version")
+
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "::notice::$name@$version is already on npm — skipping."
+              continue
+            fi
+
+            # pnpm rewrites workspace: ranges to real semver (npm would ship
+            # them verbatim — the 0.3.18 incident) and satisfies the prepack guard.
+            tarball=$(cd "$dir" && pnpm pack --pack-destination "$RUNNER_TEMP/packs" | tail -n 1)
+
+            # Belt and braces: no consumer-facing workspace: specifier may survive.
+            tar -xzOf "$tarball" package/package.json | node -e '
+              const pkg = JSON.parse(require("fs").readFileSync(0, "utf8"));
+              const bad = ["dependencies", "peerDependencies", "optionalDependencies"]
+                .flatMap((f) => Object.entries(pkg[f] ?? {}).filter(([, s]) => String(s).startsWith("workspace:")).map(([n, s]) => `${f}.${n}=${s}`));
+              if (bad.length) { console.error("workspace: specifiers in packed manifest:", bad.join(", ")); process.exit(1); }
+            '
+
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "::notice::[dry run] would publish $name@$version ($(basename "$tarball"))"
+              continue
+            fi
+
+            # Publishing a tarball uses npm's OIDC trusted publishing and
+            # attaches a provenance attestation.
+            npm publish "$tarball" --access public --provenance
+            echo "::notice::Published $name@$version"
+          done
