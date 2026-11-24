@@ -79,14 +79,25 @@ Each needs a decision: adopt now with a deprecated alias (non-breaking, 0.4.0), 
 - **Tests:** upstream added cross-framework `generic-tests` covering pane activation keys, click-connect, intersection with origin, viewport transitions and reconnect, plus Playwright specs and examples (DragThreshold, MeasurementRace, Remount, FixedExtentNode). Port these as regression scenarios into `tests/playwright` / `examples/angular`.
 - **Process:** keep the reference copies tracking upstream and repeat this triage per upstream minor release, so the drift doesn't grow to ~1000 commits again.
 
-## 5. Proposed sub-projects
+## 5. Roadmap
 
-1. **Upstream bug-fix sync** (§1), non-breaking. Ships as system 0.1.14 / angular 0.3.22.
-2. **Angflow-native fixes** (§2, except deletion).
-3. **Deletion via `getElementsToRemove`**: a behaviour change, released on its own.
-4. **Full upstream 1.0 API alignment** (all of §3, Changeset class included), in a single breaking 0.4.0,
-   with the agent tools, mcp snapshot and `AGENT_BRIDGE.md` updated.
+The ecosystem lever: `tests/playwright` is upstream's shared cross-framework e2e suite. It already
+has an Angular config (`test:angular`, `FRAMEWORK=ng`), but `examples/angular` has no
+`/tests/generic/*` pages, so the suite can't run against angflow. Building those pages makes
+upstream's own tests check angflow, and every future sync brings new tests along. Upstream has added
+7 spec files since the fork (background, click-connect, connection-hooks, intersection-origin,
+measurement-race, nodes-data-hooks, reconnect-edge, viewport).
 
-**Decisions (2026-11-24):** start with sub-project 1. For breaking changes, match upstream fully rather
-than deprecate-and-alias.
-6. Optional: the #5996 perf subset, and porting the upstream generic tests (these can run alongside 1–2).
+| # | Sub-project | Notes |
+|---|---|---|
+| A | Angular generic-test pages + upstream e2e specs, run in CI | Mirrors `examples/{react,svelte,vue}/src/generic-tests`. Failures feed B. |
+| B | Bug-fix release: §1 upstream fixes + §2 angflow-native bugs (except deletion) | Includes #6097. system 0.1.x / angular 0.3.x |
+| C | Deletion via system `getElementsToRemove` (+ #6074/#6111) | Behaviour change, its own release note |
+| D | 0.4.0: full upstream 1.0 API alignment (all of §3, Changeset class included) | Agent tools, mcp snapshot, `AGENT_BRIDGE.md` |
+| E | Feature parity: `selectNode`/`selectEdge`, `changeParent`, `xy-theme.css`, DevTools panel, missing React examples (refresh `docs/examples-parity.md`), optional #5996 perf subset with #6109 | |
+| F | `@angflow/ui`: Angular port of the React Flow UI components, as a new package with no Tailwind/spartan dependency | Verify the upstream license first. Never port React Flow **Pro** examples (not open source). |
+| G | Monthly scheduled upstream triage (report only, no code changes) | Prevents drift from piling up again |
+
+**Decisions (2026-11-24):** order A→B→C→D→E→F. For breaking changes, match upstream fully rather
+than deprecate-and-alias. UI components ship as a separate `@angflow/ui` package. Upstream triage
+runs monthly on a schedule.
