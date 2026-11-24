@@ -1,4 +1,4 @@
-import { ForwardedRef, useCallback, type CSSProperties } from 'react';
+import { ForwardedRef, type CSSProperties } from 'react';
 import cc from 'classcat';
 import { ConnectionLineType, PanOnScrollMode, SelectionMode, infiniteExtent, isMacOs } from '@xyflow/system';
 
@@ -6,7 +6,6 @@ import { A11yDescriptions } from '../../components/A11yDescriptions';
 import { Attribution } from '../../components/Attribution';
 import { SelectionListener } from '../../components/SelectionListener';
 import { StoreUpdater } from '../../components/StoreUpdater';
-import { useColorModeClass } from '../../hooks/useColorModeClass';
 import { GraphView } from '../GraphView';
 import { Wrapper } from './Wrapper';
 import type { Edge, Node, ReactFlowProps } from '../../types';
@@ -104,8 +103,7 @@ function ReactFlow<NodeType extends Node = Node, EdgeType extends Edge = Edge>(
     onPaneMouseLeave,
     onPaneScroll,
     onPaneContextMenu,
-    paneClickDistance = 1,
-    nodeClickDistance = 0,
+    paneDragThreshold = 1,
     children,
     onReconnect,
     onReconnectStart,
@@ -128,10 +126,11 @@ function ReactFlow<NodeType extends Node = Node, EdgeType extends Edge = Edge>(
     proOptions,
     defaultEdgeOptions,
     elevateNodesOnSelect = true,
-    elevateEdgesOnSelect = false,
+    elevateEdgesOnSelect = true,
     disableKeyboardA11y = false,
     autoPanOnConnect,
     autoPanOnNodeDrag,
+    autoPanOnSelection = true,
     autoPanSpeed,
     connectionRadius,
     isValidConnection,
@@ -144,7 +143,7 @@ function ReactFlow<NodeType extends Node = Node, EdgeType extends Edge = Edge>(
     onViewportChange,
     width,
     height,
-    colorMode = 'light',
+    forceColorMode,
     debug,
     onScroll,
     ariaLabelConfig,
@@ -154,16 +153,12 @@ function ReactFlow<NodeType extends Node = Node, EdgeType extends Edge = Edge>(
   ref: ForwardedRef<HTMLDivElement>
 ) {
   const rfId = id || '1';
-  const colorModeClassName = useColorModeClass(colorMode);
 
   // Undo scroll events, preventing viewport from shifting when nodes outside of it are focused
-  const wrapperOnScroll = useCallback(
-    (e: React.UIEvent<HTMLDivElement>) => {
-      e.currentTarget.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-      onScroll?.(e);
-    },
-    [onScroll]
-  );
+  const wrapperOnScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    e.currentTarget.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    onScroll?.(e);
+  };
 
   return (
     <div
@@ -172,7 +167,7 @@ function ReactFlow<NodeType extends Node = Node, EdgeType extends Edge = Edge>(
       onScroll={wrapperOnScroll}
       style={{ ...style, ...wrapperStyle }}
       ref={ref}
-      className={cc(['react-flow', className, colorModeClassName])}
+      className={cc(['react-flow', forceColorMode, className])}
       id={id}
       role="application"
     >
@@ -285,14 +280,14 @@ function ReactFlow<NodeType extends Node = Node, EdgeType extends Edge = Edge>(
           panOnScrollSpeed={panOnScrollSpeed}
           panOnScrollMode={panOnScrollMode}
           panOnDrag={panOnDrag}
+          autoPanOnSelection={autoPanOnSelection}
           onPaneClick={onPaneClick}
           onPaneMouseEnter={onPaneMouseEnter}
           onPaneMouseMove={onPaneMouseMove}
           onPaneMouseLeave={onPaneMouseLeave}
           onPaneScroll={onPaneScroll}
           onPaneContextMenu={onPaneContextMenu}
-          paneClickDistance={paneClickDistance}
-          nodeClickDistance={nodeClickDistance}
+          paneDragThreshold={paneDragThreshold}
           onSelectionContextMenu={onSelectionContextMenu}
           onSelectionStart={onSelectionStart}
           onSelectionEnd={onSelectionEnd}
@@ -314,6 +309,7 @@ function ReactFlow<NodeType extends Node = Node, EdgeType extends Edge = Edge>(
           nodeExtent={nodeExtent}
           viewport={viewport}
           onViewportChange={onViewportChange}
+          nodesDraggable={nodesDraggable}
         />
         <SelectionListener<NodeType, EdgeType> onSelectionChange={onSelectionChange} />
         {children}

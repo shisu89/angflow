@@ -15,14 +15,15 @@
 		ControlButton,
 		type FitViewOptions,
 		useSvelteFlow,
-		Position
+		Position,
+		type Viewport
 	} from '@xyflow/svelte';
 
 	import CustomNode from './CustomNode.svelte';
 	import CustomNodeDragHandle from './CustomNodeDragHandle.svelte';
 	import CustomEdge from './CustomEdge.svelte';
 
-	import '@xyflow/svelte/dist/style.css';
+	import '@xyflow/svelte/style.css';
 	import InitTracker from './InitTracker.svelte';
 
 	const nodeTypes: NodeTypes = {
@@ -157,6 +158,14 @@
 	});
 
 	let hidden = $state(false);
+
+	let viewport = $state.raw<Viewport>({
+		x: 100,
+		y: 100,
+		zoom: 2
+	});
+
+	$inspect(viewport);
 </script>
 
 <!-- oninit={() => console.log('on init')}
@@ -202,6 +211,7 @@
 	style="display:{hidden ? 'none' : 'block'}"
 	bind:nodes
 	bind:edges
+	bind:viewport
 	{nodeTypes}
 	{edgeTypes}
 	fitView
@@ -216,6 +226,7 @@
 	snapGrid={[25, 25]}
 	autoPanOnConnect
 	autoPanOnNodeDrag
+	autoPanOnSelection={true}
 	connectionMode={ConnectionMode.Strict}
 	attributionPosition={'top-center'}
 	deleteKey={['Backspace', 'd']}
@@ -246,6 +257,7 @@
 				}));
 			}}>left-right</button
 		>
+		<button onclick={() => (viewport = { x: 100, y: 100, zoom: 2 })}>reset bound viewport</button>
 	</Panel>
 	<InitTracker />
 </SvelteFlow>
@@ -265,13 +277,7 @@
 	}
 
 	:root {
-		/* --background-color: #ffffdd; */
-		--background-pattern-color: #5050ff;
-
 		--xy-minimap-background-color: red;
 		--xy-minimap-mask-color: rgb(255, 255, 240, 0.6);
-
-		--controls-button-background-color: #ddd;
-		--controls-button-background-color-hover: #ccc;
 	}
 </style>

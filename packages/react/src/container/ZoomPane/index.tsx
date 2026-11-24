@@ -1,33 +1,26 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useEffect, useRef } from 'react';
-import { shallow } from 'zustand/shallow';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { XYPanZoom, PanOnScrollMode, type Transform, type PanZoomInstance } from '@xyflow/system';
 
 import { useKeyPress } from '../../hooks/useKeyPress';
 import { useResizeHandler } from '../../hooks/useResizeHandler';
-import { useStore, useStoreApi } from '../../hooks/useStore';
+import { useOptionsStore, useConnectionStore, useReactFlowStoreApi } from '../../hooks/useReactFlowStore';
 import { containerStyle } from '../../styles/utils';
 import type { FlowRendererProps } from '../FlowRenderer';
-import type { ReactFlowState } from '../../types';
 
 type ZoomPaneProps = Omit<
   FlowRendererProps,
   'deleteKeyCode' | 'selectionKeyCode' | 'multiSelectionKeyCode' | 'noDragClassName' | 'disableKeyboardA11y'
 > & {
   isControlledViewport: boolean;
+  panActivationKeyPressed: boolean;
 };
-
-const selector = (s: ReactFlowState) => ({
-  userSelectionActive: s.userSelectionActive,
-  lib: s.lib,
-  connectionInProgress: s.connection.inProgress,
-});
 
 export function ZoomPane({
   onPaneContextMenu,
   zoomOnScroll = true,
   zoomOnPinch = true,
   panOnScroll = false,
+  panActivationKeyPressed,
   panOnScrollSpeed = 0.5,
   panOnScrollMode = PanOnScrollMode.Free,
   zoomOnDoubleClick = true,
@@ -43,14 +36,22 @@ export function ZoomPane({
   noPanClassName,
   onViewportChange,
   isControlledViewport,
-  paneClickDistance,
-  selectionOnDrag,
+  paneDragThreshold,
 }: ZoomPaneProps) {
-  const store = useStoreApi();
-  const zoomPane = useRef<HTMLDivElement>(null);
-  const { userSelectionActive, lib, connectionInProgress } = useStore(selector, shallow);
+  const { optionsStore, viewportStore } = useReactFlowStoreApi();
+  const userSelectionActive = useOptionsStore((s) => s.userSelectionActive);
+  const connectionInProgress = useConnectionStore((state) => state.connection.inProgress);
   const zoomActivationKeyPressed = useKeyPress(zoomActivationKeyCode);
+
+  const zoomPane = useRef<HTMLDivElement>(null);
   const panZoom = useRef<PanZoomInstance>();
+  // We want to prevent re-initialization of the pan/zoom instance
+  const [panZoomOptions] = useState(() => ({
+    minZoom,
+    maxZoom,
+    translateExtent,
+    defaultViewport,
+  }));
 
   useResizeHandler(zoomPane);
 
@@ -59,34 +60,36 @@ export function ZoomPane({
       onViewportChange?.({ x: transform[0], y: transform[1], zoom: transform[2] });
 
       if (!isControlledViewport) {
-        store.setState({ transform });
+        viewportStore.setState({ transform });
       }
     },
-    [onViewportChange, isControlledViewport]
+    [onViewportChange, isControlledViewport, viewportStore]
   );
 
   useEffect(() => {
     if (zoomPane.current) {
       panZoom.current = XYPanZoom({
         domNode: zoomPane.current,
-        minZoom,
-        maxZoom,
-        translateExtent,
-        viewport: defaultViewport,
+        minZoom: panZoomOptions.minZoom,
+        maxZoom: panZoomOptions.maxZoom,
+        translateExtent: panZoomOptions.translateExtent,
+        viewport: panZoomOptions.defaultViewport,
         onDraggingChange: (paneDragging) =>
-          store.setState((prevState) => prevState.paneDragging === paneDragging ? prevState : { paneDragging }),
+          viewportStore.setState((prevState) =>
+            prevState.paneDragging === paneDragging ? prevState : { paneDragging }
+          ),
         onPanZoomStart: (event, vp) => {
-          const { onViewportChangeStart, onMoveStart } = store.getState();
+          const { onViewportChangeStart, onMoveStart } = optionsStore.getState();
           onMoveStart?.(event, vp);
           onViewportChangeStart?.(vp);
         },
         onPanZoom: (event, vp) => {
-          const { onViewportChange, onMove } = store.getState();
+          const { onViewportChange, onMove } = optionsStore.getState();
           onMove?.(event, vp);
           onViewportChange?.(vp);
         },
         onPanZoomEnd: (event, vp) => {
-          const { onViewportChangeEnd, onMoveEnd } = store.getState();
+          const { onViewportChangeEnd, onMoveEnd } = optionsStore.getState();
           onMoveEnd?.(event, vp);
           onViewportChangeEnd?.(vp);
         },
@@ -94,17 +97,17 @@ export function ZoomPane({
 
       const { x, y, zoom } = panZoom.current.getViewport();
 
-      store.setState({
+      optionsStore.setState({
         panZoom: panZoom.current,
-        transform: [x, y, zoom],
         domNode: zoomPane.current.closest('.react-flow') as HTMLDivElement,
       });
+      viewportStore.setState({ transform: [x, y, zoom] });
 
       return () => {
         panZoom.current?.destroy();
       };
     }
-  }, []);
+  }, [panZoomOptions, optionsStore, viewportStore]);
 
   useEffect(() => {
     panZoom.current?.update({
@@ -112,6 +115,7 @@ export function ZoomPane({
       zoomOnScroll,
       zoomOnPinch,
       panOnScroll,
+      panActivationKeyPressed,
       panOnScrollSpeed,
       panOnScrollMode,
       zoomOnDoubleClick,
@@ -121,17 +125,17 @@ export function ZoomPane({
       noPanClassName,
       userSelectionActive,
       noWheelClassName,
-      lib,
+      lib: 'react',
       onTransformChange,
       connectionInProgress,
-      selectionOnDrag,
-      paneClickDistance,
+      paneDragThreshold,
     });
   }, [
     onPaneContextMenu,
     zoomOnScroll,
     zoomOnPinch,
     panOnScroll,
+    panActivationKeyPressed,
     panOnScrollSpeed,
     panOnScrollMode,
     zoomOnDoubleClick,
@@ -141,11 +145,9 @@ export function ZoomPane({
     noPanClassName,
     userSelectionActive,
     noWheelClassName,
-    lib,
     onTransformChange,
     connectionInProgress,
-    selectionOnDrag,
-    paneClickDistance,
+    paneDragThreshold,
   ]);
 
   return (

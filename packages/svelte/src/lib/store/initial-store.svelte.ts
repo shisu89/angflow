@@ -4,17 +4,20 @@ import {
   infiniteExtent,
   SelectionMode,
   ConnectionMode,
-  devWarn,
+  createDevWarn,
   adoptUserNodes,
   getViewportForBounds,
   updateConnectionLookup,
   initialConnection,
   mergeAriaLabelConfig,
+  defaultFitViewPadding,
   type SelectionRect,
   type SnapGrid,
   type MarkerProps,
   type PanZoomInstance,
   type CoordinateExtent,
+  EdgeChangeset,
+  NodeChangeset,
   type NodeOrigin,
   type OnError,
   type Viewport,
@@ -29,28 +32,33 @@ import {
   type ConnectionLookup,
   type ParentLookup,
   pointToRendererPoint,
-  type ColorModeClass,
   type Transform,
   fitViewport,
-  type Handle,
+  type HandleBounds,
   type OnReconnect,
   type OnReconnectStart,
   type OnReconnectEnd,
   type AriaLabelConfig,
-  type ZIndexMode
+  type ZIndexMode,
+  type NodeChange,
+  type EdgeChange
 } from '@xyflow/system';
 
-import DefaultNode from '$lib/components/nodes/DefaultNode.svelte';
-import InputNode from '$lib/components/nodes/InputNode.svelte';
-import OutputNode from '$lib/components/nodes/OutputNode.svelte';
-import GroupNode from '$lib/components/nodes/GroupNode.svelte';
+import { untrack } from 'svelte';
+
+const devWarn = createDevWarn('Svelte Flow', 'https://svelteflow.dev/');
+
+import DefaultNode from '#lib/components/nodes/DefaultNode.svelte';
+import InputNode from '#lib/components/nodes/InputNode.svelte';
+import OutputNode from '#lib/components/nodes/OutputNode.svelte';
+import GroupNode from '#lib/components/nodes/GroupNode.svelte';
 
 import {
   BezierEdgeInternal,
   SmoothStepEdgeInternal,
   StraightEdgeInternal,
   StepEdgeInternal
-} from '$lib/components/edges';
+} from '#lib/components/edges/index.js';
 
 import type {
   NodeTypes,
@@ -66,12 +74,13 @@ import type {
   InternalNode,
   OnBeforeReconnect,
   OnSelectionChange,
-  OnSelectionDrag
-} from '$lib/types';
+  OnSelectionDrag,
+  OnNodesChange,
+  OnEdgesChange
+} from '#lib/types/index.js';
 
-import type { StoreSignals } from './types';
-import { MediaQuery } from 'svelte/reactivity';
-import { getLayoutedEdges, getVisibleNodes, type EdgeLayoutAllOptions } from './visibleElements';
+import type { StoreSignals } from './types.js';
+import { getLayoutedEdges, getVisibleNodes, type EdgeLayoutAllOptions } from './visibleElements.js';
 
 export const initialNodeTypes = {
   input: InputNode,
@@ -87,20 +96,30 @@ export const initialEdgeTypes = {
   step: StepEdgeInternal
 };
 
-function getInitialViewport(
+function getInitialViewport<NodeType extends Node = Node>(
   // This is just used to make sure adoptUserNodes is called before we calculate the viewport
   _nodesInitialized: boolean,
   fitView: boolean | undefined,
+  fitViewOptions: FitViewOptions<NodeType> | undefined,
+  minZoom: number = 0.5,
+  maxZoom: number = 2,
   initialViewport: Viewport | undefined,
   width: number,
   height: number,
-  nodeLookup: NodeLookup
+  nodeLookup: NodeLookup<InternalNode<NodeType>>
 ) {
   if (fitView && !initialViewport && width && height) {
     const bounds = getInternalNodesBounds(nodeLookup, {
       filter: (node) => !!((node.width || node.initialWidth) && (node.height || node.initialHeight))
     });
-    return getViewportForBounds(bounds, width, height, 0.5, 2, 0.1);
+    return getViewportForBounds(
+      bounds,
+      width,
+      height,
+      minZoom,
+      maxZoom,
+      fitViewOptions?.padding ?? defaultFitViewPadding
+    );
   } else {
     return initialViewport ?? { x: 0, y: 0, zoom: 1 };
   }
@@ -109,6 +128,8 @@ function getInitialViewport(
 export function getInitialStore<NodeType extends Node = Node, EdgeType extends Edge = Edge>(
   signals: StoreSignals<NodeType, EdgeType>
 ) {
+  let latestFitViewId = 0;
+
   // We use a class here, because Svelte adds getters & setter for us.
   // Inline classes have some performance implications but we just call it once (max twice).
   class SvelteFlowStore {
@@ -120,13 +141,18 @@ export function getInitialStore<NodeType extends Node = Node, EdgeType extends E
     zIndexMode = $state.raw<ZIndexMode>(signals.props.zIndexMode ?? 'basic');
 
     nodesInitialized: boolean = $derived.by(() => {
-      const { nodesInitialized } = adoptUserNodes(signals.nodes, this.nodeLookup, this.parentLookup, {
-        nodeExtent: this.nodeExtent,
-        nodeOrigin: this.nodeOrigin,
-        elevateNodesOnSelect: signals.props.elevateNodesOnSelect ?? true,
-        checkEquality: true,
-        zIndexMode: this.zIndexMode
-      });
+      const { nodesInitialized } = adoptUserNodes(
+        signals.nodes,
+        this.nodeLookup,
+        this.parentLookup,
+        {
+          nodeExtent: this.nodeExtent,
+          nodeOrigin: this.nodeOrigin,
+          elevateNodesOnSelect: signals.props.elevateNodesOnSelect ?? true,
+          checkEquality: true,
+          zIndexMode: this.zIndexMode
+        }
+      );
 
       if (this.fitViewQueued && nodesInitialized) {
         if (this.fitViewOptions?.duration) {
@@ -150,6 +176,67 @@ export function getInitialStore<NodeType extends Node = Node, EdgeType extends E
       updateConnectionLookup(this.connectionLookup, this.edgeLookup, signals.edges);
       return signals.edges;
     });
+
+    pendingNodeChanges: NodeChangeset<NodeType> | undefined = $state.raw();
+    pendingEdgeChanges: EdgeChangeset<EdgeType> | undefined = $state.raw();
+
+    /**
+     * Changes are flushed in our own microtask. It is queued *before* the first reactive write,
+     * so if nothing else touched state in this task yet, it runs ahead of Svelte's batch flush and
+     * Svelte only ever sees the final nodes/edges.
+     * If a Svelte batch was already scheduled, the $effect.pre in the constructor flushes the
+     * changes as part of that batch instead.
+     */
+    queueNodeChanges = (changes: NodeChange<NodeType>[]) => {
+      if (changes.length === 0) {
+        return;
+      }
+      if (!this.pendingNodeChanges) {
+        queueMicrotask(this.flushNodeChanges);
+        this.pendingNodeChanges = new NodeChangeset<NodeType>();
+      }
+      this.pendingNodeChanges.add(changes);
+    };
+
+    queueEdgeChanges = (changes: EdgeChange<EdgeType>[]) => {
+      if (changes.length === 0) {
+        return;
+      }
+      if (!this.pendingEdgeChanges) {
+        queueMicrotask(this.flushEdgeChanges);
+        this.pendingEdgeChanges = new EdgeChangeset<EdgeType>();
+      }
+      this.pendingEdgeChanges.add(changes);
+    };
+
+    // untracked, so reads inside onnodeschange/onedgeschange never become dependencies of the effect
+    flushNodeChanges = () =>
+      untrack(() => {
+        const changes = this.pendingNodeChanges;
+        if (!changes) {
+          return;
+        }
+        this.pendingNodeChanges = undefined;
+        this.onnodeschange?.(changes);
+
+        if (!changes.isEmpty()) {
+          this.nodes = changes.applyTo(this.nodes);
+        }
+      });
+
+    flushEdgeChanges = () =>
+      untrack(() => {
+        const changes = this.pendingEdgeChanges;
+        if (!changes) {
+          return;
+        }
+        this.pendingEdgeChanges = undefined;
+        this.onedgeschange?.(changes);
+
+        if (!changes.isEmpty()) {
+          this.edges = changes.applyTo(this.edges);
+        }
+      });
 
     get nodes() {
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
@@ -266,6 +353,8 @@ export function getInitialStore<NodeType extends Node = Node, EdgeType extends E
         visibleEdges = getLayoutedEdges(options as EdgeLayoutAllOptions<NodeType, EdgeType>);
       }
 
+      this._prevVisibleEdges = visibleEdges;
+
       return {
         nodes: visibleNodes,
         edges: visibleEdges
@@ -297,7 +386,7 @@ export function getInitialStore<NodeType extends Node = Node, EdgeType extends E
     connectionDragThreshold: number = $derived(signals.props.connectionDragThreshold ?? 1);
 
     fitViewQueued: boolean = signals.props.fitView ?? false;
-    fitViewOptions: FitViewOptions | undefined = signals.props.fitViewOptions;
+    fitViewOptions: FitViewOptions<NodeType> | undefined = signals.props.fitViewOptions;
     fitViewResolver: PromiseWithResolvers<boolean> | null = null;
 
     snapGrid: SnapGrid | null = $derived(signals.props.snapGrid ?? null);
@@ -330,6 +419,9 @@ export function getInitialStore<NodeType extends Node = Node, EdgeType extends E
       getInitialViewport(
         this.nodesInitialized,
         signals.props.fitView,
+        signals.props.fitViewOptions,
+        signals.props.minZoom,
+        signals.props.maxZoom,
         signals.props.initialViewport,
         this.width,
         this.height,
@@ -347,9 +439,9 @@ export function getInitialStore<NodeType extends Node = Node, EdgeType extends E
     }
 
     // _connection is viewport independent and originating from XYHandle
-    _connection: ConnectionState = $state.raw(initialConnection);
+    _connection: ConnectionState<InternalNode<NodeType>> = $state.raw(initialConnection);
     // We derive a viewport dependent connection here
-    connection: ConnectionState = $derived.by(() => {
+    connection: ConnectionState<InternalNode<NodeType>> = $derived.by(() => {
       if (!this._connection.inProgress) {
         return this._connection;
       }
@@ -367,7 +459,7 @@ export function getInitialStore<NodeType extends Node = Node, EdgeType extends E
       signals.props.connectionMode ?? ConnectionMode.Strict
     );
     connectionRadius: number = $derived(signals.props.connectionRadius ?? 20);
-    isValidConnection: IsValidConnection = $derived(
+    isValidConnection: IsValidConnection<EdgeType> = $derived(
       signals.props.isValidConnection ?? (() => true)
     );
 
@@ -387,10 +479,13 @@ export function getInitialStore<NodeType extends Node = Node, EdgeType extends E
     onlyRenderVisibleElements: boolean = $derived(signals.props.onlyRenderVisibleElements ?? false);
     onerror: OnError = $derived(signals.props.onflowerror ?? devWarn);
 
+    onnodeschange?: OnNodesChange<NodeType> = $derived(signals.props.onnodeschange);
+    onedgeschange?: OnEdgesChange<EdgeType> = $derived(signals.props.onedgeschange);
+
     ondelete?: OnDelete<NodeType, EdgeType> = $derived(signals.props.ondelete);
     onbeforedelete?: OnBeforeDelete<NodeType, EdgeType> = $derived(signals.props.onbeforedelete);
 
-    onbeforeconnect?: OnBeforeConnect = $derived(signals.props.onbeforeconnect);
+    onbeforeconnect?: OnBeforeConnect<EdgeType> = $derived(signals.props.onbeforeconnect);
     onconnect?: OnConnect = $derived(signals.props.onconnect);
     onconnectstart?: OnConnectStart = $derived(signals.props.onconnectstart);
     onconnectend?: OnConnectEnd = $derived(signals.props.onconnectend);
@@ -398,12 +493,12 @@ export function getInitialStore<NodeType extends Node = Node, EdgeType extends E
     onbeforereconnect?: OnBeforeReconnect<EdgeType> = $derived(signals.props.onbeforereconnect);
     onreconnect?: OnReconnect<EdgeType> = $derived(signals.props.onreconnect);
     onreconnectstart?: OnReconnectStart<EdgeType> = $derived(signals.props.onreconnectstart);
-    onreconnectend?: OnReconnectEnd<EdgeType> = $derived(signals.props.onreconnectend);
+    onreconnectend?: OnReconnectEnd<NodeType, EdgeType> = $derived(signals.props.onreconnectend);
 
     clickConnect?: boolean = $derived(signals.props.clickConnect ?? true);
     onclickconnectstart?: OnConnectStart = $derived(signals.props.onclickconnectstart);
     onclickconnectend?: OnConnectEnd = $derived(signals.props.onclickconnectend);
-    clickConnectStartHandle: Pick<Handle, 'id' | 'nodeId' | 'type'> | null = $state.raw(null);
+    clickConnectStartHandle: Pick<HandleBounds, 'id' | 'nodeId' | 'type'> | null = $state.raw(null);
 
     onselectiondrag?: OnSelectionDrag<NodeType> = $derived(signals.props.onselectiondrag);
     onselectiondragstart?: OnSelectionDrag<NodeType> = $derived(signals.props.onselectiondragstart);
@@ -414,7 +509,9 @@ export function getInitialStore<NodeType extends Node = Node, EdgeType extends E
         return;
       }
 
-      await fitViewport(
+      const fitViewId = ++latestFitViewId;
+
+      const ended = await fitViewport(
         {
           nodes: this.nodeLookup,
           width: this.width,
@@ -426,7 +523,14 @@ export function getInitialStore<NodeType extends Node = Node, EdgeType extends E
         this.fitViewOptions
       );
 
-      this.fitViewResolver?.resolve(true);
+      /*
+       * A newer fitView started while this one was running and settles the shared promise instead
+       */
+      if (fitViewId !== latestFitViewId) {
+        return;
+      }
+
+      this.fitViewResolver?.resolve(ended);
       /**
        * wait for the fitViewport to resolve before deleting the resolver,
        * we want to reuse the old resolver if the user calls fitView again in the mean time
@@ -436,23 +540,23 @@ export function getInitialStore<NodeType extends Node = Node, EdgeType extends E
       this.fitViewResolver = null;
     };
 
-    _prefersDark = new MediaQuery(
-      '(prefers-color-scheme: dark)',
-      signals.props.colorModeSSR === 'dark'
-    );
-    colorMode: ColorModeClass = $derived(
-      signals.props.colorMode === 'system'
-        ? this._prefersDark.current
-          ? 'dark'
-          : 'light'
-        : (signals.props.colorMode ?? 'light')
-    );
-
     constructor() {
       if (process.env.NODE_ENV === 'development') {
         warnIfDeeplyReactive(signals.nodes, 'nodes');
         warnIfDeeplyReactive(signals.edges, 'edges');
       }
+
+      $effect.pre(() => {
+        if (this.pendingNodeChanges) {
+          this.flushNodeChanges();
+        }
+      });
+
+      $effect.pre(() => {
+        if (this.pendingEdgeChanges) {
+          this.flushEdgeChanges();
+        }
+      });
     }
 
     resetStoreValues() {
@@ -484,5 +588,4 @@ function warnIfDeeplyReactive(array: unknown[] | undefined, name: string) {
     console.warn(`Use $state.raw for ${name} to prevent performance issues.`);
   }
 }
-
 /* eslint-enable svelte/prefer-svelte-reactivity */

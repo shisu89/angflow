@@ -32,8 +32,7 @@ export type GraphViewProps<NodeType extends Node = Node, EdgeType extends Edge =
       | 'noPanClassName'
       | 'defaultViewport'
       | 'disableKeyboardA11y'
-      | 'paneClickDistance'
-      | 'nodeClickDistance'
+      | 'paneDragThreshold'
     >
   > & {
     rfId: string;
@@ -80,14 +79,14 @@ function GraphViewComponent<NodeType extends Node = Node, EdgeType extends Edge 
   panOnScrollMode,
   zoomOnDoubleClick,
   panOnDrag,
+  autoPanOnSelection,
   onPaneClick,
   onPaneMouseEnter,
   onPaneMouseMove,
   onPaneMouseLeave,
   onPaneScroll,
   onPaneContextMenu,
-  paneClickDistance,
-  nodeClickDistance,
+  paneDragThreshold,
   onEdgeContextMenu,
   onEdgeMouseEnter,
   onEdgeMouseMove,
@@ -104,6 +103,7 @@ function GraphViewComponent<NodeType extends Node = Node, EdgeType extends Edge 
   rfId,
   viewport,
   onViewportChange,
+  nodesDraggable,
 }: GraphViewProps<NodeType, EdgeType>) {
   useNodeOrEdgeTypesWarning(nodeTypes);
   useNodeOrEdgeTypesWarning(edgeTypes);
@@ -120,7 +120,7 @@ function GraphViewComponent<NodeType extends Node = Node, EdgeType extends Edge 
       onPaneMouseLeave={onPaneMouseLeave}
       onPaneContextMenu={onPaneContextMenu}
       onPaneScroll={onPaneScroll}
-      paneClickDistance={paneClickDistance}
+      paneDragThreshold={paneDragThreshold}
       deleteKeyCode={deleteKeyCode}
       selectionKeyCode={selectionKeyCode}
       selectionOnDrag={selectionOnDrag}
@@ -138,6 +138,7 @@ function GraphViewComponent<NodeType extends Node = Node, EdgeType extends Edge 
       panOnScrollSpeed={panOnScrollSpeed}
       panOnScrollMode={panOnScrollMode}
       panOnDrag={panOnDrag}
+      autoPanOnSelection={autoPanOnSelection}
       defaultViewport={defaultViewport}
       translateExtent={translateExtent}
       minZoom={minZoom}
@@ -185,13 +186,13 @@ function GraphViewComponent<NodeType extends Node = Node, EdgeType extends Edge 
           onNodeMouseMove={onNodeMouseMove}
           onNodeMouseLeave={onNodeMouseLeave}
           onNodeContextMenu={onNodeContextMenu}
-          nodeClickDistance={nodeClickDistance}
           onlyRenderVisibleElements={onlyRenderVisibleElements}
           noPanClassName={noPanClassName}
           noDragClassName={noDragClassName}
           disableKeyboardA11y={disableKeyboardA11y}
           nodeExtent={nodeExtent}
           rfId={rfId}
+          nodesDraggable={nodesDraggable}
         />
         <div className="react-flow__viewport-portal" />
       </Viewport>

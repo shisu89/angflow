@@ -13,6 +13,7 @@ import DefaultEdgeOverwrite from '../examples/DefaultEdgeOverwrite';
 import DefaultNodeOverwrite from '../examples/DefaultNodeOverwrite';
 import DefaultNodes from '../examples/DefaultNodes';
 import DragHandle from '../examples/DragHandle';
+import DragThreshold from '../examples/DragThreshold';
 import DragNDrop from '../examples/DragNDrop';
 import EasyConnect from '../examples/EasyConnect';
 import Edges from '../examples/Edges';
@@ -63,6 +64,8 @@ import DetachedHandle from '../examples/DetachedHandle';
 import ZIndexMode from '../examples/ZIndexMode';
 import Middlewares from '../examples/Middlewares';
 import NodeSelectionBug from '../examples/NodeSelectionBug';
+import Remount from '../examples/Remount';
+import MeasurementRace from '../examples/MeasurementRace';
 
 export interface IRoute {
   name: string;
@@ -167,6 +170,11 @@ const routes: IRoute[] = [
     component: DragHandle,
   },
   {
+    name: 'Drag Threshold',
+    path: 'drag-threshold',
+    component: DragThreshold,
+  },
+  {
     name: 'Drag and Drop',
     path: 'dragndrop',
     component: DragNDrop,
@@ -242,6 +250,11 @@ const routes: IRoute[] = [
     component: Layouting,
   },
   {
+    name: 'Measurement Race',
+    path: 'measurement-race',
+    component: MeasurementRace,
+  },
+  {
     name: 'Middlewares',
     path: 'middlewares',
     component: Middlewares,
@@ -290,6 +303,11 @@ const routes: IRoute[] = [
     name: 'Provider',
     path: 'provider',
     component: Provider,
+  },
+  {
+    name: 'Remount',
+    path: 'remount',
+    component: Remount,
   },
   {
     name: 'Save/Restore',
