@@ -70,4 +70,18 @@ describe('DragDirective clicks (#5556)', () => {
     mouse('click', pane, 90);
     expect(fixture.componentInstance.paneClicks).toBe(0);
   });
+
+  it('re-enabling after ngFlowDragDisabled rebinds the drag', () => {
+    fixture.componentInstance.disabled = true;
+    fixture.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    drag(node, 10, 60);
+    expect(store.nodeLookup.get('a')!.internals.positionAbsolute.x).toBe(0);
+
+    fixture.componentInstance.disabled = false;
+    fixture.changeDetectorRef.markForCheck();
+    fixture.detectChanges();
+    drag(node, 10, 60);
+    expect(store.nodeLookup.get('a')!.internals.positionAbsolute.x).toBeGreaterThan(0);
+  });
 });

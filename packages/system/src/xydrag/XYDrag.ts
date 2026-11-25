@@ -106,6 +106,12 @@ export function XYDrag<OnNodeDrag extends (e: any, nodes: any, node: any) => voi
   let nodePositionsChanged = false;
   // we store the last drag event to be able to use it in the update function
   let dragEvent: MouseEvent | null = null;
+  // the current `update` params, read by the drag behaviour below on every event
+  let noDragClassName: string | undefined;
+  let handleSelector: string | undefined;
+  let isSelectable: boolean | undefined;
+  let nodeId: string | undefined;
+  let domNode: Element | undefined;
 
   /*
    * Suppresses the click that the browser dispatches right after a drag that moved nodes.
@@ -124,324 +130,338 @@ export function XYDrag<OnNodeDrag extends (e: any, nodes: any, node: any) => voi
     setTimeout(() => view.removeEventListener('click', suppressClick, { capture: true }), 0);
   }
 
-  // public functions
-  function update({
-    noDragClassName,
-    handleSelector,
-    domNode,
-    isSelectable,
-    nodeId,
-  }: DragUpdateParams) {
-    d3Selection = select(domNode);
-    function updateNodes({ x, y }: XYPosition) {
-      const {
+  function updateNodes({ x, y }: XYPosition) {
+    const {
+      nodeLookup,
+      nodeExtent,
+      snapGrid,
+      snapToGrid,
+      nodeOrigin,
+      onNodeDrag,
+      onSelectionDrag,
+      onError,
+      updateNodePositions,
+    } = getStoreItems();
+
+    lastPos = { x, y };
+    let hasChange = false;
+
+    const isMultiDrag = dragItems.size > 1;
+    const nodesBox = isMultiDrag && nodeExtent ? rectToBox(getInternalNodesBounds(dragItems)) : null;
+    const multiDragSnapOffset =
+      isMultiDrag && snapToGrid
+        ? calculateSnapOffset({
+            dragItems,
+            snapGrid,
+            x,
+            y,
+          })
+        : null;
+
+    for (const [id, dragItem] of dragItems) {
+      /*
+       * if the node is not in the nodeLookup anymore, it was probably deleted while dragging
+       */
+      if (!nodeLookup.has(id)) {
+        continue;
+      }
+
+      let nextPosition = { x: x - dragItem.distance.x, y: y - dragItem.distance.y };
+      if (snapToGrid) {
+        nextPosition = multiDragSnapOffset
+          ? {
+              x: Math.round(nextPosition.x + multiDragSnapOffset.x),
+              y: Math.round(nextPosition.y + multiDragSnapOffset.y),
+            }
+          : snapPosition(nextPosition, snapGrid);
+      }
+
+      let adjustedNodeExtent: CoordinateExtent | null = null;
+
+      if (isMultiDrag && nodeExtent && !dragItem.extent && nodesBox) {
+        const { positionAbsolute } = dragItem.internals;
+        const x1 = positionAbsolute.x - nodesBox.x + nodeExtent[0][0];
+        const x2 = positionAbsolute.x + dragItem.measured.width - nodesBox.x2 + nodeExtent[1][0];
+
+        const y1 = positionAbsolute.y - nodesBox.y + nodeExtent[0][1];
+        const y2 = positionAbsolute.y + dragItem.measured.height - nodesBox.y2 + nodeExtent[1][1];
+
+        adjustedNodeExtent = [
+          [x1, y1],
+          [x2, y2],
+        ];
+      }
+
+      const { position, positionAbsolute } = calculateNodePosition({
+        nodeId: id,
+        nextPosition,
         nodeLookup,
-        nodeExtent,
-        snapGrid,
-        snapToGrid,
+        nodeExtent: adjustedNodeExtent ? adjustedNodeExtent : nodeExtent,
         nodeOrigin,
-        onNodeDrag,
-        onSelectionDrag,
         onError,
-        updateNodePositions,
-      } = getStoreItems();
+      });
 
-      lastPos = { x, y };
-      let hasChange = false;
+      // we want to make sure that we only fire a change event when there is a change
+      hasChange = hasChange || dragItem.position.x !== position.x || dragItem.position.y !== position.y;
 
-      const isMultiDrag = dragItems.size > 1;
-      const nodesBox = isMultiDrag && nodeExtent ? rectToBox(getInternalNodesBounds(dragItems)) : null;
-      const multiDragSnapOffset =
-        isMultiDrag && snapToGrid
-          ? calculateSnapOffset({
-              dragItems,
-              snapGrid,
-              x,
-              y,
-            })
-          : null;
-
-      for (const [id, dragItem] of dragItems) {
-        /*
-         * if the node is not in the nodeLookup anymore, it was probably deleted while dragging
-         */
-        if (!nodeLookup.has(id)) {
-          continue;
-        }
-
-        let nextPosition = { x: x - dragItem.distance.x, y: y - dragItem.distance.y };
-        if (snapToGrid) {
-          nextPosition = multiDragSnapOffset
-            ? {
-                x: Math.round(nextPosition.x + multiDragSnapOffset.x),
-                y: Math.round(nextPosition.y + multiDragSnapOffset.y),
-              }
-            : snapPosition(nextPosition, snapGrid);
-        }
-
-        let adjustedNodeExtent: CoordinateExtent | null = null;
-
-        if (isMultiDrag && nodeExtent && !dragItem.extent && nodesBox) {
-          const { positionAbsolute } = dragItem.internals;
-          const x1 = positionAbsolute.x - nodesBox.x + nodeExtent[0][0];
-          const x2 = positionAbsolute.x + dragItem.measured.width - nodesBox.x2 + nodeExtent[1][0];
-
-          const y1 = positionAbsolute.y - nodesBox.y + nodeExtent[0][1];
-          const y2 = positionAbsolute.y + dragItem.measured.height - nodesBox.y2 + nodeExtent[1][1];
-
-          adjustedNodeExtent = [
-            [x1, y1],
-            [x2, y2],
-          ];
-        }
-
-        const { position, positionAbsolute } = calculateNodePosition({
-          nodeId: id,
-          nextPosition,
-          nodeLookup,
-          nodeExtent: adjustedNodeExtent ? adjustedNodeExtent : nodeExtent,
-          nodeOrigin,
-          onError,
-        });
-
-        // we want to make sure that we only fire a change event when there is a change
-        hasChange = hasChange || dragItem.position.x !== position.x || dragItem.position.y !== position.y;
-
-        dragItem.position = position;
-        dragItem.internals.positionAbsolute = positionAbsolute;
-      }
-
-      nodePositionsChanged = nodePositionsChanged || hasChange;
-
-      if (!hasChange) {
-        return;
-      }
-
-      updateNodePositions(dragItems, true);
-
-      if (dragEvent && (onDrag || onNodeDrag || (!nodeId && onSelectionDrag))) {
-        const [currentNode, currentNodes] = getEventHandlerParams({
-          nodeId,
-          dragItems,
-          nodeLookup,
-        });
-
-        onDrag?.(dragEvent, dragItems, currentNode, currentNodes);
-        onNodeDrag?.(dragEvent, currentNode, currentNodes);
-
-        if (!nodeId) {
-          onSelectionDrag?.(dragEvent, currentNodes);
-        }
-      }
+      dragItem.position = position;
+      dragItem.internals.positionAbsolute = positionAbsolute;
     }
 
-    async function autoPan() {
-      if (!containerBounds) {
-        return;
-      }
+    nodePositionsChanged = nodePositionsChanged || hasChange;
 
-      const { transform, panBy, autoPanSpeed, autoPanOnNodeDrag } = getStoreItems();
-
-      if (!autoPanOnNodeDrag) {
-        autoPanStarted = false;
-        cancelAnimationFrame(autoPanId);
-        return;
-      }
-
-      const [xMovement, yMovement] = calcAutoPan(mousePosition, containerBounds, autoPanSpeed);
-
-      if (xMovement !== 0 || yMovement !== 0) {
-        lastPos.x = (lastPos.x ?? 0) - xMovement / transform[2];
-        lastPos.y = (lastPos.y ?? 0) - yMovement / transform[2];
-
-        if (await panBy({ x: xMovement, y: yMovement })) {
-          updateNodes(lastPos as XYPosition);
-        }
-      }
-
-      autoPanId = requestAnimationFrame(autoPan);
+    if (!hasChange) {
+      return;
     }
 
-    function startDrag(event: UseDragEvent) {
-      const {
+    updateNodePositions(dragItems, true);
+
+    if (dragEvent && (onDrag || onNodeDrag || (!nodeId && onSelectionDrag))) {
+      const [currentNode, currentNodes] = getEventHandlerParams({
+        nodeId,
+        dragItems,
         nodeLookup,
-        multiSelectionActive,
-        nodesDraggable,
-        transform,
-        snapGrid,
-        snapToGrid,
-        selectNodesOnDrag,
-        onNodeDragStart,
-        onSelectionDragStart,
-        unselectNodesAndEdges,
-      } = getStoreItems();
+      });
 
-      dragStarted = true;
+      onDrag?.(dragEvent, dragItems, currentNode, currentNodes);
+      onNodeDrag?.(dragEvent, currentNode, currentNodes);
 
-      // if a node is being dragged that is not currently selected, we only want to drag that node and not the rest of the selection
-      const isUnselectedNodeDrag = !!nodeId && !multiSelectionActive && !nodeLookup.get(nodeId)?.selected;
-
-      if ((!selectNodesOnDrag || !isSelectable) && !multiSelectionActive && nodeId) {
-        if (!nodeLookup.get(nodeId)?.selected) {
-          // we need to reset selected nodes when selectNodesOnDrag=false
-          unselectNodesAndEdges();
-        }
+      if (!nodeId) {
+        onSelectionDrag?.(dragEvent, currentNodes);
       }
+    }
+  }
 
-      if (isSelectable && selectNodesOnDrag && nodeId) {
-        onNodeMouseDown?.(nodeId);
+  async function autoPan() {
+    if (!containerBounds) {
+      return;
+    }
+
+    const { transform, panBy, autoPanSpeed, autoPanOnNodeDrag } = getStoreItems();
+
+    if (!autoPanOnNodeDrag) {
+      autoPanStarted = false;
+      cancelAnimationFrame(autoPanId);
+      return;
+    }
+
+    const [xMovement, yMovement] = calcAutoPan(mousePosition, containerBounds, autoPanSpeed);
+
+    if (xMovement !== 0 || yMovement !== 0) {
+      lastPos.x = (lastPos.x ?? 0) - xMovement / transform[2];
+      lastPos.y = (lastPos.y ?? 0) - yMovement / transform[2];
+
+      if (await panBy({ x: xMovement, y: yMovement })) {
+        updateNodes(lastPos as XYPosition);
+      }
+    }
+
+    autoPanId = requestAnimationFrame(autoPan);
+  }
+
+  function startDrag(event: UseDragEvent) {
+    const {
+      nodeLookup,
+      multiSelectionActive,
+      nodesDraggable,
+      transform,
+      snapGrid,
+      snapToGrid,
+      selectNodesOnDrag,
+      onNodeDragStart,
+      onSelectionDragStart,
+      unselectNodesAndEdges,
+    } = getStoreItems();
+
+    dragStarted = true;
+
+    // if a node is being dragged that is not currently selected, we only want to drag that node and not the rest of the selection
+    const isUnselectedNodeDrag = !!nodeId && !multiSelectionActive && !nodeLookup.get(nodeId)?.selected;
+
+    if ((!selectNodesOnDrag || !isSelectable) && !multiSelectionActive && nodeId) {
+      if (!nodeLookup.get(nodeId)?.selected) {
+        // we need to reset selected nodes when selectNodesOnDrag=false
+        unselectNodesAndEdges();
+      }
+    }
+
+    if (isSelectable && selectNodesOnDrag && nodeId) {
+      onNodeMouseDown?.(nodeId);
+    }
+
+    const pointerPos = getPointerPosition(event.sourceEvent, { transform, snapGrid, snapToGrid, containerBounds });
+    lastPos = pointerPos;
+    dragItems = getDragItems(nodeLookup, nodesDraggable, pointerPos, nodeId, isUnselectedNodeDrag);
+
+    if (dragItems.size > 0 && (onDragStart || onNodeDragStart || (!nodeId && onSelectionDragStart))) {
+      const [currentNode, currentNodes] = getEventHandlerParams({
+        nodeId,
+        dragItems,
+        nodeLookup,
+      });
+
+      onDragStart?.(event.sourceEvent as MouseEvent, dragItems, currentNode, currentNodes);
+      onNodeDragStart?.(event.sourceEvent as MouseEvent, currentNode, currentNodes);
+
+      if (!nodeId) {
+        onSelectionDragStart?.(event.sourceEvent as MouseEvent, currentNodes);
+      }
+    }
+  }
+
+  const d3DragInstance = drag()
+    .clickDistance(Infinity)
+    .on('start', (event: UseDragEvent) => {
+      const { domNode, nodeDragThreshold, transform, snapGrid, snapToGrid } = getStoreItems();
+      containerBounds = domNode?.getBoundingClientRect() || null;
+      dragStarted = false;
+      autoPanStarted = false;
+      abortDrag = false;
+      nodePositionsChanged = false;
+      dragEvent = event.sourceEvent;
+
+      if (nodeDragThreshold === 0) {
+        startDrag(event);
       }
 
       const pointerPos = getPointerPosition(event.sourceEvent, { transform, snapGrid, snapToGrid, containerBounds });
       lastPos = pointerPos;
-      dragItems = getDragItems(nodeLookup, nodesDraggable, pointerPos, nodeId, isUnselectedNodeDrag);
+      mousePosition = getEventPosition(event.sourceEvent, containerBounds!);
+      initialMousePosition = mousePosition;
+    })
+    .on('drag', (event: UseDragEvent) => {
+      const { autoPanOnNodeDrag, transform, snapGrid, snapToGrid, nodeDragThreshold, nodeLookup } = getStoreItems();
+      const pointerPos = getPointerPosition(event.sourceEvent, { transform, snapGrid, snapToGrid, containerBounds });
+      dragEvent = event.sourceEvent;
 
-      if (dragItems.size > 0 && (onDragStart || onNodeDragStart || (!nodeId && onSelectionDragStart))) {
-        const [currentNode, currentNodes] = getEventHandlerParams({
-          nodeId,
-          dragItems,
-          nodeLookup,
-        });
-
-        onDragStart?.(event.sourceEvent as MouseEvent, dragItems, currentNode, currentNodes);
-        onNodeDragStart?.(event.sourceEvent as MouseEvent, currentNode, currentNodes);
-
-        if (!nodeId) {
-          onSelectionDragStart?.(event.sourceEvent as MouseEvent, currentNodes);
-        }
+      if (
+        (event.sourceEvent.type === 'touchmove' && event.sourceEvent.touches.length > 1) ||
+        // if user deletes a node while dragging, we need to abort the drag to prevent errors
+        (nodeId && !nodeLookup.has(nodeId))
+      ) {
+        abortDrag = true;
       }
-    }
 
-    const d3DragInstance = drag()
-      .clickDistance(Infinity)
-      .on('start', (event: UseDragEvent) => {
-        const { domNode, nodeDragThreshold, transform, snapGrid, snapToGrid } = getStoreItems();
-        containerBounds = domNode?.getBoundingClientRect() || null;
-        dragStarted = false;
-        autoPanStarted = false;
-        abortDrag = false;
-        nodePositionsChanged = false;
-        dragEvent = event.sourceEvent;
+      if (abortDrag) {
+        return;
+      }
 
-        if (nodeDragThreshold === 0) {
+      if (!autoPanStarted && autoPanOnNodeDrag && dragStarted) {
+        autoPanStarted = true;
+        autoPan();
+      }
+
+      if (!dragStarted) {
+        // Calculate distance in client coordinates for consistent drag threshold behavior across zoom levels
+        const currentMousePosition = getEventPosition(event.sourceEvent, containerBounds!);
+        const dx = currentMousePosition.x - initialMousePosition.x;
+        const dy = currentMousePosition.y - initialMousePosition.y;
+        const distance = Math.hypot(dx, dy);
+
+        if (distance > nodeDragThreshold) {
           startDrag(event);
         }
+      }
 
-        const pointerPos = getPointerPosition(event.sourceEvent, { transform, snapGrid, snapToGrid, containerBounds });
-        lastPos = pointerPos;
+      // skip events without movement
+      if ((lastPos.x !== pointerPos.xSnapped || lastPos.y !== pointerPos.ySnapped) && dragItems && dragStarted) {
         mousePosition = getEventPosition(event.sourceEvent, containerBounds!);
-        initialMousePosition = mousePosition;
-      })
-      .on('drag', (event: UseDragEvent) => {
-        const { autoPanOnNodeDrag, transform, snapGrid, snapToGrid, nodeDragThreshold, nodeLookup } = getStoreItems();
-        const pointerPos = getPointerPosition(event.sourceEvent, { transform, snapGrid, snapToGrid, containerBounds });
-        dragEvent = event.sourceEvent;
+        updateNodes(pointerPos);
+      }
+    })
+    .on('end', (event: UseDragEvent) => {
+      // when released outside of the node, the browser dispatches the click to a common ancestor (e.g. the pane)
+      const releasedOutside = !domNode?.contains(event.sourceEvent.target as globalThis.Node | null);
 
-        if (
-          (event.sourceEvent.type === 'touchmove' && event.sourceEvent.touches.length > 1) ||
-          // if user deletes a node while dragging, we need to abort the drag to prevent errors
-          (nodeId && !nodeLookup.has(nodeId))
-        ) {
-          abortDrag = true;
-        }
+      if (releasedOutside || nodePositionsChanged) {
+        preventNextClick(event.sourceEvent);
+      }
 
-        if (abortDrag) {
-          return;
-        }
-
-        if (!autoPanStarted && autoPanOnNodeDrag && dragStarted) {
-          autoPanStarted = true;
-          autoPan();
-        }
-
-        if (!dragStarted) {
-          // Calculate distance in client coordinates for consistent drag threshold behavior across zoom levels
-          const currentMousePosition = getEventPosition(event.sourceEvent, containerBounds!);
-          const dx = currentMousePosition.x - initialMousePosition.x;
-          const dy = currentMousePosition.y - initialMousePosition.y;
-          const distance = Math.hypot(dx, dy);
-
-          if (distance > nodeDragThreshold) {
-            startDrag(event);
-          }
-        }
-
-        // skip events without movement
-        if ((lastPos.x !== pointerPos.xSnapped || lastPos.y !== pointerPos.ySnapped) && dragItems && dragStarted) {
-          mousePosition = getEventPosition(event.sourceEvent, containerBounds!);
-          updateNodes(pointerPos);
-        }
-      })
-      .on('end', (event: UseDragEvent) => {
-        // when released outside of the node, the browser dispatches the click to a common ancestor (e.g. the pane)
-        const releasedOutside = !domNode.contains(event.sourceEvent.target as globalThis.Node | null);
-
-        if (releasedOutside || nodePositionsChanged) {
-          preventNextClick(event.sourceEvent);
-        }
-
-        if (!dragStarted || abortDrag) {
-          // Stop the auto-pan loop even on the abort/never-started path —
-          // otherwise, if the abort happened while the pointer was inside the
-          // auto-pan edge zone, the rAF loop keeps panning the canvas forever.
-          autoPanStarted = false;
-          cancelAnimationFrame(autoPanId);
-
-          // An aborted drag (e.g. a second touch went down, or the dragged node
-          // was removed mid-drag) still committed dragging:true to the affected
-          // nodes. Reset their positions/dragging flag here; otherwise they stay
-          // stuck with dragging:true, which downstream tween/hit-test logic keys
-          // off. (Upstream xyflow 0.0.77 fix.)
-          if (abortDrag && dragItems.size > 0) {
-            const { updateNodePositions } = getStoreItems();
-            updateNodePositions(dragItems, false);
-            nodePositionsChanged = false;
-          }
-          return;
-        }
-
+      if (!dragStarted || abortDrag) {
+        // Stop the auto-pan loop even on the abort/never-started path —
+        // otherwise, if the abort happened while the pointer was inside the
+        // auto-pan edge zone, the rAF loop keeps panning the canvas forever.
+        autoPanStarted = false;
         cancelAnimationFrame(autoPanId);
 
-        if (dragItems.size > 0) {
-          const { nodeLookup, updateNodePositions, onNodeDragStop, onSelectionDragStop } = getStoreItems();
+        // An aborted drag (e.g. a second touch went down, or the dragged node
+        // was removed mid-drag) still committed dragging:true to the affected
+        // nodes. Reset their positions/dragging flag here; otherwise they stay
+        // stuck with dragging:true, which downstream tween/hit-test logic keys
+        // off. (Upstream xyflow 0.0.77 fix.)
+        if (abortDrag && dragItems.size > 0) {
+          const { updateNodePositions } = getStoreItems();
+          updateNodePositions(dragItems, false);
+          nodePositionsChanged = false;
+        }
+        return;
+      }
 
-          if (nodePositionsChanged) {
-            updateNodePositions(dragItems, false);
-            nodePositionsChanged = false;
-          }
+      cancelAnimationFrame(autoPanId);
 
-          if (onDragStop || onNodeDragStop || (!nodeId && onSelectionDragStop)) {
-            const [currentNode, currentNodes] = getEventHandlerParams({
-              nodeId,
-              dragItems,
-              nodeLookup,
-              dragging: false,
-            });
+      if (dragItems.size > 0) {
+        const { nodeLookup, updateNodePositions, onNodeDragStop, onSelectionDragStop } = getStoreItems();
 
-            onDragStop?.(event.sourceEvent as MouseEvent, dragItems, currentNode, currentNodes);
-            onNodeDragStop?.(event.sourceEvent as MouseEvent, currentNode, currentNodes);
+        if (nodePositionsChanged) {
+          updateNodePositions(dragItems, false);
+          nodePositionsChanged = false;
+        }
 
-            if (!nodeId) {
-              onSelectionDragStop?.(event.sourceEvent as MouseEvent, currentNodes);
-            }
+        if (onDragStop || onNodeDragStop || (!nodeId && onSelectionDragStop)) {
+          const [currentNode, currentNodes] = getEventHandlerParams({
+            nodeId,
+            dragItems,
+            nodeLookup,
+            dragging: false,
+          });
+
+          onDragStop?.(event.sourceEvent as MouseEvent, dragItems, currentNode, currentNodes);
+          onNodeDragStop?.(event.sourceEvent as MouseEvent, currentNode, currentNodes);
+
+          if (!nodeId) {
+            onSelectionDragStop?.(event.sourceEvent as MouseEvent, currentNodes);
           }
         }
-      })
-      .filter((event: MouseEvent) => {
-        const target = event.target;
-        const isDraggable =
-          !event.button &&
-          (!noDragClassName || !hasSelector(target, `.${noDragClassName}`, domNode)) &&
-          (!handleSelector || hasSelector(target, handleSelector, domNode));
+      }
+    })
+    .filter((event: MouseEvent) => {
+      const target = event.target;
+      const boundNode = domNode;
 
-        return isDraggable;
-      });
+      if (!boundNode) {
+        return false;
+      }
 
+      const isDraggable =
+        !event.button &&
+        (!noDragClassName || !hasSelector(target, `.${noDragClassName}`, boundNode)) &&
+        (!handleSelector || hasSelector(target, handleSelector, boundNode));
+
+      return isDraggable;
+    });
+
+  // public functions
+  function update(params: DragUpdateParams) {
+    noDragClassName = params.noDragClassName;
+    handleSelector = params.handleSelector;
+    isSelectable = params.isSelectable;
+    nodeId = params.nodeId;
+
+    // re-binding would drop a running touch drag: d3 keeps the listeners of a touch gesture on the element
+    if (params.domNode === domNode) {
+      return;
+    }
+
+    domNode = params.domNode;
+    d3Selection?.on('.drag', null);
+    d3Selection = select(domNode);
     d3Selection.call(d3DragInstance);
   }
 
   function destroy() {
     d3Selection?.on('.drag', null);
+    d3Selection = null;
+    domNode = undefined;
   }
 
   return {

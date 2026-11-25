@@ -162,3 +162,63 @@ describe('XYDrag click suppression (#5556)', () => {
     expect([...(first[0] as Map<string, unknown>).keys()]).toEqual(['b']);
   });
 });
+
+const touch = (type: string, target: EventTarget, x: number, y = 10, id = 1) => {
+  const point = { identifier: id, clientX: x, clientY: y, pageX: x, pageY: y, target };
+  const event = new Event(type, { bubbles: true, cancelable: true });
+  Object.defineProperties(event, {
+    touches: { value: type === 'touchend' ? [] : [point] },
+    changedTouches: { value: [point] },
+    view: { value: view },
+  });
+  target.dispatchEvent(event);
+};
+
+describe('XYDrag binds once per element (#6168)', () => {
+  it('a second update() with the same element adds and removes no listeners; new params apply to the next gesture', () => {
+    const { nodeEl, drag: instance, updateNodePositions } = setup();
+    const add = vi.spyOn(nodeEl, 'addEventListener');
+    const remove = vi.spyOn(nodeEl, 'removeEventListener');
+    instance.update({ domNode: nodeEl, nodeId: 'a', isSelectable: true, handleSelector: '.grip' });
+    expect(add).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+
+    drag(nodeEl, 10, 60); // not on .grip → filtered out
+    expect(moved(updateNodePositions)).toBe(false);
+
+    const grip = document.createElement('span');
+    grip.className = 'grip';
+    nodeEl.appendChild(grip);
+    drag(grip, 10, 60);
+    expect(moved(updateNodePositions)).toBe(true);
+  });
+
+  it('destroy() then update() rebinds', () => {
+    const { nodeEl, drag: instance, updateNodePositions } = setup();
+    instance.destroy();
+    const add = vi.spyOn(nodeEl, 'addEventListener');
+    instance.update({ domNode: nodeEl, nodeId: 'a', isSelectable: true });
+    expect(add.mock.calls.some(([type]) => type === 'mousedown')).toBe(true);
+    drag(nodeEl, 10, 60);
+    expect(moved(updateNodePositions)).toBe(true);
+  });
+
+  it('a touch drag in progress survives an update()', () => {
+    const { nodeEl, drag: instance, updateNodePositions } = setup();
+    // d3-drag binds touch listeners only on touch-capable elements; mark the node element as one, then rebind.
+    Object.defineProperty(nodeEl, 'ontouchstart', { value: null, configurable: true });
+    instance.destroy();
+    instance.update({ domNode: nodeEl, nodeId: 'a', isSelectable: true });
+
+    touch('touchstart', nodeEl, 10);
+    touch('touchmove', nodeEl, 40); // crossing: starts the drag, moves nothing
+    touch('touchmove', nodeEl, 50); // first position update
+    const before = updateNodePositions.mock.calls.length;
+    expect(before).toBeGreaterThan(0);
+    instance.update({ domNode: nodeEl, nodeId: 'a', isSelectable: true }); // e.g. an input changed mid-gesture
+    touch('touchmove', nodeEl, 80);
+    expect(updateNodePositions.mock.calls.length).toBeGreaterThan(before);
+    touch('touchend', nodeEl, 80);
+    expect(updateNodePositions).toHaveBeenLastCalledWith(expect.any(Map), false);
+  });
+});
