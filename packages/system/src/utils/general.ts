@@ -161,7 +161,7 @@ export const isDevEnv = (): boolean =>
 
 const defaultDevWarn: OnError = (id, message) => {
   if (isDevEnv()) {
-    console.warn(`[React Flow]: ${message} Help: https://reactflow.dev/error#${id}`);
+    console.warn(`[xyflow]: ${message} Help: https://xyflow.com/error#${id}`);
   }
 };
 
@@ -250,7 +250,7 @@ function parsePadding(padding: PaddingWithUnit, viewport: number): number {
   }
 
   console.error(
-    `[React Flow] The padding value "${padding}" is invalid. Please provide a number or a string with a valid unit (px or %).`
+    `The padding value "${padding}" is invalid. Please provide a number or a string with a valid unit (px or %).`
   );
   return 0;
 }

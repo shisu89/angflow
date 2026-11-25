@@ -26,7 +26,7 @@ export const ngDevWarn: OnError = (id: string, message: string): void => {
   const key = `${id}::${message}`;
   if (seen.has(key)) return;
   seen.add(key);
-  console.warn(`[angflow]: ${message} Help: https://reactflow.dev/error#${id}`);
+  console.warn(`[angflow]: ${message}`);
 };
 
 /**

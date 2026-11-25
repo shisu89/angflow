@@ -13,11 +13,11 @@ describe('ngDevWarn', () => {
     warn.mockRestore();
   });
 
-  it('warns with the angflow prefix and the help link', () => {
+  it('warns with the angflow prefix and no help link', () => {
     ngDevWarn('011', 'Edge type "bogus" not found. Using fallback type "default".');
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toBe(
-      '[angflow]: Edge type "bogus" not found. Using fallback type "default". Help: https://reactflow.dev/error#011'
+      '[angflow]: Edge type "bogus" not found. Using fallback type "default".'
     );
   });
 

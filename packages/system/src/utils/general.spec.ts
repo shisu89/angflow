@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { devWarn, setDevWarnSink } from './general';
+import { errorMessages } from '../constants';
 import { addEdge, reconnectEdge } from './edges/general';
 import type { Connection, EdgeBase } from '../types';
 
@@ -53,5 +54,26 @@ describe('setDevWarnSink', () => {
 
     expect(result).toEqual(edges);
     expect(sink).toHaveBeenCalledWith('007', expect.stringContaining('missing'));
+  });
+});
+
+describe('dev warning branding', () => {
+  afterEach(() => {
+    setDevWarnSink(null);
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('error001/error004 messages carry no React Flow branding or link', () => {
+    expect(errorMessages.error001()).toBe('Seems like you have not used zustand provider as an ancestor.');
+    expect(errorMessages.error004()).toBe('The parent container needs a width and a height to render the graph.');
+  });
+
+  it('default sink prints the upstream xyflow prefix and help link', () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    setDevWarnSink(null);
+    devWarn('001', 'Boom.');
+    expect(warn).toHaveBeenCalledWith('[xyflow]: Boom. Help: https://xyflow.com/error#001');
   });
 });
