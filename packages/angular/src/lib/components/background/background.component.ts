@@ -21,6 +21,10 @@ export type BackgroundVariant = 'dots' | 'lines' | 'cross';
   host: {
     'class': 'ng-flow__background xy-flow__background xy-flow__container',
     'style': 'display: block; position: absolute; width: 100%; height: 100%; top: 0; left: 0; pointer-events: none; z-index: -1;',
+    // As upstream: colours travel as CSS custom properties, because the
+    // `.xy-flow__background*` rules would override fill/stroke attributes.
+    '[style.--xy-background-color-props]': 'bgColor()',
+    '[style.--xy-background-pattern-color-props]': 'color()',
   },
   template: `
     <svg
@@ -28,9 +32,6 @@ export type BackgroundVariant = 'dots' | 'lines' | 'cross';
       [style.width]="'100%'"
       [style.height]="'100%'"
     >
-      @if (bgColor()) {
-        <rect x="0" y="0" width="100%" height="100%" [attr.fill]="bgColor()" />
-      }
       <defs>
         <pattern
           [attr.id]="patternId()"
@@ -47,13 +48,11 @@ export type BackgroundVariant = 'dots' | 'lines' | 'cross';
               [attr.cx]="scaledSize() / 2"
               [attr.cy]="scaledSize() / 2"
               [attr.r]="scaledSize() / 2"
-              [attr.fill]="color()"
             />
           } @else {
             <svg:path
               [class]="'xy-flow__background-pattern ' + variant() + ' ' + (patternClassName() ?? '')"
               fill="none"
-              [attr.stroke]="color()"
               [attr.stroke-width]="resolvedLineWidth()"
               [attr.d]="linePath()"
             />
@@ -83,9 +82,9 @@ export class BackgroundComponent {
   readonly lineWidth = input<number>();
   /** Offset of the pattern origin, in flow units. */
   readonly offset = input<number | [number, number]>(0);
-  /** Pattern stroke/fill color. */
+  /** Pattern stroke/fill color (sets `--xy-background-pattern-color-props`). */
   readonly color = input<string>();
-  /** Solid fill drawn behind the pattern. Leave unset for transparent. */
+  /** Background colour behind the pattern (sets `--xy-background-color-props`). Leave unset for the theme default. */
   readonly bgColor = input<string>();
   /** Extra CSS class applied to each generated pattern shape. */
   readonly patternClassName = input<string>();

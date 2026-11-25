@@ -351,7 +351,7 @@ function parseKeyCode(raw: string): string | string[] {
           (error)="logEvent('error', $event.message)"
         >
           @if (settings().showBackground) {
-            <ng-flow-background [variant]="settings().backgroundVariant" [gap]="22" [size]="1" />
+            <ng-flow-background [variant]="settings().backgroundVariant" [gap]="22" />
           }
           @if (settings().showControls) {
             <ng-flow-controls [showDelete]="true" />

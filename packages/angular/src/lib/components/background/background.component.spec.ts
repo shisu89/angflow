@@ -1,13 +1,16 @@
 /**
- * BackgroundComponent fill tests.
+ * BackgroundComponent tests.
  *
- * Regression coverage for the "lines background renders as triangles" bug: the
- * `lines` and `cross` patterns draw a `<path>` with only a `stroke`, no `fill`.
+ * Fill: regression coverage for the "lines background renders as triangles"
+ * bug. The `lines` and `cross` patterns draw a `<path>` with only a `stroke`.
  * An SVG `<path>` fills with black by default, and nothing in the stylesheet
  * sets `fill: none` for `.xy-flow__background-pattern` (only edge/connection
- * paths get that rule). So the open `lines` path `M gap 0 L 0 0 0 gap` was
- * implicitly closed and filled as a triangle. The fix sets `fill="none"` on the
- * pattern paths.
+ * paths get that rule), so an open path would fill. The pattern paths carry
+ * `fill="none"`.
+ *
+ * Geometry: pattern ids, x/y, patternTransform and shapes as upstream
+ * `Background.tsx` / `Patterns.tsx`; colours travel as upstream's
+ * `--xy-background(-pattern)-color-props` custom properties.
  *
  * Like the other component specs we drive signal inputs directly via ɵSIGNAL
  * (JIT does not populate ɵcmp.inputs from signal `input()` declarations).
@@ -162,10 +165,43 @@ describe('BackgroundComponent pattern geometry', () => {
     expect(path.getAttribute('stroke-width')).toBe('0');
   });
 
-  it('keeps patternClassName and color on the shape', () => {
-    const { el } = render({ variant: 'dots', patternClassName: 'extra', color: 'red' });
+  it('keeps patternClassName on the shape', () => {
+    const { el } = render({ variant: 'dots', patternClassName: 'extra' });
     const circle = el.querySelector('circle') as SVGCircleElement;
     expect(circle.classList.contains('extra')).toBe(true);
-    expect(circle.getAttribute('fill')).toBe('red');
+  });
+
+  it('passes color and bgColor as upstream CSS custom properties, not fill/stroke attributes', () => {
+    const { el } = render({ variant: 'lines', color: 'red', bgColor: 'blue' });
+    expect(el.style.getPropertyValue('--xy-background-pattern-color-props')).toBe('red');
+    expect(el.style.getPropertyValue('--xy-background-color-props')).toBe('blue');
+    const path = el.querySelector('path') as SVGPathElement;
+    expect(path.hasAttribute('stroke')).toBe(false);
+    expect(el.querySelectorAll('rect').length).toBe(1);
+  });
+
+  it('leaves the colour properties unset without color/bgColor', () => {
+    const { el } = render();
+    expect(el.style.getPropertyValue('--xy-background-pattern-color-props')).toBe('');
+    expect(el.style.getPropertyValue('--xy-background-color-props')).toBe('');
+  });
+
+  it('applies an uneven array offset per axis', () => {
+    const { pattern } = render({ offset: [3, 7] });
+    expect(pattern.getAttribute('patternTransform')).toBe('translate(-13,-17)');
+  });
+
+  it('halves each axis of an array gap in patternTransform', () => {
+    const { pattern } = render({ variant: 'lines', gap: [50, 30] });
+    expect(pattern.getAttribute('patternTransform')).toBe('translate(-25,-15)');
+    expect(pattern.getAttribute('width')).toBe('50');
+    expect(pattern.getAttribute('height')).toBe('30');
+  });
+
+  it('falls back to a 1px cell when the scaled gap is 0', () => {
+    const { pattern } = render({ variant: 'lines', gap: 0 });
+    expect(pattern.getAttribute('width')).toBe('1');
+    expect(pattern.getAttribute('height')).toBe('1');
+    expect(pattern.getAttribute('patternTransform')).toBe('translate(-0.5,-0.5)');
   });
 });
