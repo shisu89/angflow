@@ -57,3 +57,83 @@ jobs:
 
       - name: Test @angflow/mcp
         run: pnpm --filter @angflow/mcp run test
+
+  e2e-angular:
+    name: Upstream e2e suite (Angular, Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build @angflow/system
+        run: pnpm --filter @angflow/system run build
+
+      - name: Build @angflow/angular
+        run: pnpm --filter @angflow/angular run build
+
+      - name: Drift check (upstream generic-test configs)
+        run: pnpm --filter angular-examples run check:generic-tests
+
+      - name: Playwright version
+        id: pw
+        working-directory: tests/playwright
+        run: echo "v=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-${{ steps.pw.outputs.v }}
+
+      - name: Install Chromium
+        working-directory: tests/playwright
+        run: pnpm exec playwright install --with-deps chromium
+
+      # Playwright's exit code is not the verdict: known-failure tests fail by design.
+      # check-known-failures.mjs decides from the JSON report (and fails if it is missing).
+      - name: Run suite (blocking + known-failures projects, one server start)
+        working-directory: tests/playwright
+        env:
+          FRAMEWORK: ng
+          CI: 'true'
+        run: |
+          # The ng-known-failures project only exists when known-failures.ng.ts has entries.
+          projects=(--project=chromium)
+          if grep -qE '^\s+titlePath: \[' known-failures.ng.ts; then
+            projects+=(--project=ng-known-failures)
+          fi
+          pnpm exec playwright test -c playwright.angular.config.ts "${projects[@]}" || true
+
+      - name: Verdict
+        working-directory: tests/playwright
+        run: |
+          echo '### Upstream e2e suite (Angular)' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          set +e
+          node check-known-failures.mjs test-results/report.json 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          status=${PIPESTATUS[0]}
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-angular
+          path: |
+            tests/playwright/playwright-report
+            tests/playwright/test-results
+          retention-days: 7
