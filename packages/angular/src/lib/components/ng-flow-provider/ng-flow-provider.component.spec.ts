@@ -178,9 +178,88 @@ describe('NgFlowProviderComponent state sharing', () => {
     expect(store.width()).toBe(0);
     expect(store.height()).toBe(0);
     expect(store.connection()).toEqual(initialConnection);
-    expect(() =>
-      store.triggerNodeChanges([{ id: 'n1', type: 'select', selected: true }])
-    ).not.toThrow();
     expect(store.nodes().map((n) => n.id)).toEqual(['n1']); // graph kept
+  });
+
+  it('a remounted <ng-flow> re-wires the shared store and its outputs fire', () => {
+    const seen: unknown[] = [];
+    @Component({
+      standalone: true,
+      imports: [NgFlowProviderComponent, NgFlowComponent],
+      template: `
+        <ng-flow-provider>
+          @if (showFlow()) {
+            <ng-flow (nodesChange)="seen.push($event)" />
+          }
+        </ng-flow-provider>
+      `,
+    })
+    class RemountHostComponent {
+      readonly showFlow = signal(true);
+      readonly seen = seen;
+    }
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [RemountHostComponent],
+      providers: [provideZonelessChangeDetection()],
+    });
+    const fixture = TestBed.createComponent(RemountHostComponent);
+    fixture.detectChanges();
+    const store = fixture.debugElement.query(By.directive(NgFlowProviderComponent)).injector.get(FlowStore);
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {} } as Node]);
+
+    fixture.componentInstance.showFlow.set(false);
+    fixture.detectChanges();
+    fixture.componentInstance.showFlow.set(true);
+    fixture.detectChanges();
+
+    seen.length = 0;
+    store.triggerNodeChanges([{ id: 'n1', type: 'select', selected: true }]);
+    expect(seen.length).toBe(1);
+  });
+
+  it('destroying one <ng-flow> keeps a sibling flow\'s wiring in the shared store', () => {
+    @Component({
+      standalone: true,
+      imports: [NgFlowProviderComponent, NgFlowComponent],
+      template: `
+        <ng-flow-provider>
+          @if (showA()) {
+            <ng-flow />
+          }
+          @if (showB()) {
+            <ng-flow />
+          }
+        </ng-flow-provider>
+      `,
+    })
+    class SiblingHostComponent {
+      readonly showB = signal(true);
+      readonly showA = signal(true);
+    }
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [SiblingHostComponent],
+      providers: [provideZonelessChangeDetection()],
+    });
+    const fixture = TestBed.createComponent(SiblingHostComponent);
+    fixture.detectChanges();
+    const store = fixture.debugElement.query(By.directive(NgFlowProviderComponent)).injector.get(FlowStore);
+    const flows = fixture.debugElement.queryAll(By.directive(NgFlowComponent));
+    const b = flows[1].componentInstance as NgFlowComponent;
+    const bDom = store.domNode();
+    expect(bDom).not.toBeNull();
+    const bOnNodesChange = store.onNodesChange;
+    expect(bOnNodesChange).toBeTruthy();
+    expect(b).toBeTruthy();
+
+    fixture.componentInstance.showA.set(false);
+    fixture.detectChanges();
+
+    expect(store.onNodesChange).toBe(bOnNodesChange);
+    expect(store.domNode()).toBe(bDom);
+    expect(store.width()).toBeGreaterThan(0);
   });
 });

@@ -1109,36 +1109,40 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
   // ── Reset ─────────────────────────────────────────────────────────────
 
+  /** Callback slots an <ng-flow> installs on the store. */
+  static readonly FLOW_CALLBACKS = [
+    'onNodesChange', 'onEdgesChange', 'onConnect', 'onConnectStart', 'onConnectEnd',
+    'onClickConnectStart', 'onClickConnectEnd', 'onBeforeDelete',
+    'onNodeDragStart', 'onNodeDrag', 'onNodeDragStop',
+    'onSelectionDragStart', 'onSelectionDrag', 'onSelectionDragStop',
+    'onNodesDelete', 'onEdgesDelete', 'onDelete',
+  ] as const;
+
   /**
-   * Clears everything a mounted <ng-flow> wired into this store (output callbacks,
-   * DOM node, size, panZoom, connection/interaction state), keeping the graph and
-   * configuration. Called when a flow unmounts, so a provider-shared store holds no
-   * reference to the destroyed component (e.g. emitting into a destroyed OutputRef).
+   * Clears what a mounted <ng-flow> wired into this store (output callbacks, DOM node,
+   * size, panZoom, connection/interaction state), keeping the graph and configuration,
+   * so a provider-shared store holds no reference to the destroyed component.
+   *
+   * With `owner`, only that flow's wiring is cleared: a callback slot only if it still
+   * holds the owner's handler, and the DOM/size/panZoom/gesture state only if
+   * `domNode()` is the owner's element. A sibling <ng-flow>, or one that mounted before
+   * this one was destroyed, keeps its wiring. Without `owner` everything is cleared.
    */
-  detachFlow(): void {
-    this.onNodesChange = null;
-    this.onEdgesChange = null;
-    this.onConnect = null;
-    this.onConnectStart = null;
-    this.onConnectEnd = null;
-    this.onClickConnectStart = null;
-    this.onClickConnectEnd = null;
-    this.onBeforeDelete = null;
-    this.onNodeDragStart = null;
-    this.onNodeDrag = null;
-    this.onNodeDragStop = null;
-    this.onSelectionDragStart = null;
-    this.onSelectionDrag = null;
-    this.onSelectionDragStop = null;
-    this.onNodesDelete = null;
-    this.onEdgesDelete = null;
-    this.onDelete = null;
+  detachFlow(owner?: { domNode: HTMLDivElement | null; callbacks: Record<string, unknown> }): void {
+    const self = this as unknown as Record<string, unknown>;
+    for (const k of FlowStore.FLOW_CALLBACKS) {
+      if (!owner || (k in owner.callbacks && self[k] === owner.callbacks[k])) self[k] = null;
+    }
+    if (owner && (owner.domNode === null || this.domNode() !== owner.domNode)) return;
     this.domNode.set(null);
     this.width.set(0);
     this.height.set(0);
     this.panZoom.set(null);
     this.cancelConnection();
     this.connectionClickStartHandle.set(null);
+    this.connectionTargetNodeId.set(null);
+    this.nodeDragging.set(false);
+    this.nodeResizing.set(false);
     this.paneDragging.set(false);
     this.userSelectionActive.set(false);
     this.userSelectionRect.set(null);

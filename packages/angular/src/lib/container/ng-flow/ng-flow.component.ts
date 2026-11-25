@@ -858,6 +858,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
     effect(() => {
       this.store.onBeforeDelete = this.onBeforeDelete() ?? null;
+      this.installedCallbacks['onBeforeDelete'] = this.store.onBeforeDelete;
     });
 
     // Sync registered type names → store for agent-bridge discovery.
@@ -954,27 +955,12 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     this.store.onEdgesDelete = (edges: EdgeType[]) => this.edgesDelete.emit(edges);
     this.store.onDelete = (params: { nodes: NodeType[]; edges: EdgeType[] }) => this.deleteEvent.emit(params);
 
-    // In a shared-store (<ng-flow-provider> reuse) context the store outlives
-    // this component. Null the callbacks this component installed on destroy so
-    // post-destroy store activity doesn't emit into a destroyed component.
-    // Identity-guarded: only clear a slot still pointing at our handler, so a
-    // newer sibling <ng-flow>'s handlers are never clobbered.
-    const installedCallbacks = [
-      'onNodesChange', 'onEdgesChange',
-      'onNodesDelete', 'onEdgesDelete', 'onDelete',
-      'onConnect', 'onConnectStart', 'onConnectEnd', 'onClickConnectStart', 'onClickConnectEnd',
-      'onNodeDragStart', 'onNodeDrag', 'onNodeDragStop',
-      'onSelectionDragStart', 'onSelectionDrag', 'onSelectionDragStop',
-    ] as const;
-    const storeRecord = this.store as unknown as Record<string, unknown>;
-    const installedRefs = new Map<string, unknown>(
-      installedCallbacks.map((k) => [k, storeRecord[k]]),
-    );
-    this.destroyRef.onDestroy(() => {
-      for (const k of installedCallbacks) {
-        if (storeRecord[k] === installedRefs.get(k)) storeRecord[k] = undefined;
-      }
-    });
+    // Remember the handlers this component installed so detachFlow() on destroy
+    // only clears slots that still hold them (a sibling or newer <ng-flow> sharing
+    // the store keeps its own).
+    for (const k of FlowStore.FLOW_CALLBACKS) {
+      if (k !== 'onBeforeDelete') this.installedCallbacks[k] = this.store[k];
+    }
   }
 
   ngOnInit(): void {
@@ -1022,6 +1008,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     const containerEl = this.containerRef()?.nativeElement;
     if (!containerEl) return;
 
+    this.ownDomNode = containerEl;
     this.store.domNode.set(containerEl);
 
     // Seed container dimensions synchronously BEFORE initPanZoom drains any
@@ -1055,6 +1042,10 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     this.init.emit(this.service);
   }
 
+  /** Store callback slots this component installed (identity-checked on detach). */
+  private readonly installedCallbacks: Record<string, unknown> = {};
+  private ownDomNode: HTMLDivElement | null = null;
+
   ngOnDestroy(): void {
     this.resizeObserver?.disconnect();
     this.panZoomInstance?.destroy();
@@ -1065,7 +1056,10 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     // store (fresh branch) — that is handled via the factory's DestroyRef
     // callback above. An enclosing provider's store keeps its graph state across
     // inner <ng-flow> unmounts.
-    this.store.detachFlow();
+    this.store.detachFlow({
+      domNode: this.ownDomNode,
+      callbacks: this.installedCallbacks,
+    });
     if (this.colorSchemeQuery && this.colorSchemeHandler) {
       this.colorSchemeQuery.removeEventListener('change', this.colorSchemeHandler);
     }
