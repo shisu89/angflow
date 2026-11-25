@@ -1134,6 +1134,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       if (!owner || (k in owner.callbacks && self[k] === owner.callbacks[k])) self[k] = null;
     }
     if (owner && (owner.domNode === null || this.domNode() !== owner.domNode)) return;
+    this.settlePendingFits();
     this.domNode.set(null);
     this.width.set(0);
     this.height.set(0);

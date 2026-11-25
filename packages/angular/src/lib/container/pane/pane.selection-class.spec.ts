@@ -52,4 +52,12 @@ describe('PaneComponent selection class (upstream isSelecting)', () => {
   it('is absent with selectionOnDrag and panOnDrag [0, 1]', () => {
     expect(setup({ selectionOnDrag: true, panOnDrag: [0, 1] }).has()).toBe(false);
   });
+
+  it('draggable only for panOnDrag true or an array with the primary button', () => {
+    const cls = (f: ReturnType<typeof setup>) => (f.fixture.nativeElement as HTMLElement).classList.contains('draggable');
+    expect(cls(setup({ panOnDrag: true }))).toBe(true);
+    expect(cls(setup({ panOnDrag: [0, 1] }))).toBe(true);
+    expect(cls(setup({ panOnDrag: [1, 2] }))).toBe(false);
+    expect(cls(setup({ panOnDrag: false }))).toBe(false);
+  });
 });

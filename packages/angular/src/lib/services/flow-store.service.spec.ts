@@ -1219,6 +1219,21 @@ describe('shared fit promise', () => {
     await expect(bounds).resolves.toEqual({ zoom: NaN, clamped: false, ended: false });
   });
 
+  it('detachFlow of the owning flow settles pending fits; a non-owner leaves them', async () => {
+    const { pz } = deferredPanZoom();
+    store.panZoom.set(pz as never);
+    const el = document.createElement('div');
+    store.domNode.set(el);
+    const fit = store.fitView({ duration: 5000 });
+    store.detachFlow({ domNode: document.createElement('div'), callbacks: {} });
+    let settled = false;
+    void fit.then(() => (settled = true));
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    store.detachFlow({ domNode: el, callbacks: {} });
+    await expect(fit).resolves.toEqual({ zoom: NaN, clamped: false, ended: false });
+  });
+
   it('a rejected fit joined to the queued initial fit rejects only the caller', async () => {
     const error = new Error('boom');
     const setViewport = vi.fn().mockRejectedValue(error);

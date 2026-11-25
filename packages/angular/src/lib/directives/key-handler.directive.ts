@@ -65,7 +65,8 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
 
   // Upstream useKeyPress semantics (combinations) for delete/selection/multi-selection.
   // Activation keys keep their physical-key tracking above.
-  private readonly deleteTracker = computed(() => new KeyPressTracker(this.deleteKeyCode()));
+  // actInsideInputWithModifier=false like upstream useGlobalKeyHandler: Cmd+Backspace in a text field edits text.
+  private readonly deleteTracker = computed(() => new KeyPressTracker(this.deleteKeyCode(), false));
   private readonly selectionTracker = computed(() => new KeyPressTracker(this.selectionKeyCode()));
   private readonly multiSelectionTracker = computed(() => new KeyPressTracker(this.multiSelectionKeyCode()));
 

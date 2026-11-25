@@ -248,6 +248,22 @@ describe('KeyHandlerDirective key combinations', () => {
     expect(deleted.map((n) => n.id)).toEqual(['n1']);
   });
 
+  it("deleteKeyCode 'Meta+Backspace' does not delete from inside a text input", () => {
+    setSignalInput(directive, 'deleteKeyCode', 'Meta+Backspace');
+    store.setNodes([makeNode('n1', { selected: true })]);
+    let deleted: Node[] = [];
+    directive.nodesDelete.subscribe((n) => (deleted = n));
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.addEventListener('keydown', (e) => directive.onKeyDown(e));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Meta', code: 'MetaLeft', metaKey: true, bubbles: true }));
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Backspace', code: 'Backspace', metaKey: true, bubbles: true }),
+    );
+    input.remove();
+    expect(deleted).toEqual([]);
+  });
+
   it("selectionKeyCode 'Shift+s' is active only while both are held", () => {
     setSignalInput(directive, 'selectionKeyCode', 'Shift+s');
     directive.onKeyDown(new KeyboardEvent('keydown', { key: 'Shift', code: 'ShiftLeft', shiftKey: true }));

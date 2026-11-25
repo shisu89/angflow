@@ -20,7 +20,7 @@ const isLeftClickPan = (panOnDrag: boolean | number[]) => panOnDrag === true || 
   host: {
     'class': 'ng-flow__pane xy-flow__pane xy-flow__container',
     'style': 'display: block; position: absolute; width: 100%; height: 100%; top: 0; left: 0; z-index: 1;',
-    '[class.draggable]': 'panOnDrag()',
+    '[class.draggable]': 'draggable()',
     '[class.dragging]': 'store.paneDragging()',
     '[class.selection]': 'isSelecting()',
     '(wheel)': 'onWheel($event)',
@@ -32,6 +32,11 @@ export class PaneComponent implements OnDestroy {
   private el = inject(ElementRef<HTMLElement>);
 
   readonly panOnDrag = input<boolean | number[]>(true);
+  /** Upstream: draggable only for `true` or an array including the primary button (0). */
+  readonly draggable = computed(() => {
+    const p = this.panOnDrag();
+    return p === true || (Array.isArray(p) && p.includes(0));
+  });
   readonly selectionOnDrag = input(false);
   readonly selectionKeyCode = input<KeyCode | null>(null);
   readonly selectionMode = input<SelectionMode>(SelectionMode.Full);
