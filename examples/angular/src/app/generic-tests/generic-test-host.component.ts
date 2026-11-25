@@ -56,8 +56,11 @@ export class GenericTestHostComponent {
       if (!config || !outlet) return;
       const flowProps = (config.flowProps ?? {}) as Record<string, unknown>;
 
-      this.nodes.set(structuredClone((flowProps['nodes'] as any[]) ?? []));
-      this.edges.set(structuredClone((flowProps['edges'] as any[]) ?? []));
+      // Shallow copies: overrides may carry non-cloneable data (functions, class instances).
+      this.nodes.set(((flowProps['nodes'] as any[]) ?? []).map((n) => ({ ...n, data: { ...n.data } })));
+      this.edges.set(
+        ((flowProps['edges'] as any[]) ?? []).map((e) => (e.data ? { ...e, data: { ...e.data } } : { ...e })),
+      );
 
       const ref = outlet.createComponent(NgFlowComponent);
       this.destroyRef.onDestroy(() => ref.destroy());

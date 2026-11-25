@@ -8,6 +8,10 @@ import paneClickConnect from '../../../../react/src/generic-tests/pane/click-con
 import paneClickConnectSelection from '../../../../react/src/generic-tests/pane/click-connect-selection';
 import paneGeneral from '../../../../react/src/generic-tests/pane/general';
 import paneNonDefaults from '../../../../react/src/generic-tests/pane/non-defaults';
+import nodesConnectionUpdates from './overrides/nodes/connection-updates';
+import nodesDataUpdates from './overrides/nodes/data-updates';
+import nodesGeneral from './overrides/nodes/general';
+import nodesIntersectionOrigin from './overrides/nodes/intersection-origin';
 
 export const DATA_ONLY: Record<string, FlowConfig> = {
   'edges/general': edgesGeneral,
@@ -19,6 +23,12 @@ export const DATA_ONLY: Record<string, FlowConfig> = {
   'pane/non-defaults': paneNonDefaults,
 };
 
-export const OVERRIDES: Record<string, FlowConfig> = {}; // filled in Tasks 4–5
+export const OVERRIDES: Record<string, FlowConfig> = {
+  // Task 5 adds node-toolbar/general and viewport/transitions.
+  'nodes/connection-updates': nodesConnectionUpdates,
+  'nodes/data-updates': nodesDataUpdates,
+  'nodes/general': nodesGeneral,
+  'nodes/intersection-origin': nodesIntersectionOrigin,
+};
 
 export const REGISTRY: Record<string, FlowConfig> = { ...DATA_ONLY, ...OVERRIDES };
