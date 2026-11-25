@@ -1,4 +1,4 @@
-import { Connection, InternalNodeBase, Transform, errorMessages, isEdgeBase, EdgeBase, ZIndexMode } from '../..';
+import { Connection, InternalNodeBase, Transform, errorMessages, isEdgeBase, EdgeBase, ZIndexMode, OnError } from '../..';
 import { getOverlappingArea, boxToRect, nodeToBox, getBoundsOfBoxes, devWarn } from '../general';
 
 // this is used for straight edges and simple smoothstep edges (LTR, RTL, BTT, TTB)
@@ -116,6 +116,10 @@ export type AddEdgeOptions = {
    * Custom function to generate edge IDs. If not provided, the default `getEdgeId` function is used.
    */
   getEdgeId?: GetEdgeId;
+  /**
+   * Called when edge validation fails. If not provided, a default dev warning is used.
+   */
+  onError?: OnError;
 };
 
 /**
@@ -136,8 +140,10 @@ export const addEdge = <EdgeType extends EdgeBase>(
   edges: EdgeType[],
   options: AddEdgeOptions = {}
 ): EdgeType[] => {
+  const onError = options.onError ?? devWarn;
+
   if (!edgeParams.source || !edgeParams.target) {
-    devWarn('006', errorMessages['error006']());
+    onError('006', errorMessages['error006']());
 
     return edges;
   }
@@ -179,6 +185,10 @@ export type ReconnectEdgeOptions = {
    * Custom function to generate edge IDs. If not provided, the default `getEdgeId` function is used.
    */
   getEdgeId?: GetEdgeId;
+  /**
+   * Called when edge validation fails. If not provided, a default dev warning is used.
+   */
+  onError?: OnError;
 };
 
 /**
@@ -204,9 +214,10 @@ export const reconnectEdge = <EdgeType extends EdgeBase>(
   options: ReconnectEdgeOptions = { shouldReplaceId: true }
 ): EdgeType[] => {
   const { id: oldEdgeId, ...rest } = oldEdge;
+  const onError = options.onError ?? devWarn;
 
   if (!newConnection.source || !newConnection.target) {
-    devWarn('006', errorMessages['error006']());
+    onError('006', errorMessages['error006']());
 
     return edges;
   }
@@ -214,17 +225,18 @@ export const reconnectEdge = <EdgeType extends EdgeBase>(
   const foundEdge = edges.find((e) => e.id === oldEdge.id) as EdgeType;
 
   if (!foundEdge) {
-    devWarn('007', errorMessages['error007'](oldEdgeId));
+    onError('007', errorMessages['error007'](oldEdgeId));
 
     return edges;
   }
 
   const edgeIdGenerator = options.getEdgeId || getEdgeId;
+  const shouldReplaceId = options.shouldReplaceId ?? true;
 
   // Remove old edge and create the new edge with parameters of old edge.
   const edge = {
     ...rest,
-    id: options.shouldReplaceId ? edgeIdGenerator(newConnection) : oldEdgeId,
+    id: shouldReplaceId ? edgeIdGenerator(newConnection) : oldEdgeId,
     source: newConnection.source,
     target: newConnection.target,
     sourceHandle: newConnection.sourceHandle,

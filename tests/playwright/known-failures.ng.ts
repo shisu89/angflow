@@ -132,20 +132,6 @@ export const KNOWN_FAILURES: KnownFailure[] = [
       'page lacks the upstream testids (report §3).',
     owner: 'D',
   },
-
-  // ── reconnect-edge.spec.ts ────────────────────────────────────────────────
-  {
-    file: 'reconnect-edge.spec.ts',
-    titlePath: ['reconnectEdge', 'replaces the id with getEdgeId when shouldReplaceId is omitted'],
-    reason: 'System `reconnectEdge` ignores `options.getEdgeId` and keeps "old-edge" (report §1, #6055).',
-    owner: 'B',
-  },
-  {
-    file: 'reconnect-edge.spec.ts',
-    titlePath: ['reconnectEdge', 'replaces the id when only onError is passed'],
-    reason: 'System `reconnectEdge` keeps the old id when an options object without `shouldReplaceId` is passed (report §1, #6055).',
-    owner: 'B',
-  },
 ];
 
 function escapeRegExp(s: string): string {
