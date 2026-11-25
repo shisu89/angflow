@@ -1141,3 +1141,25 @@ describe('dissolveGroup', () => {
     expect(service.getNode('a')?.parentId).toBe('g'); // child not detached
   });
 });
+
+describe('getNodesBounds', () => {
+  let service: NgFlowService;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), FlowStore, NgFlowService],
+    });
+    service = TestBed.inject(NgFlowService);
+  });
+
+  it('uses absolute positions for sub-flow children', () => {
+    service.setNodes([
+      makeNode('p', { position: { x: 100, y: 100 } }),
+      makeNode('c', { parentId: 'p', position: { x: 10, y: 10 }, width: 50, height: 50 }),
+    ]);
+    const bounds = service.getNodesBounds([service.getNode('c')!]);
+    expect(bounds.x).toBe(110);
+    expect(bounds.y).toBe(110);
+  });
+});

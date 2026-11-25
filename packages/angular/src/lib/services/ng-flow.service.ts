@@ -851,7 +851,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
   /** Compute the axis-aligned bounding `Rect` that contains all given nodes. */
   getNodesBounds(nodes: NodeType[]): Rect {
-    return getNodesBoundsSystem(nodes, { nodeOrigin: this.store.nodeOrigin() });
+    return getNodesBoundsSystem(nodes, { nodeLookup: this.store.nodeLookup, nodeOrigin: this.store.nodeOrigin() });
   }
 
   /**

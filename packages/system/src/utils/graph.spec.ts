@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { fitViewport, isEdgeBase, isNodeBase, isInternalNodeBase } from './graph';
+import { fitViewport, getNodesBounds, isEdgeBase, isNodeBase, isInternalNodeBase } from './graph';
 import { adoptUserNodes } from './store';
 import type { NodeBase, InternalNodeBase, NodeLookup, ParentLookup, PanZoomInstance } from '../types';
 
@@ -150,5 +150,17 @@ describe('type guards are null/primitive safe', () => {
   it('still identify valid nodes and edges', () => {
     expect(isNodeBase({ id: 'n', position: { x: 0, y: 0 }, data: {} } as never)).toBe(true);
     expect(isEdgeBase({ id: 'e', source: 'a', target: 'b' } as never)).toBe(true);
+  });
+});
+
+describe('getNodesBounds with nodeLookup', () => {
+  it('skips ids that cannot be resolved instead of stretching to the origin', () => {
+    const nodeLookup = buildLookup([sized('a', 100, 100, 50, 50)]);
+    expect(getNodesBounds(['missing', 'a'], { nodeLookup })).toEqual({ x: 100, y: 100, width: 50, height: 50 });
+  });
+
+  it('returns an empty rect when nothing resolves', () => {
+    const nodeLookup = buildLookup([sized('a', 100, 100, 50, 50)]);
+    expect(getNodesBounds(['missing'], { nodeLookup })).toEqual({ x: 0, y: 0, width: 0, height: 0 });
   });
 });
