@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { fitViewport, getNodesBounds, isEdgeBase, isNodeBase, isInternalNodeBase } from './graph';
+import { calculateNodePosition, fitViewport, getNodesBounds, isEdgeBase, isNodeBase, isInternalNodeBase } from './graph';
 import { adoptUserNodes } from './store';
 import type { NodeBase, InternalNodeBase, NodeLookup, ParentLookup, PanZoomInstance } from '../types';
 
@@ -162,5 +162,27 @@ describe('getNodesBounds with nodeLookup', () => {
   it('returns an empty rect when nothing resolves', () => {
     const nodeLookup = buildLookup([sized('a', 100, 100, 50, 50)]);
     expect(getNodesBounds(['missing'], { nodeLookup })).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+  });
+});
+
+describe('calculateNodePosition with extent: parent', () => {
+  it('clamps to an unmeasured parent that has a width and height', () => {
+    const parent = { id: 'p', position: { x: 0, y: 0 }, data: {}, width: 100, height: 100 } as NodeBase;
+    const child: NodeBase = {
+      id: 'c',
+      position: { x: 0, y: 0 },
+      data: {},
+      parentId: 'p',
+      extent: 'parent',
+      measured: { width: 20, height: 20 },
+    };
+    const nodeLookup = buildLookup([parent, child]);
+    const result = calculateNodePosition({
+      nodeId: 'c',
+      nextPosition: { x: 500, y: 500 },
+      nodeLookup,
+      nodeOrigin: [0, 0],
+    });
+    expect(result.positionAbsolute).toEqual({ x: 80, y: 80 });
   });
 });

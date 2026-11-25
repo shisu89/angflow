@@ -444,8 +444,7 @@ export function calculateNodePosition<NodeType extends NodeBase>({
     if (!parentNode) {
       onError?.('005', errorMessages['error005']());
     } else {
-      const parentWidth = parentNode.measured.width;
-      const parentHeight = parentNode.measured.height;
+      const { width: parentWidth, height: parentHeight } = getNodeDimensions(parentNode);
 
       if (parentWidth && parentHeight) {
         extent = [
