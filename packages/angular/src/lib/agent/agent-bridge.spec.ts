@@ -8,6 +8,7 @@ import { provideAgentBridge } from './provide-agent-bridge';
 import { WindowTransport } from './transports/window';
 import type { AgentOutbound, AgentTransport, AgentInbound, AgentResponse } from './types';
 import type { Node, Edge } from '../types';
+import type { FitViewResult } from '@angflow/system';
 import type { AgentLayoutFn } from '../types/node-template';
 
 function makeNode(id: string, overrides: Partial<Node> = {}): Node {
@@ -2046,6 +2047,45 @@ describe('AngflowAgentBridge — bulk payload caps', () => {
   });
 
   describe('fit clamp signal', () => {
+    function stubPanZoom(flow: NgFlowService, setViewport: (...a: unknown[]) => Promise<boolean>) {
+      const store = (flow as unknown as { store: FlowStore }).store; // NgFlowService.store is private
+      store.width.set(800);
+      store.height.set(600);
+      store.panZoom.set({ setViewport, getViewport: () => ({ x: 0, y: 0, zoom: 1 }) } as never);
+    }
+
+    it('an interrupted fit_view resolves with ended: false', async () => {
+      const { bridge, newFlow } = setup();
+      const flow = newFlow();
+      bridge.register('main', flow);
+      flow.setNodes([
+        makeNode('a', { width: 100, height: 50 }),
+        makeNode('b', { position: { x: 300, y: 0 }, width: 100, height: 50 }),
+      ]);
+      stubPanZoom(flow, vi.fn().mockResolvedValue(false));
+      const res = (await bridge.callTool('fit_view', { duration: 500 })) as FitViewResult;
+      expect(res.ended).toBe(false);
+    });
+
+    it('set_viewport awaits the animation and returns its boolean', async () => {
+      const { bridge, newFlow } = setup();
+      const flow = newFlow();
+      bridge.register('main', flow);
+      let finish!: (ended: boolean) => void;
+      stubPanZoom(flow, () => new Promise<boolean>((r) => (finish = r)));
+      let settled = false;
+      const call = bridge
+        .callTool('set_viewport', { viewport: { x: 1, y: 2, zoom: 1 }, duration: 500 })
+        .then((r) => {
+          settled = true;
+          return r;
+        });
+      await Promise.resolve();
+      expect(settled).toBe(false);
+      finish(true);
+      await expect(call).resolves.toBe(true);
+    });
+
     it('fit_view returns { zoom, clamped }', async () => {
       const { bridge, newFlow } = setup();
       const flow = newFlow();
@@ -2054,6 +2094,7 @@ describe('AngflowAgentBridge — bulk payload caps', () => {
       const res = (await bridge.callTool('fit_view', {})) as { zoom: number; clamped: boolean };
       expect(res).toHaveProperty('zoom');
       expect(res).toHaveProperty('clamped');
+      expect(res).toHaveProperty('ended');
       // No panZoom in the harness, so the fit is a no-op: zoom is the NaN sentinel.
       expect(typeof res.zoom).toBe('number');
       expect(typeof res.clamped).toBe('boolean');
@@ -2090,6 +2131,7 @@ describe('AngflowAgentBridge — bulk payload caps', () => {
       })) as { zoom: number; clamped: boolean };
       expect(res).toHaveProperty('zoom');
       expect(res).toHaveProperty('clamped');
+      expect(res).toHaveProperty('ended');
       expect(typeof res.clamped).toBe('boolean');
       expect(spy).toHaveBeenCalledWith(
         { x: 0, y: 0, width: 200, height: 100 },

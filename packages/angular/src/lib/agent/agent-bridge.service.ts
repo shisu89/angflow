@@ -759,7 +759,7 @@ export class AngflowAgentBridge {
     this.handlers.set('set_viewport', (flow, params) => {
       const viewport = requireObject(params, 'viewport') as { x: number; y: number; zoom: number };
       const duration = typeof params['duration'] === 'number' ? (params['duration'] as number) : undefined;
-      flow.setViewport(viewport, { duration });
+      return flow.setViewport(viewport, { duration });
     });
 
     this.handlers.set('get_viewport', (flow) => flow.getViewport());

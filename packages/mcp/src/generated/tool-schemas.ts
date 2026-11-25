@@ -504,7 +504,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
   },
   {
     "name": "fit_view",
-    "description": "Zoom and pan so all (or the given) nodes are visible. Returns { zoom, clamped }; clamped is true when the content was too large to frame at minZoom.",
+    "description": "Zoom and pan so all (or the given) nodes are visible. Returns { zoom, clamped, ended }; clamped is true when the content was too large to frame at minZoom, ended is false when a user gesture or another viewport call interrupted the animation.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -525,7 +525,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
         },
         "minZoom": {
           "type": "number",
-          "description": "Per-call min-zoom floor for this fit (overrides host minZoom). Returns { zoom, clamped } where clamped means the board could not be fully framed."
+          "description": "Per-call min-zoom floor for this fit (overrides host minZoom). Returns { zoom, clamped, ended } where clamped means the board could not be fully framed."
         }
       },
       "additionalProperties": false
@@ -533,7 +533,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
   },
   {
     "name": "set_viewport",
-    "description": "Set the viewport to an absolute { x, y, zoom }.",
+    "description": "Set the viewport to an absolute { x, y, zoom }. With duration, the call resolves after the animation: true when it ran to the end, false when it was interrupted.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -981,7 +981,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
   },
   {
     "name": "fit_bounds",
-    "description": "Fit the viewport to a specific Rect in flow coordinates. Returns { zoom, clamped }; clamped is true when the rect was too large to frame at minZoom.",
+    "description": "Fit the viewport to a specific Rect in flow coordinates. Returns { zoom, clamped, ended }; clamped is true when the rect was too large to frame at minZoom, ended is false when a user gesture or another viewport call interrupted the animation.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1019,7 +1019,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
         },
         "minZoom": {
           "type": "number",
-          "description": "Per-call min-zoom floor for this fit (overrides host minZoom). Returns { zoom, clamped }."
+          "description": "Per-call min-zoom floor for this fit (overrides host minZoom). Returns { zoom, clamped, ended }."
         }
       },
       "required": [

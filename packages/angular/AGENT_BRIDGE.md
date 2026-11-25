@@ -177,12 +177,14 @@ Every tool takes an optional `flowId` (omit when only one flow is registered; re
 | Tool | Params | Notes |
 |---|---|---|
 | `fit_view` | `nodeIds?`, `padding?`, `duration?`, `minZoom?` | Animates to fit the given nodes (all if omitted). Returns `{ zoom, clamped, ended }` — `clamped` is true when the fit hit the min-zoom floor (board too big to frame). |
-| `set_viewport` | `viewport: { x, y, zoom }`, `duration?` | Animate to an explicit viewport |
-| `zoom_in` | `duration?: number` | Incremental zoom in |
-| `zoom_out` | `duration?: number` | Incremental zoom out |
-| `zoom_to` | `level: number`, `duration?: number` | Set zoom to an absolute level |
-| `set_center` | `x: number`, `y: number`, `zoom?: number`, `duration?: number` | Center the viewport on a flow coordinate |
+| `set_viewport` | `viewport: { x, y, zoom }`, `duration?` | Animate to an explicit viewport. Awaits the animation; returns `true` when it ran to the end, `false` when interrupted (a user gesture or another viewport call). The JSON-RPC reply therefore arrives after the animation. |
+| `zoom_in` | `duration?: number` | Incremental zoom in. Returns `true`, or `false` if the animation was interrupted. |
+| `zoom_out` | `duration?: number` | Incremental zoom out. Returns `true`, or `false` if the animation was interrupted. |
+| `zoom_to` | `level: number`, `duration?: number` | Set zoom to an absolute level. Returns `true`, or `false` if the animation was interrupted. |
+| `set_center` | `x: number`, `y: number`, `zoom?: number`, `duration?: number` | Center the viewport on a flow coordinate. Returns `true`, or `false` if the animation was interrupted. |
 | `fit_bounds` | `bounds: { x, y, width, height }`, `padding?: number`, `duration?: number`, `minZoom?` | Fit the viewport to an explicit bounding rect. Returns `{ zoom, clamped, ended }`. |
+
+No viewport tool can hang any more: an interrupted animation settles its call.
 
 **`FitViewResult`** — `{ zoom: number; clamped: boolean; ended: boolean }`. `zoom` is the achieved zoom; it is JSON `null` when the fit was a no-op — for `fit_view` that means there were no nodes to fit, and for `fit_bounds` it means the canvas isn't initialized yet (no panZoom). `clamped` is true only when the fit was limited by the minimum zoom (content larger than the viewport can show) — a signal to split into regions or use `set_center`. Clamping at `maxZoom` is not flagged. `ended` is `false` when a user gesture or another viewport call interrupted the fit's animation (a later fit of the same kind — `fit_view` after `fit_view`, `fit_bounds` after `fit_bounds` — doesn't count: overlapping fits share one result, the last one's), and `true` when it ran to the end or there was nothing to animate (no nodes to fit, or duration 0). It is also `false` when pan/zoom isn't initialised yet, because no fit was attempted.
 
