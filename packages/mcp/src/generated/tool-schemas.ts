@@ -351,7 +351,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
   },
   {
     "name": "dissolve_group",
-    "description": "Remove a group node; its direct children survive (reparented to the group's parent, pinned in place). Returns { dissolvedGroupId, memberIds }.",
+    "description": "Remove a group node; its direct children survive (reparented to the group's parent, kept where drawn, except an extent: parent child overhanging a grandparent, which is clamped into it). Returns { dissolvedGroupId, memberIds }; memberIds is [] when the delete is vetoed, narrowed to keep the group, or blocked by deletable: false (the children are restored).",
     "inputSchema": {
       "type": "object",
       "properties": {

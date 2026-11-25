@@ -385,7 +385,9 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    *
    * The children are first reparented to the group's own parent (top-level if
    * it had none) in one raw `replace` write, staying where they are drawn
-   * (`internals.positionAbsolute`, including any `extent: 'parent'` clamp). A
+   * (`internals.positionAbsolute`, including any `extent: 'parent'` clamp; the one
+   * exception is an `extent: 'parent'` child overhanging a grandparent, which the
+   * grandparent's clamp pulls inside). A
    * child of a top-level group loses `extent: 'parent'`; under a grandparent it
    * keeps it. Only then is the group deleted, so `onBeforeDelete` sees just the
    * group and its connected edges. If the group survives (a veto, a narrowing

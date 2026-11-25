@@ -347,8 +347,9 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   onNodesChange: ((changes: NodeChange<NodeType>[]) => void) | null = null;
   onEdgesChange: ((changes: EdgeChange<EdgeType>[]) => void) | null = null;
   // Fired by programmatic deletion (NgFlowService.deleteElements, dissolveGroup,
-  // agent bridge) so those paths notify (nodesDelete)/(edgesDelete)/(delete) too,
-  // not just the delete-key path.
+  // the delete_elements agent tool) so those paths notify (nodesDelete)/(edgesDelete)/
+  // (delete) too. The apply_changes delete_elements op writes via setNodes/setEdges
+  // and does not fire them.
   onNodesDelete: ((nodes: NodeType[]) => void) | null = null;
   onEdgesDelete: ((edges: EdgeType[]) => void) | null = null;
   onDelete: ((params: { nodes: NodeType[]; edges: EdgeType[] }) => void) | null = null;

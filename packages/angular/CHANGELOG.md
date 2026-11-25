@@ -79,9 +79,12 @@ Bug-fix release. Requires `@angflow/system` 0.1.14.
   `deletable: false`.
 - A non-deletable child of a deleted parent, or a non-deletable edge connected to a
   deleted node, survives with a dangling `parentId` / endpoint (upstream semantics).
-- `(nodesDelete)` / `(edgesDelete)` / `(delete)` fire once per deletion, before the
+- `(nodesDelete)` / `(edgesDelete)` / `(delete)` fire once per deletion (keyboard,
+  Controls, `deleteElements`, `delete_elements` tool, `dissolveGroup`), before the
   removal is applied, in upstream's order (edges, then nodes, then `delete`). Migration:
-  handlers that read the store expecting the elements gone must defer.
+  handlers that read the store expecting the elements gone must defer. The
+  `apply_changes` `delete_elements` op writes through `setNodes` / `setEdges` and does
+  not fire them (unchanged).
 - Keyboard deletion is asynchronous: it goes through `deleteElements` (it used to be
   synchronous) and clears `nodesSelectionActive`. Failures of keyboard and Controls
   deletion, such as a throwing `onBeforeDelete`, are reported through `onError` with id
@@ -97,14 +100,18 @@ Bug-fix release. Requires `@angflow/system` 0.1.14.
   hook throws or rejects. A move made to a child while an async veto is pending is
   reverted. The intermediate reparent shows in `(nodesChange)`. An `extent: 'parent'`
   child of a top-level group loses `extent`. Under a grandparent, children keep it and
-  are clamped to the grandparent (drawn inside it; the raw `position` is unchanged).
+  stay where drawn except an `extent: 'parent'` child overhanging the grandparent, which
+  is clamped into it (drawn inside it; the raw `position` is unchanged).
 - Agent: `delete_elements` (the tool and the `apply_changes` op) cascades and skips
   `deletable: false`. Results list the ids actually deleted (the op used to echo the
   requested ids). `apply_changes` still bypasses `onBeforeDelete`.
 - Agent: an `apply_changes` batch containing a `delete_elements` op is no longer fully
   synchronous (runs of other ops stay synchronous; batches without a delete are
   unchanged). In-process callers (`bridge.callTool`, `window.angflow.callTool`) should
-  await `apply_changes` before issuing other calls. WebSocket requests are unaffected.
+  await `apply_changes` before issuing other calls. WebSocket text frames are
+  dispatched one per macrotask, so they don't interleave unless an async
+  `AGENT_CAN_MUTATE` gate resolves several requests together; binary frames
+  (`await Blob.text()`) can interleave.
 
 ### Fixed
 
@@ -123,8 +130,8 @@ Bug-fix release. Requires `@angflow/system` 0.1.14.
   line gets the `connection` and valid/invalid classes (custom lines are wrapped).
 - The pane `selection` class tracks upstream `isSelecting`.
 - Arrow-key move announcement.
-- The `delete_elements` tool description named the wrong result keys
-  (`deletedNodeIds` / `deletedEdgeIds`).
+- The `delete_elements` tool description named the wrong result keys (`deletedNodes` /
+  `deletedEdges`); the tool returns `deletedNodeIds` / `deletedEdgeIds`.
 - Shared-store unmount; MiniMap follows a new `panZoom` after remount;
   `selectNodesData` only emits when node data changes.
 

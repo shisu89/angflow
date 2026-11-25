@@ -138,7 +138,7 @@ payload, #6117). D: 2 → 4 (2 colour-mode, 2 click-connect payload). Commit ran
 
 ### C — results
 
-Known failures unchanged at 4 (all D). The five entry points (`deleteElements`, keyboard
+Known failures unchanged at 4 (all D), verified by the full e2e verdict (0 NOT MATCHED, 0 STALE, 0 chromium failures); vitest, lint, typecheck and builds green. The five entry points (`deleteElements`, keyboard
 delete, Controls delete, the `delete_elements` tool and the `apply_changes` op) and
 `dissolveGroup` all go through `getElementsToRemove`. Upstream #6074 / #6111 are ported
 into system `getElementsToRemove` (ae51254f7). Commit range: `d54d18f8d..HEAD`.
