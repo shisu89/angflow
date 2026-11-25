@@ -40,8 +40,6 @@ export class DragDirective implements OnInit, OnChanges, OnDestroy {
   readonly handleSelector = input<string | undefined>(undefined, { alias: 'ngFlowDragHandleSelector' });
   /** Whether mousedown on the element should also select the node. */
   readonly isSelectable = input(true, { alias: 'ngFlowDragSelectable' });
-  /** Pixel threshold below which the gesture is treated as a click, not a drag. */
-  readonly nodeClickDistance = input(0, { alias: 'ngFlowDragClickDistance' });
 
   private dragInstance: XYDragInstance | null = null;
 
@@ -86,7 +84,6 @@ export class DragDirective implements OnInit, OnChanges, OnDestroy {
       domNode: this.el.nativeElement,
       isSelectable: this.isSelectable(),
       nodeId: this.nodeId(),
-      nodeClickDistance: this.nodeClickDistance(),
     });
   }
 

@@ -506,9 +506,6 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   /** Maximum pixels between mousedown and mouseup that still count as a pane click. */
   readonly paneClickDistance = input(0);
 
-  /** Maximum pixels between mousedown and mouseup that still count as a node click. */
-  readonly nodeClickDistance = input(0);
-
   // ── Appearance ────────────────────────────────────────────────────────
 
   /** `'light'` | `'dark'` | `'system'`. When `'system'`, resolves via `prefers-color-scheme`. */
@@ -812,7 +809,6 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       this.store.connectionDragThreshold.set(this.connectionDragThreshold());
       this.store.nodeDragThreshold.set(this.nodeDragThreshold());
       this.store.paneClickDistance.set(this.paneClickDistance());
-      this.store.nodeClickDistance.set(this.nodeClickDistance());
       this.store.autoPanOnConnect.set(this.autoPanOnConnect());
       this.store.autoPanOnNodeDrag.set(this.autoPanOnNodeDrag());
       this.store.autoPanOnSelection.set(this.autoPanOnSelection());

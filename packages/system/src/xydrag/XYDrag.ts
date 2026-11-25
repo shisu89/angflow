@@ -83,7 +83,6 @@ export type DragUpdateParams = {
   isSelectable?: boolean;
   nodeId?: string;
   domNode: Element;
-  nodeClickDistance?: number;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -99,6 +98,7 @@ export function XYDrag<OnNodeDrag extends (e: any, nodes: any, node: any) => voi
   let dragItems = new Map<string, NodeDragItem>();
   let autoPanStarted = false;
   let mousePosition: XYPosition = { x: 0, y: 0 };
+  let initialMousePosition: XYPosition = { x: 0, y: 0 };
   let containerBounds: DOMRect | null = null;
   let dragStarted = false;
   let d3Selection: Selection<Element, unknown, null, undefined> | null = null;
@@ -107,6 +107,23 @@ export function XYDrag<OnNodeDrag extends (e: any, nodes: any, node: any) => voi
   // we store the last drag event to be able to use it in the update function
   let dragEvent: MouseEvent | null = null;
 
+  /*
+   * Suppresses the click that the browser dispatches right after a drag that moved nodes.
+   * The listener sits on the window in the capture phase so it also catches clicks that are
+   * dispatched to a common ancestor (e.g. the pane) when the pointer is released outside of the node.
+   * It is removed in the next task, after the click has been dispatched (same approach as d3-drag).
+   */
+  function preventNextClick(sourceEvent: MouseEvent | TouchEvent) {
+    const view = sourceEvent.view ?? window;
+    const suppressClick = (event: MouseEvent) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+
+    view.addEventListener('click', suppressClick, { capture: true });
+    setTimeout(() => view.removeEventListener('click', suppressClick, { capture: true }), 0);
+  }
+
   // public functions
   function update({
     noDragClassName,
@@ -114,7 +131,6 @@ export function XYDrag<OnNodeDrag extends (e: any, nodes: any, node: any) => voi
     domNode,
     isSelectable,
     nodeId,
-    nodeClickDistance = 0,
   }: DragUpdateParams) {
     d3Selection = select(domNode);
     function updateNodes({ x, y }: XYPosition) {
@@ -297,11 +313,12 @@ export function XYDrag<OnNodeDrag extends (e: any, nodes: any, node: any) => voi
     }
 
     const d3DragInstance = drag()
-      .clickDistance(nodeClickDistance)
+      .clickDistance(Infinity)
       .on('start', (event: UseDragEvent) => {
         const { domNode, nodeDragThreshold, transform, snapGrid, snapToGrid } = getStoreItems();
         containerBounds = domNode?.getBoundingClientRect() || null;
-
+        dragStarted = false;
+        autoPanStarted = false;
         abortDrag = false;
         nodePositionsChanged = false;
         dragEvent = event.sourceEvent;
@@ -313,6 +330,7 @@ export function XYDrag<OnNodeDrag extends (e: any, nodes: any, node: any) => voi
         const pointerPos = getPointerPosition(event.sourceEvent, { transform, snapGrid, snapToGrid, containerBounds });
         lastPos = pointerPos;
         mousePosition = getEventPosition(event.sourceEvent, containerBounds!);
+        initialMousePosition = mousePosition;
       })
       .on('drag', (event: UseDragEvent) => {
         const { autoPanOnNodeDrag, transform, snapGrid, snapToGrid, nodeDragThreshold, nodeLookup } = getStoreItems();
@@ -339,9 +357,9 @@ export function XYDrag<OnNodeDrag extends (e: any, nodes: any, node: any) => voi
         if (!dragStarted) {
           // Calculate distance in client coordinates for consistent drag threshold behavior across zoom levels
           const currentMousePosition = getEventPosition(event.sourceEvent, containerBounds!);
-          const x = currentMousePosition.x - mousePosition.x;
-          const y = currentMousePosition.y - mousePosition.y;
-          const distance = Math.sqrt(x * x + y * y);
+          const dx = currentMousePosition.x - initialMousePosition.x;
+          const dy = currentMousePosition.y - initialMousePosition.y;
+          const distance = Math.hypot(dx, dy);
 
           if (distance > nodeDragThreshold) {
             startDrag(event);
@@ -355,6 +373,13 @@ export function XYDrag<OnNodeDrag extends (e: any, nodes: any, node: any) => voi
         }
       })
       .on('end', (event: UseDragEvent) => {
+        // when released outside of the node, the browser dispatches the click to a common ancestor (e.g. the pane)
+        const releasedOutside = !domNode.contains(event.sourceEvent.target as globalThis.Node | null);
+
+        if (releasedOutside || nodePositionsChanged) {
+          preventNextClick(event.sourceEvent);
+        }
+
         if (!dragStarted || abortDrag) {
           // Stop the auto-pan loop even on the abort/never-started path —
           // otherwise, if the abort happened while the pointer was inside the
@@ -375,8 +400,6 @@ export function XYDrag<OnNodeDrag extends (e: any, nodes: any, node: any) => voi
           return;
         }
 
-        autoPanStarted = false;
-        dragStarted = false;
         cancelAnimationFrame(autoPanId);
 
         if (dragItems.size > 0) {

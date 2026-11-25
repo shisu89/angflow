@@ -90,7 +90,6 @@ interface KitchenSinkSettings {
   connectionRadius: number;
   reconnectRadius: number;
   paneClickDistance: number;
-  nodeClickDistance: number;
   onlyRenderVisibleElements: boolean;
   nodeOriginPreset: NodeOriginPreset;
   isValidConnectionEnabled: boolean;
@@ -173,7 +172,6 @@ const DEFAULTS: KitchenSinkSettings = {
   connectionRadius: 20,
   reconnectRadius: 10,
   paneClickDistance: 0,
-  nodeClickDistance: 0,
   onlyRenderVisibleElements: false,
   nodeOriginPreset: 'top-left',
   isValidConnectionEnabled: false,
@@ -224,7 +222,7 @@ const CATEGORY_KEYS: Record<string, (keyof KitchenSinkSettings)[]> = {
   ],
   Behavior: [
     'connectionMode', 'connectionLineType', 'connectionRadius', 'reconnectRadius',
-    'paneClickDistance', 'nodeClickDistance', 'onlyRenderVisibleElements',
+    'paneClickDistance', 'onlyRenderVisibleElements',
     'nodeOriginPreset', 'isValidConnectionEnabled', 'debug',
   ],
   Appearance: [
@@ -304,7 +302,6 @@ function parseKeyCode(raw: string): string | string[] {
           [connectionRadius]="settings().connectionRadius"
           [reconnectRadius]="settings().reconnectRadius"
           [paneClickDistance]="settings().paneClickDistance"
-          [nodeClickDistance]="settings().nodeClickDistance"
           [onlyRenderVisibleElements]="settings().onlyRenderVisibleElements"
           [nodeOrigin]="computedNodeOrigin()"
           [isValidConnection]="computedIsValidConnection()"
@@ -605,10 +602,6 @@ function parseKeyCode(raw: string): string | string[] {
                 <div class="ctrl ctrl--slider">
                   <span class="ctrl__label">paneClickDistance ({{ settings().paneClickDistance }})</span>
                   <input type="range" min="0" max="20" [value]="settings().paneClickDistance" (input)="set('paneClickDistance', +$any($event.target).value)" />
-                </div>
-                <div class="ctrl ctrl--slider">
-                  <span class="ctrl__label">nodeClickDistance ({{ settings().nodeClickDistance }})</span>
-                  <input type="range" min="0" max="20" [value]="settings().nodeClickDistance" (input)="set('nodeClickDistance', +$any($event.target).value)" />
                 </div>
                 <div class="ctrl ctrl--switch">
                   <span class="ctrl__label">onlyRenderVisibleElements</span>

@@ -232,7 +232,6 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   readonly nodeDragThreshold = signal(1);
   readonly connectionDragThreshold = signal(1);
   readonly paneClickDistance = signal(0);
-  readonly nodeClickDistance = signal(0);
   readonly snapGrid = signal<SnapGrid>([15, 15]);
   readonly snapToGrid = signal(false);
 
