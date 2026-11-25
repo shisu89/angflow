@@ -12,7 +12,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { EdgeRendererComponent } from './edge-renderer.component';
 import { FlowStore } from '../../services/flow-store.service';
-import { Position, type Handle } from '@angflow/system';
+import { Position, type HandleBounds } from '@angflow/system';
 import type { Node, Edge } from '../../types';
 
 describe('edge renderer enriches handles with registry data', () => {
@@ -57,7 +57,7 @@ describe('edge renderer enriches handles with registry data', () => {
     store.registerHandleData('a', 'sh', 'source', 'string');
 
     const inputs = renderer.getEdgeInputs(edge);
-    expect((inputs['sourceHandle'] as Handle | null)?.data).toBe('string');
+    expect((inputs['sourceHandle'] as HandleBounds | null)?.data).toBe('string');
   });
 
   it('enriches targetHandle with registry data', () => {
@@ -65,7 +65,7 @@ describe('edge renderer enriches handles with registry data', () => {
     store.registerHandleData('b', 'th', 'target', 'number');
 
     const inputs = renderer.getEdgeInputs(edge);
-    expect((inputs['targetHandle'] as Handle | null)?.data).toBe('number');
+    expect((inputs['targetHandle'] as HandleBounds | null)?.data).toBe('number');
   });
 
   it('returns null handles when nodes are missing their handle bounds', () => {
@@ -99,11 +99,11 @@ describe('floating endpoints', () => {
 
   function seedNodes() {
     // Source node at (0,0) sized 100x50; target node at (300, 200) sized 100x50.
-    const srcHandle: Handle = {
+    const srcHandle: HandleBounds = {
       id: 'auto', nodeId: 'A', type: 'source', position: Position.Right,
       x: 50, y: 25, width: 0, height: 0, floating: true,
     };
-    const tgtHandle: Handle = {
+    const tgtHandle: HandleBounds = {
       id: 'auto', nodeId: 'B', type: 'target', position: Position.Left,
       x: 50, y: 25, width: 0, height: 0, floating: true,
     };
@@ -162,11 +162,11 @@ describe('floating endpoints', () => {
 
   it('uses fixed-handle position on the fixed side and ray-rect on the floating side', () => {
     // Set A's source handle as fixed (no floating flag).
-    const srcHandle: Handle = {
+    const srcHandle: HandleBounds = {
       id: 'fixed', nodeId: 'A', type: 'source', position: Position.Right,
       x: 90, y: 20, width: 10, height: 10, // fixed position on right side
     };
-    const tgtHandle: Handle = {
+    const tgtHandle: HandleBounds = {
       id: 'auto', nodeId: 'B', type: 'target', position: Position.Left,
       x: 50, y: 25, width: 0, height: 0, floating: true,
     };

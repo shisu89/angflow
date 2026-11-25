@@ -8,7 +8,7 @@ import type {
   EdgePosition,
   HandleType,
   ConnectionLineType,
-  Handle,
+  HandleBounds,
   Position,
   XYPosition,
 } from '@angflow/system';
@@ -113,7 +113,7 @@ export interface EdgeComponentInputs<EdgeType extends Edge = Edge> {
 export type ConnectionLineComponentProps<NodeType extends Node = Node> = {
   connectionLineType: ConnectionLineType;
   fromNode: InternalNode<NodeType>;
-  fromHandle: Handle;
+  fromHandle: HandleBounds;
   fromX: number;
   fromY: number;
   toX: number;
@@ -122,6 +122,6 @@ export type ConnectionLineComponentProps<NodeType extends Node = Node> = {
   toPosition: Position;
   connectionStatus: 'valid' | 'invalid' | null;
   toNode: InternalNode<NodeType> | null;
-  toHandle: Handle | null;
+  toHandle: HandleBounds | null;
   pointer: XYPosition;
 };

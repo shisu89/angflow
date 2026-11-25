@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, computed } from '@angular/core';
-import { getStraightPath, type Handle } from '@angflow/system';
+import { getStraightPath, type HandleBounds } from '@angflow/system';
 import type { CSSProperties } from '../../types/general';
 import { BaseEdgeComponent } from './base-edge.component';
 
@@ -46,8 +46,8 @@ export class StraightEdgeComponent {
   readonly labelBgStyle = input<CSSProperties>();
   readonly labelBgPadding = input<[number, number] | undefined>();
   readonly labelBgBorderRadius = input<number | undefined>();
-  readonly sourceHandle = input<Handle | null>(null);
-  readonly targetHandle = input<Handle | null>(null);
+  readonly sourceHandle = input<HandleBounds | null>(null);
+  readonly targetHandle = input<HandleBounds | null>(null);
 
   private readonly pathData = computed(() => {
     return getStraightPath({

@@ -181,7 +181,8 @@ export type {
   DefaultEdgeOptionsBase,
 
   // Handle types
-  Handle as SystemHandle,
+  HandleBounds,
+  NodeHandle,
   HandleType,
   HandleConnection,
 

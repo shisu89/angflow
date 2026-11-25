@@ -23,7 +23,7 @@ import {
   type Edge,
   type Connection,
   type IsValidConnection,
-  type SystemHandle,
+  type HandleBounds,
 } from '@angflow/angular';
 
 const COLORS: Record<string, string> = {
@@ -107,7 +107,7 @@ export class ThTypedLineComponent {
   readonly toY = input(0);
   readonly fromPosition = input<Position>(Position.Right);
   readonly toPosition = input<Position>(Position.Left);
-  readonly fromHandle = input<SystemHandle | null>(null);
+  readonly fromHandle = input<HandleBounds | null>(null);
 
   readonly color = computed(() => {
     const d = this.fromHandle()?.data as string | undefined;
@@ -142,8 +142,8 @@ export class ThTypedEdgeComponent {
   readonly targetY = input(0);
   readonly sourcePosition = input<Position>(Position.Right);
   readonly targetPosition = input<Position>(Position.Left);
-  readonly sourceHandle = input<SystemHandle | null>(null);
-  readonly targetHandle = input<SystemHandle | null>(null);
+  readonly sourceHandle = input<HandleBounds | null>(null);
+  readonly targetHandle = input<HandleBounds | null>(null);
 
   readonly color = computed(() => {
     const d = this.sourceHandle()?.data as string | undefined;

@@ -12,10 +12,10 @@ import { TestBed } from '@angular/core/testing';
 import { Component, provideZonelessChangeDetection } from '@angular/core';
 import { ConnectionLineComponent } from './connection-line.component';
 import { FlowStore } from '../../services/flow-store.service';
-import { Position, type ConnectionInProgress, type Handle } from '@angflow/system';
+import { Position, type ConnectionInProgress, type HandleBounds } from '@angflow/system';
 
 function makeInProgressConnection(): ConnectionInProgress {
-  const handle: Handle = {
+  const handle: HandleBounds = {
     id: 'h1',
     nodeId: 'n1',
     x: 0,
@@ -60,7 +60,7 @@ describe('ConnectionLineComponent data enrichment', () => {
     fixture.detectChanges();
 
     const props = fixture.componentInstance.connectionProps();
-    expect((props.fromHandle as Handle | null)?.data).toBe('string');
+    expect((props.fromHandle as HandleBounds | null)?.data).toBe('string');
   });
 
   it('leaves fromHandle.data undefined when nothing is registered', () => {
@@ -70,7 +70,7 @@ describe('ConnectionLineComponent data enrichment', () => {
     fixture.detectChanges();
 
     const props = fixture.componentInstance.connectionProps();
-    expect((props.fromHandle as Handle | null)?.data).toBeUndefined();
+    expect((props.fromHandle as HandleBounds | null)?.data).toBeUndefined();
   });
 });
 

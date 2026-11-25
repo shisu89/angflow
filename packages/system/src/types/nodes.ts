@@ -1,5 +1,4 @@
-import type { XYPosition, Position, CoordinateExtent, Handle } from '.';
-import { Optional } from '../utils/types';
+import type { XYPosition, Position, CoordinateExtent, HandleBounds } from '.';
 
 /**
  * Framework independent node data structure.
@@ -127,8 +126,8 @@ export type NodeProps<NodeType extends NodeBase> = NodeType extends unknown
   : never;
 
 export type NodeHandleBounds = {
-  source: Handle[] | null;
-  target: Handle[] | null;
+  source: HandleBounds[] | null;
+  target: HandleBounds[] | null;
 };
 
 export type InternalNodeUpdate = {
@@ -172,7 +171,10 @@ export type OnSelectionDrag = (event: MouseEvent, nodes: NodeBase[]) => void;
  *
  * @public
  */
-export type NodeHandle = Omit<Optional<Handle, 'width' | 'height'>, 'nodeId'>;
+export type NodeHandle = Omit<HandleBounds, 'nodeId' | 'width' | 'height'> & {
+  width?: number;
+  height?: number;
+};
 
 export type Align = 'center' | 'start' | 'end';
 

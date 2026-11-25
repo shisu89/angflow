@@ -1,5 +1,5 @@
 import { getHandlePosition, getOverlappingArea, nodeToRect } from '../utils';
-import type { HandleType, XYPosition, Handle, InternalNodeBase, NodeLookup, ConnectionMode } from '../types';
+import type { HandleType, XYPosition, HandleBounds, InternalNodeBase, NodeLookup, ConnectionMode } from '../types';
 import { Position } from '../types';
 
 function getNodesWithinDistance(
@@ -43,8 +43,8 @@ export function getClosestHandle(
   nodeLookup: NodeLookup,
   fromHandle: { nodeId: string; type: HandleType; id?: string | null },
   isNodeVisible?: (node: InternalNodeBase) => boolean,
-): Handle | null {
-  let closestHandles: Handle[] = [];
+): HandleBounds | null {
+  let closestHandles: HandleBounds[] = [];
   let minDistance = Infinity;
 
   const closeNodes = getNodesWithinDistance(position, nodeLookup, connectionRadius + ADDITIONAL_DISTANCE, isNodeVisible);
@@ -107,7 +107,7 @@ export function getFloatingDropTarget(
   nodeLookup: NodeLookup,
   fromHandle: { nodeId: string; type: HandleType; id?: string | null },
   isNodeVisible?: (node: InternalNodeBase) => boolean,
-): Handle | null {
+): HandleBounds | null {
   const oppositeType: HandleType = fromHandle.type === 'source' ? 'target' : 'source';
 
   let bestNode: InternalNodeBase | null = null;
@@ -131,7 +131,7 @@ export function getFloatingDropTarget(
     if (position.y < ny || position.y > ny + nh) continue;
 
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-    const oppositeList = (node.internals?.handleBounds?.[oppositeType] ?? []) as Handle[];
+    const oppositeList = (node.internals?.handleBounds?.[oppositeType] ?? []) as HandleBounds[];
     const hasFloating = oppositeList.some((h) => h.floating === true);
     if (!hasFloating) continue;
 
@@ -145,7 +145,7 @@ export function getFloatingDropTarget(
   if (!bestNode) return null;
 
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-  const candidates = ((bestNode.internals?.handleBounds?.[oppositeType] ?? []) as Handle[])
+  const candidates = ((bestNode.internals?.handleBounds?.[oppositeType] ?? []) as HandleBounds[])
     .filter((h) => h.floating === true);
 
   if (candidates.length === 0) return null;
@@ -175,7 +175,7 @@ export function getHandle(
   nodeLookup: NodeLookup,
   connectionMode: ConnectionMode,
   withAbsolutePosition = false
-): Handle | null {
+): HandleBounds | null {
   const node = nodeLookup.get(nodeId);
   if (!node) {
     return null;

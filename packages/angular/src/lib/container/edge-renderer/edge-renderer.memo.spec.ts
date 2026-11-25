@@ -12,7 +12,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import * as system from '@angflow/system';
-import { Position, type Handle } from '@angflow/system';
+import { Position, type HandleBounds } from '@angflow/system';
 import { EdgeRendererComponent, computeEdgeGeometryKey } from './edge-renderer.component';
 import { FlowStore } from '../../services/flow-store.service';
 import type { Node, Edge, InternalNode } from '../../types';
@@ -92,13 +92,13 @@ describe('edge renderer memoizes inputs and path per edge', () => {
   it('REGRESSION: registering handle data after a cached read invalidates enrichment', () => {
     const { edge } = seedFlow();
     const before = renderer.getEdgeInputs(edge);
-    expect((before['sourceHandle'] as Handle | null)?.data).toBeUndefined();
+    expect((before['sourceHandle'] as HandleBounds | null)?.data).toBeUndefined();
 
     store.registerHandleData('a', 'sh', 'source', 'payload');
 
     const after = renderer.getEdgeInputs(edge);
     expect(after).not.toBe(before);
-    expect((after['sourceHandle'] as Handle | null)?.data).toBe('payload');
+    expect((after['sourceHandle'] as HandleBounds | null)?.data).toBe('payload');
   });
 
   it('REGRESSION: a new edge object (prop change) invalidates', () => {

@@ -4,7 +4,7 @@ import type { NodeChange, ConnectionState } from '@angflow/system';
 import { FlowStore } from './flow-store.service';
 import { getCollapsedHiddenIds } from '../graph/collapse';
 import type { Node, Edge } from '../types';
-import { Position, initialConnection, getViewportForBounds, type Handle } from '@angflow/system';
+import { Position, initialConnection, getViewportForBounds, type HandleBounds } from '@angflow/system';
 
 vi.mock('../graph/collapse', { spy: true });
 
@@ -707,8 +707,8 @@ describe('FlowStore', () => {
 
       store.setNodes([makeNode('n1', { position: { x: 0, y: 0 } })]);
 
-      // Create a properly typed Handle
-      const handle: Handle = {
+      // Create a properly typed HandleBounds
+      const handle: HandleBounds = {
         id: 'h1',
         nodeId: 'n1',
         x: 0,

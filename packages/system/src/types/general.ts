@@ -7,7 +7,7 @@ import type { Transition } from 'd3-transition';
 
 import type { XYPosition, Rect, Position } from './utils';
 import type { InternalNodeBase, NodeBase, NodeDragItem } from './nodes';
-import type { Handle, HandleType } from './handles';
+import type { HandleBounds, HandleType } from './handles';
 import { PanZoomInstance } from './panzoom';
 import { EdgeBase } from '..';
 
@@ -344,7 +344,7 @@ export type ConnectionInProgress<NodeType extends InternalNodeBase = InternalNod
   /** Returns the xy start position or `null` if no connection is in progress. */
   from: XYPosition;
   /** Returns the start handle or `null` if no connection is in progress. */
-  fromHandle: Handle;
+  fromHandle: HandleBounds;
   /** Returns the side (called position) of the start handle or `null` if no connection is in progress. */
   fromPosition: Position;
   /** Returns the start node or `null` if no connection is in progress. */
@@ -352,7 +352,7 @@ export type ConnectionInProgress<NodeType extends InternalNodeBase = InternalNod
   /** Returns the xy end position or `null` if no connection is in progress. */
   to: XYPosition;
   /** Returns the end handle or `null` if no connection is in progress. */
-  toHandle: Handle | null;
+  toHandle: HandleBounds | null;
   /** Returns the side (called position) of the end handle or `null` if no connection is in progress. */
   toPosition: Position;
   /** Returns the end node or `null` if no connection is in progress. */

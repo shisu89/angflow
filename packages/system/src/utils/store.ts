@@ -1,4 +1,4 @@
-import { Handle, HandleConnection, infiniteExtent, NodeHandleBounds, ZIndexMode } from '..';
+import { HandleBounds, HandleConnection, infiniteExtent, NodeHandleBounds, ZIndexMode } from '..';
 import {
   NodeBase,
   CoordinateExtent,
@@ -186,8 +186,8 @@ function parseHandles(userNode: NodeBase, internalNode?: InternalNodeBase): Node
     return internalNode?.internals.handleBounds;
   }
 
-  const source: Handle[] = [];
-  const target: Handle[] = [];
+  const source: HandleBounds[] = [];
+  const target: HandleBounds[] = [];
 
   for (const handle of userNode.handles) {
     const handleBounds = {
