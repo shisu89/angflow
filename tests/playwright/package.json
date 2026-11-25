@@ -7,6 +7,7 @@
   "scripts": {
     "test:svelte": "FRAMEWORK=svelte pnpm exec playwright test -c playwright.svelte.config.ts",
     "test:react": "FRAMEWORK=react pnpm exec playwright test -c playwright.react.config.ts",
+    "test:vue": "FRAMEWORK=vue pnpm exec playwright test -c playwright.vue.config.ts",
     "test:angular": "FRAMEWORK=ng pnpm exec playwright test -c playwright.angular.config.ts",
     "test:react:ui": "pnpm run test:react --ui",
     "test:svelte:ui": "pnpm run test:svelte --ui",
@@ -16,15 +17,10 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@playwright/test": "^1.51.1",
+    "@playwright/test": "^1.65.1",
     "@types/node": "^20.14.6"
   },
   "dependencies": {
-    "@playwright/experimental-ct-react": "^1.51.1",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
     "typescript": "^5.7.3"
   }
 }

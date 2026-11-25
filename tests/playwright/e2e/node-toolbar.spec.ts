@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { FRAMEWORK } from './constants';
+import { expectToBeWithin } from './utils';
 
 type Position = 'top' | 'right' | 'bottom' | 'left';
 const positions: Position[] = ['top', 'right', 'bottom', 'left'];
@@ -32,7 +33,6 @@ test.describe('Node Toolbar', async () => {
   });
 
   test('all toolbars are positioned correctly', async ({ page }) => {
-    test.skip(FRAMEWORK === 'ng', 'Sub-pixel rounding: Angular host element boundary causes 1px offset');
     const tests = permutations.map((permutation) => async () => {
       const toolbar = page
         .locator(`[data-id="${permutation.id}"]`)
@@ -65,17 +65,16 @@ test.describe('Node Toolbar', async () => {
 
       switch (permutation.align) {
         case 'start':
-          expect(Math.floor(toolbarBox![dimension])).toBe(Math.floor(nodeBox![dimension]));
+          expectToBeWithin(toolbarBox![dimension], nodeBox![dimension]);
           break;
         case 'center':
-          expect(Math.floor(toolbarBox![dimension] + toolbarBox![extent] * 0.5)).toBe(
-            Math.floor(nodeBox![dimension] + nodeBox![extent] * 0.5)
+          expectToBeWithin(
+            toolbarBox![dimension] + toolbarBox![extent] * 0.5,
+            nodeBox![dimension] + nodeBox![extent] * 0.5
           );
           break;
         case 'end':
-          expect(Math.floor(toolbarBox![dimension] + toolbarBox![extent])).toBe(
-            Math.floor(nodeBox![dimension] + nodeBox![extent])
-          );
+          expectToBeWithin(toolbarBox![dimension] + toolbarBox![extent], nodeBox![dimension] + nodeBox![extent]);
           break;
       }
     });

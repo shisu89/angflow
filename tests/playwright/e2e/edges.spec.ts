@@ -98,8 +98,6 @@ test.describe('Edges', () => {
     });
 
     test('deletable=false prevents deleting of edges', async ({ page }) => {
-      test.skip(FRAMEWORK === 'ng', 'SVG hit-test: bounding box center misses bezier edge path');
-
       const edge = page.locator('[data-id="not-deletable"]');
 
       await expect(edge).toBeAttached();
@@ -134,7 +132,6 @@ test.describe('Edges', () => {
     });
 
     test('interactionWidth is working', async ({ page }) => {
-      test.skip(FRAMEWORK === 'ng', 'SVG hit-test: bounding box center misses bezier edge path');
       const edge = page.locator('[data-id="interaction-width"]');
 
       await expect(edge).toBeAttached();
@@ -177,5 +174,27 @@ test.describe('Edges', () => {
       await expect(svg).toBeAttached();
       await expect(svg).toHaveCSS('z-index', '1');
     });
+  });
+});
+
+test.describe('elevate edges on select for overlapping reconnect anchors', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/tests/generic/edges/reconnect');
+  });
+
+  test('selected edge gets elevated z-index above non-selected overlapping edge', async ({ page }) => {
+    const edge1 = page.locator('[data-id="reconnect-1"]');
+
+    await edge1.click();
+    await expect(edge1).toHaveClass(/selected/);
+
+    const svg1 = page.locator('svg', { has: page.locator('[data-id="reconnect-1"]') });
+    const svg2 = page.locator('svg', { has: page.locator('[data-id="reconnect-2"]') });
+
+    await expect(svg1).toHaveCSS('z-index', '1000');
+    await expect(svg2).toHaveCSS('z-index', '0');
+    const z1 = await svg1.evaluate((el) => parseInt(getComputedStyle(el).zIndex, 10));
+    const z2 = await svg2.evaluate((el) => parseInt(getComputedStyle(el).zIndex, 10));
+    expect(z1).toBeGreaterThan(z2);
   });
 });

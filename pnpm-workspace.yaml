@@ -3,6 +3,7 @@ packages:
   - 'packages/angular'
   - 'packages/mcp'
   - 'examples/angular'
+  - 'tests/playwright'
   - 'tooling/*'
 allowBuilds:
   '@parcel/watcher': true
