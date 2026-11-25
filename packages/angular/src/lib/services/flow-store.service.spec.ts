@@ -1057,6 +1057,36 @@ describe('FlowStore', () => {
   });
 });
 
+describe('viewport helpers report interruption', () => {
+  let store: FlowStore;
+  beforeEach(() => {
+    store = new FlowStore();
+    store.width.set(800);
+    store.height.set(600);
+  });
+
+  it('setViewport resolves what panZoom.setViewport resolves', async () => {
+    const setViewport = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    store.panZoom.set({ setViewport } as never);
+    await expect(store.setViewport({ x: 0, y: 0, zoom: 1 })).resolves.toBe(true);
+    await expect(store.setViewport({ x: 0, y: 0, zoom: 1 })).resolves.toBe(false);
+  });
+
+  it('setViewport resolves false without panZoom', async () => {
+    await expect(store.setViewport({ x: 0, y: 0, zoom: 1 })).resolves.toBe(false);
+  });
+
+  it('setCenter resolves false when panZoom.setViewport resolves false', async () => {
+    store.panZoom.set({ setViewport: vi.fn().mockResolvedValue(false) } as never);
+    await expect(store.setCenter(0, 0, { zoom: 1 })).resolves.toBe(false);
+  });
+
+  it('zoomTo resolves false when scaleTo resolves false', async () => {
+    store.panZoom.set({ scaleTo: vi.fn().mockResolvedValue(false) } as never);
+    await expect(store.zoomTo(2)).resolves.toBe(false);
+  });
+});
+
 describe('tweenNodePositions', () => {
   let frames: FrameRequestCallback[];
   let now: number;

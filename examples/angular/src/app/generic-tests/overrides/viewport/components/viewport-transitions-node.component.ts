@@ -1,14 +1,10 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { NgFlowService } from '@angflow/angular';
+import { NgFlowService, type FitViewResult } from '@angflow/angular';
 
 // long enough for a test to interrupt the transition halfway
 const duration = 5000;
 
-// Angular's viewport API does not report interruption the way React's does:
-//  - fitView resolves { zoom, clamped } and setViewport resolves void, so a settled
-//    promise is reported as "ended" (the API gives no way to tell otherwise);
-//  - setCenter/zoomTo/zoomIn resolve a boolean, which is used as-is.
-// Interruption tests therefore surface any library gap instead of being faked.
+// fitView resolves { zoom, clamped, ended }; the other helpers resolve a boolean.
 type Transition = () => Promise<unknown>;
 
 @Component({
@@ -36,7 +32,7 @@ export class ViewportTransitionsNodeComponent {
   protected async track(name: string, transition: Transition): Promise<void> {
     this.status.set(`${name}: pending`);
     const result = await transition();
-    const ended = typeof result === 'boolean' ? result : true;
+    const ended = typeof result === 'boolean' ? result : (result as FitViewResult).ended;
     this.status.set(`${name}: ${ended ? 'ended' : 'interrupted'}`);
   }
 

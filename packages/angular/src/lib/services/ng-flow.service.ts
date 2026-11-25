@@ -89,17 +89,17 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
   // ── Viewport operations ───────────────────────────────────────────────
 
-  /** Zoom the viewport in by one step. Optionally animate over `duration` ms (with `ease`/`interpolate`). */
+  /** Zoom the viewport in by one step. Optionally animate over `duration` ms (with `ease`/`interpolate`). Resolves `true` when the animation ran to the end and `false` when a user gesture or another viewport call interrupted it. */
   zoomIn(options?: ViewportAnimationOptions) {
     return this.store.zoomIn(options);
   }
 
-  /** Zoom the viewport out by one step. Optionally animate over `duration` ms (with `ease`/`interpolate`). */
+  /** Zoom the viewport out by one step. Optionally animate over `duration` ms (with `ease`/`interpolate`). Resolves `true` when the animation ran to the end and `false` when a user gesture or another viewport call interrupted it. */
   zoomOut(options?: ViewportAnimationOptions) {
     return this.store.zoomOut(options);
   }
 
-  /** Set the viewport zoom to an absolute level (clamped to `minZoom`/`maxZoom`). */
+  /** Set the viewport zoom to an absolute level (clamped to `minZoom`/`maxZoom`). Resolves `true` when the animation ran to the end and `false` when a user gesture or another viewport call interrupted it. */
   zoomTo(zoomLevel: number, options?: ViewportAnimationOptions) {
     return this.store.zoomTo(zoomLevel, options);
   }
@@ -107,13 +107,14 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   /**
    * Zoom and pan so all nodes (or `options.nodes`) fit in the canvas.
    * Respects `minZoom`, `maxZoom`, and `padding`.
-   * Returns the achieved zoom and whether it was clamped at the min-zoom floor.
+   * Resolves `{ zoom, clamped, ended }`: the achieved zoom, whether it was clamped at the min-zoom floor,
+   * and `ended` (`false` when a user gesture or another viewport call interrupted the animation).
    */
   fitView(options?: FitViewOptionsBase<NodeType>): Promise<FitViewResult> {
     return this.store.fitView(options);
   }
 
-  /** Set the viewport to an absolute `{ x, y, zoom }`. Optionally animate (`duration`/`ease`/`interpolate`). */
+  /** Set the viewport to an absolute `{ x, y, zoom }`. Optionally animate (`duration`/`ease`/`interpolate`). Resolves `true` when the animation ran to the end and `false` when a user gesture or another viewport call interrupted it. */
   setViewport(viewport: Viewport, options?: ViewportAnimationOptions) {
     return this.store.setViewport(viewport, options);
   }
@@ -128,7 +129,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     return this.store.transform()[2];
   }
 
-  /** Center the viewport on a flow-space coordinate. Optionally animate (`duration`/`ease`/`interpolate`). */
+  /** Center the viewport on a flow-space coordinate. Optionally animate (`duration`/`ease`/`interpolate`). Resolves `true` when the animation ran to the end and `false` when a user gesture or another viewport call interrupted it. */
   setCenter(x: number, y: number, options?: ViewportAnimationOptions & { zoom?: number }) {
     return this.store.setCenter(x, y, options);
   }

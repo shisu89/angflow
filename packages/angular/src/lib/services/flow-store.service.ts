@@ -932,7 +932,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
     const nextZoom = options?.zoom ?? this.maxZoom();
 
-    await pz.setViewport(
+    return pz.setViewport(
       {
         x: this.width() / 2 - x * nextZoom,
         y: this.height() / 2 - y * nextZoom,
@@ -940,15 +940,13 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       },
       { duration: options?.duration, ease: options?.ease, interpolate: options?.interpolate }
     );
-
-    return true;
   }
 
-  async setViewport(viewport: Viewport, options?: ViewportAnimationOptions): Promise<void> {
+  async setViewport(viewport: Viewport, options?: ViewportAnimationOptions): Promise<boolean> {
     const pz = this.panZoom();
-    if (!pz) return;
+    if (!pz) return false;
 
-    await pz.setViewport(viewport, options);
+    return pz.setViewport(viewport, options);
   }
 
   async zoomIn(options?: ViewportAnimationOptions): Promise<boolean> {

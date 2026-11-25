@@ -203,32 +203,12 @@ export const KNOWN_FAILURES: KnownFailure[] = [
   },
 
   // ── viewport.spec.ts ──────────────────────────────────────────────────────
-  ...['fit view', 'set center'].map(
-    (transition): KnownFailure => ({
-      file: 'viewport.spec.ts',
-      titlePath: ['Viewport transitions', `${transition} resolves with false when a scroll interrupts it`],
-      reason: `"${transition}" stays pending: an interrupted d3 transition never settles its promise (report §1, #6064).`,
-      owner: 'B',
-    }),
-  ),
-  {
-    file: 'viewport.spec.ts',
-    titlePath: ['Viewport transitions', 'a transition resolves with false when a viewport change cancels it before it starts'],
-    reason: 'setCenter cancelled by an immediate setViewport stays pending (report §1, #6064).',
-    owner: 'B',
-  },
   {
     file: 'viewport.spec.ts',
     titlePath: ['Viewport transitions', 'fit view called again during its transition settles when the last fit ends'],
     reason:
       'Each fitView call gets its own promise and the superseded first one never settles; upstream shares ' +
       'one promise and resolves it when the last fit ends (report §1, #6064).',
-    owner: 'B',
-  },
-  {
-    file: 'viewport.spec.ts',
-    titlePath: ['Viewport transitions', 'an interrupted fit view does not run again when a node is dragged'],
-    reason: 'The scroll-interrupted fitView stays pending, so the status never reads "interrupted" (report §1, #6064).',
     owner: 'B',
   },
 ];
