@@ -58,22 +58,31 @@ function mergeObjects<T extends Record<string, unknown>>(base: T, incoming?: Par
   return result;
 }
 
-// Pass stamps for updateAbsolutePositions' nested children, one id -> pass map per node
-// lookup, reused across calls so a drag frame doesn't allocate a visited set.
-const absolutePassStamps = new WeakMap<object, Map<string, number>>();
-let absolutePass = 0;
+/**
+ * A cached parents-first processing order for one node lookup, see updateAbsolutePositions.
+ * `ids`/`parentIds` record the lookup's iteration order when the cache was built; `order`
+ * lists indices into it, parents first (`undefined` when that iteration order already is).
+ * `nodes` is a reused buffer filled with the lookup's current entries on every call.
+ */
+type AbsolutePositionOrder<NodeType extends NodeBase> = {
+  ids: string[];
+  parentIds: (string | undefined)[];
+  order: number[] | undefined;
+  nodes: InternalNodeBase<NodeType>[];
+};
+
+const absolutePositionOrders = new WeakMap<object, AbsolutePositionOrder<NodeBase>>();
 
 /**
  * DELIBERATE DIVERGENCE FROM xyflow UPSTREAM (which no longer calls this): parents are
  * resolved before their children, whatever the lookup's insertion order, so a child
  * listed before its parent (#5915) never reads the parent's previous-pass position.
  *
- * This runs on every drag frame, so the common case does no bookkeeping: roots are updated
- * first, then every child of a root. Only a child whose parent is itself a child resolves
- * its parent chain first, marking visited ids with a pass stamp (also the cycle guard).
- * `updateChildNode` is idempotent for a resolved parent, so the few chain nodes that get
- * updated twice in one pass end up the same. Iterating the lookup while `updateChildNode`
- * replaces entries is safe: `Map.set` on an existing key keeps the iteration order.
+ * This runs on every drag frame. The parents-first order is computed once per graph
+ * structure and cached per lookup. Each call checks the cache in one pass over the lookup
+ * (same ids and parentIds in the same order) and rebuilds it on any mismatch, so a
+ * structural change made by any writer is picked up. A child whose parent is missing is
+ * skipped silently (adoptUserNodes already warned once).
  */
 export function updateAbsolutePositions<NodeType extends NodeBase>(
   nodeLookup: NodeLookup<InternalNodeBase<NodeType>>,
@@ -81,74 +90,90 @@ export function updateAbsolutePositions<NodeType extends NodeBase>(
   options?: UpdateNodesOptions<NodeType>
 ) {
   const _options = mergeObjects(defaultOptions, options);
+  let cache = absolutePositionOrders.get(nodeLookup) as AbsolutePositionOrder<NodeType> | undefined;
 
-  for (const node of nodeLookup.values()) {
-    if (!node.parentId) {
+  if (!cache || !fillAbsolutePositionOrder(nodeLookup, cache)) {
+    cache = buildAbsolutePositionOrder(nodeLookup);
+    absolutePositionOrders.set(nodeLookup, cache as unknown as AbsolutePositionOrder<NodeBase>);
+  }
+
+  const { nodes, order } = cache;
+  const count = order ? order.length : nodes.length;
+
+  for (let k = 0; k < count; k++) {
+    // `nodes` holds each entry as it was at the start of this call; only the node's own
+    // updateChildNode replaces its entry, and each node is processed once
+    const node = nodes[order ? order[k] : k];
+
+    if (node.parentId) {
+      updateChildNode(node, nodeLookup, parentLookup, _options);
+    } else {
       const positionWithOrigin = getNodePositionWithOrigin(node, _options.nodeOrigin);
       const extent = isCoordinateExtent(node.extent) ? node.extent : _options.nodeExtent;
       const clampedPosition = clampPosition(positionWithOrigin, extent, getNodeDimensions(node));
       node.internals.positionAbsolute = clampedPosition;
     }
   }
-
-  let stamps: Map<string, number> | undefined;
-  let pass = 0;
-
-  for (const node of nodeLookup.values()) {
-    if (!node.parentId) {
-      continue;
-    }
-    const parent = nodeLookup.get(node.parentId);
-    // A missing parent is skipped silently: adoptUserNodes already warned once, and this
-    // runs on every drag frame.
-    if (!parent) {
-      continue;
-    }
-    if (parent.parentId) {
-      if (!stamps) {
-        stamps = absolutePassStamps.get(nodeLookup);
-        // drop stamps of removed ids once they outnumber the live ones
-        if (!stamps || stamps.size > nodeLookup.size * 2) {
-          stamps = new Map();
-          absolutePassStamps.set(nodeLookup, stamps);
-        }
-        pass = ++absolutePass;
-      }
-      if (stamps.get(node.id) === pass) {
-        continue;
-      }
-      stamps.set(node.id, pass);
-      resolveNestedParent(parent.id, nodeLookup, parentLookup, _options, stamps, pass);
-    }
-    // `node` is the current entry: Map iteration yields the value at the time it is reached,
-    // and resolving the parent chain replaces only ancestors' entries
-    updateChildNode(node, nodeLookup, parentLookup, _options);
-  }
 }
 
-/** Updates a child that is itself a parent, after its own parent chain. */
-function resolveNestedParent<NodeType extends NodeBase>(
-  id: string,
+/** Fills the cache's buffer from the lookup; false when the lookup's structure changed. */
+function fillAbsolutePositionOrder<NodeType extends NodeBase>(
   nodeLookup: NodeLookup<InternalNodeBase<NodeType>>,
-  parentLookup: ParentLookup<InternalNodeBase<NodeType>>,
-  options: typeof defaultOptions,
-  stamps: Map<string, number>,
-  pass: number
-) {
-  if (stamps.get(id) === pass) {
-    return;
-  }
-  // stamped before recursing, so a parentId cycle can't loop
-  stamps.set(id, pass);
+  cache: AbsolutePositionOrder<NodeType>
+): boolean {
+  const { ids, parentIds, nodes } = cache;
 
-  const parent = nodeLookup.get(nodeLookup.get(id)!.parentId!);
-  if (!parent) {
-    return;
+  if (ids.length !== nodeLookup.size) {
+    return false;
   }
-  if (parent.parentId) {
-    resolveNestedParent(parent.id, nodeLookup, parentLookup, options, stamps, pass);
+
+  let i = 0;
+  for (const node of nodeLookup.values()) {
+    if (node.id !== ids[i] || node.parentId !== parentIds[i]) {
+      return false;
+    }
+    nodes[i++] = node;
   }
-  updateChildNode(nodeLookup.get(id)!, nodeLookup, parentLookup, options);
+
+  return true;
+}
+
+function buildAbsolutePositionOrder<NodeType extends NodeBase>(
+  nodeLookup: NodeLookup<InternalNodeBase<NodeType>>
+): AbsolutePositionOrder<NodeType> {
+  const nodes = [...nodeLookup.values()];
+  const ids = nodes.map((node) => node.id);
+  const parentIds = nodes.map((node) => node.parentId);
+  const indexById = new Map(ids.map((id, i) => [id, i]));
+  const visited = new Uint8Array(nodes.length);
+  const order: number[] = [];
+
+  const visit = (i: number) => {
+    if (visited[i]) {
+      return;
+    }
+    // marked before recursing, so a parentId cycle can't loop
+    visited[i] = 1;
+
+    const parentId = parentIds[i];
+    if (parentId !== undefined) {
+      const parentIndex = indexById.get(parentId);
+      // a child whose parent is missing is left out
+      if (parentIndex === undefined) {
+        return;
+      }
+      visit(parentIndex);
+    }
+    order.push(i);
+  };
+
+  for (let i = 0; i < nodes.length; i++) {
+    visit(i);
+  }
+
+  const isIterationOrder = order.length === nodes.length && order.every((index, k) => index === k);
+
+  return { ids, parentIds, order: isIterationOrder ? undefined : order, nodes };
 }
 
 function parseHandles(userNode: NodeBase, internalNode?: InternalNodeBase): NodeHandleBounds | undefined {

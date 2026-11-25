@@ -116,6 +116,18 @@ describe('subflow order (#5915)', () => {
     expect(nodeLookup.get('gc')!.internals.positionAbsolute).toEqual({ x: 511, y: 522 });
   });
 
+  it('updateAbsolutePositions picks up a reordered lookup after a cached pass', () => {
+    const { nodeLookup, parentLookup } = lookups();
+    const g = node('g', { position: { x: 100, y: 200 }, width: 300, height: 300 });
+    const c = node('c', { parentId: 'g', position: { x: 10, y: 20 } });
+    adoptUserNodes([g, c], nodeLookup, parentLookup);
+    updateAbsolutePositions(nodeLookup, parentLookup);
+    adoptUserNodes([{ ...c }, { ...g }], nodeLookup, parentLookup);
+    nodeLookup.get('g')!.position = { x: 500, y: 500 };
+    updateAbsolutePositions(nodeLookup, parentLookup);
+    expect(nodeLookup.get('c')!.internals.positionAbsolute).toEqual({ x: 510, y: 520 });
+  });
+
   it('updateAbsolutePositions terminates on a parentId cycle', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { nodeLookup, parentLookup } = lookups();
