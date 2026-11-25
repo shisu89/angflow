@@ -219,3 +219,52 @@ describe('XYPanZoom pane extent cache (#5850)', () => {
     expect(ro.disconnect).toHaveBeenCalled();
   });
 });
+
+describe('createFilter pan activation key (#5922)', () => {
+  function filterFor(panActivationKeyPressed?: boolean) {
+    return createFilter({
+      panActivationKeyPressed,
+      zoomOnScroll: true,
+      zoomOnPinch: true,
+      panOnDrag: true,
+      panOnScroll: false,
+      zoomOnDoubleClick: true,
+      userSelectionActive: false,
+      noWheelClassName: 'nowheel',
+      noPanClassName: 'nopan',
+      lib: 'ng',
+    });
+  }
+
+  function ctrlMouseDown() {
+    const target = document.createElement('div');
+    return { type: 'mousedown', button: 0, ctrlKey: true, target, composedPath: () => [target] };
+  }
+
+  it('rejects a ctrl-modified drag without the pan activation key', () => {
+    expect(filterFor()(ctrlMouseDown())).toBe(false);
+  });
+
+  it('allows a ctrl-modified drag while the pan activation key is held', () => {
+    expect(filterFor(true)(ctrlMouseDown())).toBe(true);
+  });
+
+  it('leaves ctrl+wheel to the zoomOnPinch rules', () => {
+    const target = document.createElement('div');
+    const wheel = { type: 'wheel', button: 0, ctrlKey: true, target, composedPath: () => [target] };
+    expect(filterFor(true)(wheel)).toBe(true);
+    const noPinch = createFilter({
+      panActivationKeyPressed: true,
+      zoomOnScroll: true,
+      zoomOnPinch: false,
+      panOnDrag: true,
+      panOnScroll: false,
+      zoomOnDoubleClick: true,
+      userSelectionActive: false,
+      noWheelClassName: 'nowheel',
+      noPanClassName: 'nopan',
+      lib: 'ng',
+    });
+    expect(noPinch(wheel)).toBe(false);
+  });
+});

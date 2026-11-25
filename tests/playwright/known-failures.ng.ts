@@ -163,12 +163,6 @@ export const KNOWN_FAILURES: KnownFailure[] = [
       'selecting is enabled (selection key held or selectionOnDrag) as upstream `isSelecting` does (new bug).',
     owner: 'B',
   },
-  {
-    file: 'pane.spec.ts',
-    titlePath: ['Pane activation keys', 'Control and primary-button drag pans the pane'],
-    reason: 'Holding `panActivationKeyCode="Control"` never starts a drag-pan; the viewport does not move (report §1, #5922).',
-    owner: 'B',
-  },
 
   // ── props.spec.ts ─────────────────────────────────────────────────────────
   {

@@ -132,6 +132,7 @@ export function XYPanZoom({
     zoomOnScroll,
     zoomOnDoubleClick,
     zoomActivationKeyPressed,
+    panActivationKeyPressed = false,
     lib,
     onTransformChange,
     connectionInProgress,
@@ -219,6 +220,7 @@ export function XYPanZoom({
 
     const filter = createFilter({
       zoomActivationKeyPressed,
+      panActivationKeyPressed,
       panOnDrag,
       zoomOnScroll,
       panOnScroll,

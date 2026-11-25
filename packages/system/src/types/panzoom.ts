@@ -39,6 +39,7 @@ export type PanZoomUpdateOptions = {
   zoomOnScroll: boolean;
   zoomOnDoubleClick: boolean;
   zoomActivationKeyPressed?: boolean;
+  panActivationKeyPressed?: boolean;
   lib: string;
   onTransformChange: OnTransformChange;
   connectionInProgress?: boolean;

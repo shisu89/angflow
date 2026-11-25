@@ -888,6 +888,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       this.zoomOnDoubleClick();
       this.effectiveSelectionOnDrag();
       this.store.zoomActivationKeyActive();
+      this.store.panActivationKeyActive();
       this.preventScrolling();
       this.noPanClassName();
       this.noWheelClassName();
@@ -1227,6 +1228,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       zoomOnDoubleClick: this.zoomOnDoubleClick(),
       selectionOnDrag: this.effectiveSelectionOnDrag(),
       zoomActivationKeyPressed: this.store.zoomActivationKeyActive(),
+      panActivationKeyPressed: this.store.panActivationKeyActive(),
       preventScrolling: this.preventScrolling(),
       noPanClassName: this.noPanClassName(),
       noWheelClassName: this.noWheelClassName(),
