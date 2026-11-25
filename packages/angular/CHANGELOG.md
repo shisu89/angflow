@@ -1,8 +1,12 @@
 # @angflow/angular
 
-## 0.3.22
+## 0.4.0 *(unreleased)*
 
-Bug-fix release. Requires `@angflow/system` 0.1.14.
+Requires `@angflow/system` 0.2.0. Contains the unreleased 0.3.22 bug-fix (B) and deletion (C) entries, plus the upstream 1.0 API alignment (D1), whose breaking changes come first.
+
+### Breaking changes
+
+<!-- D1: filled in by the release-docs task (Task 12). -->
 
 ### Added (additive API)
 

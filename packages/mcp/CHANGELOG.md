@@ -1,8 +1,12 @@
 # @angflow/mcp
 
-## 0.0.4
+## 0.1.0 *(unreleased)*
 
-Tool snapshot regenerated from @angflow/angular 0.3.22 (`fit_view` / `fit_bounds` /
+### Breaking changes
+
+<!-- D1: filled in by the release-docs task (Task 12). -->
+
+Tool snapshot regenerated from @angflow/angular 0.4.0 (`fit_view` / `fit_bounds` /
 `set_viewport` / `delete_elements` / `apply_changes` descriptions).
 
 
