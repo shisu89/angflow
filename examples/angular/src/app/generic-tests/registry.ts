@@ -8,6 +8,8 @@ import paneClickConnect from '../../../../react/src/generic-tests/pane/click-con
 import paneClickConnectSelection from '../../../../react/src/generic-tests/pane/click-connect-selection';
 import paneGeneral from '../../../../react/src/generic-tests/pane/general';
 import paneNonDefaults from '../../../../react/src/generic-tests/pane/non-defaults';
+import nodeToolbarGeneral from './overrides/node-toolbar/general';
+import viewportTransitions from './overrides/viewport/transitions';
 import nodesConnectionUpdates from './overrides/nodes/connection-updates';
 import nodesDataUpdates from './overrides/nodes/data-updates';
 import nodesGeneral from './overrides/nodes/general';
@@ -24,11 +26,12 @@ export const DATA_ONLY: Record<string, FlowConfig> = {
 };
 
 export const OVERRIDES: Record<string, FlowConfig> = {
-  // Task 5 adds node-toolbar/general and viewport/transitions.
   'nodes/connection-updates': nodesConnectionUpdates,
   'nodes/data-updates': nodesDataUpdates,
   'nodes/general': nodesGeneral,
   'nodes/intersection-origin': nodesIntersectionOrigin,
+  'node-toolbar/general': nodeToolbarGeneral,
+  'viewport/transitions': viewportTransitions,
 };
 
 export const REGISTRY: Record<string, FlowConfig> = { ...DATA_ONLY, ...OVERRIDES };
