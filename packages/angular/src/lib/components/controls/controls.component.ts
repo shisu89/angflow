@@ -136,7 +136,7 @@ export class ControlsComponent {
   readonly fitViewClick = output<void>();
   /** Fires with the new interactive state after the lock button is toggled. */
   readonly interactiveChange = output<boolean>();
-  /** Fires with the deleted elements after the delete button is clicked. */
+  /** Fires after the delete button is clicked with the elements actually deleted (descendants and connected edges included; empty if `onBeforeDelete` vetoed). */
   readonly deleteClick = output<{ nodes: unknown[]; edges: unknown[] }>();
 
   // Derive interactive/locked state directly from the store so external
@@ -188,15 +188,15 @@ export class ControlsComponent {
   }
 
   onDelete() {
-    // Respect per-element `deletable`; deleteElements handles connected edges,
-    // the onBeforeDelete gate, and the (nodesDelete)/(edgesDelete)/(deleteElements)
-    // outputs — the same path the Delete key takes.
-    const nodes = this.store.selectedNodes().filter((n) => n.deletable !== false);
-    const edges = this.store.selectedEdges().filter((e) => e.deletable !== false);
+    // Same path as the delete key: NgFlowService.deleteElements does the cascade,
+    // deletable filtering, onBeforeDelete and the <ng-flow> delete outputs.
+    const nodes = this.store.selectedNodes();
+    const edges = this.store.selectedEdges();
     if (nodes.length === 0 && edges.length === 0) return;
-
-    void this.ngFlowService.deleteElements({ nodes, edges }).then((deleted) => {
-      this.deleteClick.emit({ nodes: deleted.deletedNodes, edges: deleted.deletedEdges });
-    });
+    this.ngFlowService.deleteElements({ nodes, edges }).then(
+      (deleted) => this.deleteClick.emit({ nodes: deleted.deletedNodes, edges: deleted.deletedEdges }),
+      (err: unknown) =>
+        this.store.onError()('delete-failed', `deleteElements failed: ${err instanceof Error ? err.message : String(err)}`),
+    );
   }
 }
