@@ -54,7 +54,37 @@ export function XYPanZoom({
     isPanScrolling: false,
   };
   const bbox = domNode.getBoundingClientRect();
-  const d3ZoomInstance = zoom().scaleExtent([minZoom, maxZoom]).translateExtent(translateExtent);
+
+  /*
+   * Cache the pane extent and refresh it from a ResizeObserver. Otherwise d3-zoom falls back to its
+   * defaultExtent, which reads clientWidth/clientHeight and forces a synchronous layout while panning
+   * and pinching. The observer stays connected while zooming is paused during a user selection
+   * (angflow never tears listeners down there; see update()), so the cache stays fresh, and is
+   * disconnected in destroy(), which in angflow only runs on unmount.
+   */
+  let cachedExtent: CoordinateExtent = [
+    [0, 0],
+    [bbox.width, bbox.height],
+  ];
+  const extentResizeObserver =
+    typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver((entries) => {
+          const entry = entries[0];
+          // test mocks may call back without contentRect
+          if (entry?.contentRect) {
+            cachedExtent = [
+              [0, 0],
+              [entry.contentRect.width, entry.contentRect.height],
+            ];
+          }
+        })
+      : null;
+  extentResizeObserver?.observe(domNode);
+
+  const d3ZoomInstance = zoom()
+    .extent(() => cachedExtent)
+    .scaleExtent([minZoom, maxZoom])
+    .translateExtent(translateExtent);
   const d3Selection = select(domNode).call(d3ZoomInstance);
 
   setViewportConstrained(
@@ -215,6 +245,7 @@ export function XYPanZoom({
   }
 
   function destroy() {
+    extentResizeObserver?.disconnect();
     d3ZoomInstance.on('zoom', null);
     // Remove d3-zoom's DOM listeners (namespaced wheel.zoom / mousedown.zoom /
     // dblclick.zoom / touchstart.zoom …). Clearing only the 'zoom' behavior

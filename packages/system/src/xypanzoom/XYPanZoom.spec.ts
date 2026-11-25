@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PanOnScrollMode, type CoordinateExtent, type PanZoomUpdateOptions } from '../types';
 import { XYPanZoom } from './XYPanZoom';
 import { createFilter } from './filter';
@@ -150,5 +150,72 @@ describe('XYPanZoom transition promises (#6064)', () => {
     await new Promise((r) => setTimeout(r, 50)); // let it start
     void panZoom.setViewport({ x: 0, y: 0, zoom: 1 }); // -> 'interrupt'
     await expect(pending).resolves.toBe(false);
+  });
+});
+
+describe('XYPanZoom pane extent cache (#5850)', () => {
+  function stubResizeObserver() {
+    const captured: { callback?: (entries: unknown[]) => void; disconnect: ReturnType<typeof vi.fn> } = {
+      disconnect: vi.fn(),
+    };
+    class FakeResizeObserver {
+      constructor(callback: (entries: unknown[]) => void) {
+        captured.callback = callback;
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {
+        captured.disconnect();
+      }
+    }
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    return captured;
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('does not read layout size per gesture', async () => {
+    stubResizeObserver();
+    const { domNode, panZoom } = setup();
+    const clientWidth = vi.fn(() => 800);
+    const clientHeight = vi.fn(() => 600);
+    Object.defineProperty(domNode, 'clientWidth', { get: clientWidth });
+    Object.defineProperty(domNode, 'clientHeight', { get: clientHeight });
+
+    await panZoom.scaleBy(2);
+
+    expect(clientWidth).not.toHaveBeenCalled();
+    expect(clientHeight).not.toHaveBeenCalled();
+  });
+
+  it('uses the observed size', async () => {
+    const ro = stubResizeObserver();
+    const { panZoom } = setup();
+
+    ro.callback!([{ contentRect: { width: 400, height: 300 } }]);
+    await panZoom.scaleTo(2);
+
+    expect(panZoom.getViewport()).toEqual({ x: -200, y: -150, zoom: 2 });
+  });
+
+  it('ignores observer entries without contentRect (#6108)', async () => {
+    const ro = stubResizeObserver();
+    const { panZoom } = setup();
+
+    expect(() => ro.callback!([{}])).not.toThrow();
+    await panZoom.scaleTo(2);
+
+    expect(panZoom.getViewport()).toEqual({ x: -400, y: -300, zoom: 2 });
+  });
+
+  it('disconnects the observer on destroy (#6054)', () => {
+    const ro = stubResizeObserver();
+    const { panZoom } = setup();
+
+    panZoom.destroy();
+
+    expect(ro.disconnect).toHaveBeenCalled();
   });
 });
