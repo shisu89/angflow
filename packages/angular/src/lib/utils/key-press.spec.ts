@@ -41,8 +41,7 @@ describe('KeyPressTracker', () => {
 
   it("'+' matches the plus key", () => {
     const t = new KeyPressTracker('+');
-    const t2 = new KeyPressTracker('+');
-    expect(t2.down(ev('keydown', { key: '+', code: 'Equal' }))).toBe(true);
+    expect(t.down(ev('keydown', { key: '+', code: 'Equal' }))).toBe(true);
   });
 
   it("'Meta++' is the combination Meta and plus", () => {
