@@ -15,6 +15,7 @@ import {
   getBoundsOfRects,
   XYMinimap,
   type XYMinimapInstance,
+  type PanZoomInstance,
   type PanelPosition,
   type Rect,
 } from '@angflow/system';
@@ -198,6 +199,8 @@ export class MiniMapComponent {
   readonly minimapNodeClick = output<{ event: MouseEvent; node: Node }>();
 
   private minimap: XYMinimapInstance | null = null;
+  /** The panZoom the current minimap was created against. */
+  private minimapPanZoom: PanZoomInstance | null = null;
 
   constructor() {
     const destroyRef = inject(DestroyRef);
@@ -211,6 +214,13 @@ export class MiniMapComponent {
     effect(() => {
       const panZoom = this.store.panZoom();
       const svgEl = this.minimapSvgRef()?.nativeElement;
+      // A flow remount nulls panZoom then supplies a new instance: the old
+      // minimap is bound to the dead one, so drop it and rebuild.
+      if (panZoom !== this.minimapPanZoom) {
+        this.minimap?.destroy();
+        this.minimap = null;
+        this.minimapPanZoom = panZoom;
+      }
       if (!panZoom || !svgEl || this.minimap) return;
 
       this.minimap = XYMinimap({

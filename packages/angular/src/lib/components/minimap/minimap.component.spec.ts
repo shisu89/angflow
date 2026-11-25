@@ -289,6 +289,35 @@ describe('MiniMapComponent adopts XYMinimap', () => {
     }
   });
 
+  it('destroys and recreates the minimap when panZoom goes null then a new instance', async () => {
+    const fixture = createMinimap();
+    document.body.appendChild(fixture.nativeElement);
+    try {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const a = fakePanZoom();
+      const b = fakePanZoom();
+      store.panZoom.set(a);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(XYMinimap).toHaveBeenCalledTimes(1);
+      expect((XYMinimap as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0].panZoom).toBe(a);
+
+      store.panZoom.set(null);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(minimapSpy.destroy).toHaveBeenCalledTimes(1);
+
+      store.panZoom.set(b);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(XYMinimap).toHaveBeenCalledTimes(2);
+      expect((XYMinimap as unknown as ReturnType<typeof vi.fn>).mock.calls[1][0].panZoom).toBe(b);
+    } finally {
+      fixture.nativeElement.remove();
+    }
+  });
+
   it('forwards the exact update params (defaults: pannable/zoomable false, zoomStep 1)', async () => {
     const fixture = createMinimap();
     document.body.appendChild(fixture.nativeElement);
