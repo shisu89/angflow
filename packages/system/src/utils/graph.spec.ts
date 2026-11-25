@@ -106,6 +106,29 @@ describe('fitViewport', () => {
     expect(Number.isNaN(r2.zoom)).toBe(true);
     expect(setViewport).not.toHaveBeenCalled();
   });
+
+  it('fits nothing for `nodes: []` (an empty selection is not "all nodes")', async () => {
+    const setViewport = vi.fn(async () => true);
+    const panZoom = { setViewport } as unknown as PanZoomInstance;
+    const nodes = buildLookup([sized('a', 0, 0)]);
+    const result = await fitViewport(
+      { nodes, width: 800, height: 600, panZoom, minZoom: 0.5, maxZoom: 2 },
+      { nodes: [] } as never,
+    );
+    expect(Number.isNaN(result.zoom)).toBe(true);
+    expect(result.ended).toBe(true);
+    expect(setViewport).not.toHaveBeenCalled();
+  });
+
+  it('fits nothing when every node is hidden', async () => {
+    const setViewport = vi.fn(async () => true);
+    const panZoom = { setViewport } as unknown as PanZoomInstance;
+    const nodes = buildLookup([{ ...sized('a', 0, 0), hidden: true }]);
+    const result = await fitViewport({ nodes, width: 800, height: 600, panZoom, minZoom: 0.5, maxZoom: 2 }, {});
+    expect(Number.isNaN(result.zoom)).toBe(true);
+    expect(result.ended).toBe(true);
+    expect(setViewport).not.toHaveBeenCalled();
+  });
 });
 
 describe('type guards are null/primitive safe', () => {
