@@ -261,14 +261,16 @@ await angflow.callTool('apply_changes', {
 
 **`set_nodes` and `set_edges` are NOT valid ops inside `apply_changes`.** Use the incremental ops instead.
 
-**`delete_elements` inside `apply_changes` skips the `onBeforeDelete` hook.** The standalone `delete_elements` tool awaits `onBeforeDelete` if the host has registered one. Inside `apply_changes`, deletions go through synchronous `setNodes`/`setEdges` filters so the whole batch can roll back on failure — there is no opportunity to await an async veto. If your app relies on `onBeforeDelete` to gate deletions, call the standalone `delete_elements` tool instead. The bridge emits a one-time `console.warn` the first time this combination occurs (`apply_changes` containing `delete_elements` while the host has `onBeforeDelete` set), so the silent veto-loss is discoverable.
+**`delete_elements` inside `apply_changes` skips the `onBeforeDelete` hook.** The op selects elements exactly like the standalone tool (descendants, connected edges, `deletable: false` skipped) and returns the actually-deleted `{ deletedNodeIds, deletedEdgeIds }`, but skips the `onBeforeDelete` hook, which the standalone `delete_elements` tool awaits if the host has registered one. The batch rolls back by snapshot on failure, and the host hook can't take part in that. If your app relies on `onBeforeDelete` to gate deletions, call the standalone `delete_elements` tool instead. The bridge emits a one-time `console.warn` the first time this combination occurs (`apply_changes` containing `delete_elements` while the host has `onBeforeDelete` set), so the silent veto-loss is discoverable.
 
 **Snapshot-rollback semantics:**
 
 1. Before any op executes, `apply_changes` captures a snapshot of `{ nodes, edges }` (viewport is intentionally excluded). Each node and edge is shallow-cloned so concurrent in-place mutations cannot corrupt the snapshot.
-2. All ops run inside `service.batch()`.
+2. Consecutive ops run synchronously inside one `service.batch()`. A `delete_elements` op ends that batch, awaits its element selection (microtasks only), applies its removals in its own `batch()`, and the following ops start a new batch. A batch without a `delete_elements` op is applied entirely synchronously. No render, user event or `flow.state` emission happens between ops either way.
 3. If any op throws, the snapshot is restored via `setNodes`/`setEdges` inside another `batch()` call. Because the rolled-back state is byte-for-byte identical to the pre-call state, the `flow.state` dedup will normally suppress the emission — consumers should treat the JSON-RPC error response (`-32603` with `failedIndex`) as the signal that the batch was rolled back, not absence of a state event.
 4. On success, a single coalesced `flow.state` event is emitted after all ops complete.
+
+**Concurrency:** A batch containing `delete_elements` has a microtask boundary at each delete op. An in-process `bridge.callTool(...)` started in the same tick without awaiting the `apply_changes` call can run at that boundary, and if the batch later rolls back, the snapshot restore undoes that call's changes too. Await `apply_changes` before making another in-process call. Transport requests are unaffected, because each arrives in its own macrotask.
 
 **History:** A successful `apply_changes` that includes at least one non-selection op (i.e., at least one op that is not `select_nodes`, `select_edges`, or `deselect_all`) creates exactly one undo entry. A batch that is entirely selection ops creates no undo entry. A rolled-back `apply_changes` creates no undo entry.
 

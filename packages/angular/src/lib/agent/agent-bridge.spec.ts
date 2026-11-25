@@ -814,6 +814,77 @@ describe('AngflowAgentBridge', () => {
       expect('result' in res).toBe(true);
       expect(flow.selectedNodes().map((n) => n.id)).toEqual(['b']);
     });
+
+    const ok = (res: AgentResponse) => (res as { result: { results: { ok: true; value: unknown }[] } }).result.results;
+
+    it('delete_elements op cascades, skips deletable: false, and reports actually-deleted ids', async () => {
+      flow.setNodes([makeNode('p'), makeNode('c', { parentId: 'p' }), makeNode('x', { deletable: false })]);
+      flow.setEdges([{ id: 'c-x', source: 'c', target: 'x' } as Edge, { id: 'locked', source: 'p', target: 'x', deletable: false } as Edge]);
+      const res = await transport.call('apply_changes', { ops: [{ op: 'delete_elements', nodeIds: ['p', 'x', 'ghost'] }] });
+      expect(ok(res)[0].value).toEqual({ deletedNodeIds: ['p', 'c'], deletedEdgeIds: ['c-x'] });
+      expect(flow.getNodes().map((n) => n.id)).toEqual(['x']);
+      expect(flow.getEdges().map((e) => e.id)).toEqual(['locked']);
+    });
+
+    it('a delete op sees earlier ops in the same batch', async () => {
+      const res = await transport.call('apply_changes', {
+        ops: [
+          { op: 'add_node', node: { id: 'g', position: { x: 0, y: 0 }, data: {} } },
+          { op: 'add_node', node: { id: 'k', position: { x: 0, y: 0 }, data: {}, parentId: 'g' } },
+          { op: 'delete_elements', nodeIds: ['g'] },
+          { op: 'add_node', node: { id: 'after', position: { x: 0, y: 0 }, data: {} } },
+        ],
+      });
+      expect(ok(res)[2].value).toEqual({ deletedNodeIds: ['g', 'k'], deletedEdgeIds: [] });
+      expect(flow.getNodes().map((n) => n.id)).toEqual(['after']);
+    });
+
+    it('rolls back a cascaded delete when a later op fails', async () => {
+      flow.setNodes([makeNode('p'), makeNode('c', { parentId: 'p' })]);
+      flow.setEdges([{ id: 'pc', source: 'p', target: 'c' } as Edge]);
+      const res = await transport.call('apply_changes', {
+        ops: [{ op: 'delete_elements', nodeIds: ['p'] }, { op: 'update_node', id: 'missing', patch: {} }],
+      });
+      expect((res as { error: { code: number; data?: { failedIndex?: number } } }).error).toMatchObject({ code: -32603, data: { failedIndex: 1 } });
+      expect(flow.getNodes().map((n) => n.id)).toEqual(['p', 'c']);
+      expect(flow.getEdges().map((e) => e.id)).toEqual(['pc']);
+    });
+
+    it('still emits a single flow.state for a batch containing a delete op', async () => {
+      flow.setNodes([makeNode('a'), makeNode('b')]);
+      await flushEffects();
+      transport.events.length = 0;
+      await transport.call('apply_changes', {
+        ops: [{ op: 'delete_elements', nodeIds: ['a'] }, { op: 'add_node', node: { id: 'n', position: { x: 0, y: 0 }, data: {} } }],
+      });
+      await flushEffects();
+      expect(transport.events.filter((e) => 'event' in e && e.event === 'flow.state')).toHaveLength(1);
+    });
+
+    it('a batch without a delete op is applied synchronously; a delete op adds one async boundary', async () => {
+      const syncCall = transport.call('apply_changes', { ops: [{ op: 'add_node', node: { id: 's', position: { x: 0, y: 0 }, data: {} } }] });
+      expect(flow.getNode('s')).toBeTruthy(); // applied before the call's promise is awaited
+      await syncCall;
+
+      const asyncCall = transport.call('apply_changes', {
+        ops: [{ op: 'delete_elements', nodeIds: ['s'] }, { op: 'add_node', node: { id: 't', position: { x: 0, y: 0 }, data: {} } }],
+      });
+      expect(flow.getNode('t')).toBeUndefined(); // ops after the delete wait for its selection
+      await asyncCall;
+      expect(flow.getNode('s')).toBeUndefined();
+      expect(flow.getNode('t')).toBeTruthy();
+    });
+
+    it('does not call onBeforeDelete inside apply_changes', async () => {
+      flow.setNodes([makeNode('a')]);
+      const hook = vi.fn().mockResolvedValue(false);
+      (flow as unknown as { store: { onBeforeDelete: unknown } }).store.onBeforeDelete = hook;
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await transport.call('apply_changes', { ops: [{ op: 'delete_elements', nodeIds: ['a'] }] });
+      expect(hook).not.toHaveBeenCalled();
+      expect(flow.getNodes()).toEqual([]);
+      vi.mocked(console.warn).mockRestore();
+    });
   });
 
   describe('type discovery tools', () => {

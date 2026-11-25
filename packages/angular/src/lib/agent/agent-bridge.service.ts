@@ -11,6 +11,7 @@ import {
   signal,
 } from '@angular/core';
 
+import { getElementsToRemove } from '@angflow/system';
 import type { FitViewResult } from '@angflow/system';
 import type { NgFlowService } from '../services/ng-flow.service';
 import type { Node, Edge } from '../types';
@@ -943,7 +944,7 @@ export class AngflowAgentBridge {
       flow.setSelection({ nodeIds: [], edgeIds: [], additive: false });
     });
 
-    this.handlers.set('apply_changes', (flow, params) => {
+    this.handlers.set('apply_changes', async (flow, params) => {
       const ops = requireArray(params, 'ops') as Array<Record<string, unknown>>;
 
       // Cap the AGGREGATE element count across all ops. Each add_nodes/add_edges
@@ -963,10 +964,10 @@ export class AngflowAgentBridge {
         );
       }
 
-      // apply_changes' delete_elements op takes the synchronous setNodes/
-      // setEdges path so the whole batch can roll back, which means
-      // onBeforeDelete is bypassed (it can't be awaited inside a rollback-
-      // capable batch). Warn once per bridge lifetime if the host actually
+      // apply_changes' delete_elements op uses the same element selection as
+      // the delete_elements tool (cascade, `deletable`) but bypasses
+      // onBeforeDelete, so the whole batch can roll back by snapshot (the
+      // host hook can't take part in a rollback-capable batch). Warn once per bridge lifetime if the host actually
       // has the veto hook registered — otherwise the silent veto-loss is
       // very hard to discover.
       if (!this.warnedOnBeforeDeleteBypass && flow.hasOnBeforeDeleteHook()) {
@@ -991,18 +992,31 @@ export class AngflowAgentBridge {
       };
 
       const results: Array<{ ok: true; value: unknown }> = [];
-      let failure: { failedIndex: number; cause: unknown } | null = null;
-
-      flow.batch(() => {
-        for (let i = 0; i < ops.length; i++) {
-          try {
-            results.push({ ok: true, value: executeOp(flow, ops[i]) });
-          } catch (err) {
-            failure = { failedIndex: i, cause: err };
-            break;
+      // Runs of non-delete ops stay in one synchronous batch, as before. A delete_elements
+      // op closes the run, awaits its selection (microtasks only) and batches its own
+      // writes; FlowStore.batch is synchronous and must never span an await.
+      let failure = null as { failedIndex: number; cause: unknown } | null;
+      let i = 0;
+      while (i < ops.length && !failure) {
+        flow.batch(() => {
+          for (; i < ops.length && ops[i]['op'] !== 'delete_elements'; i++) {
+            try {
+              results.push({ ok: true, value: executeOp(flow, ops[i]) });
+            } catch (err) {
+              failure = { failedIndex: i, cause: err };
+              return;
+            }
           }
+        });
+        if (failure || i >= ops.length) break;
+        try {
+          results.push({ ok: true, value: await executeDeleteOp(flow, ops[i]) });
+        } catch (err) {
+          failure = { failedIndex: i, cause: err };
+          break;
         }
-      });
+        i++;
+      }
 
       if (failure) {
         flow.batch(() => {
@@ -1285,8 +1299,32 @@ function signatureOf(params: {
   }
 }
 
+/** apply_changes' delete_elements op: the delete_elements tool's element selection, without onBeforeDelete. */
+async function executeDeleteOp(flow: NgFlowService, op: Record<string, unknown>): Promise<unknown> {
+  const nodeIds = Array.isArray(op['nodeIds']) ? (op['nodeIds'] as string[]) : [];
+  const edgeIds = Array.isArray(op['edgeIds']) ? (op['edgeIds'] as string[]) : [];
+  // Same selection as NgFlowService.deleteElements (descendants, deletable, connected
+  // edges), but no onBeforeDelete: the batch rolls back by snapshot and the host hook
+  // can't take part in that. With no hook getElementsToRemove only yields microtasks,
+  // so nothing renders and no user event runs mid-batch.
+  const { nodes, edges } = await getElementsToRemove({
+    nodesToRemove: nodeIds.map((id) => ({ id })),
+    edgesToRemove: edgeIds.map((id) => ({ id })),
+    nodes: flow.getNodes(),
+    edges: flow.getEdges(),
+  });
+  const deadNodes = new Set(nodes.map((n) => n.id));
+  const deadEdges = new Set(edges.map((e) => e.id));
+  flow.batch(() => {
+    if (deadNodes.size > 0) flow.setNodes(flow.getNodes().filter((n) => !deadNodes.has(n.id)));
+    if (deadEdges.size > 0) flow.setEdges(flow.getEdges().filter((e) => !deadEdges.has(e.id)));
+  });
+  return { deletedNodeIds: [...deadNodes], deletedEdgeIds: [...deadEdges] };
+}
+
 function executeOp(flow: NgFlowService, op: Record<string, unknown>): unknown {
   const kind = op['op'];
+  // `delete_elements` is handled by `executeDeleteOp` (async).
   switch (kind) {
     case 'add_node': {
       const node = validateNodeShape(op['node'], 'apply_changes/add_node');
@@ -1363,24 +1401,6 @@ function executeOp(flow: NgFlowService, op: Record<string, unknown>): unknown {
       if (!flow.getEdge(id)) throw new InvalidParamsError(`update_edge_data: edge "${id}" not found.`);
       flow.updateEdgeData(id, dataPatch as Record<string, unknown>);
       return flow.getEdge(id) ?? null;
-    }
-    case 'delete_elements': {
-      const nodeIds = Array.isArray(op['nodeIds']) ? (op['nodeIds'] as string[]) : [];
-      const edgeIds = Array.isArray(op['edgeIds']) ? (op['edgeIds'] as string[]) : [];
-      // deleteElements is async because of onBeforeDelete; inside apply_changes we
-      // intentionally do not await — the synchronous setNodes/setEdges paths are
-      // what we need for rollback semantics. Skip onBeforeDelete hooks inside batches.
-      const allEdgeIds = new Set(edgeIds);
-      for (const e of flow.getEdges()) {
-        if (nodeIds.includes(e.source) || nodeIds.includes(e.target)) allEdgeIds.add(e.id);
-      }
-      if (nodeIds.length > 0) {
-        flow.setNodes(flow.getNodes().filter((n) => !nodeIds.includes(n.id)));
-      }
-      if (allEdgeIds.size > 0) {
-        flow.setEdges(flow.getEdges().filter((e) => !allEdgeIds.has(e.id)));
-      }
-      return { deletedNodeIds: nodeIds, deletedEdgeIds: Array.from(allEdgeIds) };
     }
     case 'select_nodes': {
       const nodeIds = op['nodeIds'];

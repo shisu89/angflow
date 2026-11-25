@@ -716,7 +716,9 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
       'data.failedIndex pointing at the bad op. Use this to build/edit graphs in one round trip. ' +
       'Allowed ops: add_node, add_nodes, add_edge, add_edges, update_node, update_node_data, ' +
       'update_edge, update_edge_data, delete_elements, select_nodes, select_edges, deselect_all. ' +
-      'Op shape mirrors the corresponding individual tool params, with an extra `op` field.',
+      'Op shape mirrors the corresponding individual tool params, with an extra `op` field. ' +
+      'delete_elements ops cascade to descendants and skip deletable: false like the delete_elements tool, ' +
+      'but do not call the host\'s onBeforeDelete.',
     inputSchema: {
       type: 'object',
       properties: {
