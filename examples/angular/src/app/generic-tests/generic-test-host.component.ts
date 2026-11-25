@@ -57,7 +57,7 @@ export class GenericTestHostComponent {
       const flowProps = (config.flowProps ?? {}) as Record<string, unknown>;
 
       // Shallow copies: overrides may carry non-cloneable data (functions, class instances).
-      this.nodes.set(((flowProps['nodes'] as any[]) ?? []).map((n) => ({ ...n, data: { ...n.data } })));
+      this.nodes.set(((flowProps['nodes'] as any[]) ?? []).map((n) => (n.data ? { ...n, data: { ...n.data } } : { ...n })));
       this.edges.set(
         ((flowProps['edges'] as any[]) ?? []).map((e) => (e.data ? { ...e, data: { ...e.data } } : { ...e })),
       );

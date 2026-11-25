@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component, effect, inject, signal, untracked } from '@angular/core';
 import { NgFlowService } from '@angflow/angular';
 
+// NOT COVERAGE: upstream's connection-hooks.spec.ts starts with test.skip(FRAMEWORK !== 'react'),
+// so this page exists for route parity only and is never exercised on Angular.
 // React: useNodeConnections({ id: 'a', onConnect, onDisconnect }).
 // angflow's selectNodeConnections has no onConnect/onDisconnect callbacks, so the
 // connect/disconnect events are derived by diffing successive connection lists.

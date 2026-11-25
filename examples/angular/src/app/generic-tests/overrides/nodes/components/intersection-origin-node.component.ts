@@ -21,6 +21,8 @@ export class IntersectionOriginNodeComponent {
     const area = { x: 55, y: 55, width: 5, height: 5 };
     // angflow's getIntersectingNodes takes a node, not a rect/candidate list (API gap):
     // approximate upstream's (area, partially, candidates) with isNodeIntersecting.
+    // Consequence: explicitTargets/implicitTargets do NOT exercise angflow's own
+    // getIntersectingNodes; switch to it once it accepts (area, partially, candidates).
     const intersecting = (candidates: { id: string }[]) =>
       candidates.filter((n) => f.isNodeIntersecting(n as any, area)).map((n) => n.id);
 

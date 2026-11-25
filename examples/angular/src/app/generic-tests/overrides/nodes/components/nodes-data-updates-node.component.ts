@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { NgFlowService } from '@angflow/angular';
 
+// NOT COVERAGE: upstream's nodes-data-hooks.spec.ts starts with test.skip(FRAMEWORK !== 'react'),
+// so this page exists for route parity only and is never exercised on Angular.
 @Component({
   selector: 'nodes-data-updates-node',
   changeDetection: ChangeDetectionStrategy.OnPush,
