@@ -1249,6 +1249,25 @@ describe('dissolveGroup', () => {
     expect(service.getInternalNode('a')!.internals.positionAbsolute).toEqual({ x: 250, y: 250 });
   });
 
+  it('keeps children where they are drawn under a non-zero nodeOrigin', async () => {
+    store.nodeOrigin.set([0.5, 0.5]);
+    service.setNodes([
+      makeNode('outer', { type: 'group', position: { x: 10, y: 10 }, width: 600, height: 600 }),
+      makeNode('inner', { type: 'group', parentId: 'outer', position: { x: 100, y: 80 }, width: 300, height: 300 }),
+      makeNode('a', { parentId: 'inner', position: { x: 60, y: 40 }, width: 50, height: 30 }),
+      makeNode('g', { type: 'group', position: { x: 500, y: 500 }, width: 200, height: 200 }),
+      makeNode('b', { parentId: 'g', position: { x: 30, y: 20 }, width: 40, height: 20 }),
+    ]);
+    const drawnA = { ...service.getInternalNode('a')!.internals.positionAbsolute };
+    const drawnB = { ...service.getInternalNode('b')!.internals.positionAbsolute };
+    expect(await service.dissolveGroup('inner')).toEqual(['a']);
+    expect(await service.dissolveGroup('g')).toEqual(['b']);
+    expect(service.getNode('a')?.parentId).toBe('outer');
+    expect(service.getNode('b')?.parentId).toBeUndefined();
+    expect(service.getInternalNode('a')!.internals.positionAbsolute).toEqual(drawnA);
+    expect(service.getInternalNode('b')!.internals.positionAbsolute).toEqual(drawnB);
+  });
+
   it('a veto restores raw parentId, position and extent', async () => {
     service.setNodes([
       makeNode('g', { type: 'group', position: { x: 50, y: 50 }, width: 200, height: 200 }),

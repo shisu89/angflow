@@ -161,7 +161,7 @@ Every tool takes an optional `flowId` (omit when only one flow is registered; re
 | `group_nodes` | `nodeIds: string[]`, `label?`, `collapsed?`, `groupId?`, `padding?`, `headerHeight?` | `{ groupId }` — creates a group wrapping the nodes (visually pinned), mints groupId when omitted |
 | `set_node_group` | `nodeId: string`, `groupId: string \| null` | `{ nodeId, groupId }` — reparent into a group or detach (null); rejects cycles (`-32602`) |
 | `set_group_collapsed` | `groupId: string`, `collapsed: boolean` | `{ groupId, collapsed }` — fold/unfold a group's descendants |
-| `dissolve_group` | `groupId: string` | `{ dissolvedGroupId, memberIds }`: children are reparented to the group's parent (pinned where drawn), then the group is deleted. If `onBeforeDelete` vetoes or keeps the group, or the group is `deletable: false`, the children are restored and `memberIds` is `[]`. |
+| `dissolve_group` | `groupId: string` | `{ dissolvedGroupId, memberIds }`: children are reparented to the group's parent (pinned where drawn), then the group is deleted. If `onBeforeDelete` vetoes or keeps the group, or the group is `deletable: false`, the children are restored to their captured parent/position (they are already reparented while an async `onBeforeDelete` is pending, so a move made meanwhile is reverted) and `memberIds` is `[]`. |
 | `get_group_bounds` | `groupId: string` | `{ x, y, width, height } \| null` — current absolute box (read-only) |
 
 ### Selection

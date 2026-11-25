@@ -391,6 +391,10 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * hook that keeps it, or a `deletable: false` group) the children's raw
    * `parentId`/`position`/`extent` are restored and `[]` is returned. The
    * intermediate reparent is visible in `(nodesChange)`.
+   *
+   * While an async `onBeforeDelete` is pending, the children are already
+   * reparented. A veto restores the parent/position/extent captured before the
+   * reparent, so a move made to a child in the meantime is reverted.
    */
   async dissolveGroup(groupId: string): Promise<string[]> {
     const group = this.getNode(groupId);
