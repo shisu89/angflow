@@ -30,14 +30,29 @@ describe('EdgeToolbarComponent', () => {
     expect(component.shouldShow()).toBe(true);
   });
 
-  it('zIndex is the edge zIndex + 1, without an any-cast', () => {
+  function setNodes(): void {
+    store.setNodes([
+      { id: 'a', data: {}, position: { x: 0, y: 0 } },
+      { id: 'b', data: {}, position: { x: 0, y: 100 } },
+    ]);
+  }
+
+  it('zIndex equals the edge zIndex (via getElevatedEdgeZIndex) when unselected', () => {
+    setNodes();
     store.setEdges([{ id: 'e1', source: 'a', target: 'b', zIndex: 7 }]);
-    expect(component.zIndex()).toBe(8);
+    expect(component.zIndex()).toBe(7);
   });
 
-  it('zIndex defaults to 1 when the edge has no zIndex', () => {
+  it('zIndex is elevated by 1000 when the edge is selected', () => {
+    setNodes();
+    store.setEdges([{ id: 'e1', source: 'a', target: 'b', zIndex: 7, selected: true }]);
+    expect(component.zIndex()).toBe(1007);
+  });
+
+  it('zIndex is 0 when the edge has no zIndex', () => {
+    setNodes();
     store.setEdges([{ id: 'e1', source: 'a', target: 'b' }]);
-    expect(component.zIndex()).toBe(1);
+    expect(component.zIndex()).toBe(0);
   });
 
   it('isVisible input overrides edge selection', () => {

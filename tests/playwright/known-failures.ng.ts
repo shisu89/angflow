@@ -81,17 +81,6 @@ export const KNOWN_FAILURES: KnownFailure[] = [
   },
 
   // ── edges.spec.ts ─────────────────────────────────────────────────────────
-  {
-    file: 'edges.spec.ts',
-    titlePath: [
-      'elevate edges on select for overlapping reconnect anchors',
-      'selected edge gets elevated z-index above non-selected overlapping edge',
-    ],
-    reason:
-      'The selected edge svg keeps z-index 0 instead of 1000: `elevateEdgesOnSelect` is a no-op and defaults ' +
-      'to false (report §2).',
-    owner: 'B',
-  },
 
   // ── nodes.spec.ts ─────────────────────────────────────────────────────────
   {

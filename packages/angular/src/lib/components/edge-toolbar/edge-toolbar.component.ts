@@ -1,5 +1,5 @@
 import { Component, ChangeDetectionStrategy, input, inject, computed } from '@angular/core';
-import { getEdgeToolbarTransform } from '@angflow/system';
+import { getEdgeToolbarTransform, getElevatedEdgeZIndex } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 
 /**
@@ -67,7 +67,20 @@ export class EdgeToolbarComponent {
   });
 
   readonly zIndex = computed(() => {
-    return (this.resolvedEdge()?.zIndex ?? 0) + 1;
+    this.store.version();
+    const edge = this.resolvedEdge();
+    if (!edge) return 0;
+    const sourceNode = this.store.nodeLookup.get(edge.source);
+    const targetNode = this.store.nodeLookup.get(edge.target);
+    if (!sourceNode || !targetNode) return edge.zIndex ?? 0;
+    return getElevatedEdgeZIndex({
+      selected: edge.selected,
+      zIndex: edge.zIndex,
+      sourceNode,
+      targetNode,
+      elevateOnSelect: this.store.elevateEdgesOnSelect(),
+      zIndexMode: this.store.zIndexMode(),
+    });
   });
 
   readonly toolbarTransform = computed(() => {

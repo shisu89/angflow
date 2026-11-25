@@ -60,4 +60,44 @@ describe('EdgeRendererComponent selection guards', () => {
     component.onEdgeFocus(store.edges()[0]);
     expect(store.selectedEdges()).toHaveLength(0);
   });
+  describe('z-index elevation', () => {
+    function zOf(fixture: { nativeElement: HTMLElement }, id: string): string {
+      const g = fixture.nativeElement.querySelector(`[data-id="${id}"]`)!;
+      return (g.closest('svg.ng-flow__edge') as SVGElement).style.zIndex;
+    }
+
+    function setup(edge: Partial<Edge>) {
+      store.setNodes([
+        { id: 'a', data: {}, position: { x: 0, y: 0 } },
+        { id: 'b', data: {}, position: { x: 0, y: 200 } },
+      ]);
+      store.setEdges([makeEdge('e1', edge)]);
+      const fixture = TestBed.createComponent(EdgeRendererComponent);
+      fixture.detectChanges();
+      return fixture;
+    }
+
+    it('a selected edge between root nodes renders z-index 1000 by default', async () => {
+      const fixture = setup({ selected: true });
+      await fixture.whenStable();
+      expect(zOf(fixture, 'e1')).toBe('1000');
+    });
+
+    it('renders 0 when elevateEdgesOnSelect is false', async () => {
+      store.elevateEdgesOnSelect.set(false);
+      const fixture = setup({ selected: true });
+      await fixture.whenStable();
+      expect(zOf(fixture, 'e1')).toBe('0');
+    });
+
+    it('edge zIndex 7 renders 7 unselected and 1007 selected', async () => {
+      const fixture = setup({ zIndex: 7 });
+      await fixture.whenStable();
+      expect(zOf(fixture, 'e1')).toBe('7');
+      store.setEdges([makeEdge('e1', { zIndex: 7, selected: true })]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(zOf(fixture, 'e1')).toBe('1007');
+    });
+  });
 });

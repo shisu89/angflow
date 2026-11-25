@@ -30,6 +30,7 @@ import {
   type ConnectionState,
   type FinalConnectionState,
   type IsValidConnection,
+  getElevatedEdgeZIndex,
 } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 import { BezierEdgeComponent } from '../../components/edges/bezier-edge.component';
@@ -393,10 +394,17 @@ export class EdgeRendererComponent {
   }
 
   getEdgeZIndex(edge: Edge): number {
-    if (edge.zIndex !== undefined) return edge.zIndex;
-    const sourceZ = this.store.nodeLookup.get(edge.source)?.internals?.z ?? 0;
-    const targetZ = this.store.nodeLookup.get(edge.target)?.internals?.z ?? 0;
-    return Math.max(sourceZ, targetZ);
+    const sourceNode = this.store.nodeLookup.get(edge.source);
+    const targetNode = this.store.nodeLookup.get(edge.target);
+    if (!sourceNode || !targetNode) return edge.zIndex ?? 0;
+    return getElevatedEdgeZIndex({
+      selected: edge.selected,
+      zIndex: edge.zIndex,
+      sourceNode,
+      targetNode,
+      elevateOnSelect: this.store.elevateEdgesOnSelect(),
+      zIndexMode: this.store.zIndexMode(),
+    });
   }
 
   getEdgePath(ei: Record<string, unknown>): string {

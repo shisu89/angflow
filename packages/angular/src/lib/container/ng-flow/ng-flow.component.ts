@@ -516,8 +516,8 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   /** Raise a node's `z-index` when selected. */
   readonly elevateNodesOnSelect = input(true);
 
-  /** Raise an edge's `z-index` when selected. */
-  readonly elevateEdgesOnSelect = input(false);
+  /** Raise an edge's `z-index` by 1000 when selected. Defaults to `true`, like upstream. */
+  readonly elevateEdgesOnSelect = input(true);
 
   /** Skip rendering nodes/edges outside the viewport (expensive graphs benefit). */
   readonly onlyRenderVisibleElements = input(false);
