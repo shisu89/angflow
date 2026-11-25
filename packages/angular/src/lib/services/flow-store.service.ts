@@ -853,7 +853,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     }
 
     this.triggerNodeChanges(
-      getSelectionChanges(this.nodeLookup, new Set([...selectedNodeIds]), true) as NodeChange<NodeType>[]
+      getSelectionChanges(this.nodeLookup, new Set([...selectedNodeIds])) as NodeChange<NodeType>[]
     );
     this.triggerEdgeChanges(getSelectionChanges(this.edgeLookup) as EdgeChange<EdgeType>[]);
   }
@@ -869,7 +869,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       getSelectionChanges(this.edgeLookup, new Set([...selectedEdgeIds])) as EdgeChange<EdgeType>[]
     );
     this.triggerNodeChanges(
-      getSelectionChanges(this.nodeLookup, new Set(), true) as NodeChange<NodeType>[]
+      getSelectionChanges(this.nodeLookup, new Set()) as NodeChange<NodeType>[]
     );
   }
 
@@ -880,10 +880,6 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     const nodeChanges: NodeSelectionChange[] = [];
     for (const node of nodesToUnselect) {
       if (!node.selected) continue;
-      const internalNode = this.nodeLookup.get(node.id);
-      if (internalNode) {
-        internalNode.selected = false;
-      }
       nodeChanges.push(createSelectionChange(node.id, false) as NodeSelectionChange);
     }
 

@@ -262,6 +262,9 @@ export function XYDrag<OnNodeDrag extends (e: any, nodes: any, node: any) => voi
 
       dragStarted = true;
 
+      // if a node is being dragged that is not currently selected, we only want to drag that node and not the rest of the selection
+      const isUnselectedNodeDrag = !!nodeId && !multiSelectionActive && !nodeLookup.get(nodeId)?.selected;
+
       if ((!selectNodesOnDrag || !isSelectable) && !multiSelectionActive && nodeId) {
         if (!nodeLookup.get(nodeId)?.selected) {
           // we need to reset selected nodes when selectNodesOnDrag=false
@@ -275,7 +278,7 @@ export function XYDrag<OnNodeDrag extends (e: any, nodes: any, node: any) => voi
 
       const pointerPos = getPointerPosition(event.sourceEvent, { transform, snapGrid, snapToGrid, containerBounds });
       lastPos = pointerPos;
-      dragItems = getDragItems(nodeLookup, nodesDraggable, pointerPos, nodeId);
+      dragItems = getDragItems(nodeLookup, nodesDraggable, pointerPos, nodeId, isUnselectedNodeDrag);
 
       if (dragItems.size > 0 && (onDragStart || onNodeDragStart || (!nodeId && onSelectionDragStart))) {
         const [currentNode, currentNodes] = getEventHandlerParams({

@@ -1475,3 +1475,36 @@ describe('position fast-path absolute positions', () => {
     expect(store.nodeLookup.get('n')!.internals.positionAbsolute).toEqual({ x: 9, y: 9 });
   });
 });
+
+describe('selection does not mutate internal state (#6097)', () => {
+  let store: FlowStore;
+  beforeEach(() => {
+    store = new FlowStore();
+  });
+
+  function rejectSelect(): void {
+    store.nodesChangeMiddleware.set('reject', (c) => c.filter((x) => x.type !== 'select'));
+  }
+
+  it('addSelectedNodes leaves the lookup node unselected when the change is rejected', () => {
+    store.setNodes([makeNode('a'), makeNode('b')]);
+    rejectSelect();
+    store.addSelectedNodes(['b']);
+    expect(store.nodeLookup.get('b')!.selected).toBeFalsy();
+  });
+
+  it('addSelectedEdges leaves a selected lookup node selected when the change is rejected', () => {
+    store.setNodes([makeNode('a', { selected: true }), makeNode('b')]);
+    store.setEdges([makeEdge('e1', 'a', 'b')]);
+    rejectSelect();
+    store.addSelectedEdges(['e1']);
+    expect(store.nodeLookup.get('a')!.selected).toBe(true);
+  });
+
+  it('unselectNodesAndEdges leaves a selected lookup node selected when the change is rejected', () => {
+    store.setNodes([makeNode('a', { selected: true }), makeNode('b')]);
+    rejectSelect();
+    store.unselectNodesAndEdges();
+    expect(store.nodeLookup.get('a')!.selected).toBe(true);
+  });
+});

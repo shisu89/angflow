@@ -194,8 +194,7 @@ export function createSelectionChange(id: string, selected: boolean): NodeSelect
 export function getSelectionChanges(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   items: Map<string, any>, // change-applier mirrors xyflow's untyped element diffing
-  selectedIds: Set<string> = new Set(),
-  mutateItem = false
+  selectedIds: Set<string> = new Set()
 ): NodeSelectionChange[] | EdgeSelectionChange[] {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const changes: any[] = [];
@@ -203,9 +202,6 @@ export function getSelectionChanges(
   for (const [id, item] of items) {
     const willBeSelected = selectedIds.has(id);
     if (!(item.selected === undefined && !willBeSelected) && item.selected !== willBeSelected) {
-      if (mutateItem) {
-        item.selected = willBeSelected;
-      }
       changes.push(createSelectionChange(item.id, willBeSelected));
     }
   }

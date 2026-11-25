@@ -199,20 +199,11 @@ describe('getSelectionChanges', () => {
     expect(changes).toContainEqual({ id: '2', type: 'select', selected: false });
   });
 
-  it('mutateItem=true updates items in-place', () => {
+  it('never modifies the items it diffs (#6097)', () => {
     const item1 = { id: '1', selected: false };
     const lookup = new Map([['1', item1]]);
 
-    getSelectionChanges(lookup, new Set(['1']), true);
-
-    expect(item1.selected).toBe(true);
-  });
-
-  it('mutateItem=false does not modify items', () => {
-    const item1 = { id: '1', selected: false };
-    const lookup = new Map([['1', item1]]);
-
-    getSelectionChanges(lookup, new Set(['1']), false);
+    getSelectionChanges(lookup, new Set(['1']));
 
     expect(item1.selected).toBe(false);
   });
