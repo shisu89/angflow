@@ -1291,15 +1291,15 @@ describe('dissolveGroup', () => {
       makeNode('x', { position: { x: 600, y: 0 } }),
     ]);
     service.setEdges([makeEdge('gx', 'g', 'x'), makeEdge('ax', 'a', 'x')]);
-    const seen: { nodes: string[]; edges: string[]; aParent?: string } = { nodes: [], edges: [] };
+    const seen: { nodes: string[]; edges: string[]; parentOfA?: string } = { nodes: [], edges: [] };
     store.onBeforeDelete = async ({ nodes, edges }) => {
       seen.nodes = nodes.map((n) => n.id);
       seen.edges = edges.map((e) => e.id);
-      seen.aParent = service.getNode('a')?.parentId; // already reparented when the hook runs
+      seen.parentOfA = service.getNode('a')?.parentId; // already reparented when the hook runs
       return true;
     };
     expect(await service.dissolveGroup('g')).toEqual(['a']);
-    expect(seen).toEqual({ nodes: ['g'], edges: ['gx'], aParent: undefined });
+    expect(seen).toEqual({ nodes: ['g'], edges: ['gx'], parentOfA: undefined });
     expect(service.getEdge('ax')).toBeTruthy();
   });
 
