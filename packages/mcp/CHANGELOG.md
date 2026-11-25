@@ -3,7 +3,7 @@
 ## 0.0.4
 
 Tool snapshot regenerated from @angflow/angular 0.3.22 (`fit_view` / `fit_bounds` /
-`set_viewport` descriptions).
+`set_viewport` / `delete_elements` / `apply_changes` descriptions).
 
 
 ## 0.0.1

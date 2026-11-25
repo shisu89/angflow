@@ -17,6 +17,8 @@ Bug-fix release. Requires `@angflow/system` 0.1.14.
 - Key combinations for `deleteKeyCode`, `selectionKeyCode` and `multiSelectionKeyCode`
   (e.g. `'Meta+Backspace'`), with upstream `useKeyPress` semantics.
 - `ReconnectEdgeOptions.onError` / `AddEdgeOptions.onError` (from `@angflow/system`).
+- `onBeforeDelete` may return `{ nodes, edges }` to delete exactly that set (the
+  `OnBeforeDelete` type widens; boolean returns keep working).
 
 ### FlowStore additions
 
@@ -70,6 +72,39 @@ Bug-fix release. Requires `@angflow/system` 0.1.14.
 - `reconnectEdge` with an options object but no `shouldReplaceId` now replaces the id.
 - Unmounting a flow that shares a store detaches only that flow's wiring; a sibling or
   newly mounted `<ng-flow>` keeps its callbacks, DOM node and size.
+- Deleting a parent deletes its descendants (keyboard, Controls, `deleteElements`, agent
+  tools). Migration: to keep children, reparent them first (`setNodeGroup`) or mark them
+  `deletable: false`.
+- Programmatic deletion (`deleteElements`, Controls, agent tools) respects
+  `deletable: false`.
+- A non-deletable child of a deleted parent, or a non-deletable edge connected to a
+  deleted node, survives with a dangling `parentId` / endpoint (upstream semantics).
+- `(nodesDelete)` / `(edgesDelete)` / `(delete)` fire once per deletion, before the
+  removal is applied, in upstream's order (edges, then nodes, then `delete`). Migration:
+  handlers that read the store expecting the elements gone must defer.
+- Keyboard deletion is asynchronous: it goes through `deleteElements` (it used to be
+  synchronous) and clears `nodesSelectionActive`. Failures of keyboard and Controls
+  deletion, such as a throwing `onBeforeDelete`, are reported through `onError` with id
+  `'delete-failed'`; they are no longer unhandled rejections.
+- `onBeforeDelete` returning `undefined` / `null` (untyped JS) now throws a `TypeError`;
+  it used to veto. This matches upstream. Migration: return `false` to veto.
+- `KeyHandlerDirective` no longer has `nodesDelete` / `edgesDelete` / `deleteElements`
+  outputs. Used standalone, it requires `NgFlowService` in its injector. Migration: use
+  `<ng-flow>`'s outputs.
+- `dissolveGroup` (and `dissolve_group`) moves the children out first, then deletes the
+  group: `onBeforeDelete` sees only the group and its edges. The children are restored
+  if the group survives (a veto, a narrowing hook or `deletable: false`) and also if the
+  hook throws or rejects. A move made to a child while an async veto is pending is
+  reverted. The intermediate reparent shows in `(nodesChange)`. An `extent: 'parent'`
+  child of a top-level group loses `extent`. Under a grandparent, children keep it and
+  are clamped to the grandparent (drawn inside it; the raw `position` is unchanged).
+- Agent: `delete_elements` (the tool and the `apply_changes` op) cascades and skips
+  `deletable: false`. Results list the ids actually deleted (the op used to echo the
+  requested ids). `apply_changes` still bypasses `onBeforeDelete`.
+- Agent: an `apply_changes` batch containing a `delete_elements` op is no longer fully
+  synchronous (runs of other ops stay synchronous; batches without a delete are
+  unchanged). In-process callers (`bridge.callTool`, `window.angflow.callTool`) should
+  await `apply_changes` before issuing other calls. WebSocket requests are unaffected.
 
 ### Fixed
 
@@ -88,6 +123,8 @@ Bug-fix release. Requires `@angflow/system` 0.1.14.
   line gets the `connection` and valid/invalid classes (custom lines are wrapped).
 - The pane `selection` class tracks upstream `isSelecting`.
 - Arrow-key move announcement.
+- The `delete_elements` tool description named the wrong result keys
+  (`deletedNodeIds` / `deletedEdgeIds`).
 - Shared-store unmount; MiniMap follows a new `panZoom` after remount;
   `selectNodesData` only emits when node data changes.
 

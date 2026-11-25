@@ -41,6 +41,9 @@
 - Smooth-step bends keep `borderRadius` when nodes are close (#6036).
 - `NodeProps` distributes over node-type unions (#6131).
 - Dev warnings no longer mention "React Flow" (#5793).
+- `getElementsToRemove` removes all descendants regardless of node order and uses Map
+  lookups instead of array scans (#6074, #6111); output keeps input order and
+  `deletable: false` still protects a subtree.
 
 
 ## @angflow fork

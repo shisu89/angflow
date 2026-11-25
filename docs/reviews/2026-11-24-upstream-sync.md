@@ -51,7 +51,7 @@ These are not upstream ports; the comparison surfaced them. Each one was checked
 | The arrow-key a11y live announcement is missing entirely: `ariaLiveMessage` is rendered but never written. No Shift ×4 step and no snap/extent post-read. | `key-handler.directive.ts:225`, `flow-store.service.ts:295` | S | B ✓ d1139cfc6 |
 | `(paneClick)` fires, and the selection resets, when a connection drag ends on the pane. | `ng-flow.component.ts` `onPaneClick` | S | B ✓ cf05e1cc3, 882902101 |
 | A pane click cancels click-to-connect without firing `onClickConnectEnd`. | | S | B ✓ cf05e1cc3 (`(clickConnectEnd)` emitted; its `FinalConnectionState` payload stays D) |
-| Programmatic `deleteElements` doesn't cascade a parent's children, ignores `deletable: false`, and merges edges quadratically. Switching to system `getElementsToRemove` fixes all three and picks up #6074/#6111 perf, but it's a **behaviour change** and needs its own release note. | `ng-flow.service.ts:742` | M | C |
+| Programmatic `deleteElements` doesn't cascade a parent's children, ignores `deletable: false`, and merges edges quadratically. Switching to system `getElementsToRemove` fixes all three and picks up #6074/#6111 perf, but it's a **behaviour change** and needs its own release note. | `ng-flow.service.ts:742` | M | C ✓ ae51254f7, 63875b8b8, 46145dc89, 73382f3a8, 48630023f, ff43a6b19, 346fe2de8, e083f0f2b, 7826af094 |
 | Smaller issues: store `reset()` leaves state behind for a provider-shared store; MiniMap keeps a stale `panZoom` after remount; `selectNodesData` has no equality function; key combinations like `Meta+Backspace` aren't supported. | | S each | B ✓ 92ea25a81, eeb20bbee (store reset / shared store), 0bdafc7ad, ee5b6c33d (MiniMap), cc81221fa (`selectNodesData`), 81c535327 (key combinations) |
 | `(connectEnd)` emits no `FinalConnectionState`, and `NgFlowService.connection.to` is in screen coordinates while React's `useConnection` uses flow coordinates. | | S | D |
 
@@ -92,7 +92,7 @@ measurement-race, nodes-data-hooks, reconnect-edge, viewport).
 |---|---|---|
 | A | Angular generic-test pages + upstream e2e specs, run in CI | Mirrors `examples/{react,svelte,vue}/src/generic-tests`. Failures feed B. Spec: [design](../superpowers/specs/2026-11-25-shared-e2e-suite-angular-design.md), plan: [plan](../superpowers/plans/2026-11-25-shared-e2e-suite-angular.md). |
 | B | Bug-fix release: §1 upstream fixes + §2 angflow-native bugs (except deletion) | Includes #6097. system 0.1.x / angular 0.3.x. Plan: [plan](../superpowers/plans/2026-11-25-bug-fix-release.md). Done: system 0.1.14 / angular 0.3.22 / mcp 0.0.4 |
-| C | Deletion via system `getElementsToRemove` (+ #6074/#6111) | Behaviour change, its own release note |
+| C | Deletion via system `getElementsToRemove` (+ #6074/#6111) | Behaviour change, its own release note. Plan: [plan](../superpowers/plans/2026-11-25-deletion.md). Done (unpublished, in 0.1.14 / 0.3.22 / 0.0.4) |
 | D | 0.4.0: full upstream 1.0 API alignment (all of §3, Changeset class included) | Agent tools, mcp snapshot, `AGENT_BRIDGE.md` |
 | E | Feature parity: `selectNode`/`selectEdge`, `changeParent`, `xy-theme.css`, DevTools panel, missing React examples (refresh `docs/examples-parity.md`), optional #5996 perf subset with #6109 | |
 | F | `@angflow/ui`: Angular port of the React Flow UI components, as a new package with no Tailwind/spartan dependency | Verify the upstream license first. Never port React Flow **Pro** examples (not open source). |
@@ -135,3 +135,10 @@ Known-failures entries 27 → 4. B: 25 → 0 (23 fixed, 2 re-owned to D: the two
 cancels a pending connection" click-connect entries need the `FinalConnectionState`
 payload, #6117). D: 2 → 4 (2 colour-mode, 2 click-connect payload). Commit range:
 `343756d6a..HEAD` of the B work (everything on `main` after `343756d6a`, including the 0.3.22 release commit and the final-review fix commits).
+
+### C — results
+
+Known failures unchanged at 4 (all D). The five entry points (`deleteElements`, keyboard
+delete, Controls delete, the `delete_elements` tool and the `apply_changes` op) and
+`dissolveGroup` all go through `getElementsToRemove`. Upstream #6074 / #6111 are ported
+into system `getElementsToRemove` (ae51254f7). Commit range: `d54d18f8d..HEAD`.
