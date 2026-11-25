@@ -4,7 +4,7 @@ import type { NodeChange } from '@angflow/system';
 import { FlowStore } from './flow-store.service';
 import { getCollapsedHiddenIds } from '../graph/collapse';
 import type { Node, Edge } from '../types';
-import { Position, type Handle } from '@angflow/system';
+import { Position, getViewportForBounds, type Handle } from '@angflow/system';
 
 vi.mock('../graph/collapse', { spy: true });
 
@@ -1084,6 +1084,101 @@ describe('viewport helpers report interruption', () => {
   it('zoomTo resolves false when scaleTo resolves false', async () => {
     store.panZoom.set({ scaleTo: vi.fn().mockResolvedValue(false) } as never);
     await expect(store.zoomTo(2)).resolves.toBe(false);
+  });
+});
+
+describe('shared fit promise', () => {
+  let store: FlowStore;
+
+  function deferredPanZoom() {
+    const pending: Array<(ended: boolean) => void> = [];
+    const setViewport = vi.fn(() => new Promise<boolean>((r) => pending.push(r)));
+    return { pz: { setViewport, getViewport: () => ({ x: 0, y: 0, zoom: 1 }) }, pending, setViewport };
+  }
+
+  async function flush() {
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+  }
+
+  beforeEach(() => {
+    store = new FlowStore();
+    store.width.set(800);
+    store.height.set(600);
+    store.setNodes([
+      makeNode('a', { width: 100, height: 50 }),
+      makeNode('b', { position: { x: 300, y: 0 }, width: 100, height: 50 }),
+    ]);
+  });
+
+  it('a fitView superseded by a later fitView settles with the last fit', async () => {
+    const { pz, pending } = deferredPanZoom();
+    store.panZoom.set(pz as never);
+    const first = store.fitView({ duration: 5000 });
+    const second = store.fitView({ duration: 2000 });
+    let firstSettled = false;
+    void first.then(() => (firstSettled = true));
+    pending[0](false); // the second fit interrupted the first
+    await flush();
+    expect(firstSettled).toBe(false);
+    pending[1](true);
+    await expect(first).resolves.toMatchObject({ ended: true });
+    await expect(second).resolves.toMatchObject({ ended: true });
+  });
+
+  it('a non-fit interruption settles the pending fit with ended: false', async () => {
+    const { pz, pending } = deferredPanZoom();
+    store.panZoom.set(pz as never);
+    const fit = store.fitView({ duration: 5000 });
+    pending[0](false);
+    await expect(fit).resolves.toMatchObject({ ended: false });
+  });
+
+  it('a fitView after the shared promise settled gets a fresh promise', async () => {
+    const { pz, pending } = deferredPanZoom();
+    store.panZoom.set(pz as never);
+    const first = store.fitView({ duration: 100 });
+    pending[0](false);
+    await expect(first).resolves.toMatchObject({ ended: false });
+
+    const second = store.fitView({ duration: 100 });
+    expect(second).not.toBe(first);
+    pending[1](true);
+    await expect(second).resolves.toMatchObject({ ended: true });
+  });
+
+  it('fitBounds keeps its own chain', async () => {
+    const { pz, pending } = deferredPanZoom();
+    store.panZoom.set(pz as never);
+    const firstBounds = store.fitBounds({ x: 0, y: 0, width: 100, height: 100 }, { duration: 5000 });
+    const secondBounds = store.fitBounds({ x: 0, y: 0, width: 400, height: 300 }, { duration: 2000 });
+    const fit = store.fitView({ duration: 1000 });
+    expect(fit).not.toBe(firstBounds);
+
+    let boundsSettled = false;
+    void firstBounds.then(() => (boundsSettled = true));
+    pending[0](false); // the second fitBounds interrupted the first
+    pending[2](true); // the interleaved fitView ends on its own chain
+    await expect(fit).resolves.toMatchObject({ ended: true });
+    await flush();
+    expect(boundsSettled).toBe(false);
+
+    pending[1](true);
+    const settled = await firstBounds;
+    expect(settled).toMatchObject({ ended: true });
+    await expect(secondBounds).resolves.toEqual(settled);
+    // the second call's viewport, not the first's
+    const expected = (w: number, h: number) =>
+      getViewportForBounds({ x: 0, y: 0, width: w, height: h }, 800, 600, store.minZoom(), store.maxZoom(), 0.1).zoom;
+    expect(expected(400, 300)).not.toBe(expected(100, 100));
+    expect(settled.zoom).toBe(expected(400, 300));
+  });
+
+  it('fitBounds resolves ended: false without panZoom', async () => {
+    await expect(store.fitBounds({ x: 0, y: 0, width: 10, height: 10 })).resolves.toEqual({
+      zoom: NaN,
+      clamped: false,
+      ended: false,
+    });
   });
 });
 

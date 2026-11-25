@@ -7,7 +7,6 @@ import {
   getConnectedEdges as getConnectedEdgesSystem,
   getOutgoers as getOutgoersSystem,
   getIncomers as getIncomersSystem,
-  getViewportForBounds,
   type XYPosition,
   type SnapGrid,
   type Viewport,
@@ -109,6 +108,8 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * Respects `minZoom`, `maxZoom`, and `padding`.
    * Resolves `{ zoom, clamped, ended }`: the achieved zoom, whether it was clamped at the min-zoom floor,
    * and `ended` (`false` when a user gesture or another viewport call interrupted the animation).
+   * Overlapping `fitView` calls share one promise: a fit superseded by a later `fitView` doesn't
+   * resolve `ended: false`, every caller receives the last fit's result.
    */
   fitView(options?: FitViewOptionsBase<NodeType>): Promise<FitViewResult> {
     return this.store.fitView(options);
@@ -134,20 +135,12 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     return this.store.setCenter(x, y, options);
   }
 
-  /** Fit the viewport to a specific `Rect` in flow coordinates. Resolves `{ zoom: NaN, clamped: false, ended: false }` if pan/zoom isn't yet initialized; `ended` is `false` when a gesture or another viewport call interrupted the animation. */
-  async fitBounds(
+  /** Fit the viewport to a specific `Rect` in flow coordinates. Resolves `{ zoom: NaN, clamped: false, ended: false }` if pan/zoom isn't yet initialized; `ended` is `false` when a gesture or another viewport call interrupted the animation. Overlapping `fitBounds` calls share one promise and all receive the last call's result. */
+  fitBounds(
     bounds: Rect,
     options?: { padding?: number; duration?: number; minZoom?: number; maxZoom?: number },
   ): Promise<FitViewResult> {
-    const pz = this.store.panZoom();
-    if (!pz) return { zoom: NaN, clamped: false, ended: false };
-
-    const effMin = options?.minZoom ?? this.store.minZoom();
-    const effMax = options?.maxZoom ?? this.store.maxZoom();
-    const viewport = this.getViewportForBoundsInternal(bounds, options?.padding ?? 0.1, effMin, effMax);
-    const ended = await pz.setViewport({ x: viewport.x, y: viewport.y, zoom: viewport.zoom }, { duration: options?.duration });
-    // 1e-6 matches ZOOM_CLAMP_EPSILON in @angflow/system (utils/graph.ts).
-    return { zoom: viewport.zoom, clamped: viewport.zoom <= effMin + 1e-6, ended };
+    return this.store.fitBounds(bounds, options);
   }
 
   // ── Coordinate Conversion ─────────────────────────────────────────────
@@ -1204,24 +1197,6 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    */
   getHandleData(nodeId: string, handleId: string | null, type: HandleType): unknown {
     return this.store.getHandleData(nodeId, handleId, type);
-  }
-
-  // ── Helpers ───────────────────────────────────────────────────────────
-
-  private getViewportForBoundsInternal(
-    bounds: Rect,
-    padding: number,
-    minZoom = this.store.minZoom(),
-    maxZoom = this.store.maxZoom(),
-  ) {
-    return getViewportForBounds(
-      bounds,
-      this.store.width(),
-      this.store.height(),
-      minZoom,
-      maxZoom,
-      padding
-    );
   }
 
   // ── Node templates (agent bridge) ─────────────────────────────────────

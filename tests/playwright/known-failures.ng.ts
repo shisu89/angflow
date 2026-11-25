@@ -201,16 +201,6 @@ export const KNOWN_FAILURES: KnownFailure[] = [
     reason: 'System `reconnectEdge` keeps the old id when an options object without `shouldReplaceId` is passed (report §1, #6055).',
     owner: 'B',
   },
-
-  // ── viewport.spec.ts ──────────────────────────────────────────────────────
-  {
-    file: 'viewport.spec.ts',
-    titlePath: ['Viewport transitions', 'fit view called again during its transition settles when the last fit ends'],
-    reason:
-      'Each fitView call gets its own promise and the superseded first one never settles; upstream shares ' +
-      'one promise and resolves it when the last fit ends (report §1, #6064).',
-    owner: 'B',
-  },
 ];
 
 function escapeRegExp(s: string): string {

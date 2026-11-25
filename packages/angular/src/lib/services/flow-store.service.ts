@@ -7,6 +7,7 @@ import {
   updateConnectionLookup,
   handleExpandParent,
   fitViewport,
+  getViewportForBounds,
   getHandlePosition,
   infiniteExtent,
   clampPosition,
@@ -39,6 +40,7 @@ import {
   type AriaLabelConfig,
   type FitViewOptionsBase,
   type FitViewResult,
+  type Rect,
   type HandleType,
   setDevWarnSink,
 } from '@angflow/system';
@@ -60,6 +62,20 @@ export type ViewportAnimationOptions = {
 import { applyNodeChanges, applyEdgeChanges, createSelectionChange, getSelectionChanges } from '../utils/changes';
 import { sampleTween, prefersReducedMotion, type TweenEntry } from '../utils/position-tween';
 import { getCollapsedHiddenIds, rewriteEdgesForCollapse, type DisplayEdge } from '../graph/collapse';
+
+type FitResolver = { promise: Promise<FitViewResult>; resolve: (r: FitViewResult) => void; reject: (e: unknown) => void };
+type FitChain = { latestId: number; resolver: FitResolver | null };
+
+/** Hand-rolled `Promise.withResolvers` (ES2024; the package targets ES2022). */
+function createFitResolver(): FitResolver {
+  let resolve!: (r: FitViewResult) => void;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise<FitViewResult>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
 
 /**
  * Content equality for derived string-id sets. Used as a computed `equal` so
@@ -893,21 +909,54 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     });
   }
 
-  async fitView(options?: FitViewOptionsBase<NodeType>): Promise<FitViewResult> {
+  /**
+   * Fit the viewport to the nodes. Overlapping calls share one promise (as upstream
+   * React's store): a fit superseded by a later fit doesn't settle on its own
+   * interruption, every caller receives the last fit's result. Non-fit viewport calls
+   * still interrupt it and settle it with `ended: false`.
+   */
+  fitView(options?: FitViewOptionsBase<NodeType>): Promise<FitViewResult> {
     const pz = this.panZoom();
-    if (!pz) return { zoom: NaN, clamped: false, ended: false };
+    if (!pz) return Promise.resolve({ zoom: NaN, clamped: false, ended: false });
 
-    return fitViewport(
-      {
-        nodes: this.nodeLookup,
-        width: this.width(),
-        height: this.height(),
-        panZoom: pz,
-        minZoom: this.minZoom(),
-        maxZoom: this.maxZoom(),
-      },
-      options
+    return this.runFitChain('fitView', () =>
+      fitViewport(
+        {
+          nodes: this.nodeLookup,
+          width: this.width(),
+          height: this.height(),
+          panZoom: pz,
+          minZoom: this.minZoom(),
+          maxZoom: this.maxZoom(),
+        },
+        options
+      )
     );
+  }
+
+  /**
+   * Fit the viewport to a flow-space `Rect`. Overlapping `fitBounds` calls share one
+   * promise on their own chain (separate from `fitView`'s), settled with the last
+   * call's result.
+   */
+  fitBounds(
+    bounds: Rect,
+    options?: { padding?: number; duration?: number; minZoom?: number; maxZoom?: number }
+  ): Promise<FitViewResult> {
+    const pz = this.panZoom();
+    if (!pz) return Promise.resolve({ zoom: NaN, clamped: false, ended: false });
+
+    return this.runFitChain('fitBounds', async () => {
+      const effMin = options?.minZoom ?? this.minZoom();
+      const effMax = options?.maxZoom ?? this.maxZoom();
+      const viewport = getViewportForBounds(bounds, this.width(), this.height(), effMin, effMax, options?.padding ?? 0.1);
+      const ended = await pz.setViewport(
+        { x: viewport.x, y: viewport.y, zoom: viewport.zoom },
+        { duration: options?.duration }
+      );
+      // 1e-6 matches ZOOM_CLAMP_EPSILON in @angflow/system (utils/graph.ts).
+      return { zoom: viewport.zoom, clamped: viewport.zoom <= effMin + 1e-6, ended };
+    });
   }
 
   /**
@@ -1059,20 +1108,55 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
   // ── Internal helpers ──────────────────────────────────────────────────
 
+  private readonly fitChains: Record<'fitView' | 'fitBounds', FitChain> = {
+    fitView: { latestId: 0, resolver: null },
+    fitBounds: { latestId: 0, resolver: null },
+  };
+
+  /**
+   * Runs `run` and settles the chain's shared promise with the LATEST call's result.
+   * A call superseded by a newer one on the same chain never settles on its own
+   * interruption; it receives the newer call's result. Non-fit viewport calls
+   * (scroll, setViewport, zoom*) still interrupt it and settle it with ended: false.
+   * Mirrors upstream React's `latestFitViewId` / `fitViewResolver` (store/index.ts).
+   */
+  private runFitChain(kind: 'fitView' | 'fitBounds', run: () => Promise<FitViewResult>): Promise<FitViewResult> {
+    const chain = this.fitChains[kind];
+    const resolver = (chain.resolver ??= createFitResolver());
+    const id = ++chain.latestId;
+    run().then(
+      (result) => {
+        // A newer call on this chain started while this one ran; it settles the shared promise.
+        if (id !== chain.latestId) return;
+        resolver.resolve(result);
+        if (chain.resolver === resolver) chain.resolver = null;
+      },
+      (error) => {
+        if (id !== chain.latestId) return;
+        if (chain.resolver === resolver) chain.resolver = null;
+        resolver.reject(error);
+      }
+    );
+    return resolver.promise;
+  }
+
   private async resolveFitView(): Promise<void> {
     const pz = this.panZoom();
     if (!pz) return;
 
-    await fitViewport(
-      {
-        nodes: this.nodeLookup,
-        width: this.width(),
-        height: this.height(),
-        panZoom: pz,
-        minZoom: this.minZoom(),
-        maxZoom: this.maxZoom(),
-      },
-      this.fitViewOptions()
+    // Shares the fitView chain, so a user fitView() during the initial fit joins its promise.
+    await this.runFitChain('fitView', () =>
+      fitViewport(
+        {
+          nodes: this.nodeLookup,
+          width: this.width(),
+          height: this.height(),
+          panZoom: pz,
+          minZoom: this.minZoom(),
+          maxZoom: this.maxZoom(),
+        },
+        this.fitViewOptions()
+      )
     );
 
     // fitViewport applies the transform to d3's internal state; mirror it into

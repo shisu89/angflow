@@ -390,6 +390,18 @@ describe('NgFlowService', () => {
     });
   });
 
+  describe('fitBounds', () => {
+    it('delegates to the store so overlapping calls share its fit chain', async () => {
+      const result = { zoom: 2, clamped: false, ended: true };
+      const spy = vi.spyOn(store, 'fitBounds').mockResolvedValue(result);
+      const bounds = { x: 0, y: 0, width: 10, height: 10 };
+      const options = { padding: 0.2, duration: 100 };
+
+      await expect(service.fitBounds(bounds, options)).resolves.toBe(result);
+      expect(spy).toHaveBeenCalledWith(bounds, options);
+    });
+  });
+
   describe('selectNodesInitialized includeHiddenNodes', () => {
     it('ignores hidden nodes by default but requires them when includeHiddenNodes', () => {
       // A measured visible node + an unmeasured hidden node.
