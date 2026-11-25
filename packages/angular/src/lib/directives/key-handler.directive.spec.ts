@@ -277,8 +277,14 @@ describe('KeyHandlerDirective arrow keys', () => {
     store.nodeExtent.set([[0, 0], [100, 100]]);
     store.setNodes([makeNode('n1', { selected: true, position: { x: 98, y: 0 } })]);
     press('ArrowRight');
-    expect(pos('n1').x).toBeLessThanOrEqual(100);
-    expect(pos('n1').x).toBeGreaterThanOrEqual(98);
+    expect(pos('n1')).toEqual({ x: 100, y: 0 });
+  });
+
+  it('ArrowLeft at x: 0 inside nodeExtent stays at 0', () => {
+    store.nodeExtent.set([[0, 0], [100, 100]]);
+    store.setNodes([makeNode('n1', { selected: true })]);
+    press('ArrowLeft');
+    expect(pos('n1')).toEqual({ x: 0, y: 0 });
   });
 
   it('does not move a non-draggable selected node', () => {
