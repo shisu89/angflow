@@ -9,13 +9,14 @@ import {
   getOutgoers as getOutgoersSystem,
   getIncomers as getIncomersSystem,
   shallowNodeData,
+  getConnectionsFromLookup,
   type XYPosition,
   type SnapGrid,
   type Viewport,
   type Rect,
   type FitViewOptionsBase,
   type FitViewResult,
-  type HandleConnection,
+  type NodeConnection,
   type ConnectionState,
   type NodeBase,
   type InternalNodeUpdate,
@@ -934,22 +935,12 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     return getConnectedEdgesSystem<NodeBase, EdgeType>(nodeObjects, this.store.edges());
   }
 
-  /** Return all `HandleConnection`s currently attached to a specific handle. */
-  getHandleConnections(params: { nodeId: string; type: 'source' | 'target'; id?: string }): HandleConnection[] {
-    // The connectionLookup is keyed by composite keys: nodeId, nodeId-type, nodeId-type-handleId
-    const lookupKey = params.id
-      ? `${params.nodeId}-${params.type}-${params.id}`
-      : `${params.nodeId}-${params.type}`;
-    const connections = this.store.connectionLookup.get(lookupKey);
-    if (!connections) return [];
-    return Array.from(connections.values());
-  }
-
-  /** Return all `HandleConnection`s for every handle on a node. */
-  getNodeConnections(nodeId: string): HandleConnection[] {
-    const nodeConnections = this.store.connectionLookup.get(nodeId);
-    if (!nodeConnections) return [];
-    return Array.from(nodeConnections.values());
+  /**
+   * Connections of a node (`Connection & { edgeId }`), optionally narrowed to one handle type
+   * and, together with `type`, one handle id. A `handleId` without a `type` is ignored, as upstream.
+   */
+  getNodeConnections(params: { nodeId: string; type?: HandleType | null; handleId?: string | null }): NodeConnection[] {
+    return getConnectionsFromLookup(this.store.connectionLookup, params);
   }
 
   // ── Serialization ─────────────────────────────────────────────────────
@@ -989,31 +980,13 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   }
 
   /**
-   * Returns a signal containing all connections for a node.
-   * Equivalent to React's `useNodeConnections()`.
+   * Returns a signal with the connections of a node, optionally narrowed by handle type and handle id.
+   * Equivalent to React's `useNodeConnections({ id, handleType, handleId })`.
    */
-  selectNodeConnections(nodeId: string): Signal<HandleConnection[]> {
+  selectNodeConnections(params: { nodeId: string; type?: HandleType | null; handleId?: string | null }): Signal<NodeConnection[]> {
     return computed(() => {
       this.store.version();
-      const nodeConnections = this.store.connectionLookup.get(nodeId);
-      if (!nodeConnections) return [];
-      return Array.from(nodeConnections.values());
-    });
-  }
-
-  /**
-   * Returns a signal containing connections for a specific handle.
-   * Equivalent to React's `useHandleConnections()`.
-   */
-  selectHandleConnections(params: { nodeId: string; type: 'source' | 'target'; id?: string }): Signal<HandleConnection[]> {
-    return computed(() => {
-      this.store.version();
-      const lookupKey = params.id
-        ? `${params.nodeId}-${params.type}-${params.id}`
-        : `${params.nodeId}-${params.type}`;
-      const connections = this.store.connectionLookup.get(lookupKey);
-      if (!connections) return [];
-      return Array.from(connections.values());
+      return getConnectionsFromLookup(this.store.connectionLookup, params);
     });
   }
 

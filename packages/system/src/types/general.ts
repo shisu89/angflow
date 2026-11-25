@@ -84,15 +84,7 @@ export type Connection = {
 };
 
 /**
- * The `HandleConnection` type is an extension of a basic [Connection](/api-reference/types/connection) that includes the `edgeId`.
- */
-export type HandleConnection = Connection & {
-  edgeId: string;
-};
-
-/**
  * The `NodeConnection` type is an extension of a basic [Connection](/api-reference/types/connection) that includes the `edgeId`.
- *
  */
 export type NodeConnection = Connection & {
   edgeId: string;
@@ -387,7 +379,7 @@ export type UpdateConnection<NodeType extends InternalNodeBase = InternalNodeBas
 export type ColorModeClass = 'light' | 'dark';
 export type ColorMode = ColorModeClass | 'system';
 
-export type ConnectionLookup = Map<string, Map<string, HandleConnection>>;
+export type ConnectionLookup = Map<string, Map<string, NodeConnection>>;
 
 export type OnBeforeDeleteBase<NodeType extends NodeBase = NodeBase, EdgeType extends EdgeBase = EdgeBase> = ({
   nodes,

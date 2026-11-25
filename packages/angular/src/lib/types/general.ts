@@ -15,8 +15,8 @@ import type {
   SnapGrid,
   Rect,
   Viewport,
-  HandleConnection,
   NodeConnection,
+  HandleType,
 } from '@angflow/system';
 
 import type { Node, Edge, InternalNode } from '.';
@@ -174,8 +174,7 @@ export type NgFlowInstance<NodeType extends Node = Node, EdgeType extends Edge =
 
   // Connection queries
   getConnectedEdges: (nodeIds: string | string[]) => EdgeType[];
-  getHandleConnections: (params: { nodeId: string; type: 'source' | 'target'; id?: string }) => HandleConnection[];
-  getNodeConnections: (nodeId: string) => NodeConnection[];
+  getNodeConnections: (params: { nodeId: string; type?: HandleType | null; handleId?: string | null }) => NodeConnection[];
 
   // Serialization
   toObject: () => NgFlowJsonObject<NodeType, EdgeType>;

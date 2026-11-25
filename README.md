@@ -181,7 +181,7 @@ If you already know React Flow, you know angflow. The public API is modeled on i
 | `useReactFlow()` | `inject(NgFlowService)` | `fitView()`, `zoomIn/Out()`, `setViewport()`, `addNodes/Edges()`, `screenToFlowPosition()`, `toObject()`, etc. |
 | `useNodes()` / `useEdges()` / `useViewport()` | `flowService.nodes` / `.edges` / `.viewport` | Signals instead of hooks |
 | `useNodesState()` / `useEdgesState()` | `applyNodeChanges()` / `applyEdgeChanges()` | Same change pipeline; wire via `(nodesChange)` / `(edgesChange)` |
-| `useNodeConnections()` / `useHandleConnections()` | `flowService.selectNodeConnections()` / `.selectHandleConnections()` | Returns a `Signal<…>` |
+| `useNodeConnections()` | `flowService.selectNodeConnections({ nodeId, type?, handleId? })` | Returns a `Signal<…>` |
 | `onConnect`, `onNodeClick`, … (props) | `(connect)`, `(nodeClick)`, … (outputs) | Same payloads |
 | `nodeTypes={...}` | `[nodeTypes]="{ custom: MyComponent }"` | Angular standalone components |
 

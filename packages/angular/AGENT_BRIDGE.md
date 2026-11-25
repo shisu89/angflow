@@ -122,8 +122,7 @@ Every tool takes an optional `flowId` (omit when only one flow is registered; re
 | `get_outgoers` | `id: string` | `Node[]` — direct downstream neighbours of the node |
 | `get_incomers` | `id: string` | `Node[]` — direct upstream neighbours of the node |
 | `get_connected_edges` | `nodeIds: string[]` | `Edge[]` — all edges touching any of the given nodes |
-| `get_node_connections` | `nodeId: string` | `Connection[]` — all connections (source+target pairs) for the node |
-| `get_handle_connections` | `nodeId: string`, `type: 'source' \| 'target'`, `handleId?: string` | `Connection[]` — connections for a specific handle |
+| `get_node_connections` | `nodeId: string`, `type?: 'source' \| 'target'`, `handleId?: string` (requires `type`) | `NodeConnection[]` (`Connection & { edgeId }`); `handleId` without `type` → `-32602` |
 | `get_handle_data` | `nodeId: string`, `type: 'source' \| 'target'`, `handleId: string \| null` | `HandleElement \| null` — raw handle element data |
 
 ### Read — coordinates

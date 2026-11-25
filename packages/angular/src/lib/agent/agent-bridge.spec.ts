@@ -692,15 +692,6 @@ describe('AngflowAgentBridge', () => {
       expect(Array.isArray((res as { result: unknown[] }).result)).toBe(true);
     });
 
-    it('get_handle_connections rejects an invalid `type` value', async () => {
-      const res = await transport.call('get_handle_connections', {
-        nodeId: 'a',
-        type: 'both',
-      });
-      expect('error' in res).toBe(true);
-      expect((res as { error: { code: number } }).error.code).toBe(-32602);
-    });
-
     it('get_handle_data returns null when no data is attached', async () => {
       const res = await transport.call('get_handle_data', {
         nodeId: 'a',
@@ -2678,5 +2669,38 @@ describe('provenance: op-log + onOp + flow.history source', () => {
     await bridge.callTool('get_changes_since', {});
     const status = (await bridge.callTool('history_status', {})) as { pastDepth: number };
     expect(status.pastDepth).toBe(0);
+  });
+});
+
+describe('connection tools (#6114)', () => {
+  function bridgeWithEdges() {
+    const { bridge, newFlow } = setup();
+    const flow = newFlow();
+    bridge.register('main', flow);
+    flow.setNodes([makeNode('a'), makeNode('b'), makeNode('c')]);
+    flow.setEdges([
+      { id: 'e1', source: 'a', target: 'b', sourceHandle: 'h1' } as Edge,
+      { id: 'e2', source: 'c', target: 'a' } as Edge,
+    ]);
+    return bridge;
+  }
+  const ids = (r: unknown) => (r as { edgeId: string }[]).map((c) => c.edgeId).sort();
+
+  it('get_node_connections returns NodeConnections, filtered by type and handleId', async () => {
+    const bridge = bridgeWithEdges();
+    expect(ids(await bridge.callTool('get_node_connections', { nodeId: 'a' }))).toEqual(['e1', 'e2']);
+    expect(ids(await bridge.callTool('get_node_connections', { nodeId: 'a', type: 'target' }))).toEqual(['e2']);
+    expect(ids(await bridge.callTool('get_node_connections', { nodeId: 'a', type: 'source', handleId: 'h1' }))).toEqual(['e1']);
+  });
+
+  it('get_node_connections rejects a handleId without a type, and an invalid type, with -32602', async () => {
+    const bridge = bridgeWithEdges();
+    await expect(bridge.callTool('get_node_connections', { nodeId: 'a', handleId: 'h1' })).rejects.toMatchObject({ code: -32602 });
+    await expect(bridge.callTool('get_node_connections', { nodeId: 'a', type: 'both' })).rejects.toMatchObject({ code: -32602 });
+  });
+
+  it('get_handle_connections no longer exists (-32601)', async () => {
+    const bridge = bridgeWithEdges();
+    await expect(bridge.callTool('get_handle_connections', { nodeId: 'a', type: 'source' })).rejects.toMatchObject({ code: -32601 });
   });
 });

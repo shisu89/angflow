@@ -821,17 +821,18 @@ export class AngflowAgentBridge {
 
     this.handlers.set('get_node_connections', (flow, params) => {
       const nodeId = requireString(params, 'nodeId');
-      return flow.getNodeConnections(nodeId);
-    });
-
-    this.handlers.set('get_handle_connections', (flow, params) => {
-      const nodeId = requireString(params, 'nodeId');
-      const type = requireString(params, 'type');
-      if (type !== 'source' && type !== 'target') {
+      const type = params['type'] ?? null;
+      if (type !== null && type !== 'source' && type !== 'target') {
         throw new InvalidParamsError('Param "type" must be "source" or "target".');
       }
-      const handleId = typeof params['handleId'] === 'string' ? (params['handleId'] as string) : undefined;
-      return flow.getHandleConnections({ nodeId, type, id: handleId });
+      const handleId = params['handleId'] ?? null;
+      if (handleId !== null && typeof handleId !== 'string') {
+        throw new InvalidParamsError('Param "handleId" must be a string.');
+      }
+      if (handleId !== null && type === null) {
+        throw new InvalidParamsError('Param "handleId" requires "type": handle ids are only unique per handle type.');
+      }
+      return flow.getNodeConnections({ nodeId, type, handleId });
     });
 
     this.handlers.set('get_handle_data', (flow, params) => {

@@ -4,7 +4,8 @@ import { NgFlowService } from '@angflow/angular';
 // NOT COVERAGE: upstream's connection-hooks.spec.ts starts with test.skip(FRAMEWORK !== 'react'),
 // so this page exists for route parity only and is never exercised on Angular.
 // React: useNodeConnections({ id: 'a', onConnect, onDisconnect }).
-// angflow's selectNodeConnections has no onConnect/onDisconnect callbacks, so the
+// angflow's selectNodeConnections has no onConnect/onDisconnect callbacks (React's
+// useNodeConnections({ id: 'a', ... }) maps to selectNodeConnections({ nodeId: 'a', ... })), so the
 // connect/disconnect events are derived by diffing successive connection lists.
 @Component({
   selector: 'connection-updates-node',
@@ -21,7 +22,7 @@ import { NgFlowService } from '@angflow/angular';
 })
 export class ConnectionUpdatesNodeComponent {
   private readonly flow = inject(NgFlowService);
-  private readonly connections = this.flow.selectNodeConnections('a');
+  private readonly connections = this.flow.selectNodeConnections({ nodeId: 'a' });
   protected readonly events = signal<string[]>([]);
   protected readonly connectionIds = () => this.connections().map((c) => c.edgeId).join(',');
 

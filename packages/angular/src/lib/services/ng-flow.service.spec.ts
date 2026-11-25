@@ -1421,6 +1421,38 @@ describe('dissolveGroup', () => {
     expect(service.getNode('inner')?.parentId).toBeUndefined();
     expect(service.getNode('a')?.parentId).toBe('inner');
   });
+
+  describe('connection queries (#6114)', () => {
+    beforeEach(() => {
+      service.setNodes([makeNode('a'), makeNode('b'), makeNode('c'), makeNode('d')]);
+      service.setEdges([
+        makeEdge('e1', 'a', 'b', { sourceHandle: 'h1' }),
+        makeEdge('e2', 'a', 'c', { sourceHandle: 'h2' }),
+        makeEdge('e3', 'd', 'a', { targetHandle: 't1' }),
+      ]);
+    });
+    const ids = (cs: { edgeId: string }[]) => cs.map((c) => c.edgeId).sort();
+
+    it('getNodeConnections takes { nodeId, type?, handleId? }', () => {
+      expect(ids(service.getNodeConnections({ nodeId: 'a' }))).toEqual(['e1', 'e2', 'e3']);
+      expect(ids(service.getNodeConnections({ nodeId: 'a', type: 'source' }))).toEqual(['e1', 'e2']);
+      expect(ids(service.getNodeConnections({ nodeId: 'a', type: 'source', handleId: 'h1' }))).toEqual(['e1']);
+      expect(ids(service.getNodeConnections({ nodeId: 'a', type: 'target', handleId: 't1' }))).toEqual(['e3']);
+      expect(service.getNodeConnections({ nodeId: 'zz' })).toEqual([]);
+    });
+
+    it('selectNodeConnections takes the same params and tracks edge changes', () => {
+      const sig = service.selectNodeConnections({ nodeId: 'a', type: 'source' });
+      expect(ids(sig())).toEqual(['e1', 'e2']);
+      service.setEdges([makeEdge('e1', 'a', 'b', { sourceHandle: 'h1' })]);
+      expect(ids(sig())).toEqual(['e1']);
+    });
+
+    it('has no getHandleConnections / selectHandleConnections', () => {
+      expect('getHandleConnections' in service).toBe(false);
+      expect('selectHandleConnections' in service).toBe(false);
+    });
+  });
 });
 
 describe('getNodesBounds', () => {

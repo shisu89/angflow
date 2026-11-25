@@ -340,7 +340,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   readonly nodeLookup: NodeLookup<InternalNodeBase<NodeType>> = new Map();
   readonly parentLookup: ParentLookup<InternalNodeBase<NodeType>> = new Map();
   readonly edgeLookup: EdgeLookup<EdgeType> = new Map();
-  readonly connectionLookup: Map<string, Map<string, import('@angflow/system').HandleConnection>> = new Map();
+  readonly connectionLookup: import('@angflow/system').ConnectionLookup = new Map();
 
   // ── Callback references ───────────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-import { HandleBounds, HandleConnection, infiniteExtent, NodeHandleBounds, ZIndexMode } from '..';
+import { HandleBounds, infiniteExtent, NodeConnection, NodeHandleBounds, ZIndexMode } from '..';
 import {
   NodeBase,
   CoordinateExtent,
@@ -728,7 +728,7 @@ export async function panBy({
  */
 function addConnectionToLookup(
   type: 'source' | 'target',
-  connection: HandleConnection,
+  connection: NodeConnection,
   connectionKey: string,
   connectionLookup: ConnectionLookup,
   nodeId: string,

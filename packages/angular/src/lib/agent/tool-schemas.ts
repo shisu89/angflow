@@ -458,19 +458,9 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
   },
   {
     name: 'get_node_connections',
-    description: 'Return all HandleConnection objects for every handle on the given node.',
-    inputSchema: {
-      type: 'object',
-      properties: { flowId: { type: 'string' }, nodeId: { type: 'string' } },
-      required: ['nodeId'],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: 'get_handle_connections',
     description:
-      'Return HandleConnections for a specific handle. Pass handleId to scope to a named handle, ' +
-      'or omit to get every connection of that type on the node.',
+      'Return the NodeConnection objects (Connection & { edgeId }) of a node. Pass type ("source" | "target") to keep one side, ' +
+      'and handleId together with type to keep one handle. A handleId without a type is an error.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -479,7 +469,7 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
         type: { type: 'string', enum: ['source', 'target'] },
         handleId: { type: 'string' },
       },
-      required: ['nodeId', 'type'],
+      required: ['nodeId'],
       additionalProperties: false,
     },
   },

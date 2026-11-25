@@ -184,7 +184,6 @@ export type {
   HandleBounds,
   NodeHandle,
   HandleType,
-  HandleConnection,
 
   // Connection types
   Connection,
