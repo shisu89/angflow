@@ -111,9 +111,13 @@ export type ViewportHelperFunctions = {
   flowToScreenPosition: (flowPosition: XYPosition) => XYPosition;
 };
 
-export type OnBeforeDelete<NodeType extends Node = Node, EdgeType extends Edge = Edge> = (
-  params: { nodes: NodeType[]; edges: EdgeType[] }
-) => boolean | Promise<boolean>;
+export type OnBeforeDelete<NodeType extends Node = Node, EdgeType extends Edge = Edge> = (params: {
+  nodes: NodeType[];
+  edges: EdgeType[];
+}) =>
+  | boolean
+  | { nodes: NodeType[]; edges: EdgeType[] }
+  | Promise<boolean | { nodes: NodeType[]; edges: EdgeType[] }>;
 
 export type IsValidConnection<EdgeType extends Edge = Edge> = (edge: EdgeType | Connection) => boolean;
 

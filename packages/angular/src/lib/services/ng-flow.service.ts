@@ -5,6 +5,7 @@ import {
   rendererPointToPoint,
   getNodesBounds as getNodesBoundsSystem,
   getConnectedEdges as getConnectedEdgesSystem,
+  getElementsToRemove,
   getOutgoers as getOutgoersSystem,
   getIncomers as getIncomersSystem,
   shallowNodeData,
@@ -783,56 +784,49 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   }
 
   /**
-   * Delete the specified nodes and/or edges. Edges connected to deleted nodes
-   * are also removed. If an `onBeforeDelete` hook is set, it runs first and
-   * can veto the deletion.
+   * Delete the specified nodes and/or edges, like pressing the delete key
+   * (upstream `useReactFlow().deleteElements`). `{ id }` stubs are accepted.
+   *
+   * - Deleting a node also deletes its descendants (child nodes, recursively).
+   * - Nodes and edges with `deletable: false` are skipped; a protected child of
+   *   a deleted parent survives and keeps its now-dangling `parentId`.
+   * - Deletable edges connected to deleted nodes are included.
+   * - If an `onBeforeDelete` hook is set it receives the matched set and may
+   *   return `false` to cancel, `true` to proceed, or `{ nodes, edges }` to
+   *   delete exactly that set instead (sync or async). It is never called with
+   *   an empty set.
+   * - `onEdgesDelete`, `onNodesDelete` and `onDelete` each fire once, before
+   *   their removal is applied.
    *
    * @returns The nodes and edges that were actually deleted (empty arrays if
-   *          `onBeforeDelete` returned `false`).
+   *          `onBeforeDelete` vetoed the deletion).
    */
   async deleteElements(params: DeleteElementsOptions): Promise<{ deletedNodes: NodeType[]; deletedEdges: EdgeType[] }> {
-    const nodeIdsToDelete = new Set((params.nodes ?? []).map((n) => n.id));
-    const edgeIdsToDelete = new Set((params.edges ?? []).map((e) => e.id));
+    const hook = this.store.onBeforeDelete;
+    const { nodes: matchingNodes, edges: matchingEdges } = await getElementsToRemove<NodeType, EdgeType>({
+      nodesToRemove: (params.nodes ?? []) as Partial<NodeType>[],
+      edgesToRemove: (params.edges ?? []) as Partial<EdgeType>[],
+      nodes: this.store.nodes(),
+      edges: this.store.edges(),
+      // Angflow never asks the host about an empty set.
+      onBeforeDelete: hook
+        ? async (p) => (p.nodes.length === 0 && p.edges.length === 0 ? true : hook(p))
+        : undefined,
+    });
 
-    // Also delete edges connected to deleted nodes
-    for (const edge of this.store.edges()) {
-      if (nodeIdsToDelete.has(edge.source) || nodeIdsToDelete.has(edge.target)) {
-        edgeIdsToDelete.add(edge.id);
-      }
+    if (matchingEdges.length > 0) {
+      this.store.onEdgesDelete?.(matchingEdges);
+      this.store.triggerEdgeChanges(matchingEdges.map((e) => elementToRemoveChange(e)) as EdgeChange<EdgeType>[]);
+    }
+    if (matchingNodes.length > 0) {
+      this.store.onNodesDelete?.(matchingNodes);
+      this.store.triggerNodeChanges(matchingNodes.map((n) => elementToRemoveChange(n)) as NodeChange<NodeType>[]);
+    }
+    if (matchingNodes.length > 0 || matchingEdges.length > 0) {
+      this.store.onDelete?.({ nodes: matchingNodes, edges: matchingEdges });
     }
 
-    const nodesToDelete = this.store.nodes().filter((n) => nodeIdsToDelete.has(n.id));
-    const edgesToDelete = this.store.edges().filter((e) => edgeIdsToDelete.has(e.id));
-
-    // Check onBeforeDelete callback
-    if (this.store.onBeforeDelete && (nodesToDelete.length > 0 || edgesToDelete.length > 0)) {
-      const shouldDelete = await this.store.onBeforeDelete({ nodes: nodesToDelete, edges: edgesToDelete });
-      if (!shouldDelete) {
-        return { deletedNodes: [], deletedEdges: [] };
-      }
-    }
-
-    if (edgesToDelete.length > 0) {
-      this.store.triggerEdgeChanges(
-        edgesToDelete.map((e) => elementToRemoveChange(e)) as EdgeChange<EdgeType>[],
-      );
-    }
-    if (nodesToDelete.length > 0) {
-      this.store.triggerNodeChanges(
-        nodesToDelete.map((n) => elementToRemoveChange(n)) as NodeChange<NodeType>[],
-      );
-    }
-
-    // Notify delete callbacks so programmatic deletion reaches the
-    // (nodesDelete)/(edgesDelete)/(delete) outputs, matching React Flow where
-    // onNodesDelete/onDelete fire for programmatic deletes too.
-    if (nodesToDelete.length > 0) this.store.onNodesDelete?.(nodesToDelete);
-    if (edgesToDelete.length > 0) this.store.onEdgesDelete?.(edgesToDelete);
-    if (nodesToDelete.length > 0 || edgesToDelete.length > 0) {
-      this.store.onDelete?.({ nodes: nodesToDelete, edges: edgesToDelete });
-    }
-
-    return { deletedNodes: nodesToDelete, deletedEdges: edgesToDelete };
+    return { deletedNodes: matchingNodes, deletedEdges: matchingEdges };
   }
 
   // ── Spatial Queries ───────────────────────────────────────────────────

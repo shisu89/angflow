@@ -263,8 +263,11 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
   {
     name: 'delete_elements',
     description:
-      'Delete nodes and/or edges by id. Edges connected to deleted nodes are removed automatically. ' +
-      'Returns { deletedNodes, deletedEdges }.',
+      'Delete nodes and/or edges by id, like the delete key. Deleting a node also deletes its descendants ' +
+      '(child nodes, recursively) and its connected edges. Elements with deletable: false are skipped ' +
+      '(a non-deletable child survives with a dangling parentId). The host\'s onBeforeDelete hook may veto or ' +
+      'narrow the set. Returns { deletedNodeIds, deletedEdgeIds }, listing everything actually deleted, ' +
+      'cascaded elements included.',
     inputSchema: {
       type: 'object',
       properties: {

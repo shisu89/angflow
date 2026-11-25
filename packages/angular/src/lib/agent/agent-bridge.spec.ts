@@ -221,6 +221,13 @@ describe('AngflowAgentBridge', () => {
       expect(flow.getEdges()).toEqual([]);
     });
 
+    it('delete_elements cascades to descendants and reports every deleted id', async () => {
+      flow.setNodes([makeNode('p'), makeNode('c', { parentId: 'p' }), makeNode('x', { deletable: false })]);
+      flow.setEdges([{ id: 'c-x', source: 'c', target: 'x' } as Edge]);
+      const res = await transport.call('delete_elements', { nodeIds: ['p', 'x', 'ghost'] });
+      expect('result' in res && res.result).toEqual({ deletedNodeIds: ['p', 'c'], deletedEdgeIds: ['c-x'] });
+    });
+
     it('get_state returns nodes, edges, viewport', async () => {
       flow.setNodes([makeNode('a')]);
       const res = await transport.call('get_state');

@@ -165,6 +165,82 @@ describe('NgFlowService', () => {
     });
   });
 
+  describe('deleteElements via getElementsToRemove', () => {
+    it('cascades to descendants (3 levels, child listed before parent), output in store order', async () => {
+      service.setNodes([
+        makeNode('gc', { parentId: 'c' }), makeNode('c', { parentId: 'p' }), makeNode('p'), makeNode('other'),
+      ]);
+      service.setEdges([makeEdge('c-other', 'c', 'other')]);
+      const res = await service.deleteElements({ nodes: [{ id: 'p' }] });
+      expect(res.deletedNodes.map((n) => n.id)).toEqual(['gc', 'c', 'p']);
+      expect(res.deletedEdges.map((e) => e.id)).toEqual(['c-other']);
+      expect(store.nodes().map((n) => n.id)).toEqual(['other']);
+    });
+
+    it('respects deletable: false on nodes and edges', async () => {
+      service.setNodes([makeNode('a', { deletable: false }), makeNode('b'), makeNode('c')]);
+      service.setEdges([makeEdge('bc', 'b', 'c', { deletable: false }), makeEdge('ac', 'a', 'c')]);
+      const res = await service.deleteElements({ nodes: [{ id: 'a' }, { id: 'b' }], edges: [{ id: 'bc' }] });
+      expect(res.deletedNodes.map((n) => n.id)).toEqual(['b']);
+      expect(res.deletedEdges).toEqual([]); // bc is locked; ac belongs to the locked node a
+      expect(store.edges().map((e) => e.id).sort()).toEqual(['ac', 'bc']); // bc survives with a dangling source
+    });
+
+    it('a non-deletable child of a deleted parent survives orphaned; the store warns, never throws', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      onTestFinished(() => warn.mockRestore());
+      service.setNodes([makeNode('p'), makeNode('locked', { parentId: 'p', deletable: false }), makeNode('gc', { parentId: 'locked' })]);
+      const res = await service.deleteElements({ nodes: [{ id: 'p' }] });
+      expect(res.deletedNodes.map((n) => n.id)).toEqual(['p']);
+      expect(store.nodes().map((n) => n.id)).toEqual(['locked', 'gc']);
+      expect(service.getNode('locked')?.parentId).toBe('p');
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('"locked"'));
+    });
+
+    it('onBeforeDelete: sync false vetoes, true deletes the matched set', async () => {
+      service.setNodes([makeNode('a'), makeNode('b')]);
+      store.onBeforeDelete = () => false;
+      expect(await service.deleteElements({ nodes: [{ id: 'a' }] })).toEqual({ deletedNodes: [], deletedEdges: [] });
+      store.onBeforeDelete = () => true;
+      expect((await service.deleteElements({ nodes: [{ id: 'a' }] })).deletedNodes.map((n) => n.id)).toEqual(['a']);
+    });
+
+    it('onBeforeDelete may narrow the set ({ nodes, edges }, sync or async), used verbatim', async () => {
+      service.setNodes([makeNode('a'), makeNode('b'), makeNode('c')]);
+      service.setEdges([makeEdge('ab', 'a', 'b'), makeEdge('bc', 'b', 'c')]);
+      store.onBeforeDelete = async ({ edges }) => ({ nodes: [], edges: edges.filter((e) => e.id === 'ab') });
+      const res = await service.deleteElements({ edges: [{ id: 'ab' }, { id: 'bc' }] });
+      expect(res.deletedEdges.map((e) => e.id)).toEqual(['ab']);
+      expect(store.edges().map((e) => e.id)).toEqual(['bc']);
+    });
+
+    it('fires each on*Delete once, before its changes, in upstream order', async () => {
+      service.setNodes([makeNode('a'), makeNode('b'), makeNode('c')]);
+      service.setEdges([makeEdge('ab', 'a', 'b'), makeEdge('bc', 'b', 'c'), makeEdge('ac', 'a', 'c')]);
+      const order: string[] = [];
+      store.onEdgesDelete = () => order.push(`edgesDelete:${store.edges().length}`);
+      store.onEdgesChange = () => order.push('edgesChange');
+      store.onNodesDelete = () => order.push(`nodesDelete:${store.nodes().length}`);
+      store.onNodesChange = () => order.push('nodesChange');
+      store.onDelete = ({ nodes, edges }) => order.push(`delete:${nodes.length}/${edges.length}`);
+      await service.deleteElements({ nodes: [{ id: 'b' }] });
+      expect(order).toEqual(['edgesDelete:3', 'edgesChange', 'nodesDelete:3', 'nodesChange', 'delete:1/2']);
+    });
+
+    it('empty input or nothing matching: no hook, no callbacks, no changes', async () => {
+      service.setNodes([makeNode('a', { deletable: false })]);
+      const hook = vi.fn().mockResolvedValue(true);
+      const cb = vi.fn();
+      store.onBeforeDelete = hook;
+      store.onNodesDelete = store.onEdgesDelete = store.onDelete = store.onNodesChange = cb;
+      for (const params of [{}, { nodes: [{ id: 'ghost' }] }, { nodes: [{ id: 'a' }] }]) {
+        expect(await service.deleteElements(params)).toEqual({ deletedNodes: [], deletedEdges: [] });
+      }
+      expect(hook).not.toHaveBeenCalled(); // Open question 1 default
+      expect(cb).not.toHaveBeenCalled();
+    });
+  });
+
   // ── batch: coalescing through the service layer ───────────────────────
 
   describe('batch through service', () => {
@@ -1277,6 +1353,39 @@ describe('dissolveGroup', () => {
     expect(await service.dissolveGroup('g')).toEqual([]);
     expect(service.getNode('g')).toBeTruthy();
     expect(service.getNode('a')).toMatchObject({ parentId: 'g', extent: 'parent', position: { x: 180, y: 10 } }); // raw, not re-clamped
+  });
+  it('a narrowing onBeforeDelete that keeps the group restores the children', async () => {
+    service.setNodes([
+      makeNode('g', { type: 'group', position: { x: 50, y: 50 }, width: 400, height: 400 }),
+      makeNode('a', { parentId: 'g', position: { x: 100, y: 100 }, width: 50, height: 50 }),
+    ]);
+    store.onBeforeDelete = async () => ({ nodes: [], edges: [] });
+    expect(await service.dissolveGroup('g')).toEqual([]);
+    expect(service.getNode('g')).toBeTruthy();
+    expect(service.getNode('a')).toMatchObject({ parentId: 'g', position: { x: 100, y: 100 } });
+  });
+
+  it('a deletable: false group restores the children', async () => {
+    service.setNodes([
+      makeNode('g', { type: 'group', deletable: false, position: { x: 50, y: 50 }, width: 400, height: 400 }),
+      makeNode('a', { parentId: 'g', position: { x: 100, y: 100 }, width: 50, height: 50 }),
+    ]);
+    expect(await service.dissolveGroup('g')).toEqual([]);
+    expect(service.getNode('g')).toBeTruthy();
+    expect(service.getNode('a')).toMatchObject({ parentId: 'g', position: { x: 100, y: 100 } });
+  });
+
+  it('a group whose child is itself a group: only the group is deleted', async () => {
+    service.setNodes([
+      makeNode('g', { type: 'group', position: { x: 10, y: 10 }, width: 600, height: 600 }),
+      makeNode('inner', { type: 'group', parentId: 'g', position: { x: 40, y: 40 }, width: 300, height: 300 }),
+      makeNode('a', { parentId: 'inner', position: { x: 20, y: 20 }, width: 50, height: 50 }),
+    ]);
+    await service.dissolveGroup('g');
+    expect(service.getNode('g')).toBeUndefined();
+    expect(service.getNode('inner')).toBeTruthy();
+    expect(service.getNode('inner')?.parentId).toBeUndefined();
+    expect(service.getNode('a')?.parentId).toBe('inner');
   });
 });
 

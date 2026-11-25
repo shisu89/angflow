@@ -145,7 +145,7 @@ Every tool takes an optional `flowId` (omit when only one flow is registered; re
 | `update_node_data` | `id: string`, `dataPatch: Record<string, unknown>` | Shallow-merges only the `data` property; returns updated `Node` |
 | `update_edge` | `id: string`, `patch: Partial<Edge>` | Shallow merge; returns updated `Edge` |
 | `update_edge_data` | `id: string`, `dataPatch: Record<string, unknown>` | Shallow-merges only the `data` property; returns updated `Edge` |
-| `delete_elements` | `nodeIds?: string[]`, `edgeIds?: string[]` | Edges to deleted nodes auto-removed. Returns `{ deletedNodeIds, deletedEdgeIds }` |
+| `delete_elements` | `nodeIds?: string[]`, `edgeIds?: string[]` | Cascades to descendants and to connected edges; skips `deletable: false`; awaits `onBeforeDelete` (veto, or `{ nodes, edges }` to narrow). Returns `{ deletedNodeIds, deletedEdgeIds }`: every id actually deleted, cascaded ones included; unknown or non-deletable ids are omitted. |
 
 ### Mutate — bulk (prefer incremental ops above)
 

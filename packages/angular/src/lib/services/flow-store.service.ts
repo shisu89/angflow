@@ -45,7 +45,7 @@ import {
   setDevWarnSink,
 } from '@angflow/system';
 
-import type { Node, Edge } from '../types';
+import type { Node, Edge, OnBeforeDelete } from '../types';
 import type { NodeTemplateSpec } from '../types/node-template';
 import { ngDevWarn } from '../utils/dev-warn';
 
@@ -321,7 +321,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   onClickConnectEnd: ((event: MouseEvent) => void) | null = null;
 
   // ── Delete validation callback ────────────────────────────────────
-  onBeforeDelete: ((params: { nodes: NodeType[]; edges: EdgeType[] }) => boolean | Promise<boolean>) | null = null;
+  onBeforeDelete: OnBeforeDelete<NodeType, EdgeType> | null = null;
 
   // ── Node drag callbacks (set by NgFlowComponent, consumed by XYDrag) ──
   onNodeDragStart: ((event: MouseEvent, node: NodeType, nodes: NodeType[]) => void) | null = null;

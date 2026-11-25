@@ -69,6 +69,7 @@ import type {
   DefaultEdgeOptions,
   FitViewOptions,
   IsValidConnection,
+  OnBeforeDelete,
 } from '../../types';
 
 const VIEWPORT_EPSILON = 1e-4;
@@ -706,18 +707,20 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   /** Right-click on the current multi-selection. */
   readonly selectionContextMenu = output<{ event: MouseEvent; nodes: Node[] }>({ alias: 'selectionContextMenu' });
 
-  /** Fires with the set of nodes about to be deleted (after `onBeforeDelete` approved). */
+  /** Fires once per deletion, before the removal is applied. Includes the set approved by `onBeforeDelete`. */
   readonly nodesDelete = output<Node[]>({ alias: 'nodesDelete' });
-  /** Fires with the set of edges about to be deleted. */
+  /** Fires once per deletion, before the removal is applied. Includes edges removed because they connect to deleted nodes. */
   readonly edgesDelete = output<Edge[]>({ alias: 'edgesDelete' });
   /** Combined `(delete)` output firing once with both deleted `nodes` and `edges`. */
   readonly deleteEvent = output<{ nodes: Node[]; edges: Edge[] }>({ alias: 'delete' });
 
   /**
-   * Callback invoked before elements are deleted.
-   * Return `false` (or a Promise resolving to `false`) to cancel the deletion.
+   * Called before elements are deleted, with the set that would be removed
+   * (descendants and connected edges included). Return `false` to cancel,
+   * `true` to proceed, or `{ nodes, edges }` to delete exactly that set
+   * instead. May be async.
    */
-  readonly onBeforeDelete = input<((params: { nodes: NodeType[]; edges: EdgeType[] }) => boolean | Promise<boolean>) | undefined>(undefined);
+  readonly onBeforeDelete = input<OnBeforeDelete<NodeType, EdgeType> | undefined>(undefined);
 
   /** Fires when the store reports an internal validation or consistency error. */
   readonly error = output<{ id: string; message: string }>({ alias: 'error' });
