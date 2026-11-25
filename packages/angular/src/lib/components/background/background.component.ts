@@ -32,62 +32,33 @@ export type BackgroundVariant = 'dots' | 'lines' | 'cross';
         <rect x="0" y="0" width="100%" height="100%" [attr.fill]="bgColor()" />
       }
       <defs>
-        @switch (variant()) {
-          @case ('dots') {
-            <pattern
-              [attr.id]="patternId()"
-              [attr.x]="patternOffset().x"
-              [attr.y]="patternOffset().y"
-              [attr.width]="scaledGapX()"
-              [attr.height]="scaledGapY()"
-              patternUnits="userSpaceOnUse"
-            >
-              <circle
-                [class]="'xy-flow__background-pattern dots ' + (patternClassName() ?? '')"
-                [attr.cx]="size() * zoom()"
-                [attr.cy]="size() * zoom()"
-                [attr.r]="size() * zoom()"
-                [attr.fill]="color()"
-              />
-            </pattern>
+        <pattern
+          [attr.id]="patternId()"
+          [attr.x]="patternX()"
+          [attr.y]="patternY()"
+          [attr.width]="scaledGap()[0]"
+          [attr.height]="scaledGap()[1]"
+          patternUnits="userSpaceOnUse"
+          [attr.patternTransform]="patternTransform()"
+        >
+          @if (variant() === 'dots') {
+            <svg:circle
+              [class]="'xy-flow__background-pattern dots ' + (patternClassName() ?? '')"
+              [attr.cx]="scaledSize() / 2"
+              [attr.cy]="scaledSize() / 2"
+              [attr.r]="scaledSize() / 2"
+              [attr.fill]="color()"
+            />
+          } @else {
+            <svg:path
+              [class]="'xy-flow__background-pattern ' + variant() + ' ' + (patternClassName() ?? '')"
+              fill="none"
+              [attr.stroke]="color()"
+              [attr.stroke-width]="resolvedLineWidth()"
+              [attr.d]="linePath()"
+            />
           }
-          @case ('lines') {
-            <pattern
-              [attr.id]="patternId()"
-              [attr.x]="patternOffset().x"
-              [attr.y]="patternOffset().y"
-              [attr.width]="scaledGapX()"
-              [attr.height]="scaledGapY()"
-              patternUnits="userSpaceOnUse"
-            >
-              <path
-                [class]="'xy-flow__background-pattern lines ' + (patternClassName() ?? '')"
-                fill="none"
-                [attr.stroke]="color()"
-                [attr.stroke-width]="resolvedLineWidth() * zoom()"
-                [attr.d]="'M ' + scaledGapX() + ' 0 L 0 0 0 ' + scaledGapY()"
-              />
-            </pattern>
-          }
-          @case ('cross') {
-            <pattern
-              [attr.id]="patternId()"
-              [attr.x]="patternOffset().x"
-              [attr.y]="patternOffset().y"
-              [attr.width]="scaledGapX()"
-              [attr.height]="scaledGapY()"
-              patternUnits="userSpaceOnUse"
-            >
-              <path
-                [class]="'xy-flow__background-pattern cross ' + (patternClassName() ?? '')"
-                fill="none"
-                [attr.stroke]="color()"
-                [attr.stroke-width]="resolvedLineWidth() * zoom()"
-                [attr.d]="crossPath()"
-              />
-            </pattern>
-          }
-        }
+        </pattern>
       </defs>
       <rect
         x="0" y="0" width="100%" height="100%"
@@ -103,11 +74,14 @@ export class BackgroundComponent {
   readonly variant = input<BackgroundVariant>('dots');
   /** Distance between pattern elements. Accepts a single number or `[x, y]`. */
   readonly gap = input<number | [number, number]>(20);
-  /** Dot radius (for `dots`) or cross arm length (for `cross`). */
-  readonly size = input(1);
-  /** Stroke width for `lines` and `cross` variants. Defaults match `size` for dots. */
+  /**
+   * Dot diameter (for `dots`) or cross size (for `cross`), in flow units.
+   * Defaults to 1, or 6 for `cross`; `0` also means the default.
+   */
+  readonly size = input<number>();
+  /** Stroke width for the `lines` and `cross` variants, in screen px (not scaled by zoom). Defaults to 1. */
   readonly lineWidth = input<number>();
-  /** Offset of the pattern origin from the viewport origin. */
+  /** Offset of the pattern origin, in flow units. */
   readonly offset = input<number | [number, number]>(0);
   /** Pattern stroke/fill color. */
   readonly color = input<string>();
@@ -115,13 +89,13 @@ export class BackgroundComponent {
   readonly bgColor = input<string>();
   /** Extra CSS class applied to each generated pattern shape. */
   readonly patternClassName = input<string>();
-  /** Override the generated SVG pattern id. Aliased as `id`. */
+  /**
+   * Appended to the generated pattern id `pattern-<flowId>`. Give each
+   * background in one flow a unique id. Aliased as `id`.
+   */
   readonly bgId = input<string | undefined>(undefined, { alias: 'id' });
 
-  readonly patternId = computed(() => {
-    const customId = this.bgId();
-    return customId ?? `ng-flow-bg-${this.store.rfId()}`;
-  });
+  readonly patternId = computed(() => `pattern-${this.store.rfId()}${this.bgId() ?? ''}`);
 
   readonly zoom = computed(() => this.store.transform()[2]);
 
@@ -145,29 +119,35 @@ export class BackgroundComponent {
     return Array.isArray(o) ? o[1] : o;
   });
 
-  readonly scaledGapX = computed(() => this.gapX() * this.zoom());
-  readonly scaledGapY = computed(() => this.gapY() * this.zoom());
+  readonly scaledGap = computed<[number, number]>(() => [
+    this.gapX() * this.zoom() || 1,
+    this.gapY() * this.zoom() || 1,
+  ]);
 
-  readonly resolvedLineWidth = computed(() => {
-    const lw = this.lineWidth();
-    if (lw !== undefined) return lw;
-    return this.variant() === 'dots' ? this.size() : 1;
+  // upstream: `size || defaultSize[variant]`, so `size: 0` also falls back to the default
+  private readonly patternSize = computed(() => this.size() || (this.variant() === 'cross' ? 6 : 1));
+
+  readonly scaledSize = computed(() => this.patternSize() * this.zoom());
+
+  /** Cell the line/cross path spans: the scaled size for `cross`, the scaled gap otherwise. */
+  private readonly patternDimensions = computed<[number, number]>(() =>
+    this.variant() === 'cross' ? [this.scaledSize(), this.scaledSize()] : this.scaledGap(),
+  );
+
+  readonly patternX = computed(() => this.store.transform()[0] % this.scaledGap()[0]);
+  readonly patternY = computed(() => this.store.transform()[1] % this.scaledGap()[1]);
+
+  readonly patternTransform = computed(() => {
+    const [dx, dy] = this.patternDimensions();
+    const z = this.zoom();
+    return `translate(-${this.offsetX() * z + dx / 2},-${this.offsetY() * z + dy / 2})`;
   });
 
-  readonly patternOffset = computed(() => {
-    const t = this.store.transform();
-    return {
-      x: t[0] % this.scaledGapX() + this.offsetX() * this.zoom(),
-      y: t[1] % this.scaledGapY() + this.offsetY() * this.zoom(),
-    };
-  });
+  // upstream destructures `lineWidth = 1`: undefined becomes 1, 0 stays 0; never scaled by zoom
+  readonly resolvedLineWidth = computed(() => this.lineWidth() ?? 1);
 
-  readonly crossPath = computed(() => {
-    const gx = this.scaledGapX();
-    const gy = this.scaledGapY();
-    const s = this.size() * this.zoom();
-    const halfGX = gx / 2;
-    const halfGY = gy / 2;
-    return `M ${halfGX - s} ${halfGY} L ${halfGX + s} ${halfGY} M ${halfGX} ${halfGY - s} L ${halfGX} ${halfGY + s}`;
+  readonly linePath = computed(() => {
+    const [w, h] = this.patternDimensions();
+    return `M${w / 2} 0 V${h} M0 ${h / 2} H${w}`;
   });
 }

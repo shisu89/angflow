@@ -27,24 +27,6 @@ export interface KnownFailure {
 }
 
 export const KNOWN_FAILURES: KnownFailure[] = [
-  // ── background.spec.ts ────────────────────────────────────────────────────
-  {
-    file: 'background.spec.ts',
-    titlePath: ['Background', 'centers the dot pattern with default gap and no offset (zoom 1, pan 0,0)'],
-    reason:
-      '`#pattern-flow-a0` is missing: angflow uses the Background `id` verbatim (upstream `pattern-<flowId><id>`), ' +
-      'so four flows on one page share pattern id "0", and it sets x/y instead of a half-gap `patternTransform`.',
-    owner: 'B',
-  },
-  {
-    file: 'background.spec.ts',
-    titlePath: ['Background', 'applies both the offset and the half-cell centering for a non-zero offset'],
-    reason:
-      '`#pattern-flow-d1` is missing: same Background pattern-id scheme divergence, and no ' +
-      '`patternTransform` (offset + half gap) is rendered.',
-    owner: 'B',
-  },
-
   // ── click-connect.spec.ts ─────────────────────────────────────────────────
   {
     file: 'click-connect.spec.ts',

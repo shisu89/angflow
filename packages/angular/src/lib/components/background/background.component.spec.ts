@@ -54,3 +54,118 @@ describe('BackgroundComponent pattern fill', () => {
     expect(path.getAttribute('fill')).toBe('none');
   });
 });
+
+/**
+ * Pattern ids, x/y and patternTransform as upstream `Background.tsx`, and the
+ * upstream `DotPattern` / `LinePattern` shapes (Open question 4: full parity).
+ */
+describe('BackgroundComponent pattern geometry', () => {
+  let store: FlowStore;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [BackgroundComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    store = TestBed.inject(FlowStore);
+    store.rfId.set('flow-a');
+  });
+
+  function render(inputs: Record<string, unknown> = {}) {
+    const fixture = TestBed.createComponent(BackgroundComponent);
+    for (const [k, v] of Object.entries(inputs)) setSignalInput(fixture.componentInstance, k, v);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const pattern = el.querySelector('pattern') as SVGPatternElement;
+    const rects = [...el.querySelectorAll('rect')];
+    return { fixture, el, pattern, fillRect: rects[rects.length - 1] };
+  }
+
+  it('ids the pattern pattern-<flowId><id> and fills the rect with it', () => {
+    const { pattern, fillRect, el } = render({ bgId: '0' });
+    expect(el.querySelectorAll('pattern').length).toBe(1);
+    expect(pattern.getAttribute('id')).toBe('pattern-flow-a0');
+    expect(fillRect.getAttribute('fill')).toBe('url(#pattern-flow-a0)');
+  });
+
+  it('ids the pattern pattern-<flowId> without an id', () => {
+    const { pattern, fillRect } = render();
+    expect(pattern.getAttribute('id')).toBe('pattern-flow-a');
+    expect(fillRect.getAttribute('fill')).toBe('url(#pattern-flow-a)');
+  });
+
+  it('centres the default dots by half the gap at zoom 1, transform 0', () => {
+    const { pattern } = render();
+    expect(pattern.getAttribute('patternTransform')).toBe('translate(-10,-10)');
+    expect(pattern.getAttribute('x')).toBe('0');
+    expect(pattern.getAttribute('y')).toBe('0');
+    expect(pattern.getAttribute('width')).toBe('20');
+    expect(pattern.getAttribute('height')).toBe('20');
+  });
+
+  it('adds the offset to the half-cell translation (lines, gap 100, offset 2)', () => {
+    const { pattern } = render({ variant: 'lines', gap: 100, offset: 2 });
+    expect(pattern.getAttribute('patternTransform')).toBe('translate(-52,-52)');
+  });
+
+  it('uses the scaled size as the cross pattern dimension (size 6, offset 4)', () => {
+    const { pattern } = render({ variant: 'cross', size: 6, offset: 4 });
+    expect(pattern.getAttribute('patternTransform')).toBe('translate(-7,-7)');
+  });
+
+  it('defaults the cross size to 6, and size 0 falls back to the default', () => {
+    expect(render({ variant: 'cross' }).pattern.getAttribute('patternTransform')).toBe('translate(-3,-3)');
+    expect(render({ variant: 'cross', size: 0 }).pattern.getAttribute('patternTransform')).toBe('translate(-3,-3)');
+  });
+
+  it('tracks the transform modulo the gap in x/y; the offset no longer feeds them', () => {
+    store.transform.set([15, 7, 1]);
+    const { pattern } = render({ gap: 20, offset: 3 });
+    expect(pattern.getAttribute('x')).toBe('15');
+    expect(pattern.getAttribute('y')).toBe('7');
+    expect(pattern.getAttribute('patternTransform')).toBe('translate(-13,-13)');
+  });
+
+  it('scales gap, size and offset with zoom', () => {
+    store.transform.set([45, 30, 2]);
+    const { pattern } = render({ gap: 20, offset: 1 });
+    expect(pattern.getAttribute('x')).toBe('5');
+    expect(pattern.getAttribute('y')).toBe('30');
+    expect(pattern.getAttribute('width')).toBe('40');
+    expect(pattern.getAttribute('patternTransform')).toBe('translate(-22,-22)');
+  });
+
+  it('draws dots as upstream DotPattern: circle at (r, r) with r = scaledSize / 2', () => {
+    store.transform.set([0, 0, 2]);
+    const { el } = render({ size: 3 });
+    const circle = el.querySelector('circle.xy-flow__background-pattern.dots') as SVGCircleElement;
+    expect(circle.getAttribute('cx')).toBe('3');
+    expect(circle.getAttribute('cy')).toBe('3');
+    expect(circle.getAttribute('r')).toBe('3');
+  });
+
+  it('draws lines as upstream LinePattern over the scaled gap, with unscaled lineWidth 1', () => {
+    store.transform.set([0, 0, 2]);
+    const { el } = render({ variant: 'lines', gap: [50, 30] });
+    const path = el.querySelector('path.xy-flow__background-pattern.lines') as SVGPathElement;
+    expect(path.getAttribute('d')).toBe('M50 0 V60 M0 30 H100');
+    expect(path.getAttribute('stroke-width')).toBe('1');
+    expect(path.getAttribute('fill')).toBe('none');
+  });
+
+  it('draws the cross over scaledSize, and lineWidth 0 stays 0', () => {
+    store.transform.set([0, 0, 2]);
+    const { el } = render({ variant: 'cross', lineWidth: 0 });
+    const path = el.querySelector('path.xy-flow__background-pattern.cross') as SVGPathElement;
+    expect(path.getAttribute('d')).toBe('M6 0 V12 M0 6 H12');
+    expect(path.getAttribute('stroke-width')).toBe('0');
+  });
+
+  it('keeps patternClassName and color on the shape', () => {
+    const { el } = render({ variant: 'dots', patternClassName: 'extra', color: 'red' });
+    const circle = el.querySelector('circle') as SVGCircleElement;
+    expect(circle.classList.contains('extra')).toBe(true);
+    expect(circle.getAttribute('fill')).toBe('red');
+  });
+});
