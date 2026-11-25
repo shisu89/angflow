@@ -967,9 +967,9 @@ export class AngflowAgentBridge {
       // apply_changes' delete_elements op uses the same element selection as
       // the delete_elements tool (cascade, `deletable`) but bypasses
       // onBeforeDelete, so the whole batch can roll back by snapshot (the
-      // host hook can't take part in a rollback-capable batch). Warn once per bridge lifetime if the host actually
-      // has the veto hook registered — otherwise the silent veto-loss is
-      // very hard to discover.
+      // host hook can't take part in a rollback-capable batch). Warn once per
+      // bridge lifetime if the host actually has the veto hook registered —
+      // otherwise the silent veto-loss is very hard to discover.
       if (!this.warnedOnBeforeDeleteBypass && flow.hasOnBeforeDeleteHook()) {
         const hasDelete = ops.some((o) => o['op'] === 'delete_elements');
         if (hasDelete) {

@@ -10,6 +10,13 @@ import type { AgentOutbound, AgentTransport, AgentInbound, AgentResponse } from 
 import type { Node, Edge } from '../types';
 import type { FitViewResult } from '@angflow/system';
 import type { AgentLayoutFn } from '../types/node-template';
+import { getElementsToRemove } from '@angflow/system';
+
+// Pass-through spy, so a test can make apply_changes' delete op fail.
+vi.mock('@angflow/system', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@angflow/system')>();
+  return { ...actual, getElementsToRemove: vi.fn(actual.getElementsToRemove) };
+});
 
 function makeNode(id: string, overrides: Partial<Node> = {}): Node {
   return { id, position: { x: 0, y: 0 }, data: {}, type: 'default', ...overrides };
@@ -869,10 +876,29 @@ describe('AngflowAgentBridge', () => {
       const asyncCall = transport.call('apply_changes', {
         ops: [{ op: 'delete_elements', nodeIds: ['s'] }, { op: 'add_node', node: { id: 't', position: { x: 0, y: 0 }, data: {} } }],
       });
+      expect(flow.getNode('s')).toBeTruthy(); // the delete itself hasn't been applied yet
       expect(flow.getNode('t')).toBeUndefined(); // ops after the delete wait for its selection
       await asyncCall;
       expect(flow.getNode('s')).toBeUndefined();
       expect(flow.getNode('t')).toBeTruthy();
+    });
+
+    it('rolls back and reports failedIndex when the delete op\'s selection rejects', async () => {
+      flow.setNodes([makeNode('a')]);
+      vi.mocked(getElementsToRemove).mockRejectedValueOnce(new Error('selection failed'));
+      const res = await transport.call('apply_changes', {
+        ops: [
+          { op: 'add_node', node: { id: 'n', position: { x: 0, y: 0 }, data: {} } },
+          { op: 'delete_elements', nodeIds: ['a'] },
+          { op: 'add_node', node: { id: 'm', position: { x: 0, y: 0 }, data: {} } },
+        ],
+      });
+      expect((res as { error: { code: number; message: string; data?: { failedIndex?: number } } }).error).toMatchObject({
+        code: -32603,
+        message: expect.stringContaining('selection failed'),
+        data: { failedIndex: 1 },
+      });
+      expect(flow.getNodes().map((n) => n.id)).toEqual(['a']);
     });
 
     it('does not call onBeforeDelete inside apply_changes', async () => {
