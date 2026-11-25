@@ -7,6 +7,7 @@ import {
   getConnectedEdges as getConnectedEdgesSystem,
   getOutgoers as getOutgoersSystem,
   getIncomers as getIncomersSystem,
+  shallowNodeData,
   type XYPosition,
   type SnapGrid,
   type Viewport,
@@ -934,7 +935,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
           return { id: userNode.id, data: userNode.data as Record<string, unknown>, type: userNode.type };
         })
         .filter((n): n is NonNullable<typeof n> => n !== null);
-    });
+    }, { equal: shallowNodeData });
   }
 
   /**

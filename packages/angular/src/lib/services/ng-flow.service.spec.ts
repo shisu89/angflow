@@ -265,6 +265,28 @@ describe('NgFlowService', () => {
       expect(sig()[0]).toEqual(expect.objectContaining({ id: '1', type: 'custom' }));
     });
 
+    it('keeps the same array when node data is unchanged', () => {
+      const data = { label: 'A' };
+      service.setNodes([makeNode('a', { data })]);
+
+      const sig = service.selectNodesData(['a']);
+      const first = sig();
+      store.triggerNodeChanges([{ id: 'a', type: 'position', position: { x: 5, y: 5 } }]);
+
+      expect(sig()).toBe(first);
+    });
+
+    it('emits a new value when node data changes', () => {
+      service.setNodes([makeNode('a', { data: { label: 'A' } })]);
+
+      const sig = service.selectNodesData(['a']);
+      const first = sig();
+      service.updateNodeData('a', { label: 'B' });
+
+      expect(sig()).not.toBe(first);
+      expect(sig()[0].data).toEqual({ label: 'B' });
+    });
+
     it('filters out IDs that no longer exist in nodeLookup', () => {
       service.setNodes([makeNode('1')]);
       const sig = service.selectNodesData(['1', 'gone']);
