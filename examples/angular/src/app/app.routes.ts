@@ -48,6 +48,7 @@ import { LayoutingExampleComponent } from './examples/layouting/layouting.compon
 import { StressExampleComponent } from './examples/stress/stress.component';
 import { AgentBridgeExampleComponent } from './examples/agent-bridge/agent-bridge.component';
 import { AgentChatExampleComponent } from './examples/agent-chat/agent-chat.component';
+import { BackgroundsExampleComponent } from './examples/backgrounds/backgrounds.component';
 import { GenericTestHostComponent } from './generic-tests/generic-test-host.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
 
@@ -68,6 +69,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Drag from sidebar',     path: 'drag-from-sidebar',     component: DragFromSidebarExampleComponent },
   { name: 'Minimap custom',        path: 'minimap-custom',        component: MinimapCustomExampleComponent },
   { name: 'Backgrounds variants',  path: 'backgrounds-variants',  component: BackgroundsVariantsExampleComponent },
+  { name: 'Backgrounds',           path: 'backgrounds',           component: BackgroundsExampleComponent },
   { name: 'Save / restore',        path: 'save-restore',          component: SaveRestoreExampleComponent },
   { name: 'Edge types',            path: 'edge-types',            component: EdgeTypesExampleComponent },
   { name: 'Node toolbar',          path: 'node-toolbar',          component: NodeToolbarExampleComponent },
@@ -110,8 +112,15 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Kitchen sink',            path: 'kitchen-sink',            component: KitchenSinkComponent },
 ];
 
+/** Upstream spec routes -> Angular example. Upstream specs goto('/examples/<name>'). */
+const UPSTREAM_EXAMPLE_ALIASES: Record<string, string> = {
+  'color-mode': 'color-mode',
+  backgrounds: 'backgrounds',
+};
+
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'overview' },
   ...HARNESS_ROUTES.map((r) => ({ path: r.path, component: r.component as never })),
+  { path: 'examples/:name', redirectTo: ({ params }) => UPSTREAM_EXAMPLE_ALIASES[params['name']] ?? 'overview' },
   { path: 'tests/generic', children: [{ path: '**', component: GenericTestHostComponent }] },
 ];
