@@ -239,6 +239,7 @@ function onPointerDown(
       const { inProgress, ...connectionState } = previousConnection;
       const finalConnectionState = {
         ...connectionState,
+        to: pointToRendererPoint(previousConnection.to, getTransform()),
         toPosition: previousConnection.toHandle ? previousConnection.toPosition : null,
       };
 

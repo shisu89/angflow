@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { computed } from '@angular/core';
-import type { NodeChange, ConnectionState } from '@angflow/system';
+import type { NodeChange, ConnectionInProgress, XYPosition } from '@angflow/system';
 import { FlowStore } from './flow-store.service';
 import { getCollapsedHiddenIds } from '../graph/collapse';
 import type { Node, Edge } from '../types';
@@ -10,6 +10,23 @@ vi.mock('../graph/collapse', { spy: true });
 
 function makeNode(id: string, overrides: Partial<Node> = {}): Node {
   return { id, position: { x: 0, y: 0 }, data: {}, type: 'default', ...overrides };
+}
+
+/** A full in-progress connection state ending at `to` (screen space, as XYHandle writes it). */
+function inProgressConnection(to: XYPosition): ConnectionInProgress {
+  return {
+    inProgress: true,
+    isValid: null,
+    from: { x: 0, y: 0 },
+    fromHandle: { id: 'h1', nodeId: 'n1', x: 0, y: 0, position: Position.Left, type: 'source', width: 10, height: 10 },
+    fromPosition: Position.Left,
+    fromNode: null as never,
+    to,
+    toHandle: null,
+    toPosition: Position.Right,
+    toNode: null,
+    pointer: to,
+  };
 }
 
 function makeEdge(id: string, source: string, target: string, overrides: Partial<Edge> = {}): Edge {
@@ -50,7 +67,7 @@ describe('FlowStore', () => {
     store.domNode.set(document.createElement('div'));
     store.width.set(100);
     store.height.set(50);
-    store.connection.set({ ...initialConnection, inProgress: true } as unknown as ConnectionState);
+    store.updateConnection(inProgressConnection({ x: 10, y: 10 }));
     store.connectionClickStartHandle.set({ nodeId: 'a', handleId: null, type: 'source' });
     store.selectionInProgress.set(true);
 
@@ -702,9 +719,6 @@ describe('FlowStore', () => {
     });
 
     it('updates connection.from when dragging the fromNode while connection is in progress', () => {
-      const updateConnectionSpy = vi.fn();
-      store.updateConnection = updateConnectionSpy;
-
       store.setNodes([makeNode('n1', { position: { x: 0, y: 0 } })]);
 
       // Create a properly typed HandleBounds
@@ -720,7 +734,7 @@ describe('FlowStore', () => {
       };
 
       // Simulate an in-progress connection with fromNode = n1
-      store.connection.set({
+      store.updateConnection({
         inProgress: true,
         isValid: null,
         from: { x: 0, y: 0 },
@@ -733,6 +747,8 @@ describe('FlowStore', () => {
         toNode: null,
         pointer: { x: 100, y: 100 },
       });
+      const updateConnectionSpy = vi.fn();
+      store.updateConnection = updateConnectionSpy;
 
       // Move node n1 during the connection drag
       const dragItems = new Map([
@@ -748,6 +764,41 @@ describe('FlowStore', () => {
       expect(updatedConnection.from).toBeDefined();
       expect(typeof updatedConnection.from.x).toBe('number');
       expect(typeof updatedConnection.from.y).toBe('number');
+    });
+  });
+
+  describe('derived connection (#6117)', () => {
+    it('connection().to is rawConnection().to in flow coordinates, recomputed on pan', () => {
+      store.transform.set([100, 50, 2]);
+      store.updateConnection(inProgressConnection({ x: 300, y: 250 }));
+      expect(store.rawConnection().to).toEqual({ x: 300, y: 250 });
+      expect(store.connection().to).toEqual({ x: 100, y: 100 });
+      store.transform.set([0, 0, 1]);
+      expect(store.connection().to).toEqual({ x: 300, y: 250 });
+    });
+
+    it('is the raw object itself when idle', () => {
+      expect(store.connection()).toBe(store.rawConnection());
+      expect(store.connection().inProgress).toBe(false);
+    });
+
+    it('reset() restores rawConnection to initialConnection and clears the preview flag', () => {
+      store.updateClickConnectPreview(inProgressConnection({ x: 1, y: 1 }));
+      store.reset();
+      expect(store.rawConnection()).toEqual(initialConnection);
+      expect(store.isClickConnectPreview()).toBe(false);
+    });
+
+    it('the from-node follow writes the raw state (no double conversion)', () => {
+      store.setNodes([makeNode('n1', { position: { x: 0, y: 0 } })]);
+      store.transform.set([100, 50, 2]);
+      store.updateConnection({ ...inProgressConnection({ x: 300, y: 250 }), fromNode: store.nodeLookup.get('n1')! });
+      const dragItems = new Map([
+        ['n1', { position: { x: 50, y: 75 }, internals: { positionAbsolute: { x: 50, y: 75 } }, measured: { width: 150, height: 40 } }],
+      ]);
+      store.updateNodePositions(dragItems, true);
+      expect(store.rawConnection().to).toEqual({ x: 300, y: 250 }); // still screen space
+      expect(store.connection().to).toEqual({ x: 100, y: 100 });
     });
   });
 

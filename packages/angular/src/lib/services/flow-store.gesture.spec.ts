@@ -1,7 +1,24 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
+import { Position, type ConnectionInProgress } from '@angflow/system';
 import { FlowStore } from './flow-store.service';
+
+function makeInProgressConnection(): ConnectionInProgress {
+  return {
+    inProgress: true,
+    isValid: null,
+    from: { x: 0, y: 0 },
+    fromHandle: { id: null, nodeId: '1', x: 0, y: 0, position: Position.Bottom, type: 'source', width: 10, height: 10 },
+    fromPosition: Position.Bottom,
+    fromNode: null as never,
+    to: { x: 100, y: 100 },
+    toHandle: null,
+    toPosition: Position.Top,
+    toNode: null,
+    pointer: { x: 100, y: 100 },
+  };
+}
 
 describe('FlowStore.gestureActive', () => {
   let store: FlowStore;
@@ -47,11 +64,7 @@ describe('FlowStore.gestureActive', () => {
   });
 
   it('is true while a connection is in progress', () => {
-    // ConnectionState is a discriminated union: NoConnection has
-    // `inProgress: false`, ConnectionInProgress has `inProgress: true` plus
-    // several required fields. Spreading the initial value does NOT produce a
-    // valid ConnectionInProgress, so cast the whole literal.
-    store.connection.set({ inProgress: true } as unknown as ReturnType<typeof store.connection>);
+    store.updateConnection(makeInProgressConnection());
     expect(store.gestureActive()).toBe(true);
   });
 

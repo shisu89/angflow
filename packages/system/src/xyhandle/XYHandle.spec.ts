@@ -195,6 +195,18 @@ describe('XYHandle.onPointerDown — pointer-family teardown (no dangling listen
 
     expect(startedInProgress(params.updateConnection)).toBe(true);
   });
+
+  it('reports the final `to` in flow coordinates and `pointer` in screen coordinates (#6117)', () => {
+    const onConnectEnd = vi.fn();
+    const params = { ...makeParams(), dragThreshold: 0, getTransform: () => [100, 50, 2] as any, onConnectEnd };
+    XYHandle.onPointerDown(makeFakeEvent('pointerdown', 10, 10), params);
+    document.dispatchEvent(makeFakeEvent('pointermove', 300, 250));
+    document.dispatchEvent(makeFakeEvent('pointerup', 300, 250));
+    const state = onConnectEnd.mock.calls[0][1];
+    expect(state.to).toEqual({ x: 100, y: 100 }); // ((300 - 100) / 2, (250 - 50) / 2)
+    expect(state.pointer).toEqual({ x: 300, y: 250 });
+    expect(state).not.toHaveProperty('inProgress');
+  });
 });
 
 // ── Click-to-connect preview: stateless per-move connection state ──────────────

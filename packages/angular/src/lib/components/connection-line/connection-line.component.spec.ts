@@ -54,7 +54,7 @@ describe('ConnectionLineComponent data enrichment', () => {
 
   it('enriches fromHandle with registry data before passing to custom line', () => {
     store.registerHandleData('n1', 'h1', 'source', 'string');
-    store.connection.set(makeInProgressConnection());
+    store.updateConnection(makeInProgressConnection());
 
     const fixture = TestBed.createComponent(ConnectionLineComponent);
     fixture.detectChanges();
@@ -64,13 +64,25 @@ describe('ConnectionLineComponent data enrichment', () => {
   });
 
   it('leaves fromHandle.data undefined when nothing is registered', () => {
-    store.connection.set(makeInProgressConnection());
+    store.updateConnection(makeInProgressConnection());
 
     const fixture = TestBed.createComponent(ConnectionLineComponent);
     fixture.detectChanges();
 
     const props = fixture.componentInstance.connectionProps();
     expect((props.fromHandle as HandleBounds | null)?.data).toBeUndefined();
+  });
+
+  it('draws to the flow-space end point under a transform', () => {
+    store.transform.set([100, 50, 2]);
+    store.updateConnection({ ...makeInProgressConnection(), to: { x: 300, y: 250 } });
+
+    const fixture = TestBed.createComponent(ConnectionLineComponent);
+    fixture.detectChanges();
+
+    const props = fixture.componentInstance.connectionProps() as { toX: number; toY: number };
+    expect(props.toX).toBe(100);
+    expect(props.toY).toBe(100);
   });
 });
 
@@ -87,7 +99,7 @@ describe('ConnectionLineComponent default line classes', () => {
   });
 
   function renderGroup(isValid: boolean | null): SVGGElement {
-    store.connection.set({ ...makeInProgressConnection(), isValid });
+    store.updateConnection({ ...makeInProgressConnection(), isValid });
     const fixture = TestBed.createComponent(ConnectionLineComponent);
     fixture.detectChanges();
     const g = (fixture.nativeElement as HTMLElement).querySelector('svg.xy-flow__connectionline > g');
@@ -139,7 +151,7 @@ describe('ConnectionLineComponent custom line wrapper', () => {
   });
 
   it('wraps a custom line in the connection + status classes, like upstream', () => {
-    store.connection.set({ ...makeInProgressConnection(), isValid: false });
+    store.updateConnection({ ...makeInProgressConnection(), isValid: false });
     const fixture = TestBed.createComponent(ConnectionLineComponent);
     fixture.componentRef.setInput('customComponent', TestCustomLineComponent);
     fixture.detectChanges();

@@ -77,7 +77,10 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   /** Reactive access to currently selected edges. */
   readonly selectedEdges: Signal<EdgeType[]> = computed(() => this.store.selectedEdges());
 
-  /** Reactive access to the current connection state during drag-connect. Null when idle. */
+  /**
+   * Reactive connection state during a connection drag or the click-to-connect preview. `to` is in
+   * flow coordinates, `pointer` in screen coordinates.
+   */
   readonly connection: Signal<ConnectionState> = computed(() => this.store.connection());
 
   /** Reactive signal indicating whether all nodes have been measured and positioned. */

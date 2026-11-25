@@ -104,10 +104,10 @@ describe('ClickConnectPreview', () => {
     expect(store.connectionDragInProgress()).toBe(true);
 
     document.dispatchEvent(new MouseEvent('pointermove', { clientX: 120, clientY: 90, bubbles: true }));
-    expect(store.connection()).toBe(drag);
+    expect(store.rawConnection()).toBe(drag);
 
     store.connectionClickStartHandle.set(null);
     tick();
-    expect(store.connection()).toBe(drag);
+    expect(store.rawConnection()).toBe(drag);
   });
 });

@@ -9,6 +9,7 @@ import {
   fitViewport,
   getViewportForBounds,
   getHandlePosition,
+  pointToRendererPoint,
   infiniteExtent,
   clampPosition,
   getNodeDimensions,
@@ -257,7 +258,21 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   readonly contentNodeTemplateNames = signal<string[]>([]);
 
   readonly connectionMode = signal<ConnectionMode>(ConnectionMode.Strict);
-  readonly connection = signal<ConnectionState>({ ...initialConnection });
+  /**
+   * XYHandle's connection state, `to` in screen coordinates (pane-relative). Written by
+   * updateConnection / updateClickConnectPreview / cancelConnection. Read `connection` instead
+   * unless you need the raw screen-space state.
+   */
+  readonly rawConnection = signal<ConnectionState>({ ...initialConnection });
+
+  /**
+   * The current connection with `to` in flow coordinates, like upstream React's store
+   * (`deriveConnection`). Recomputed when the raw state or, during a connection, the viewport changes.
+   */
+  readonly connection: Signal<ConnectionState> = computed(() => {
+    const raw = this.rawConnection();
+    return raw.inProgress ? { ...raw, to: pointToRendererPoint(raw.to, this.transform()) } : raw;
+  });
   readonly connectionClickStartHandle = signal<{ nodeId: string; handleId: string | null; type: import('@angflow/system').HandleType } | null>(null);
   readonly connectOnClick = signal(true);
   readonly connectionRadius = signal(20);
@@ -543,7 +558,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     const isDragging = dragging ?? false;
     const parentExpandChildren: ParentExpandChild[] = [];
     const changes: NodeChange[] = [];
-    const conn = this.connection();
+    const conn = this.rawConnection();
 
     for (const [id, dragItem] of nodeDragItems) {
       // A user drag takes ownership of the node — kill any in-flight tween.
@@ -1082,29 +1097,29 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
   cancelConnection(): void {
     this.connectionIsClickPreview = false;
-    this.connection.set({ ...initialConnection });
+    this.rawConnection.set({ ...initialConnection });
   }
 
   /** Writes a connection drag's state (XYHandle, edge reconnect). */
   updateConnection(connectionState: ConnectionState): void {
     this.connectionIsClickPreview = false;
-    this.connection.set(connectionState);
+    this.rawConnection.set(connectionState);
   }
 
   /** Writes the click-to-connect preview line's state (`ClickConnectPreview`). */
   updateClickConnectPreview(connectionState: ConnectionState): void {
     this.connectionIsClickPreview = true;
-    this.connection.set(connectionState);
+    this.rawConnection.set(connectionState);
   }
 
   /** Whether `connection()` is an in-progress connection *drag*, not the click-to-connect preview. */
   connectionDragInProgress(): boolean {
-    return this.connection().inProgress && !this.connectionIsClickPreview;
+    return this.rawConnection().inProgress && !this.connectionIsClickPreview;
   }
 
   /** Whether `connection()` currently holds the click-to-connect preview line. */
   isClickConnectPreview(): boolean {
-    return this.connection().inProgress && this.connectionIsClickPreview;
+    return this.rawConnection().inProgress && this.connectionIsClickPreview;
   }
 
   // ── Reset ─────────────────────────────────────────────────────────────
@@ -1300,7 +1315,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       translateExtent: this.translateExtent(),
       zIndexMode: this.zIndexMode(),
       lib: this.lib(),
-      connection: this.connection(),
+      connection: this.rawConnection(),
       connectOnClick: this.connectOnClick(),
       noDragClassName: this.noDragClassName(),
       noPanClassName: this.noPanClassName(),

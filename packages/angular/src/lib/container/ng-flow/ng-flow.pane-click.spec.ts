@@ -315,7 +315,7 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
 
     it('the click after a connection drag dropped on the pane is swallowed once', () => {
       const { inst, store, paneClickSpy, resetSpy } = setup();
-      store.connection.set({ ...makeInProgressConnection() });
+      store.updateConnection({ ...makeInProgressConnection() });
 
       inst.onPanePointerUp(makePanePointerUp('mouse'));
       store.cancelConnection();
@@ -330,7 +330,7 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
 
     it('a touch connection drop sets no flag (no synthesised click follows)', () => {
       const { inst, store, paneClickSpy } = setup();
-      store.connection.set({ ...makeInProgressConnection() });
+      store.updateConnection({ ...makeInProgressConnection() });
 
       inst.onPanePointerUp(makePanePointerUp('touch'));
       store.cancelConnection();
@@ -341,7 +341,7 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
 
     it('swallows any click while a connection drag is in progress', () => {
       const { inst, store, paneClickSpy, resetSpy } = setup();
-      store.connection.set({ ...makeInProgressConnection() });
+      store.updateConnection({ ...makeInProgressConnection() });
 
       inst.onPaneClick(makePaneClick());
 
@@ -384,7 +384,7 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
       // A stale pointerdown position (the start of an earlier pan): the handle
       // stops the connection drag's own pointerdown from reaching the pane.
       inst.onPanePointerDown({ clientX: 0, clientY: 0 } as PointerEvent);
-      store.connection.set({ ...makeInProgressConnection() });
+      store.updateConnection({ ...makeInProgressConnection() });
 
       inst.onPanePointerUp(makePanePointerUp('mouse'));
       store.cancelConnection();
@@ -400,7 +400,7 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
 
     it('a pane pointerdown resets stale swallow flags', () => {
       const { inst, store } = setup();
-      store.connection.set({ ...makeInProgressConnection() });
+      store.updateConnection({ ...makeInProgressConnection() });
       inst.onPanePointerUp(makePanePointerUp('mouse'));
       store.cancelConnection();
       store.selectionInProgress.set(true);

@@ -89,11 +89,8 @@ export class ConnectionLineComponent {
     const fromY = activeConn.from?.y ?? 0;
     const fromPosition = activeConn.fromPosition ?? Position.Bottom;
 
-    const toScreenX = activeConn.to?.x ?? 0;
-    const toScreenY = activeConn.to?.y ?? 0;
-    const transform = this.store.transform();
-    const toX = (toScreenX - transform[0]) / transform[2];
-    const toY = (toScreenY - transform[1]) / transform[2];
+    const toX = activeConn.to?.x ?? 0;
+    const toY = activeConn.to?.y ?? 0;
 
     const toPosition = activeConn.toPosition ?? Position.Top;
 
