@@ -19,9 +19,14 @@ import { FlowStore } from '../../services/flow-store.service';
   template: `
     @if (isConnecting()) {
       @if (customComponent()) {
-        <ng-container
-          *ngComponentOutlet="customComponent(); inputs: connectionProps()"
-        />
+        <!-- Upstream wraps custom lines in the classed connection <g>. A custom line here is
+             an Angular component that renders its own <svg>, so the classes go on a
+             display: contents wrapper instead (an HTML host can't sit inside an SVG <g>). -->
+        <div [attr.class]="connectionClass()" style="display: contents;">
+          <ng-container
+            *ngComponentOutlet="customComponent(); inputs: connectionProps()"
+          />
+        </div>
       } @else {
         <svg class="ng-flow__connectionline xy-flow__connectionline"
              style="overflow: visible; position: absolute; width: 100%; height: 100%; pointer-events: none;">

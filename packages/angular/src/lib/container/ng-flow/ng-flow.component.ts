@@ -1073,6 +1073,10 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
   onPanePointerDown(event: PointerEvent): void {
     this.panePointerDownPos = { x: event.clientX, y: event.clientY };
+    // A new gesture starts: drop swallow flags whose click never arrived, so
+    // they can't eat this gesture's click.
+    this.connectionEndedOnPane = false;
+    this.store.selectionInProgress.set(false);
   }
 
   /**
@@ -1128,14 +1132,27 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     // so the connection is still in progress here. Only a mouse release is followed by a
     // synthesised click; a moved touch/pen gesture fires none, and the flag would otherwise
     // swallow the next genuine tap (same reasoning as pane.component.ts finishSelection).
-    // An armed click-to-connect preview also reports inProgress; its cancelling click must not be eaten.
-    const connectionDragInProgress = this.store.connection().inProgress && !this.store.connectionClickStartHandle();
-    if (event.pointerType === 'mouse' && event.target === event.currentTarget && connectionDragInProgress) {
+    // The click-to-connect preview also reports inProgress; its cancelling click must not be eaten.
+    if (event.pointerType === 'mouse' && event.target === event.currentTarget && this.store.connectionDragInProgress()) {
       this.connectionEndedOnPane = true;
     }
   }
 
   onPaneClick(event: MouseEvent): void {
+    // Upstream Pane onClick order: the click that ends a marquee, the click after a
+    // connection drag dropped on the pane, and any click while a connection drag is in
+    // progress are swallowed — they must not cancel a pending click-to-connect or reset
+    // the selection. The click-to-connect preview also reports inProgress, so only a
+    // connection *drag* counts. Consumed before the paneClickDistance check: a connection
+    // drag's pointerdown never reaches the pane, so the stored down position can be
+    // stale and fail the check, which would otherwise leave the flag set.
+    if (this.store.selectionInProgress() || this.connectionEndedOnPane || this.store.connectionDragInProgress()) {
+      this.store.selectionInProgress.set(false);
+      this.connectionEndedOnPane = false;
+      this.panePointerDownPos = null;
+      return;
+    }
+
     const threshold = this.paneClickDistance();
     if (threshold > 0 && this.panePointerDownPos) {
       const dx = event.clientX - this.panePointerDownPos.x;
@@ -1148,18 +1165,6 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     const target = event.target as HTMLElement;
     if (target.closest('.xy-flow__node') || target.closest('.xy-flow__edge') ||
         target.closest('.xy-flow__handle') || target.closest('.xy-flow__selection')) {
-      return;
-    }
-
-    // Upstream Pane onClick order: the click that ends a marquee, the click after a
-    // connection drag dropped on the pane, and any click while a connection is in progress
-    // are swallowed — they must not cancel a pending click-to-connect or reset the selection.
-    // An armed click-to-connect also reports inProgress (ClickConnectPreview writes the preview
-    // state on pointermove), so only a connection *drag* counts here.
-    const connectionDragInProgress = this.store.connection().inProgress && !this.store.connectionClickStartHandle();
-    if (this.store.selectionInProgress() || this.connectionEndedOnPane || connectionDragInProgress) {
-      this.store.selectionInProgress.set(false);
-      this.connectionEndedOnPane = false;
       return;
     }
 

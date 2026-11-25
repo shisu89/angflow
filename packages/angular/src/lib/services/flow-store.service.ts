@@ -564,7 +564,10 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
       if (node && conn.inProgress && conn.fromNode?.id === node.id) {
         const updatedFrom = getHandlePosition(node, conn.fromHandle, Position.Left, true);
-        this.updateConnection({ ...conn, from: updatedFrom });
+        // Keep whether this is a drag or the click-connect preview.
+        const moved = { ...conn, from: updatedFrom };
+        if (this.connectionIsClickPreview) this.updateClickConnectPreview(moved);
+        else this.updateConnection(moved);
       }
 
       if (expandParent && node!.parentId) {
@@ -1070,12 +1073,38 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
   // ── Connection actions ────────────────────────────────────────────────
 
+  /**
+   * True while `connection()` holds the click-to-connect preview line (written by
+   * `ClickConnectPreview`) rather than a real connection drag. Not reactive: it is
+   * read only from event handlers.
+   */
+  private connectionIsClickPreview = false;
+
   cancelConnection(): void {
+    this.connectionIsClickPreview = false;
     this.connection.set({ ...initialConnection });
   }
 
+  /** Writes a connection drag's state (XYHandle, edge reconnect). */
   updateConnection(connectionState: ConnectionState): void {
+    this.connectionIsClickPreview = false;
     this.connection.set(connectionState);
+  }
+
+  /** Writes the click-to-connect preview line's state (`ClickConnectPreview`). */
+  updateClickConnectPreview(connectionState: ConnectionState): void {
+    this.connectionIsClickPreview = true;
+    this.connection.set(connectionState);
+  }
+
+  /** Whether `connection()` is an in-progress connection *drag*, not the click-to-connect preview. */
+  connectionDragInProgress(): boolean {
+    return this.connection().inProgress && !this.connectionIsClickPreview;
+  }
+
+  /** Whether `connection()` currently holds the click-to-connect preview line. */
+  isClickConnectPreview(): boolean {
+    return this.connection().inProgress && this.connectionIsClickPreview;
   }
 
   // ── Reset ─────────────────────────────────────────────────────────────

@@ -284,7 +284,7 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
       const clickConnectEndSpy = vi.spyOn(inst.clickConnectEnd, 'emit');
       const paneClickSpy = vi.spyOn(inst.paneClick, 'emit');
       const resetSpy = vi.spyOn(store, 'resetSelectedElements');
-      return { inst, store, clickConnectEndSpy, paneClickSpy, resetSpy };
+      return { inst: Object.assign(inst, { fixtureRef: fixture.componentRef }), store, clickConnectEndSpy, paneClickSpy, resetSpy };
     }
 
     it('a pane click cancels a pending click-connect and emits (clickConnectEnd)', () => {
@@ -353,7 +353,7 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
       const { inst, store, clickConnectEndSpy, paneClickSpy } = setup();
       store.connectionClickStartHandle.set(armedHandle);
       // What ClickConnectPreview writes on pointermove while a handle is armed.
-      store.connection.set({ ...makeInProgressConnection() });
+      store.updateClickConnectPreview({ ...makeInProgressConnection() });
 
       inst.onPanePointerUp(makePanePointerUp('mouse'));
       inst.onPaneClick(makePaneClick());
@@ -361,6 +361,55 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
       expect(clickConnectEndSpy).toHaveBeenCalledTimes(1);
       expect(paneClickSpy).toHaveBeenCalledTimes(1);
       expect(store.connectionClickStartHandle()).toBeNull();
+    });
+    it('a real handle drag started while click-connect is armed is still swallowed on a pane drop', () => {
+      const { inst, store, clickConnectEndSpy, paneClickSpy, resetSpy } = setup();
+      store.connectionClickStartHandle.set(armedHandle);
+      // XYHandle's drag writes through updateConnection, not the click-connect preview.
+      store.updateConnection({ ...makeInProgressConnection() });
+
+      inst.onPanePointerUp(makePanePointerUp('mouse'));
+      store.cancelConnection();
+      inst.onPaneClick(makePaneClick());
+
+      expect(clickConnectEndSpy).not.toHaveBeenCalled();
+      expect(paneClickSpy).not.toHaveBeenCalled();
+      expect(resetSpy).not.toHaveBeenCalled();
+      expect(store.connectionClickStartHandle()).toEqual(armedHandle);
+    });
+
+    it('with paneClickDistance > 0, the click after a connection drop consumes its flag even past the distance', () => {
+      const { inst, store, paneClickSpy } = setup();
+      inst.fixtureRef.setInput('paneClickDistance', 5);
+      // A stale pointerdown position (the start of an earlier pan): the handle
+      // stops the connection drag's own pointerdown from reaching the pane.
+      inst.onPanePointerDown({ clientX: 0, clientY: 0 } as PointerEvent);
+      store.connection.set({ ...makeInProgressConnection() });
+
+      inst.onPanePointerUp(makePanePointerUp('mouse'));
+      store.cancelConnection();
+      inst.onPaneClick(makePaneClick(100, 100));
+      expect(paneClickSpy).not.toHaveBeenCalled();
+      expect((inst as any).connectionEndedOnPane).toBe(false);
+
+      // The next genuine pane click is not swallowed.
+      inst.onPanePointerDown({ clientX: 200, clientY: 200 } as PointerEvent);
+      inst.onPaneClick(makePaneClick(200, 200));
+      expect(paneClickSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('a pane pointerdown resets stale swallow flags', () => {
+      const { inst, store } = setup();
+      store.connection.set({ ...makeInProgressConnection() });
+      inst.onPanePointerUp(makePanePointerUp('mouse'));
+      store.cancelConnection();
+      store.selectionInProgress.set(true);
+      expect((inst as any).connectionEndedOnPane).toBe(true);
+
+      inst.onPanePointerDown({ clientX: 10, clientY: 10 } as PointerEvent);
+
+      expect((inst as any).connectionEndedOnPane).toBe(false);
+      expect(store.selectionInProgress()).toBe(false);
     });
   });
 });

@@ -56,15 +56,16 @@ export class ClickConnectPreview {
     if (!this.moveListener) return;
     this.doc().removeEventListener('pointermove', this.moveListener as EventListener);
     this.moveListener = null;
-    // Clear the preview line. Guard so we don't stomp a real drag connection
-    // (a drag can't be in progress while a click-connect is armed, but be safe).
-    if (this.store.connection().inProgress) {
+    // Clear the preview line, but never a real connection drag started while armed.
+    if (this.store.isClickConnectPreview()) {
       this.store.cancelConnection();
     }
   }
 
   private update(event: PointerEvent, armed: ArmedHandle): void {
     const store = this.store;
+    // A real handle drag started while armed owns the connection line until it ends.
+    if (store.connectionDragInProgress()) return;
     const state = XYHandle.getClickConnectionState(event, {
       connectionMode: store.connectionMode(),
       connectionRadius: store.connectionRadius(),
@@ -81,7 +82,7 @@ export class ClickConnectPreview {
     });
 
     if (state) {
-      store.updateConnection(state);
+      store.updateClickConnectPreview(state);
     }
   }
 }

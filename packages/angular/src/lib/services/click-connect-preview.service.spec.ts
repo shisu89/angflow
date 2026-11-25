@@ -90,4 +90,24 @@ describe('ClickConnectPreview', () => {
     expect(system.XYHandle.getClickConnectionState).not.toHaveBeenCalled();
     expect(store.connection().inProgress).toBe(false);
   });
+
+  it('marks its writes as the click-connect preview', () => {
+    arm();
+    document.dispatchEvent(new MouseEvent('pointermove', { clientX: 120, clientY: 90, bubbles: true }));
+    expect(store.connectionDragInProgress()).toBe(false);
+  });
+
+  it('does not overwrite or clear a real handle drag started while armed', () => {
+    arm();
+    const drag = { ...PREVIEW, to: { x: 5, y: 5 } } as ConnectionInProgress;
+    store.updateConnection(drag);
+    expect(store.connectionDragInProgress()).toBe(true);
+
+    document.dispatchEvent(new MouseEvent('pointermove', { clientX: 120, clientY: 90, bubbles: true }));
+    expect(store.connection()).toBe(drag);
+
+    store.connectionClickStartHandle.set(null);
+    tick();
+    expect(store.connection()).toBe(drag);
+  });
 });

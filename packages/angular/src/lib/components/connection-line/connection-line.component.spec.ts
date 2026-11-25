@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { provideZonelessChangeDetection } from '@angular/core';
+import { Component, provideZonelessChangeDetection } from '@angular/core';
 import { ConnectionLineComponent } from './connection-line.component';
 import { FlowStore } from '../../services/flow-store.service';
 import { Position, type ConnectionInProgress, type Handle } from '@angflow/system';
@@ -116,5 +116,39 @@ describe('ConnectionLineComponent default line classes', () => {
     expect(g.classList.contains('xy-flow__connection')).toBe(true);
     expect(g.classList.contains('valid')).toBe(false);
     expect(g.classList.contains('invalid')).toBe(false);
+  });
+});
+
+@Component({
+  selector: 'test-custom-line',
+  standalone: true,
+  template: '<svg><path class="custom-line" /></svg>',
+})
+class TestCustomLineComponent {}
+
+describe('ConnectionLineComponent custom line wrapper', () => {
+  let store: FlowStore;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [ConnectionLineComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    store = TestBed.inject(FlowStore);
+  });
+
+  it('wraps a custom line in the connection + status classes, like upstream', () => {
+    store.connection.set({ ...makeInProgressConnection(), isValid: false });
+    const fixture = TestBed.createComponent(ConnectionLineComponent);
+    fixture.componentRef.setInput('customComponent', TestCustomLineComponent);
+    fixture.detectChanges();
+
+    const custom = (fixture.nativeElement as HTMLElement).querySelector('test-custom-line');
+    expect(custom).not.toBeNull();
+    const wrapper = custom!.parentElement!;
+    expect(wrapper.classList.contains('ng-flow__connection')).toBe(true);
+    expect(wrapper.classList.contains('xy-flow__connection')).toBe(true);
+    expect(wrapper.classList.contains('invalid')).toBe(true);
   });
 });
