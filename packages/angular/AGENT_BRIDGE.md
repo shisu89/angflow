@@ -551,10 +551,10 @@ for the reference wiring.
 
 ### Provider proxies (reference implementations in `examples/angular/server/`)
 
-| Provider | File | Key env | Default model (June 2026) | Notes |
+| Provider | File | Key env | Default model | Notes |
 |---|---|---|---|---|
-| Anthropic | `agent-proxy.mjs` | `ANTHROPIC_API_KEY` | `claude-sonnet-4-6` | Near-passthrough (the wire shape is Anthropic's) |
-| OpenAI | `agent-proxy-openai.mjs` | `OPENAI_API_KEY` | `gpt-5.2` | Tool-call/finish-reason translation |
+| Anthropic | `agent-proxy.mjs` | `ANTHROPIC_API_KEY` | `claude-sonnet-5-5` | Near-passthrough (the wire shape is Anthropic's) |
+| OpenAI | `agent-proxy-openai.mjs` | `OPENAI_API_KEY` | `gpt-6-sol` | Tool-call/finish-reason translation |
 | Ollama / OpenRouter / any OpenAI-compatible gateway | `agent-proxy-openai.mjs` + `OPENAI_BASE_URL` | `OPENAI_API_KEY` (dummy for Ollama) | set `ANGFLOW_AGENT_MODEL` (e.g. `qwen3`) | Local models: pick a tools-capable one; small models can degrade with the 52-tool catalog |
 | Gemini | `agent-proxy-gemini.mjs` | `GEMINI_API_KEY` | `gemini-3.5-flash` | Synthesizes tool-call ids; strips `additionalProperties` from schemas |
 

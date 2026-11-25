@@ -3,20 +3,20 @@ import assert from 'node:assert/strict';
 import { resolveModel } from './agent-proxy.mjs';
 
 test('resolveModel: header ignored when allowlist unset', () => {
-  assert.equal(resolveModel('gpt-5.2', undefined, 'default-model'), 'default-model');
-  assert.equal(resolveModel('gpt-5.2', '', 'default-model'), 'default-model');
+  assert.equal(resolveModel('gpt-6-sol', undefined, 'default-model'), 'default-model');
+  assert.equal(resolveModel('gpt-6-sol', '', 'default-model'), 'default-model');
 });
 
 test('resolveModel: allowlisted header honored', () => {
-  assert.equal(resolveModel('claude-opus-4-8', 'claude-sonnet-4-6, claude-opus-4-8', 'claude-sonnet-4-6'), 'claude-opus-4-8');
+  assert.equal(resolveModel('claude-opus-5-5', 'claude-sonnet-5-5, claude-opus-5-5', 'claude-sonnet-5-5'), 'claude-opus-5-5');
 });
 
 test('resolveModel: non-allowlisted header falls back to default', () => {
-  assert.equal(resolveModel('expensive-model', 'claude-sonnet-4-6', 'claude-sonnet-4-6'), 'claude-sonnet-4-6');
+  assert.equal(resolveModel('expensive-model', 'claude-sonnet-5-5', 'claude-sonnet-5-5'), 'claude-sonnet-5-5');
 });
 
 test('resolveModel: missing header uses default', () => {
-  assert.equal(resolveModel(undefined, 'claude-sonnet-4-6', 'claude-sonnet-4-6'), 'claude-sonnet-4-6');
+  assert.equal(resolveModel(undefined, 'claude-sonnet-5-5', 'claude-sonnet-5-5'), 'claude-sonnet-5-5');
 });
 
 import { toOpenAiRequest, fromOpenAiResponse } from './agent-proxy-openai.mjs';
@@ -44,9 +44,9 @@ test('toOpenAiRequest: system, text, assistant tool_use, tool_result mapping', (
     tools: [{ name: 'add_node', description: 'adds', input_schema: { type: 'object', properties: {} } }],
     max_tokens: 1024,
   };
-  const req = toOpenAiRequest(body, 'gpt-5.2', 'https://api.openai.com/v1');
+  const req = toOpenAiRequest(body, 'gpt-6-sol', 'https://api.openai.com/v1');
 
-  assert.equal(req.model, 'gpt-5.2');
+  assert.equal(req.model, 'gpt-6-sol');
   assert.equal(req.max_completion_tokens, 1024); // openai.com → new param name
   assert.equal(req.messages[0].role, 'system');
   assert.equal(req.messages[0].content, 'be brief');

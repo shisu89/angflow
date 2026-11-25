@@ -16,7 +16,7 @@
  *
  * Env:  PORT (default 8787)
  *       OPENAI_BASE_URL (default https://api.openai.com/v1)
- *       ANGFLOW_AGENT_MODEL (default gpt-5.2 — current as of June 2026)
+ *       ANGFLOW_AGENT_MODEL (default gpt-6-sol — current as of September 2026)
  *       ANGFLOW_ALLOWED_MODELS (comma-separated; enables the x-angflow-model header)
  *
  * PRODUCTION CAVEATS — example code: add auth, rate limiting / spend caps,
@@ -25,7 +25,7 @@
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 
-const DEFAULT_MODEL = 'gpt-5.2';
+const DEFAULT_MODEL = 'gpt-6-sol';
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 
 /** Same allowlist gate as the other proxies (duplicated: each file is copy-pasteable). */

@@ -8,7 +8,7 @@
  *
  * Run:  ANTHROPIC_API_KEY=sk-ant-... node server/agent-proxy.mjs
  * Env:  PORT (default 8787)
- *       ANGFLOW_AGENT_MODEL (default claude-sonnet-4-6 — current as of June 2026)
+ *       ANGFLOW_AGENT_MODEL (default claude-sonnet-5-5 — current as of September 2026)
  *       ANGFLOW_ALLOWED_MODELS (comma-separated; enables the x-angflow-model
  *         request header so an app can let END USERS pick a model at runtime.
  *         Unset = header ignored. Never trust client strings into your bill.)
@@ -22,7 +22,7 @@ import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
 
-const DEFAULT_MODEL = 'claude-sonnet-4-6';
+const DEFAULT_MODEL = 'claude-sonnet-5-5';
 
 /**
  * Pick the model for a request: the x-angflow-model header is honored only
