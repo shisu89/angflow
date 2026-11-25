@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, output, inject, OnDestroy, ElementRef } from '@angular/core';
+import { Component, ChangeDetectionStrategy, computed, input, output, inject, OnDestroy, ElementRef } from '@angular/core';
 import {
   calcAutoPan,
   getNodesInside,
@@ -10,6 +10,9 @@ import {
 } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 
+/** Upstream FlowRenderer isLeftClickPan: the primary button pans. */
+const isLeftClickPan = (panOnDrag: boolean | number[]) => panOnDrag === true || (Array.isArray(panOnDrag) && panOnDrag.includes(0));
+
 @Component({
   selector: 'ng-flow-pane',
   standalone: true,
@@ -19,7 +22,7 @@ import { FlowStore } from '../../services/flow-store.service';
     'style': 'display: block; position: absolute; width: 100%; height: 100%; top: 0; left: 0; z-index: 1;',
     '[class.draggable]': 'panOnDrag()',
     '[class.dragging]': 'store.paneDragging()',
-    '[class.selection]': 'store.userSelectionActive()',
+    '[class.selection]': 'isSelecting()',
     '(wheel)': 'onWheel($event)',
   },
   template: `<ng-content />`,
@@ -39,7 +42,12 @@ export class PaneComponent implements OnDestroy {
   readonly selectionEnd = output<MouseEvent>();
   readonly paneScroll = output<WheelEvent>();
 
-  private isSelecting = false;
+  /** Upstream `isSelecting`: selection key held, a marquee running, or drag-selection enabled without left-click pan. */
+  readonly isSelecting = computed(
+    () => this.store.selectionKeyActive() || this.store.userSelectionActive() || (this.selectionOnDrag() && !isLeftClickPan(this.panOnDrag()))
+  );
+
+  private marqueeActive = false;
   private moved = false;
   private activePointerId: number | null = null;
   private selectionOrigin: XYPosition | null = null;
@@ -141,7 +149,7 @@ export class PaneComponent implements OnDestroy {
     };
     this.selectionOrigin = pointToRendererPoint(this.pointerPosition, this.store.transform());
     this.selectionGeneration += 1;
-    this.isSelecting = true;
+    this.marqueeActive = true;
     this.moved = false;
     this.activePointerId = event.pointerId;
     // Capture the pointer so moves keep tracking even if it leaves the pane.
@@ -173,7 +181,7 @@ export class PaneComponent implements OnDestroy {
   }
 
   private onPointerMove(event: PointerEvent): void {
-    if (!this.isSelecting) return;
+    if (!this.marqueeActive) return;
     if (this.activePointerId !== null && event.pointerId !== this.activePointerId) return;
 
     // First actual movement marks the selection in progress. Doing this on move
@@ -223,7 +231,7 @@ export class PaneComponent implements OnDestroy {
   private scheduleAutoPan(): void {
     if (
       this.autoPanFrameId !== null ||
-      !this.isSelecting ||
+      !this.marqueeActive ||
       !this.moved ||
       !this.autoPanOnSelection()
     ) {
@@ -240,7 +248,7 @@ export class PaneComponent implements OnDestroy {
   private async runAutoPanFrame(generation: number, frameId: number): Promise<void> {
     if (
       generation !== this.selectionGeneration ||
-      !this.isSelecting ||
+      !this.marqueeActive ||
       !this.pointerPosition ||
       !this.autoPanOnSelection()
     ) {
@@ -268,7 +276,7 @@ export class PaneComponent implements OnDestroy {
       return;
     }
     const moved = await this.store.panBy({ x, y });
-    if (generation !== this.selectionGeneration || !this.isSelecting) return;
+    if (generation !== this.selectionGeneration || !this.marqueeActive) return;
     if (moved) this.updateSelectionFromPointer();
     if (this.autoPanFrameId !== frameId) return;
     this.autoPanFrameId = null;
@@ -276,7 +284,7 @@ export class PaneComponent implements OnDestroy {
   }
 
   private onPointerEnd(event: PointerEvent): void {
-    if (!this.isSelecting) return;
+    if (!this.marqueeActive) return;
     if (this.activePointerId !== null && event.pointerId !== this.activePointerId) return;
     this.finishSelection(event, true);
   }
@@ -286,9 +294,9 @@ export class PaneComponent implements OnDestroy {
   }
 
   private finishSelection(event: PointerEvent | null, emitEnd: boolean): void {
-    if (!this.isSelecting && this.activePointerId === null) return;
+    if (!this.marqueeActive && this.activePointerId === null) return;
     const moved = this.moved;
-    this.isSelecting = false;
+    this.marqueeActive = false;
     this.moved = false;
     if (this.autoPanFrameId !== null) {
       cancelAnimationFrame(this.autoPanFrameId);

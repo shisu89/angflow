@@ -189,7 +189,7 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
     store.domNode.set(container as HTMLDivElement);
 
     // Simulate an in-progress marquee.
-    (paneInst as any).isSelecting = true;
+    (paneInst as any).marqueeActive = true;
     (paneInst as any).activePointerId = 1;
     (paneInst as any).startX = 100;
     (paneInst as any).startY = 100;
@@ -213,7 +213,7 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
     fixture.detectChanges();
 
     // Simulate a marquee gesture that ends with no move (a plain click).
-    (paneInst as any).isSelecting = true;
+    (paneInst as any).marqueeActive = true;
     (paneInst as any).activePointerId = 1;
     (paneInst as any).onPointerUp({ clientX: 100, clientY: 100, pointerId: 1 } as PointerEvent);
 
@@ -235,7 +235,7 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
     store.setNodes([{ id: '1', position: { x: 0, y: 0 }, data: {}, selected: true }]);
     expect(store.selectedNodes().length).toBe(1);
 
-    (paneInst as any).isSelecting = true;
+    (paneInst as any).marqueeActive = true;
     (paneInst as any).activePointerId = 1;
     (paneInst as any).onPointerUp({ clientX: 100, clientY: 100, pointerId: 1, pointerType: 'mouse' } as PointerEvent);
 
@@ -253,7 +253,7 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
     const store = TestBed.inject(FlowStore);
     fixture.detectChanges();
     // A marquee that moved (moved=true, flag set), then release.
-    (paneInst as any).isSelecting = true;
+    (paneInst as any).marqueeActive = true;
     (paneInst as any).moved = true;
     (paneInst as any).activePointerId = 1;
     store.selectionInProgress.set(true);

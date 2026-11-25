@@ -50,8 +50,6 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
   /** Fires once with both deleted `nodes` and `edges`. */
   readonly deleteElements = output<{ nodes: Node[]; edges: Edge[] }>();
 
-  private selectionKeyPressed = false;
-  private multiSelectionKeyPressed = false;
   private readonly panActivationKeys = new Set<string>();
   private readonly zoomActivationKeys = new Set<string>();
 
@@ -63,13 +61,11 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
 
     // Selection key
     if (this.matchesKey(event, this.selectionKeyCode())) {
-      this.selectionKeyPressed = true;
       this.store.selectionKeyActive.set(true);
     }
 
     // Multi-selection key
     if (this.matchesKey(event, this.multiSelectionKeyCode())) {
-      this.multiSelectionKeyPressed = true;
       this.store.multiSelectionActive.set(true);
     }
 
@@ -110,12 +106,10 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
 
   onKeyUp(event: KeyboardEvent): void {
     if (this.matchesKey(event, this.selectionKeyCode())) {
-      this.selectionKeyPressed = false;
       this.store.selectionKeyActive.set(false);
     }
 
     if (this.matchesKey(event, this.multiSelectionKeyCode())) {
-      this.multiSelectionKeyPressed = false;
       this.store.multiSelectionActive.set(false);
     }
 
@@ -240,8 +234,6 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
   }
 
   private resetHeldKeys(): void {
-    this.selectionKeyPressed = false;
-    this.multiSelectionKeyPressed = false;
     this.panActivationKeys.clear();
     this.zoomActivationKeys.clear();
     this.store.selectionKeyActive.set(false);

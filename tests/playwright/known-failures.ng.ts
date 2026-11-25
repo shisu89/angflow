@@ -91,14 +91,6 @@ export const KNOWN_FAILURES: KnownFailure[] = [
       '(deliberate divergence in pane.component.ts; upstream 12.11.3 fix, react appendix row #48).',
     owner: 'B',
   },
-  {
-    file: 'pane.spec.ts',
-    titlePath: ['Pane non-default', 'pan & zoom', 'touch input', 'selection key keeps touch drag in selection mode'],
-    reason:
-      'The pane gets the `selection` class only while a marquee is active (`userSelectionActive`), not when ' +
-      'selecting is enabled (selection key held or selectionOnDrag) as upstream `isSelecting` does (new bug).',
-    owner: 'B',
-  },
 
   // ── props.spec.ts ─────────────────────────────────────────────────────────
   {
