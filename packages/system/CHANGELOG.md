@@ -8,16 +8,19 @@
   `Promise<ZoomTransform | undefined>`): `false` when the animation was interrupted.
   Affects direct `@angflow/system` users only.
 
-### Added
+### Added (mostly additive)
 
-- `FitViewResult.ended` (#6064): `false` when a user gesture or another viewport call
+- `FitViewResult.ended` (#6064), a required field (code that constructs a `FitViewResult`
+  must add it): `false` when a user gesture or another viewport call
   interrupted the animation. Nothing to fit resolves `ended: true`; pan/zoom not
   initialised resolves `ended: false`.
+- New export `getRectsOverlappingArea`.
 - `ReconnectEdgeOptions.onError` and `AddEdgeOptions.onError`: validation errors from
   `reconnectEdge` / `addEdge` go there, falling back to the dev-warn sink.
 
 ### Behaviour changes
 
+- `getNodesBounds` skips unresolved nodes and returns a zero rect when none resolve (#5871).
 - `reconnectEdge` with an options object but no `shouldReplaceId` now replaces the id
   (pass `shouldReplaceId: false` to keep the old one).
 

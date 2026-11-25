@@ -18,6 +18,13 @@ Bug-fix release. Requires `@angflow/system` 0.1.14.
   (e.g. `'Meta+Backspace'`), with upstream `useKeyPress` semantics.
 - `ReconnectEdgeOptions.onError` / `AddEdgeOptions.onError` (from `@angflow/system`).
 
+### FlowStore additions
+
+- New public `FlowStore` members: `fitBounds()`, `detachFlow(owner?)`,
+  `updateClickConnectPreview()`, `connectionDragInProgress()`, `isClickConnectPreview()`
+  and the static `FLOW_CALLBACKS` list. `FlowStore.reset()` now also clears the flow
+  callbacks and the DOM node.
+
 ### System type change
 
 - `PanZoomInstance.setViewport` resolves `Promise<boolean>` (was
@@ -27,11 +34,18 @@ Bug-fix release. Requires `@angflow/system` 0.1.14.
 
 - Touch now pans instead of starting a marquee when `panOnDrag` is on. Migration: hold
   the selection key to marquee with touch.
-- Selected edges are elevated by default. Migration: `[elevateEdgesOnSelect]="false"`
-  restores the old look. (The input was previously a no-op; `EdgeToolbar` now uses
-  `getElevatedEdgeZIndex` too.)
+- Selected edges are elevated by default, and edge z-index follows
+  `getElevatedEdgeZIndex`: `edge.zIndex ?? 0`, plus 1000 when the edge is selected and
+  `elevateEdgesOnSelect` is on, plus the higher internal z of the source/target node when
+  that node is in a sub-flow (has a `parentId`) or is selected with elevation on. The old
+  code gave every edge `max(source z, target z)`, so top-level edges now sit at 0 (below
+  nodes) unless elevated. `[elevateEdgesOnSelect]="false"` does NOT restore the old look.
+  Migration: set `zIndex` on the edges that must sit above nodes, or keep elevation on.
+  (The input was previously a no-op; `EdgeToolbar` now uses `getElevatedEdgeZIndex` too.)
 - The arrow-key step is 5px (was 1px), x4 with Shift, through snapping and extent
-  clamping. The new position is announced in the aria-live region.
+  clamping. The position after the move (post snap/clamp) is announced in the aria-live
+  region, as upstream's NodeWrapper does. Arrow keys skip selected nodes that aren't
+  draggable. The aria-live region is not rendered when `disableKeyboardA11y` is set.
 - Built-in edge labels are SVG inside the edge `<g>` (no more HTML overlay).
   Migration: styles targeting `.xy-flow__edge-label` as an HTML div must be rewritten
   for `.xy-flow__edge-textwrapper` / `-textbg` / `-text`, or use `labelStyle` /
@@ -44,8 +58,11 @@ Bug-fix release. Requires `@angflow/system` 0.1.14.
   (`patternTransform`, sizes, shapes) matches upstream. `color` / `bgColor` now set the
   `--xy-background-pattern-color-props` / `--xy-background-color-props` custom
   properties (previously `color` had no effect). Dark-mode pattern colours added (#5839).
+  The dots `size` was a radius and is now a diameter (upstream), so existing dots render
+  at half size: double `size` to keep them. `lineWidth` no longer scales with zoom.
 - The pane cursor moved to `.xy-flow__pane::before` (#6029). Migration: cursor overrides
-  targeting `.xy-flow__pane` itself should target `::before`.
+  targeting `.xy-flow__pane` itself should target `::before`; overrides for `.selection`
+  must target both the pane and its `::before`.
 - A pane click that does not move no longer turns on `nodesSelection` after a
   `selectionOnDrag` press, so it reaches `(paneClick)`.
 - `getNodesBounds` (and the `get_nodes_bounds` tool) uses absolute positions for sub-flow

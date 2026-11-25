@@ -134,4 +134,4 @@ example pages.
 Known-failures entries 27 → 4. B: 25 → 0 (23 fixed, 2 re-owned to D: the two "pane click
 cancels a pending connection" click-connect entries need the `FinalConnectionState`
 payload, #6117). D: 2 → 4 (2 colour-mode, 2 click-connect payload). Commit range:
-`343756d6a..ed9358849`.
+`343756d6a..HEAD` of the B work (everything on `main` after `343756d6a`, including the 0.3.22 release commit and the final-review fix commits).
