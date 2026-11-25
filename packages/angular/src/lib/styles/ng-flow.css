@@ -82,9 +82,9 @@
   --xy-handle-background-color-default: #bebebe;
   --xy-handle-border-color-default: #1e1e1e;
   --xy-background-color-default: #141414;
-  --xy-background-pattern-dots-color-default: #777;
-  --xy-background-pattern-lines-color-default: #777;
-  --xy-background-pattern-cross-color-default: #777;
+  --xy-background-pattern-dots-color-default: #555;
+  --xy-background-pattern-lines-color-default: #333;
+  --xy-background-pattern-cross-color-default: #333;
   --xy-minimap-background-color-default: #141414;
   --xy-minimap-mask-background-color-default: rgba(60, 60, 60, 0.6);
   --xy-minimap-node-background-color-default: #2b2b2b;
