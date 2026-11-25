@@ -133,20 +133,20 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     return this.store.setCenter(x, y, options);
   }
 
-  /** Fit the viewport to a specific `Rect` in flow coordinates. Resolves `{ zoom: NaN, clamped: false }` if pan/zoom isn't yet initialized. */
+  /** Fit the viewport to a specific `Rect` in flow coordinates. Resolves `{ zoom: NaN, clamped: false, ended: false }` if pan/zoom isn't yet initialized; `ended` is `false` when a gesture or another viewport call interrupted the animation. */
   async fitBounds(
     bounds: Rect,
     options?: { padding?: number; duration?: number; minZoom?: number; maxZoom?: number },
   ): Promise<FitViewResult> {
     const pz = this.store.panZoom();
-    if (!pz) return { zoom: NaN, clamped: false };
+    if (!pz) return { zoom: NaN, clamped: false, ended: false };
 
     const effMin = options?.minZoom ?? this.store.minZoom();
     const effMax = options?.maxZoom ?? this.store.maxZoom();
     const viewport = this.getViewportForBoundsInternal(bounds, options?.padding ?? 0.1, effMin, effMax);
-    await pz.setViewport({ x: viewport.x, y: viewport.y, zoom: viewport.zoom }, { duration: options?.duration });
+    const ended = await pz.setViewport({ x: viewport.x, y: viewport.y, zoom: viewport.zoom }, { duration: options?.duration });
     // 1e-6 matches ZOOM_CLAMP_EPSILON in @angflow/system (utils/graph.ts).
-    return { zoom: viewport.zoom, clamped: viewport.zoom <= effMin + 1e-6 };
+    return { zoom: viewport.zoom, clamped: viewport.zoom <= effMin + 1e-6, ended };
   }
 
   // ── Coordinate Conversion ─────────────────────────────────────────────

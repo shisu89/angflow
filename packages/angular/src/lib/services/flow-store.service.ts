@@ -895,7 +895,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
   async fitView(options?: FitViewOptionsBase<NodeType>): Promise<FitViewResult> {
     const pz = this.panZoom();
-    if (!pz) return { zoom: NaN, clamped: false };
+    if (!pz) return { zoom: NaN, clamped: false, ended: false };
 
     return fitViewport(
       {

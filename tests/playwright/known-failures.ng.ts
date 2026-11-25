@@ -203,7 +203,7 @@ export const KNOWN_FAILURES: KnownFailure[] = [
   },
 
   // ── viewport.spec.ts ──────────────────────────────────────────────────────
-  ...['fit view', 'set center', 'zoom to', 'zoom in'].map(
+  ...['fit view', 'set center'].map(
     (transition): KnownFailure => ({
       file: 'viewport.spec.ts',
       titlePath: ['Viewport transitions', `${transition} resolves with false when a scroll interrupts it`],

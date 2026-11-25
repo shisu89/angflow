@@ -123,3 +123,32 @@ describe('createFilter middle-click pan', () => {
     expect(filterFor(true)(middleClickOnNode())).toBe(false);
   });
 });
+
+describe('XYPanZoom transition promises (#6064)', () => {
+  it('resolves true when a transition runs to the end', async () => {
+    const { panZoom } = setup();
+    await expect(panZoom.setViewport({ x: 10, y: 0, zoom: 1 }, { duration: 20 })).resolves.toBe(true);
+    await expect(panZoom.scaleTo(1.5, { duration: 20 })).resolves.toBe(true);
+    await expect(panZoom.scaleBy(1.1, { duration: 20 })).resolves.toBe(true);
+  });
+
+  it('resolves true immediately without a duration', async () => {
+    const { panZoom } = setup();
+    await expect(panZoom.setViewport({ x: 10, y: 0, zoom: 1 })).resolves.toBe(true);
+  });
+
+  it('resolves false when another viewport call cancels a scheduled transition', async () => {
+    const { panZoom } = setup();
+    const pending = panZoom.setViewport({ x: 300, y: 0, zoom: 1 }, { duration: 5000 });
+    void panZoom.setViewport({ x: 0, y: 0, zoom: 1 }); // interrupts before the transition starts -> 'cancel'
+    await expect(pending).resolves.toBe(false);
+  });
+
+  it('resolves false when a running transition is interrupted', async () => {
+    const { panZoom } = setup();
+    const pending = panZoom.scaleTo(1.8, { duration: 5000 });
+    await new Promise((r) => setTimeout(r, 50)); // let it start
+    void panZoom.setViewport({ x: 0, y: 0, zoom: 1 }); // -> 'interrupt'
+    await expect(pending).resolves.toBe(false);
+  });
+});

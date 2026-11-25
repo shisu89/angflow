@@ -78,7 +78,7 @@ export function XYPanZoom({
     if (d3Selection) {
       return new Promise<boolean>((resolve) => {
         d3ZoomInstance?.interpolate(options?.interpolate === 'linear' ? interpolate : interpolateZoom).transform(
-          getD3Transition(d3Selection, options?.duration, options?.ease, () => resolve(true)),
+          getD3Transition(d3Selection, options?.duration, options?.ease, resolve),
           transform
         );
       });
@@ -238,12 +238,10 @@ export function XYPanZoom({
     return new Promise((resolve) => resolve(contrainedTransform));
   }
 
-  async function setViewport(viewport: Viewport, options?: PanZoomTransformOptions) {
+  function setViewport(viewport: Viewport, options?: PanZoomTransformOptions) {
     const nextTransform = viewportToTransform(viewport);
 
-    await setTransform(nextTransform, options);
-
-    return new Promise<ZoomTransform>((resolve) => resolve(nextTransform));
+    return setTransform(nextTransform, options);
   }
 
   function syncViewport(viewport: Viewport) {
@@ -272,7 +270,7 @@ export function XYPanZoom({
     if (d3Selection) {
       return new Promise<boolean>((resolve) => {
         d3ZoomInstance?.interpolate(options?.interpolate === 'linear' ? interpolate : interpolateZoom).scaleTo(
-          getD3Transition(d3Selection, options?.duration, options?.ease, () => resolve(true)),
+          getD3Transition(d3Selection, options?.duration, options?.ease, resolve),
           zoom
         );
       });
@@ -285,7 +283,7 @@ export function XYPanZoom({
     if (d3Selection) {
       return new Promise<boolean>((resolve) => {
         d3ZoomInstance?.interpolate(options?.interpolate === 'linear' ? interpolate : interpolateZoom).scaleBy(
-          getD3Transition(d3Selection, options?.duration, options?.ease, () => resolve(true)),
+          getD3Transition(d3Selection, options?.duration, options?.ease, resolve),
           factor
         );
       });

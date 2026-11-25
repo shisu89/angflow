@@ -191,6 +191,12 @@ export type FitViewResult = {
    * (content smaller than the viewport, over-zoom) is intentionally NOT flagged.
    */
   clamped: boolean;
+  /**
+   * False when a user gesture or another viewport call interrupted the fit's
+   * animation before it finished. True when it ran to the end or there was
+   * nothing to animate (no nodes to fit, or duration 0).
+   */
+  ended: boolean;
 };
 
 /**

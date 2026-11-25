@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { fitViewport, isEdgeBase, isNodeBase, isInternalNodeBase } from './graph';
 import { adoptUserNodes } from './store';
 import type { NodeBase, InternalNodeBase, NodeLookup, ParentLookup, PanZoomInstance } from '../types';
@@ -68,6 +68,43 @@ describe('fitViewport', () => {
     );
     expect(Number.isNaN(result.zoom)).toBe(true);
     expect(result.clamped).toBe(false);
+    expect(result.ended).toBe(true);
+  });
+
+  it('reports ended: true when the animation runs to the end', async () => {
+    const nodes = buildLookup([sized('a', 0, 0)]);
+    const result = await fitViewport(
+      { nodes, width: 800, height: 600, panZoom: fakePanZoom(), minZoom: 0.5, maxZoom: 2 },
+      {},
+    );
+    expect(result.ended).toBe(true);
+  });
+
+  it('reports ended: false when setViewport is interrupted', async () => {
+    const nodes = buildLookup([sized('a', 0, 0)]);
+    const panZoom = { setViewport: async () => false } as unknown as PanZoomInstance;
+    const result = await fitViewport({ nodes, width: 800, height: 600, panZoom, minZoom: 0.5, maxZoom: 2 }, {});
+    expect(result.ended).toBe(false);
+  });
+
+  it('keeps the viewport when no node is fittable (#6158)', async () => {
+    const setViewport = vi.fn(async () => true);
+    const panZoom = { setViewport } as unknown as PanZoomInstance;
+    const unsized: NodeBase = { id: 'u', position: { x: 0, y: 0 }, data: {} };
+    const nodes = buildLookup([unsized]);
+    const result = await fitViewport({ nodes, width: 800, height: 600, panZoom, minZoom: 0.5, maxZoom: 2 }, {});
+    expect(Number.isNaN(result.zoom)).toBe(true);
+    expect(result.clamped).toBe(false);
+    expect(result.ended).toBe(true);
+    expect(setViewport).not.toHaveBeenCalled();
+
+    const sizedNodes = buildLookup([sized('a', 0, 0)]);
+    const r2 = await fitViewport(
+      { nodes: sizedNodes, width: 800, height: 600, panZoom, minZoom: 0.5, maxZoom: 2 },
+      { nodes: [{ id: 'missing' }] } as never,
+    );
+    expect(Number.isNaN(r2.zoom)).toBe(true);
+    expect(setViewport).not.toHaveBeenCalled();
   });
 });
 
