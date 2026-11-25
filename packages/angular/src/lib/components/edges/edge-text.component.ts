@@ -10,26 +10,16 @@ import {
   viewChild,
 } from '@angular/core';
 import type { CSSProperties } from '../../types/general';
+import { toStyleString } from '../../utils/style';
 
 const defaultLabelBgPadding: [number, number] = [2, 4];
-
-/** `{ fill: 'red', fontSize: 12 }` → `fill: red; font-size: 12`, skipping unset values. */
-function toStyleString(style: CSSProperties | undefined): string | null {
-  if (!style) return null;
-  const parts: string[] = [];
-  for (const [key, value] of Object.entries(style)) {
-    if (value === null || value === undefined) continue;
-    const prop = key.startsWith('--') ? key : key.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
-    parts.push(`${prop}: ${value}`);
-  }
-  return parts.length ? parts.join('; ') : null;
-}
 
 /**
  * SVG edge label, the Angular counterpart of upstream `EdgeText`: a `<g>`
  * translated so the label's centre sits at `(x, y)` in flow coordinates, with
  * an optional background `<rect>` sized from the measured text. Hidden until
- * the text has been measured with `getBBox()`.
+ * the text has been measured with `getBBox()`. Projected content renders
+ * after the text, like upstream's `children`.
  *
  * It is an attribute component on an SVG `<g>`, so use it inside an `<svg>`:
  *
@@ -66,6 +56,7 @@ function toStyleString(style: CSSProperties | undefined): string | null {
       dy="0.3em"
       [attr.style]="textStyle()"
     >{{ label() }}</svg:text>
+    <ng-content />
   `,
 })
 export class EdgeTextComponent {
@@ -98,17 +89,25 @@ export class EdgeTextComponent {
   });
 
   constructor() {
-    afterRenderEffect(() => {
-      // Read the label (and style) so a change re-measures, like upstream's
-      // `useEffect(..., [label])`.
-      this.label();
-      this.labelStyle();
-      const box = this.textRef()?.nativeElement.getBBox?.();
-      if (!box) return; // jsdom has no getBBox: keep the zero box.
-      const current = untracked(this.bbox);
-      if (box.width === current.width && box.height === current.height) return;
-      // Signal write: drives the re-render without Zone.js.
-      this.bbox.set({ x: box.x, y: box.y, width: box.width, height: box.height });
+    afterRenderEffect({
+      // Measure in a read phase. Reading the label (and its style) makes a
+      // change re-measure, like upstream's `useEffect(..., [label])`; x/y
+      // moves don't.
+      earlyRead: () => {
+        this.label();
+        this.labelStyle();
+        const box = this.textRef()?.nativeElement.getBBox?.();
+        // jsdom has no getBBox: keep the zero box.
+        return box ? { x: box.x, y: box.y, width: box.width, height: box.height } : null;
+      },
+      write: (measured) => {
+        const box = measured();
+        if (!box) return;
+        const current = untracked(this.bbox);
+        if (box.width === current.width && box.height === current.height) return;
+        // Signal write: drives the re-render without Zone.js.
+        this.bbox.set(box);
+      },
     });
   }
 }
