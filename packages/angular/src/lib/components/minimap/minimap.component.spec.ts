@@ -318,6 +318,46 @@ describe('MiniMapComponent adopts XYMinimap', () => {
     }
   });
 
+  it('creates the minimap when the SVG appears after panZoom was already set', async () => {
+    store.panZoom.set(fakePanZoom());
+    const fixture = createMinimap();
+    document.body.appendChild(fixture.nativeElement);
+    try {
+      // View not rendered yet: SVG ref unresolved.
+      expect(XYMinimap).not.toHaveBeenCalled();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(XYMinimap).toHaveBeenCalledTimes(1);
+    } finally {
+      fixture.nativeElement.remove();
+    }
+  });
+
+  it('destroys the old minimap before creating one when panZoom changes A to B directly', async () => {
+    const fixture = createMinimap();
+    document.body.appendChild(fixture.nativeElement);
+    try {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const a = fakePanZoom();
+      const b = fakePanZoom();
+      store.panZoom.set(a);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      store.panZoom.set(b);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const factory = XYMinimap as unknown as ReturnType<typeof vi.fn>;
+      expect(factory).toHaveBeenCalledTimes(2);
+      expect(factory.mock.calls[1][0].panZoom).toBe(b);
+      expect(minimapSpy.destroy).toHaveBeenCalledTimes(1);
+      expect(minimapSpy.destroy.mock.invocationCallOrder[0]).toBeLessThan(factory.mock.invocationCallOrder[1]);
+    } finally {
+      fixture.nativeElement.remove();
+    }
+  });
+
   it('forwards the exact update params (defaults: pannable/zoomable false, zoomStep 1)', async () => {
     const fixture = createMinimap();
     document.body.appendChild(fixture.nativeElement);

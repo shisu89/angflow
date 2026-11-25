@@ -210,7 +210,8 @@ export class MiniMapComponent {
     // signal resolves (undefined → element on first render) or store.panZoom()
     // becomes non-null, mirroring how the main pane defers its own d3-zoom
     // wiring in ng-flow.component.ts. The `!this.minimap` guard makes it
-    // idempotent so creation happens exactly once.
+    // idempotent per panZoom; a changed (or nulled) panZoom first destroys the
+    // old minimap so it is rebuilt against the new instance.
     effect(() => {
       const panZoom = this.store.panZoom();
       const svgEl = this.minimapSvgRef()?.nativeElement;
