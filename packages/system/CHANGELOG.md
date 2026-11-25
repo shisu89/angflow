@@ -1,5 +1,45 @@
 # @angflow/system
 
+## 0.1.14
+
+### Changed (type)
+
+- `PanZoomInstance.setViewport` resolves `Promise<boolean>` (was
+  `Promise<ZoomTransform | undefined>`): `false` when the animation was interrupted.
+  Affects direct `@angflow/system` users only.
+
+### Added
+
+- `FitViewResult.ended` (#6064): `false` when a user gesture or another viewport call
+  interrupted the animation. Nothing to fit resolves `ended: true`; pan/zoom not
+  initialised resolves `ended: false`.
+- `ReconnectEdgeOptions.onError` and `AddEdgeOptions.onError`: validation errors from
+  `reconnectEdge` / `addEdge` go there, falling back to the dev-warn sink.
+
+### Behaviour changes
+
+- `reconnectEdge` with an options object but no `shouldReplaceId` now replaces the id
+  (pass `shouldReplaceId: false` to keep the old one).
+
+### Fixed
+
+- Animated viewport calls no longer hang when interrupted (#6064, #6158).
+- Pane extent cached from a ResizeObserver instead of a layout per wheel frame
+  (#5850, #6108, #6054 system half).
+- `Control` as the pan activation key starts a drag pan (#5922).
+- Middle-mouse pan from the selection rect, respecting `panOnDrag` (#5902, #6119).
+- Child nodes listed before their parent get absolute positions and a parent lookup
+  entry (#5915); parents-first order is cached so drag frames stay allocation-free.
+- Internal selection state is no longer mutated (#6097).
+- `extent: 'parent'` applies before the parent is measured (#5889).
+- Resizer: rejected frames roll back, `onResizeEnd` always follows `onResizeStart`,
+  origin with extent (#5998, #6084).
+- `getNodesInside` without a Rect allocation per node (#5806).
+- Smooth-step bends keep `borderRadius` when nodes are close (#6036).
+- `NodeProps` distributes over node-type unions (#6131).
+- Dev warnings no longer mention "React Flow" (#5793).
+
+
 ## @angflow fork
 
 This package diverged from `@xyflow/system` at v0.0.76. Everything below this

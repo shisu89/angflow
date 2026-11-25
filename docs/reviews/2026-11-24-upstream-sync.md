@@ -25,35 +25,35 @@ Detailed per-changeset triage, with file:line evidence, is in the appendices:
 
 Ranked by user impact.
 
-| Upstream | What it fixes for angflow | Effort |
-|---|---|---|
-| #6064 (patch part) | Animated viewport calls (`fitView`, `setCenter`, zoom with `duration`) never resolve when a user gesture interrupts them. **Agent-bridge JSON-RPC calls hang.** | S |
-| #5915 | A child listed before its parent is drawn at its relative position and left out of the parent lookup. **angflow's own `groupNodes` / `group_nodes` tool produces exactly this order.** Also make angular's three `updateAbsolutePositions` call sites process parents first. | S |
-| #5998 | Resizer keeps a rejected `shouldResize` frame's values; `onResizeEnd` can be skipped. Guard upstream's 0×0 edge case. | S |
-| #6097 | Internal selection state is mutated (system `getDragItems` plus angular `flow-store.service.ts:839/855/868`, `utils/changes.ts`). Can desync controlled mode. Both halves land together. | M |
-| #5922 | `panActivationKeyCode="Control"` never starts a drag-pan. | S |
-| #6036 | Smooth-step bends sharper than `borderRadius` when nodes are close (clean cherry-pick). | XS |
-| #5850 + #6108 + #6054 | Every wheel/pinch frame forces a synchronous layout. Port together, but keep angflow's box-selection `.zoom` listener fix. | S |
-| #6029 | Every cursor change restyles the whole flow. Also touches angular `style.css` / `ng-flow.css` cursor overrides. | S |
-| #5889, #6055, #6158, #6119, #6084, #6131 | Trivial fixes: unmeasured sized parent extent; `reconnectEdge` with `getEdgeId`; `fitView` with no nodes; middle-mouse respects `panOnDrag`; resize with origin + extent; `NodeProps` union narrowing. | XS each |
-| #5839 | Dark-mode background pattern colour (must change angular `ng-flow.css` too). | XS |
-| #5806, #5902, #5793 | `getNodesInside` allocations; middle-mouse pan from the selection rect (keep angflow's box-select guard); de-brand leftover "React Flow" dev-warning strings and links. | XS–S |
+| Upstream | What it fixes for angflow | Effort | Status |
+|---|---|---|---|
+| #6064 (patch part) | Animated viewport calls (`fitView`, `setCenter`, zoom with `duration`) never resolve when a user gesture interrupts them. **Agent-bridge JSON-RPC calls hang.** | S | B ✓ e03887a8e, 8a5acc908, 299f8897d, f83837c0c, 07c29bc80, 559152cbd |
+| #5915 | A child listed before its parent is drawn at its relative position and left out of the parent lookup. **angflow's own `groupNodes` / `group_nodes` tool produces exactly this order.** Also make angular's three `updateAbsolutePositions` call sites process parents first. | S | B ✓ 5dbc740f0, 29234d5e5, 5ef33a18e |
+| #5998 | Resizer keeps a rejected `shouldResize` frame's values; `onResizeEnd` can be skipped. Guard upstream's 0×0 edge case. | S | B ✓ 6ddcb228b |
+| #6097 | Internal selection state is mutated (system `getDragItems` plus angular `flow-store.service.ts:839/855/868`, `utils/changes.ts`). Can desync controlled mode. Both halves land together. | M | B ✓ 8998cffee |
+| #5922 | `panActivationKeyCode="Control"` never starts a drag-pan. | S | B ✓ b9a3484ee |
+| #6036 | Smooth-step bends sharper than `borderRadius` when nodes are close (clean cherry-pick). | XS | B ✓ 6fda4c901 |
+| #5850 + #6108 + #6054 | Every wheel/pinch frame forces a synchronous layout. Port together, but keep angflow's box-selection `.zoom` listener fix. | S | B ✓ 458124850 |
+| #6029 | Every cursor change restyles the whole flow. Also touches angular `style.css` / `ng-flow.css` cursor overrides. | S | B ✓ c68594a71 |
+| #5889, #6055, #6158, #6119, #6084, #6131 | Trivial fixes: unmeasured sized parent extent; `reconnectEdge` with `getEdgeId`; `fitView` with no nodes; middle-mouse respects `panOnDrag`; resize with origin + extent; `NodeProps` union narrowing. | XS each | B ✓ 45df8bcd8 (#5889), bf1482363 (#6055), e03887a8e/8a5acc908 (#6158), 412e2d7d5 (#6119), 6ddcb228b (#6084), 03e44b699 (#6131: applied; angflow's `NodeProps` is the system alias) |
+| #5839 | Dark-mode background pattern colour (must change angular `ng-flow.css` too). | XS | B ✓ a03a0ac1d, 0caa5566e |
+| #5806, #5902, #5793 | `getNodesInside` allocations; middle-mouse pan from the selection rect (keep angflow's box-select guard); de-brand leftover "React Flow" dev-warning strings and links. | XS–S | B ✓ 705ebdd1c (#5806), 412e2d7d5 (#5902), c57ebaffa (#5793) |
 
 ## 2. Angflow-native bugs found during reconciliation
 
 These are not upstream ports; the comparison surfaced them. Each one was checked against the code.
 
-| Bug | Where | Effort |
-|---|---|---|
-| `getNodesBounds` doesn't pass `nodeLookup`, so sub-flow children are bounded by their *relative* positions. The `get_nodes_bounds` agent tool inherits this. Fix together with upstream #5871. | `services/ng-flow.service.ts:859` | XS |
-| `elevateEdgesOnSelect` does nothing: the input default `false` overrides the store default, the edge renderer never reads it, and `EdgeToolbar` uses `edge.zIndex + 1` instead of `getElevatedEdgeZIndex`. | `ng-flow.component.ts:520`, `edge-renderer.component.ts:392`, `edge-toolbar.component.ts:69` | S |
-| `nodeClickDistance` is a dead input: the store signal is never read and `ngFlowDragClickDistance` is never bound. | `ng-flow.component.ts:509`, `drag.directive.ts:44` | XS (see §3) |
-| The arrow-key a11y live announcement is missing entirely: `ariaLiveMessage` is rendered but never written. No Shift ×4 step and no snap/extent post-read. | `key-handler.directive.ts:225`, `flow-store.service.ts:295` | S |
-| `(paneClick)` fires, and the selection resets, when a connection drag ends on the pane. | `ng-flow.component.ts` `onPaneClick` | S |
-| A pane click cancels click-to-connect without firing `onClickConnectEnd`. | | S |
-| Programmatic `deleteElements` doesn't cascade a parent's children, ignores `deletable: false`, and merges edges quadratically. Switching to system `getElementsToRemove` fixes all three and picks up #6074/#6111 perf, but it's a **behaviour change** and needs its own release note. | `ng-flow.service.ts:742` | M |
-| Smaller issues: store `reset()` leaves state behind for a provider-shared store; MiniMap keeps a stale `panZoom` after remount; `selectNodesData` has no equality function; key combinations like `Meta+Backspace` aren't supported. | | S each |
-| `(connectEnd)` emits no `FinalConnectionState`, and `NgFlowService.connection.to` is in screen coordinates while React's `useConnection` uses flow coordinates. | | S |
+| Bug | Where | Effort | Status |
+|---|---|---|---|
+| `getNodesBounds` doesn't pass `nodeLookup`, so sub-flow children are bounded by their *relative* positions. The `get_nodes_bounds` agent tool inherits this. Fix together with upstream #5871. | `services/ng-flow.service.ts:859` | XS | B ✓ a450c4298 |
+| `elevateEdgesOnSelect` does nothing: the input default `false` overrides the store default, the edge renderer never reads it, and `EdgeToolbar` uses `edge.zIndex + 1` instead of `getElevatedEdgeZIndex`. | `ng-flow.component.ts:520`, `edge-renderer.component.ts:392`, `edge-toolbar.component.ts:69` | S | B ✓ 3b2ec12e9 |
+| `nodeClickDistance` is a dead input: the store signal is never read and `ngFlowDragClickDistance` is never bound. | `ng-flow.component.ts:509`, `drag.directive.ts:44` | XS (see §3) | D |
+| The arrow-key a11y live announcement is missing entirely: `ariaLiveMessage` is rendered but never written. No Shift ×4 step and no snap/extent post-read. | `key-handler.directive.ts:225`, `flow-store.service.ts:295` | S | B ✓ d1139cfc6 |
+| `(paneClick)` fires, and the selection resets, when a connection drag ends on the pane. | `ng-flow.component.ts` `onPaneClick` | S | B ✓ cf05e1cc3, 882902101 |
+| A pane click cancels click-to-connect without firing `onClickConnectEnd`. | | S | B ✓ cf05e1cc3 (`(clickConnectEnd)` emitted; its `FinalConnectionState` payload stays D) |
+| Programmatic `deleteElements` doesn't cascade a parent's children, ignores `deletable: false`, and merges edges quadratically. Switching to system `getElementsToRemove` fixes all three and picks up #6074/#6111 perf, but it's a **behaviour change** and needs its own release note. | `ng-flow.service.ts:742` | M | C |
+| Smaller issues: store `reset()` leaves state behind for a provider-shared store; MiniMap keeps a stale `panZoom` after remount; `selectNodesData` has no equality function; key combinations like `Meta+Backspace` aren't supported. | | S each | B ✓ 92ea25a81, eeb20bbee (store reset / shared store), 0bdafc7ad, ee5b6c33d (MiniMap), cc81221fa (`selectNodesData`), 81c535327 (key combinations) |
+| `(connectEnd)` emits no `FinalConnectionState`, and `NgFlowService.connection.to` is in screen coordinates while React's `useConnection` uses flow coordinates. | | S | D |
 
 ## 3. Breaking API changes in upstream 1.0 / React 13
 
@@ -91,7 +91,7 @@ measurement-race, nodes-data-hooks, reconnect-edge, viewport).
 | # | Sub-project | Notes |
 |---|---|---|
 | A | Angular generic-test pages + upstream e2e specs, run in CI | Mirrors `examples/{react,svelte,vue}/src/generic-tests`. Failures feed B. Spec: [design](../superpowers/specs/2026-11-25-shared-e2e-suite-angular-design.md), plan: [plan](../superpowers/plans/2026-11-25-shared-e2e-suite-angular.md). |
-| B | Bug-fix release: §1 upstream fixes + §2 angflow-native bugs (except deletion) | Includes #6097. system 0.1.x / angular 0.3.x |
+| B | Bug-fix release: §1 upstream fixes + §2 angflow-native bugs (except deletion) | Includes #6097. system 0.1.x / angular 0.3.x. Plan: [plan](../superpowers/plans/2026-11-25-bug-fix-release.md). Done: system 0.1.14 / angular 0.3.22 / mcp 0.0.4 |
 | C | Deletion via system `getElementsToRemove` (+ #6074/#6111) | Behaviour change, its own release note |
 | D | 0.4.0: full upstream 1.0 API alignment (all of §3, Changeset class included) | Agent tools, mcp snapshot, `AGENT_BRIDGE.md` |
 | E | Feature parity: `selectNode`/`selectEdge`, `changeParent`, `xy-theme.css`, DevTools panel, missing React examples (refresh `docs/examples-parity.md`), optional #5996 perf subset with #6109 | |
@@ -119,7 +119,7 @@ example pages.
 | E | 0 | |
 | flaky-upstream / wontfix | 0 | The 4 former in-spec Angular skips were re-checked: node-toolbar positioning and pane panning now pass; edges `deletable=false` and `interactionWidth` are real bugs (edge-label row below), not hit-test fragility |
 
-**New bugs not yet in §1/§2** (all owner B):
+**New bugs not yet in §1/§2** (all owner B, fixed in B):
 
 | Bug | Where | Failing tests |
 |---|---|---|
@@ -128,3 +128,10 @@ example pages.
 | The click synthesised after a marquee drag cancels a pending click-to-connect: `onPaneClick` clears `connectionClickStartHandle` before its `selectionInProgress` guard. | `ng-flow.component.ts` `onPaneClick` | `click-connect.spec` dragging a selection does not cancel a pending click connection |
 | The default connection line's `<g>` lacks the `ng-flow__connection` class and the valid/invalid status classes. | `connection-line.component.ts:27` | `click-connect.spec` dropping a dragged connection on the pane does not fire pane click |
 | The pane's `selection` class tracks only an active marquee (`userSelectionActive`), not upstream's `isSelecting` (selection key held or `selectionOnDrag`). | `pane.component.ts:22` | `pane.spec` selection key keeps touch drag in selection mode |
+
+### B — results
+
+Known-failures entries 27 → 4. B: 25 → 0 (23 fixed, 2 re-owned to D: the two "pane click
+cancels a pending connection" click-connect entries need the `FinalConnectionState`
+payload, #6117). D: 2 → 4 (2 colour-mode, 2 click-connect payload). Commit range:
+`343756d6a..ed9358849`.

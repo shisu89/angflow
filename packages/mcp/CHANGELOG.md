@@ -1,5 +1,11 @@
 # @angflow/mcp
 
+## 0.0.4
+
+Tool snapshot regenerated from @angflow/angular 0.3.22 (`fit_view` / `fit_bounds` /
+`set_viewport` descriptions).
+
+
 ## 0.0.1
 
 Initial release: MCP server exposing a live angflow canvas over the
