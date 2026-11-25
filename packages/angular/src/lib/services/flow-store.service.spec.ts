@@ -1173,6 +1173,54 @@ describe('shared fit promise', () => {
     expect(settled.zoom).toBe(expected(400, 300));
   });
 
+  it('a fitBounds interrupting a pending fitView resolves the fitView with ended: false', async () => {
+    const { pz, pending } = deferredPanZoom();
+    store.panZoom.set(pz as never);
+    const fit = store.fitView({ duration: 5000 });
+    const bounds = store.fitBounds({ x: 0, y: 0, width: 400, height: 300 }, { duration: 1000 });
+    expect(bounds).not.toBe(fit);
+    pending[0](false); // fitBounds interrupted the fit
+    await expect(fit).resolves.toMatchObject({ ended: false });
+    pending[1](true);
+    await expect(bounds).resolves.toMatchObject({ ended: true });
+  });
+
+  it('destroying the store settles pending fits with ended: false', async () => {
+    const { pz } = deferredPanZoom();
+    store.panZoom.set(pz as never);
+    const fit = store.fitView({ duration: 5000 });
+    const bounds = store.fitBounds({ x: 0, y: 0, width: 400, height: 300 }, { duration: 5000 });
+    store.ngOnDestroy();
+    await expect(fit).resolves.toEqual({ zoom: NaN, clamped: false, ended: false });
+    await expect(bounds).resolves.toEqual({ zoom: NaN, clamped: false, ended: false });
+  });
+
+  it('a rejected fit joined to the queued initial fit rejects only the caller', async () => {
+    const error = new Error('boom');
+    const setViewport = vi.fn().mockRejectedValue(error);
+    const unhandled = vi.fn();
+    // The package has no @types/node; vitest runs on Node, so `process` exists at runtime.
+    const proc = (globalThis as unknown as {
+      process: { on(e: string, f: () => void): void; off(e: string, f: () => void): void };
+    }).process;
+    proc.on('unhandledRejection', unhandled);
+    try {
+      store.setNodes([
+        { id: 'a', position: { x: 0, y: 0 }, data: {}, measured: { width: 100, height: 50 } },
+      ] as never); // nodesInitialized, so setPanZoom drains the queue
+      store.fitViewQueued.set(true);
+      store.setPanZoom({ setViewport, getViewport: () => ({ x: 0, y: 0, zoom: 1 }) } as never); // drains the queued fit
+      expect(store.fitViewQueued()).toBe(false);
+      expect(setViewport).toHaveBeenCalledTimes(1);
+      const fit = store.fitView();
+      await expect(fit).rejects.toBe(error);
+      await new Promise((r) => setTimeout(r, 0));
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      proc.off('unhandledRejection', unhandled);
+    }
+  });
+
   it('fitBounds resolves ended: false without panZoom', async () => {
     await expect(store.fitBounds({ x: 0, y: 0, width: 10, height: 10 })).resolves.toEqual({
       zoom: NaN,

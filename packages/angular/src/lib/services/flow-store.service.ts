@@ -695,6 +695,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     }
     this.positionTweens.clear();
     this.settleTweenWaiters();
+    this.settlePendingFits();
   }
 
   triggerNodeChanges(changes: NodeChange<NodeType>[]): void {
@@ -1140,24 +1141,44 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     return resolver.promise;
   }
 
+  /**
+   * Settle every pending fit promise with `ended: false` and drop it. Called on destroy:
+   * the store can't rely on d3 firing `end` on removed elements. Bumping `latestId`
+   * makes any run still in flight a superseded one, so it can't settle the promise again.
+   */
+  private settlePendingFits(): void {
+    for (const chain of Object.values(this.fitChains)) {
+      chain.latestId++;
+      const resolver = chain.resolver;
+      chain.resolver = null;
+      resolver?.resolve({ zoom: NaN, clamped: false, ended: false });
+    }
+  }
+
   private async resolveFitView(): Promise<void> {
     const pz = this.panZoom();
     if (!pz) return;
 
     // Shares the fitView chain, so a user fitView() during the initial fit joins its promise.
-    await this.runFitChain('fitView', () =>
-      fitViewport(
-        {
-          nodes: this.nodeLookup,
-          width: this.width(),
-          height: this.height(),
-          panZoom: pz,
-          minZoom: this.minZoom(),
-          maxZoom: this.maxZoom(),
-        },
-        this.fitViewOptions()
-      )
-    );
+    // A rejection is the joined caller's to handle (their promise still rejects); swallow it
+    // here so the fire-and-forget internal callers don't surface it as unhandled.
+    try {
+      await this.runFitChain('fitView', () =>
+        fitViewport(
+          {
+            nodes: this.nodeLookup,
+            width: this.width(),
+            height: this.height(),
+            panZoom: pz,
+            minZoom: this.minZoom(),
+            maxZoom: this.maxZoom(),
+          },
+          this.fitViewOptions()
+        )
+      );
+    } catch {
+      return;
+    }
 
     // fitViewport applies the transform to d3's internal state; mirror it into
     // the store so consumers (viewport CSS transform, minimap, culling) reflect
