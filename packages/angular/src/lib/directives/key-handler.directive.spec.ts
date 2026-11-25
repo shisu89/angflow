@@ -4,13 +4,16 @@
  * Asserts that Ctrl+A (handleSelectAll) respects per-element `selectable`
  * flags and does not add nodes or edges where `selectable === false`.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Component, provideZonelessChangeDetection, ɵSIGNAL } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { KeyHandlerDirective } from './key-handler.directive';
 import { FlowStore } from '../services/flow-store.service';
+import { NgFlowService } from '../services/ng-flow.service';
 import type { Node, Edge } from '../types';
+
+const flush = () => new Promise<void>((r) => setTimeout(r, 0));
 
 @Component({
   standalone: true,
@@ -40,7 +43,7 @@ describe('KeyHandlerDirective select-all', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [HostComponent],
-      providers: [provideZonelessChangeDetection(), FlowStore],
+      providers: [provideZonelessChangeDetection(), FlowStore, NgFlowService],
     });
     store = TestBed.inject(FlowStore);
     const fixture = TestBed.createComponent(HostComponent);
@@ -223,7 +226,7 @@ describe('KeyHandlerDirective key combinations', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [HostComponent],
-      providers: [provideZonelessChangeDetection(), FlowStore],
+      providers: [provideZonelessChangeDetection(), FlowStore, NgFlowService],
     });
     store = TestBed.inject(FlowStore);
     fixture = TestBed.createComponent(HostComponent);
@@ -233,26 +236,24 @@ describe('KeyHandlerDirective key combinations', () => {
       .injector.get(KeyHandlerDirective);
   });
 
-  it("deleteKeyCode 'Meta+Backspace' deletes on Meta+Backspace but not on Backspace", () => {
+  it("deleteKeyCode 'Meta+Backspace' deletes on Meta+Backspace but not on Backspace", async () => {
     setSignalInput(directive, 'deleteKeyCode', 'Meta+Backspace');
     store.setNodes([makeNode('n1', { selected: true })]);
-    let deleted: Node[] = [];
-    directive.nodesDelete.subscribe((n) => (deleted = n));
 
     directive.onKeyDown(new KeyboardEvent('keydown', { key: 'Backspace', code: 'Backspace' }));
-    expect(deleted).toEqual([]);
+    await flush();
+    expect(store.nodes().map((n) => n.id)).toEqual(['n1']);
     directive.onKeyUp(new KeyboardEvent('keyup', { key: 'Backspace', code: 'Backspace' }));
 
     directive.onKeyDown(new KeyboardEvent('keydown', { key: 'Meta', code: 'MetaLeft', metaKey: true }));
     directive.onKeyDown(new KeyboardEvent('keydown', { key: 'Backspace', code: 'Backspace', metaKey: true }));
-    expect(deleted.map((n) => n.id)).toEqual(['n1']);
+    await flush();
+    expect(store.nodes().map((n) => n.id)).toEqual([]);
   });
 
-  it("deleteKeyCode 'Meta+Backspace' does not delete from inside a text input", () => {
+  it("deleteKeyCode 'Meta+Backspace' does not delete from inside a text input", async () => {
     setSignalInput(directive, 'deleteKeyCode', 'Meta+Backspace');
     store.setNodes([makeNode('n1', { selected: true })]);
-    let deleted: Node[] = [];
-    directive.nodesDelete.subscribe((n) => (deleted = n));
     const input = document.createElement('input');
     document.body.appendChild(input);
     input.addEventListener('keydown', (e) => directive.onKeyDown(e));
@@ -261,7 +262,8 @@ describe('KeyHandlerDirective key combinations', () => {
       new KeyboardEvent('keydown', { key: 'Backspace', code: 'Backspace', metaKey: true, bubbles: true }),
     );
     input.remove();
-    expect(deleted).toEqual([]);
+    await flush();
+    expect(store.nodes().map((n) => n.id)).toEqual(['n1']);
   });
 
   it("selectionKeyCode 'Shift+s' is active only while both are held", () => {
@@ -284,7 +286,7 @@ describe('KeyHandlerDirective arrow keys', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [HostComponent],
-      providers: [provideZonelessChangeDetection(), FlowStore],
+      providers: [provideZonelessChangeDetection(), FlowStore, NgFlowService],
     });
     store = TestBed.inject(FlowStore);
     const fixture = TestBed.createComponent(HostComponent);
@@ -366,5 +368,85 @@ describe('KeyHandlerDirective arrow keys', () => {
     press('ArrowRight');
     expect(pos('n1')).toEqual({ x: 5, y: 0 });
     expect(store.ariaLiveMessage()).toBe('');
+  });
+});
+
+describe('KeyHandlerDirective delete', () => {
+  let store: FlowStore;
+  let directive: KeyHandlerDirective;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [HostComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore, NgFlowService],
+    });
+    store = TestBed.inject(FlowStore);
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.detectChanges();
+    directive = fixture.debugElement
+      .query(By.directive(KeyHandlerDirective))
+      .injector.get(KeyHandlerDirective);
+  });
+
+  const press = (key = 'Backspace') => directive.onKeyDown(new KeyboardEvent('keydown', { key, code: key }));
+
+  it('a selected parent deletes its unselected children and connected edges', async () => {
+    store.setNodes([makeNode('p', { selected: true }), makeNode('c', { parentId: 'p' }), makeNode('x')]);
+    store.setEdges([makeEdge('cx', { source: 'c', target: 'x' })]);
+    press();
+    await flush();
+    expect(store.nodes().map((n) => n.id)).toEqual(['x']);
+    expect(store.edges()).toEqual([]);
+  });
+
+  it('respects deletable: false', async () => {
+    store.setNodes([makeNode('n1', { selected: true, deletable: false })]);
+    store.setEdges([makeEdge('e', { selected: true, deletable: false })]);
+    press();
+    await flush();
+    expect(store.nodes()).toHaveLength(1);
+    expect(store.edges()).toHaveLength(1);
+  });
+
+  it('honours an onBeforeDelete object result', async () => {
+    store.setNodes([makeNode('n1', { selected: true }), makeNode('n2', { selected: true })]);
+    store.onBeforeDelete = ({ nodes }) => ({ nodes: nodes.filter((n) => n.id === 'n2'), edges: [] });
+    press();
+    await flush();
+    expect(store.nodes().map((n) => n.id)).toEqual(['n1']);
+  });
+
+  it('clears nodesSelectionActive', async () => {
+    store.setNodes([makeNode('n1', { selected: true })]);
+    store.nodesSelectionActive.set(true);
+    press();
+    expect(store.nodesSelectionActive()).toBe(false);
+  });
+
+  it('a throwing onBeforeDelete goes to onError, not to an unhandled rejection', async () => {
+    const onError = vi.fn();
+    store.onError.set(onError);
+    const unhandled = vi.fn();
+    const proc = (globalThis as any).process; // spec files allow `any`; avoids depending on @types/node in tsc
+    proc.on('unhandledRejection', unhandled);
+    try {
+      store.setNodes([makeNode('n1', { selected: true })]);
+      store.onBeforeDelete = () => { throw new Error('boom'); };
+      press();
+      await flush();
+      await flush(); // give Node a turn to report an unhandled rejection
+      expect(onError).toHaveBeenCalledWith('delete-failed', expect.stringContaining('boom'));
+      expect(unhandled).not.toHaveBeenCalled();
+      expect(store.nodes()).toHaveLength(1);
+    } finally {
+      proc.off('unhandledRejection', unhandled);
+    }
+  });
+
+  it('has no delete outputs of its own', () => {
+    expect('nodesDelete' in directive).toBe(false);
+    expect('edgesDelete' in directive).toBe(false);
+    expect('deleteElements' in directive).toBe(false);
   });
 });

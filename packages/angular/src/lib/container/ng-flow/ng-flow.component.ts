@@ -187,9 +187,6 @@ function viewportsEqual(a: Viewport, b: Viewport): boolean {
       [panActivationKeyCode]="panActivationKeyCode()"
       [zoomActivationKeyCode]="zoomActivationKeyCode()"
       [disableKeyboardA11y]="disableKeyboardA11y()"
-      (nodesDelete)="nodesDelete.emit($event)"
-      (edgesDelete)="edgesDelete.emit($event)"
-      (deleteElements)="deleteEvent.emit($event)"
     >
       <ng-flow-pane
         [panOnDrag]="effectivePanOnDrag()"
@@ -953,7 +950,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       this.selectionDragStop.emit({ event, nodes });
     };
 
-    // Programmatic deletion (service.deleteElements / agent bridge) → outputs.
+    // All deletion (keyboard, Controls, service, agent) → outputs.
     this.store.onNodesDelete = (nodes: NodeType[]) => this.nodesDelete.emit(nodes);
     this.store.onEdgesDelete = (edges: EdgeType[]) => this.edgesDelete.emit(edges);
     this.store.onDelete = (params: { nodes: NodeType[]; edges: EdgeType[] }) => this.deleteEvent.emit(params);

@@ -2,7 +2,6 @@ import {
   Directive,
   inject,
   input,
-  output,
   OnInit,
   OnDestroy,
   computed,
@@ -17,15 +16,15 @@ import {
   type XYPosition,
 } from '@angflow/system';
 import { FlowStore } from '../services/flow-store.service';
-import { elementToRemoveChange } from '../utils/changes';
+import { NgFlowService } from '../services/ng-flow.service';
 import { KeyPressTracker, hasKeyCombination } from '../utils/key-press';
-import type { Node, Edge } from '../types';
 
 /**
  * Listens for document-level key events and dispatches Delete/Select-All/
  * Escape/arrow-key behavior plus selection and multi-select key tracking.
- * Attached internally by `<ng-flow>`; emits `(nodesDelete)`, `(edgesDelete)`,
- * and `(deleteElements)` when the user presses the configured delete key.
+ * Attached internally by `<ng-flow>`. Delete goes through
+ * `NgFlowService.deleteElements` (the `<ng-flow>` delete outputs fire from
+ * there). Requires `NgFlowService` in its injector, which `<ng-flow>` provides.
  */
 @Directive({
   selector: '[ngFlowKeyHandler]',
@@ -39,6 +38,7 @@ import type { Node, Edge } from '../types';
 })
 export class KeyHandlerDirective implements OnInit, OnDestroy {
   private store = inject(FlowStore);
+  private flow = inject(NgFlowService);
 
   /** Key(s) that delete selected elements. `null` disables the shortcut. */
   readonly deleteKeyCode = input<KeyCode | null>(['Backspace', 'Delete']);
@@ -52,13 +52,6 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
   readonly zoomActivationKeyCode = input<KeyCode | null>('Meta');
   /** Disable arrow-key node movement. */
   readonly disableKeyboardA11y = input(false);
-
-  /** Fires with the set of nodes deleted by the delete key. */
-  readonly nodesDelete = output<Node[]>();
-  /** Fires with the set of edges deleted by the delete key. */
-  readonly edgesDelete = output<Edge[]>();
-  /** Fires once with both deleted `nodes` and `edges`. */
-  readonly deleteElements = output<{ nodes: Node[]; edges: Edge[] }>();
 
   private readonly panActivationKeys = new Set<string>();
   private readonly zoomActivationKeys = new Set<string>();
@@ -173,54 +166,12 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
   }
 
   private handleDelete(): void {
-    const selectedNodes = this.store.selectedNodes();
-    const selectedEdges = this.store.selectedEdges();
-
-    if (selectedNodes.length === 0 && selectedEdges.length === 0) return;
-
-    // Filter to only deletable elements
-    const deletableNodes = selectedNodes.filter((n) => n.deletable !== false);
-    const deletableEdges = selectedEdges.filter((e) => e.deletable !== false);
-
-    // Collect edges connected to deleted nodes
-    const nodeIds = new Set(deletableNodes.map((n) => n.id));
-    const connectedEdges = this.store.edges().filter(
-      (e) => (nodeIds.has(e.source) || nodeIds.has(e.target)) && e.deletable !== false
-    );
-    const allEdgesToDelete = [...deletableEdges, ...connectedEdges.filter((e) => !deletableEdges.some((se) => se.id === e.id))];
-
-    if (deletableNodes.length === 0 && allEdgesToDelete.length === 0) return;
-
-    const performDelete = () => {
-      // Emit delete events
-      if (deletableNodes.length > 0) {
-        this.nodesDelete.emit(deletableNodes);
-      }
-      if (allEdgesToDelete.length > 0) {
-        this.edgesDelete.emit(allEdgesToDelete);
-      }
-      this.deleteElements.emit({ nodes: deletableNodes, edges: allEdgesToDelete });
-
-      // Apply changes
-      const nodeChanges = deletableNodes.map((n) => elementToRemoveChange(n));
-      const edgeChanges = allEdgesToDelete.map((e) => elementToRemoveChange(e));
-
-      this.store.triggerNodeChanges(nodeChanges as NodeChange[]);
-      this.store.triggerEdgeChanges(edgeChanges as EdgeChange[]);
-    };
-
-    // Check beforeDelete callback
-    const beforeDelete = this.store.onBeforeDelete;
-    if (beforeDelete) {
-      const result = beforeDelete({ nodes: deletableNodes, edges: allEdgesToDelete });
-      if (result instanceof Promise) {
-        result.then((allowed) => { if (allowed) performDelete(); });
-      } else if (result) {
-        performDelete();
-      }
-    } else {
-      performDelete();
-    }
+    this.flow
+      .deleteElements({ nodes: this.store.selectedNodes(), edges: this.store.selectedEdges() })
+      .catch((err: unknown) =>
+        this.store.onError()('delete-failed', `deleteElements failed: ${err instanceof Error ? err.message : String(err)}`),
+      );
+    if (this.store.nodesSelectionActive()) this.store.nodesSelectionActive.set(false);
   }
 
   private handleSelectAll(): void {

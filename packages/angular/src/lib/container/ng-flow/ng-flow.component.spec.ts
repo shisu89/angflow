@@ -7,6 +7,8 @@ import { NgFlowComponent } from './ng-flow.component';
 import { PaneComponent } from '../pane/pane.component';
 
 /** Set an input() signal's value directly without going through the template. */
+const flush = () => new Promise<void>((r) => setTimeout(r, 0));
+
 function setSignalInput<T>(instance: unknown, inputName: string, value: T): void {
   const sig = (instance as Record<string, unknown>)[inputName];
   const node = (sig as Record<symbol, { applyValueToInputSignal(n: unknown, v: unknown): void }>)[ɵSIGNAL as unknown as symbol];
@@ -406,5 +408,49 @@ describe('NgFlowComponent interaction wiring', () => {
       button: 0, clientX: 70, clientY: 70, bubbles: true, cancelable: true,
     }));
     expect(inst.store.userSelectionActive()).toBe(false);
+  });
+});
+
+describe('NgFlowComponent keyboard delete outputs', () => {
+  beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NgFlowComponent],
+      providers: [provideZonelessChangeDetection()],
+    });
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('fires (nodesDelete)/(edgesDelete)/(delete) exactly once per keyboard deletion', async () => {
+    const fixture = TestBed.createComponent(NgFlowComponent);
+    const inst = fixture.componentInstance;
+    setSignalInput(inst, 'defaultNodes', [
+      { id: 'a', position: { x: 0, y: 0 }, data: {}, selected: true },
+      { id: 'b', position: { x: 100, y: 0 }, data: {} },
+    ]);
+    setSignalInput(inst, 'defaultEdges', [{ id: 'ab', source: 'a', target: 'b' }]);
+    fixture.detectChanges();
+    const nodesDelete = vi.fn(), edgesDelete = vi.fn(), del = vi.fn();
+    inst.nodesDelete.subscribe(nodesDelete);
+    inst.edgesDelete.subscribe(edgesDelete);
+    inst.deleteEvent.subscribe(del);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', code: 'Backspace' }));
+    await flush();
+
+    expect(nodesDelete).toHaveBeenCalledTimes(1);
+    expect(nodesDelete.mock.calls[0][0].map((n: { id: string }) => n.id)).toEqual(['a']);
+    expect(edgesDelete).toHaveBeenCalledTimes(1);
+    expect(del).toHaveBeenCalledTimes(1);
+    expect(inst.store.nodes().map((n) => n.id)).toEqual(['b']);
+    fixture.destroy();
   });
 });
