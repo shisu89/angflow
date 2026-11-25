@@ -13,7 +13,9 @@ const box = (id: string, x = 0, extra: Partial<NodeBase> = {}): NodeBase => ({
   ...extra,
 });
 
-function setup(opts: { nodes?: NodeBase[]; nodeId?: string; nodeDragThreshold?: number } = {}) {
+function setup(
+  opts: { nodes?: NodeBase[]; nodeId?: string; nodeDragThreshold?: number; nodeExtent?: number[][] } = {}
+) {
   const pane = document.createElement('div');
   const nodeEl = document.createElement('div');
   pane.appendChild(nodeEl);
@@ -25,7 +27,7 @@ function setup(opts: { nodes?: NodeBase[]; nodeId?: string; nodeDragThreshold?: 
     nodes: [...nodeLookup.values()].map((n) => n.internals.userNode),
     nodeLookup,
     edges: [],
-    nodeExtent: [
+    nodeExtent: opts.nodeExtent ?? [
       [-Infinity, -Infinity],
       [Infinity, Infinity],
     ],
@@ -72,7 +74,9 @@ function drag(target: EventTarget, x0: number, x1: number, upTarget: EventTarget
   mouse('mouseup', upTarget, x1 + 10);
 }
 
-afterEach(() => {
+afterEach(async () => {
+  // let any pending preventNextClick suppressor remove itself so it can't leak into the next test
+  await flush();
   document.body.innerHTML = '';
 });
 
@@ -103,6 +107,19 @@ describe('XYDrag click suppression (#5556)', () => {
     drag(nodeEl, 10, 60, pane);
     mouse('click', pane, 70);
     expect(clicks.pane).not.toHaveBeenCalled();
+  });
+
+  it('a drag clamped by the extent (no position change) released on the node does not suppress the click', () => {
+    const { nodeEl, clicks, updateNodePositions } = setup({
+      nodeExtent: [
+        [0, 0],
+        [100, 40],
+      ],
+    });
+    drag(nodeEl, 10, 60);
+    expect(moved(updateNodePositions)).toBe(false);
+    mouse('click', nodeEl, 70);
+    expect(clicks.node).toHaveBeenCalledTimes(1);
   });
 
   it('measures the threshold from the press point', () => {
