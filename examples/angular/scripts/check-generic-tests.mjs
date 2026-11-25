@@ -24,6 +24,18 @@ const read = (p) => readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
 const errors = [];
 const fail = (m) => errors.push(m);
 
+// 0. The React reference copy must match upstream/main when that ref is available locally.
+let hasUpstreamRef = true;
+try { git('rev-parse', '--verify', '--quiet', 'upstream/main'); } catch { hasUpstreamRef = false; }
+if (!hasUpstreamRef) {
+  console.log('generic-tests: no upstream/main ref, skipping reference-copy drift check');
+} else {
+  try { git('diff', '--quiet', 'upstream/main', '--', CANON_DIR); }
+  catch {
+    fail(`reference copy drifted from upstream/main: refresh with git checkout upstream/main -- ${CANON_DIR}`);
+  }
+}
+
 function walk(dir) {
   return readdirSync(dir).flatMap((n) => {
     const p = join(dir, n);

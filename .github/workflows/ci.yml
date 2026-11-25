@@ -103,28 +103,20 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       # Playwright's exit code is not the verdict: known-failure tests fail by design.
-      # check-known-failures.mjs decides from the JSON report (and fails if it is missing).
-      - name: Run suite (blocking + known-failures projects, one server start)
+      # test:angular runs chromium + ng-known-failures (one server start) and then
+      # check-known-failures.mjs, whose exit code is the script's: it fails closed on a
+      # missing/errored report or a run where nothing executed.
+      - name: Run suite and verdict
         working-directory: tests/playwright
         env:
-          FRAMEWORK: ng
           CI: 'true'
         run: |
-          # The ng-known-failures project only exists when known-failures.ng.ts has entries.
-          projects=(--project=chromium)
-          if grep -qE '^\s+titlePath: \[' known-failures.ng.ts; then
-            projects+=(--project=ng-known-failures)
-          fi
-          pnpm exec playwright test -c playwright.angular.config.ts "${projects[@]}" || true
-
-      - name: Verdict
-        working-directory: tests/playwright
-        run: |
+          set +e
           echo '### Upstream e2e suite (Angular)' >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          set +e
-          node check-known-failures.mjs test-results/report.json 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          pnpm run test:angular 2>&1 | tee "$RUNNER_TEMP/e2e-run.log"
           status=${PIPESTATUS[0]}
+          sed -n '/^known failures:/,$p' "$RUNNER_TEMP/e2e-run.log" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           exit "$status"
 

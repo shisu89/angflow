@@ -12,8 +12,7 @@ config.webServer = {
   cwd: path.resolve(__dirname, '../..'),
 };
 
-// Playwright 1.65 accepts an empty grepInvert, but an empty grep matches nothing, so
-// both are only set when there is something to list.
+// An empty grepInvert is omitted so the chromium project runs everything.
 const knownFailurePatterns = KNOWN_FAILURES.map(toGrep);
 const excludeKnown = knownFailurePatterns.length ? { grepInvert: knownFailurePatterns } : {};
 const sharedProject = (name: string): Project | undefined => config.projects?.find((p) => p.name === name);
@@ -23,17 +22,15 @@ config.projects = [
   { name: 'chromium', use: { ...devices['Desktop Chrome'] }, ...excludeKnown },
   // Non-blocking: only the known failures. The entries travel in `metadata` so
   // check-known-failures.mjs can verify them from the JSON report alone.
-  ...(knownFailurePatterns.length
-    ? [
-        {
-          name: 'ng-known-failures',
-          use: { ...devices['Desktop Chrome'] },
-          grep: knownFailurePatterns,
-          retries: 0,
-          metadata: { knownFailures: KNOWN_FAILURES },
-        },
-      ]
-    : []),
+  {
+    name: 'ng-known-failures',
+    use: { ...devices['Desktop Chrome'] },
+    // Always defined so the project list is stable; with no entries the never-matching
+    // grep selects zero tests.
+    grep: knownFailurePatterns.length ? knownFailurePatterns : /$^/,
+    retries: 0,
+    metadata: { knownFailures: KNOWN_FAILURES },
+  },
   // Local use only; CI runs chromium + ng-known-failures.
   { ...sharedProject('firefox'), name: 'firefox', ...excludeKnown },
   { ...sharedProject('webkit'), name: 'webkit', ...excludeKnown },

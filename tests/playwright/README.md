@@ -90,18 +90,13 @@ The config's `webServer` starts `ng serve` on port 4201. Outside CI an already-r
 **Known failures:** `known-failures.ng.ts` lists upstream tests that fail against angflow. They run in the non-blocking `ng-known-failures` project.
 - To add one, append an entry with `file`, `titlePath` (describe titles plus test title, as Playwright reports them), `reason`, and `owner` (`B`, `C`, `D`, `E`, `flaky-upstream` or `wontfix`; `wontfix` also needs `justification`). Owner letters map to `docs/reviews/2026-11-24-upstream-sync.md` §5.
 - When `check-known-failures.mjs` reports an entry as `STALE` (now passing), delete that entry.
-- Local verdict, from `tests/playwright`:
-  ```bash
-  PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/report.json FRAMEWORK=ng pnpm exec playwright test \
-    -c playwright.angular.config.ts --project=chromium --project=ng-known-failures --reporter=list,json
-  node check-known-failures.mjs
-  ```
-  The script exits 1 on `NOT MATCHED`, `WRONG FILE`, or any failing `chromium` test.
+- Verdict, from `tests/playwright` (CI runs the same script): `pnpm run test:angular`. It runs only the `chromium` and `ng-known-failures` projects, writes `test-results/report.json`, then runs `check-known-failures.mjs` and exits with its code (Playwright's own exit code is ignored, since known failures fail by design).
+  The script exits 1 on `NOT MATCHED`, `WRONG FILE`, any failing `chromium` test, report-level `errors`, or a run where no `chromium` test executed. `test:angular:ui` opens the interactive UI for the `chromium` project only.
 
 **Re-syncing an override:** when upstream changes a config, copy its data into the override file, keep the Angular components, and update the pin to `git rev-parse HEAD:<upstream path>`.
-`pnpm --filter angular-examples run check:generic-tests` reports drift: new or removed upstream keys, stale pins, DATA_ONLY imports that point elsewhere, and unsupported plugin children or imports.
+`pnpm --filter angular-examples run check:generic-tests` reports drift (and, when an `upstream/main` ref exists locally, a drifted `examples/react/src/generic-tests` copy): new or removed upstream keys, stale pins, DATA_ONLY imports that point elsewhere, and unsupported plugin children or imports.
 
 **Verbatim paths:** `tests/playwright/e2e/` and `playwright.{shared,react,svelte,vue}.config.ts` are kept identical to upstream. Don't edit them here. To refresh them:
 ```bash
-git fetch upstream && git checkout upstream/main -- tests/playwright/e2e tests/playwright/playwright.shared.config.ts tests/playwright/playwright.react.config.ts tests/playwright/playwright.svelte.config.ts tests/playwright/playwright.vue.config.ts
+git fetch upstream && git checkout upstream/main -- examples/react/src/generic-tests tests/playwright/e2e tests/playwright/playwright.shared.config.ts tests/playwright/playwright.react.config.ts tests/playwright/playwright.svelte.config.ts tests/playwright/playwright.vue.config.ts
 ```

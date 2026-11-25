@@ -5,8 +5,10 @@
 //
 // The known-failure entries are read from the report itself: playwright.angular.config.ts
 // puts them in the `ng-known-failures` project's metadata. Locally, produce a report with
-//   PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/report.json FRAMEWORK=ng pnpm exec playwright test \
-//     -c playwright.angular.config.ts --project=chromium --project=ng-known-failures --reporter=list,json
+//   pnpm run test:angular
+//
+// Fails closed: exit 1 if the report has top-level `errors` (e.g. config/webServer failure) or
+// the chromium project ran no tests at all (every test skipped, or none reported).
 //
 // Sections (exit 1 if NOT MATCHED or WRONG FILE is non-empty, or any chromium test failed):
 //   NOT MATCHED          an entry with zero matching tests in project ng-known-failures
@@ -82,6 +84,11 @@ section('STALE (now passing)', stale);
 section(`${BLOCKING_PROJECT} failures`, blockingFailures);
 if (blockingFlaky.length) section(`${BLOCKING_PROJECT} flaky (passed on retry, informational)`, blockingFlaky);
 
-const failed = notMatched.length > 0 || wrongFile.length > 0 || blockingFailures.length > 0;
+const reportErrors = (report.errors ?? []).map((e) => (e?.message ?? JSON.stringify(e)).split('\n')[0]);
+const blockingRan = tests.filter((t) => t.project === BLOCKING_PROJECT && t.status !== 'skipped').length;
+section('report errors', reportErrors);
+if (blockingRan === 0) console.log(`NOTHING RAN: no ${BLOCKING_PROJECT} test has a status other than skipped`);
+
+const failed = reportErrors.length > 0 || blockingRan === 0 || notMatched.length > 0 || wrongFile.length > 0 || blockingFailures.length > 0;
 console.log(failed ? 'verdict: FAIL' : 'verdict: OK');
 process.exit(failed ? 1 : 0);

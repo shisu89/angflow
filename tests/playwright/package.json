@@ -8,10 +8,10 @@
     "test:svelte": "FRAMEWORK=svelte pnpm exec playwright test -c playwright.svelte.config.ts",
     "test:react": "FRAMEWORK=react pnpm exec playwright test -c playwright.react.config.ts",
     "test:vue": "FRAMEWORK=vue pnpm exec playwright test -c playwright.vue.config.ts",
-    "test:angular": "FRAMEWORK=ng pnpm exec playwright test -c playwright.angular.config.ts",
+    "test:angular": "mkdir -p test-results && PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/report.json PLAYWRIGHT_HTML_OPEN=never FRAMEWORK=ng playwright test -c playwright.angular.config.ts --project=chromium --project=ng-known-failures --reporter=list,json,html ; node check-known-failures.mjs test-results/report.json",
     "test:react:ui": "pnpm run test:react --ui",
     "test:svelte:ui": "pnpm run test:svelte --ui",
-    "test:angular:ui": "pnpm run test:angular --ui"
+    "test:angular:ui": "FRAMEWORK=ng playwright test -c playwright.angular.config.ts --project=chromium --ui"
   },
   "keywords": [],
   "author": "",
