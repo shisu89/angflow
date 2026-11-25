@@ -16,7 +16,8 @@
     "module": "preserve",
     "baseUrl": ".",
     "paths": {
-      "@examples-shared/*": ["./src/app/examples/_shared/*"]
+      "@examples-shared/*": ["./src/app/examples/_shared/*"],
+      "@xyflow/react": ["./src/app/generic-tests/xyflow-react-shim.ts"]
     }
   },
   "angularCompilerOptions": {
