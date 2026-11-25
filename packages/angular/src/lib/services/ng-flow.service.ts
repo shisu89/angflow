@@ -595,19 +595,26 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
   /**
    * Fill each edge's `labelWidth`/`labelHeight` from its live label element
-   * (`.xy-flow__edge-label[data-id]`) when present, so `layoutNodes` can reserve
-   * dagre space for the label. Reads only; returns shallow clones. Edges with no
-   * rendered label pass through unchanged.
+   * when present, so `layoutNodes` can reserve dagre space for the label.
+   * Built-in edges render their label as an SVG
+   * `<g class="xy-flow__edge-textwrapper">` inside the edge's `<g data-id>`;
+   * it is measured with `getBBox()`, which is in the label's own user units
+   * (flow units, unaffected by the viewport zoom) and includes the background
+   * rect's padding. Reads only; returns shallow clones. Edges with no rendered
+   * label pass through unchanged.
    */
   private withLiveEdgeLabels(edges: EdgeType[]): EdgeType[] {
     const container = this.store.domNode();
     if (!container) return edges;
     return edges.map((e) => {
       const escaped = NgFlowService.cssEscapeId(e.id);
-      const el = container.querySelector(`.xy-flow__edge-label[data-id="${escaped}"]`) as HTMLElement | null;
-      if (!el) return e;
-      const labelWidth = el.offsetWidth;
-      const labelHeight = el.offsetHeight;
+      const el = container.querySelector(
+        `.xy-flow__edge [data-id="${escaped}"] .xy-flow__edge-textwrapper`,
+      ) as SVGGraphicsElement | null;
+      const box = el?.getBBox?.();
+      if (!box) return e;
+      const labelWidth = box.width;
+      const labelHeight = box.height;
       if (!labelWidth || !labelHeight) return e;
       return { ...e, labelWidth, labelHeight } as EdgeType;
     });

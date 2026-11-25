@@ -488,16 +488,18 @@ describe('setNodePositions / applyLayout', () => {
     labelDims: Record<string, { w: number; h: number }> = {},
   ): HTMLDivElement {
     return {
-      querySelector(selector: string): { offsetWidth: number; offsetHeight: number } | null {
+      querySelector(selector: string): object | null {
         const node = selector.match(/^\.xy-flow__node\[data-id="(.+)"\]$/);
         if (node) {
           const d = nodeDims[node[1]];
           return d ? { offsetWidth: d.w, offsetHeight: d.h } : null;
         }
-        const label = selector.match(/^\.xy-flow__edge-label\[data-id="(.+)"\]$/);
+        // Built-in edge labels are SVG (`<g class="xy-flow__edge-textwrapper">`
+        // inside the edge's `<g data-id>`), measured with getBBox().
+        const label = selector.match(/^\.xy-flow__edge \[data-id="(.+)"\] \.xy-flow__edge-textwrapper$/);
         if (label) {
           const d = labelDims[label[1]];
-          return d ? { offsetWidth: d.w, offsetHeight: d.h } : null;
+          return d ? { getBBox: () => ({ x: 0, y: 0, width: d.w, height: d.h }) } : null;
         }
         return null;
       },

@@ -26,10 +26,6 @@ export interface KnownFailure {
   justification?: string;
 }
 
-const EDGE_LABEL =
-  'HTML edge labels render as `.xy-flow__edge-label[data-id]` siblings outside the edge `<g>` ' +
-  '(edge-renderer.component.ts:296), so';
-
 export const KNOWN_FAILURES: KnownFailure[] = [
   // ── background.spec.ts ────────────────────────────────────────────────────
   {
@@ -85,40 +81,6 @@ export const KNOWN_FAILURES: KnownFailure[] = [
   },
 
   // ── edges.spec.ts ─────────────────────────────────────────────────────────
-  {
-    file: 'edges.spec.ts',
-    titlePath: ['Edges', 'properties', 'animated=true add "animated" class'],
-    reason: `${EDGE_LABEL} \`[data-id="animated-edge"]\` resolves to 2 elements (strict-mode violation; new bug).`,
-    owner: 'B',
-  },
-  {
-    file: 'edges.spec.ts',
-    titlePath: ['Edges', 'properties', 'selectable=false prevents selecting of edges'],
-    reason: `${EDGE_LABEL} \`[data-id="not-selectable-edge"]\` resolves to 2 elements (strict-mode violation; new bug).`,
-    owner: 'B',
-  },
-  {
-    file: 'edges.spec.ts',
-    titlePath: ['Edges', 'properties', 'deletable=false prevents deleting of edges'],
-    reason:
-      `${EDGE_LABEL} the locator is ambiguous, and the label (pointer-events: all) covers the edge centre ` +
-      'without selecting the edge; with both neutralised the test passes (former in-spec skip; not hit-test fragility).',
-    owner: 'B',
-  },
-  {
-    file: 'edges.spec.ts',
-    titlePath: ['Edges', 'properties', 'aria-lable is working'],
-    reason: `${EDGE_LABEL} \`[data-id="aria-label"]\` resolves to 2 elements (strict-mode violation; new bug).`,
-    owner: 'B',
-  },
-  {
-    file: 'edges.spec.ts',
-    titlePath: ['Edges', 'properties', 'interactionWidth is working'],
-    reason:
-      `${EDGE_LABEL} the locator is ambiguous, and the click at centre+21px lands on the label div, which upstream ` +
-      'renders inside the edge (former in-spec skip; not hit-test fragility).',
-    owner: 'B',
-  },
   {
     file: 'edges.spec.ts',
     titlePath: [

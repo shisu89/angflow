@@ -37,6 +37,7 @@ import { StraightEdgeComponent } from '../../components/edges/straight-edge.comp
 import { StepEdgeComponent } from '../../components/edges/step-edge.component';
 import { SmoothStepEdgeComponent } from '../../components/edges/smooth-step-edge.component';
 import { SimpleBezierEdgeComponent } from '../../components/edges/simple-bezier-edge.component';
+import { EdgeTextComponent } from '../../components/edges/edge-text.component';
 import type { Edge, EdgeTypes, InternalNode } from '../../types';
 
 const builtInEdgeTypes: EdgeTypes = {
@@ -132,7 +133,7 @@ export function computeEdgePathFromInputs(ei: Record<string, unknown>): string {
 @Component({
   selector: 'ng-flow-edge-renderer',
   standalone: true,
-  imports: [CommonModule, NgComponentOutlet],
+  imports: [CommonModule, NgComponentOutlet, EdgeTextComponent],
   schemas: [NO_ERRORS_SCHEMA],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -231,6 +232,23 @@ export function computeEdgePathFromInputs(ei: Record<string, unknown>): string {
                 [attr.marker-end]="ei['markerEnd']"
                 [attr.style]="getEdgePathStyle(edge)"
               />
+              @if (edge.label) {
+                <!-- Upstream EdgeText: an SVG label inside the edge's <g>, so it
+                     shares the edge's data-id element and clicks select the edge.
+                     Hidden with the path while reconnecting, as upstream hides
+                     the whole edge component. -->
+                <g
+                  ngFlowEdgeText
+                  [x]="getEdgeCenterX(ei)"
+                  [y]="getEdgeCenterY(ei)"
+                  [label]="edge.label"
+                  [labelStyle]="edge.labelStyle"
+                  [labelShowBg]="edge.labelShowBg"
+                  [labelBgStyle]="edge.labelBgStyle"
+                  [labelBgPadding]="edge.labelBgPadding"
+                  [labelBgBorderRadius]="edge.labelBgBorderRadius"
+                />
+              }
             }
           }
           @if (isEdgeReconnectable(edge)) {
@@ -291,22 +309,6 @@ export function computeEdgePathFromInputs(ei: Record<string, unknown>): string {
         </div>
       }
     }
-    <div class="xy-flow__edgelabel-renderer" style="position: absolute; width: 100%; height: 100%; pointer-events: none; top: 0; left: 0;">
-      @for (edge of visibleEdges(); track edge.id) {
-        @if (edge.label && !edge.hidden) {
-          @let ei = getEdgeInputs(edge);
-          <div
-            class="xy-flow__edge-label"
-            [attr.data-id]="edge.id"
-            [style.position]="'absolute'"
-            [style.transform]="'translate(-50%, -50%) translate(' + getEdgeCenterX(ei) + 'px, ' + getEdgeCenterY(ei) + 'px)'"
-            [style.pointer-events]="'all'"
-          >
-            {{ edge.label }}
-          </div>
-        }
-      }
-    </div>
   `,
 })
 export class EdgeRendererComponent {
@@ -578,8 +580,8 @@ export class EdgeRendererComponent {
 
   /**
    * Per-edge memo of the built inputs object and its computed path. The
-   * template calls getEdgeInputs(edge) up to 3x per edge (main SVG, custom-edge
-   * overlay, label) and getEdgePath() twice; without this each call rebuilt the
+   * template calls getEdgeInputs(edge) up to 2x per edge (main SVG, custom-edge
+   * overlay) and getEdgePath() twice; without this each call rebuilt the
    * inputs and recomputed the path. Cached on edge id, validated against a
    * geometry fingerprint plus reference identities for the inputs that don't
    * appear in the key (edge object, handle-data map, handle bounds).
