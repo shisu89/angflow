@@ -432,22 +432,31 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
       );
     }
 
-    const { deletedNodes } = await this.deleteElements({ nodes: [{ id: groupId } as NodeType] });
-    const surviving = children.map((c) => this.getNode(c.id)).filter((n): n is NodeType => !!n);
+    const restore = (): void => {
+      const surviving = children.map((c) => this.getNode(c.id)).filter((n): n is NodeType => !!n);
+      if (surviving.length === 0) return;
+      this.store.triggerNodeChanges(
+        surviving.map((current) => ({
+          id: current.id,
+          type: 'replace',
+          item: { ...current, ...raw[current.id] },
+        })) as NodeChange<NodeType>[],
+      );
+    };
+
+    let deletedNodes: NodeType[];
+    try {
+      ({ deletedNodes } = await this.deleteElements({ nodes: [{ id: groupId } as NodeType] }));
+    } catch (err) {
+      restore(); // a throwing/rejecting onBeforeDelete must not leave the children reparented
+      throw err;
+    }
 
     if (!deletedNodes.some((n) => n.id === groupId)) {
-      if (surviving.length > 0) {
-        this.store.triggerNodeChanges(
-          surviving.map((current) => ({
-            id: current.id,
-            type: 'replace',
-            item: { ...current, ...raw[current.id] },
-          })) as NodeChange<NodeType>[],
-        );
-      }
+      restore();
       return [];
     }
-    return surviving.map((n) => n.id);
+    return children.map((c) => this.getNode(c.id)).filter((n): n is NodeType => !!n).map((n) => n.id);
   }
 
   /**

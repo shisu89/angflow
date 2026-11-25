@@ -214,6 +214,29 @@ describe('NgFlowService', () => {
       expect(store.edges().map((e) => e.id)).toEqual(['bc']);
     });
 
+    it('onBeforeDelete may narrow synchronously', async () => {
+      service.setNodes([makeNode('a'), makeNode('b')]);
+      store.onBeforeDelete = ({ nodes }) => ({ nodes: nodes.filter((n) => n.id === 'a'), edges: [] });
+      const res = await service.deleteElements({ nodes: [{ id: 'a' }, { id: 'b' }] });
+      expect(res.deletedNodes.map((n) => n.id)).toEqual(['a']);
+      expect(store.nodes().map((n) => n.id)).toEqual(['b']);
+    });
+
+    it.each([
+      ['throws synchronously', () => { throw new Error('boom'); }],
+      ['rejects', () => Promise.reject(new Error('boom'))],
+    ])('a hook that %s rejects deleteElements with no changes and no callbacks', async (_n, hook) => {
+      service.setNodes([makeNode('a'), makeNode('b')]);
+      service.setEdges([makeEdge('ab', 'a', 'b')]);
+      const cb = vi.fn();
+      store.onNodesDelete = store.onEdgesDelete = store.onDelete = store.onNodesChange = store.onEdgesChange = cb;
+      store.onBeforeDelete = hook as never;
+      await expect(service.deleteElements({ nodes: [{ id: 'a' }] })).rejects.toThrow('boom');
+      expect(store.nodes()).toHaveLength(2);
+      expect(store.edges()).toHaveLength(1);
+      expect(cb).not.toHaveBeenCalled();
+    });
+
     it('fires each on*Delete once, before its changes, in upstream order', async () => {
       service.setNodes([makeNode('a'), makeNode('b'), makeNode('c')]);
       service.setEdges([makeEdge('ab', 'a', 'b'), makeEdge('bc', 'b', 'c'), makeEdge('ac', 'a', 'c')]);
@@ -1361,6 +1384,17 @@ describe('dissolveGroup', () => {
     ]);
     store.onBeforeDelete = async () => ({ nodes: [], edges: [] });
     expect(await service.dissolveGroup('g')).toEqual([]);
+    expect(service.getNode('g')).toBeTruthy();
+    expect(service.getNode('a')).toMatchObject({ parentId: 'g', position: { x: 100, y: 100 } });
+  });
+
+  it('a throwing or rejecting onBeforeDelete restores the children and rethrows', async () => {
+    service.setNodes([
+      makeNode('g', { type: 'group', position: { x: 50, y: 50 }, width: 400, height: 400 }),
+      makeNode('a', { parentId: 'g', position: { x: 100, y: 100 }, width: 50, height: 50 }),
+    ]);
+    store.onBeforeDelete = () => Promise.reject(new Error('boom'));
+    await expect(service.dissolveGroup('g')).rejects.toThrow('boom');
     expect(service.getNode('g')).toBeTruthy();
     expect(service.getNode('a')).toMatchObject({ parentId: 'g', position: { x: 100, y: 100 } });
   });
