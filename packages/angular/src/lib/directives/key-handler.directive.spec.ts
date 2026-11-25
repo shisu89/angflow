@@ -214,6 +214,51 @@ describe('KeyHandlerDirective select-all', () => {
   });
 });
 
+describe('KeyHandlerDirective key combinations', () => {
+  let store: FlowStore;
+  let directive: KeyHandlerDirective;
+  let fixture: ReturnType<typeof TestBed.createComponent<HostComponent>>;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [HostComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    store = TestBed.inject(FlowStore);
+    fixture = TestBed.createComponent(HostComponent);
+    fixture.detectChanges();
+    directive = fixture.debugElement
+      .query(By.directive(KeyHandlerDirective))
+      .injector.get(KeyHandlerDirective);
+  });
+
+  it("deleteKeyCode 'Meta+Backspace' deletes on Meta+Backspace but not on Backspace", () => {
+    setSignalInput(directive, 'deleteKeyCode', 'Meta+Backspace');
+    store.setNodes([makeNode('n1', { selected: true })]);
+    let deleted: Node[] = [];
+    directive.nodesDelete.subscribe((n) => (deleted = n));
+
+    directive.onKeyDown(new KeyboardEvent('keydown', { key: 'Backspace', code: 'Backspace' }));
+    expect(deleted).toEqual([]);
+    directive.onKeyUp(new KeyboardEvent('keyup', { key: 'Backspace', code: 'Backspace' }));
+
+    directive.onKeyDown(new KeyboardEvent('keydown', { key: 'Meta', code: 'MetaLeft', metaKey: true }));
+    directive.onKeyDown(new KeyboardEvent('keydown', { key: 'Backspace', code: 'Backspace', metaKey: true }));
+    expect(deleted.map((n) => n.id)).toEqual(['n1']);
+  });
+
+  it("selectionKeyCode 'Shift+s' is active only while both are held", () => {
+    setSignalInput(directive, 'selectionKeyCode', 'Shift+s');
+    directive.onKeyDown(new KeyboardEvent('keydown', { key: 'Shift', code: 'ShiftLeft', shiftKey: true }));
+    expect(store.selectionKeyActive()).toBe(false);
+    directive.onKeyDown(new KeyboardEvent('keydown', { key: 's', code: 'KeyS', shiftKey: true }));
+    expect(store.selectionKeyActive()).toBe(true);
+    directive.onKeyUp(new KeyboardEvent('keyup', { key: 's', code: 'KeyS', shiftKey: true }));
+    expect(store.selectionKeyActive()).toBe(false);
+  });
+});
+
 describe('KeyHandlerDirective arrow keys', () => {
   let store: FlowStore;
   let directive: KeyHandlerDirective;

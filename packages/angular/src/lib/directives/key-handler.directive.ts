@@ -5,6 +5,7 @@ import {
   output,
   OnInit,
   OnDestroy,
+  computed,
 } from '@angular/core';
 import {
   isInputDOMNode,
@@ -17,6 +18,7 @@ import {
 } from '@angflow/system';
 import { FlowStore } from '../services/flow-store.service';
 import { elementToRemoveChange } from '../utils/changes';
+import { KeyPressTracker, hasKeyCombination } from '../utils/key-press';
 import type { Node, Edge } from '../types';
 
 /**
@@ -61,24 +63,43 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
   private readonly panActivationKeys = new Set<string>();
   private readonly zoomActivationKeys = new Set<string>();
 
+  // Upstream useKeyPress semantics (combinations) for delete/selection/multi-selection.
+  // Activation keys keep their physical-key tracking above.
+  private readonly deleteTracker = computed(() => new KeyPressTracker(this.deleteKeyCode()));
+  private readonly selectionTracker = computed(() => new KeyPressTracker(this.selectionKeyCode()));
+  private readonly multiSelectionTracker = computed(() => new KeyPressTracker(this.multiSelectionKeyCode()));
+
   ngOnInit(): void {}
   ngOnDestroy(): void {}
 
   onKeyDown(event: KeyboardEvent): void {
-    if (isInputDOMNode(event)) return;
+    // Combination definitions use upstream useKeyPress semantics and act inside inputs
+    // with a modifier. Plain single-key definitions keep the order-independent matching
+    // (holding Shift then Meta must keep both active).
+    const inInput = isInputDOMNode(event);
+    const selectionCombo = hasKeyCombination(this.selectionKeyCode());
+    const multiCombo = hasKeyCombination(this.multiSelectionKeyCode());
+    const deleteCombo = hasKeyCombination(this.deleteKeyCode());
 
-    // Selection key
-    if (this.matchesKey(event, this.selectionKeyCode())) {
+    if (selectionCombo) {
+      this.selectionTracker().down(event);
+      this.store.selectionKeyActive.set(this.selectionTracker().pressed);
+    }
+    if (multiCombo) {
+      this.multiSelectionTracker().down(event);
+      this.store.multiSelectionActive.set(this.multiSelectionTracker().pressed);
+    }
+    if (deleteCombo && this.deleteTracker().down(event)) this.handleDelete();
+
+    if (inInput) return;
+
+    if (!selectionCombo && this.matchesKey(event, this.selectionKeyCode())) {
       this.store.selectionKeyActive.set(true);
     }
-
-    // Multi-selection key
-    if (this.matchesKey(event, this.multiSelectionKeyCode())) {
+    if (!multiCombo && this.matchesKey(event, this.multiSelectionKeyCode())) {
       this.store.multiSelectionActive.set(true);
     }
-
-    // Delete key
-    if (this.matchesKey(event, this.deleteKeyCode())) {
+    if (!deleteCombo && this.matchesKey(event, this.deleteKeyCode())) {
       this.handleDelete();
     }
 
@@ -113,13 +134,21 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
   }
 
   onKeyUp(event: KeyboardEvent): void {
-    if (this.matchesKey(event, this.selectionKeyCode())) {
+    if (hasKeyCombination(this.selectionKeyCode())) {
+      this.selectionTracker().up(event);
+      this.store.selectionKeyActive.set(this.selectionTracker().pressed);
+    } else if (this.matchesKey(event, this.selectionKeyCode())) {
       this.store.selectionKeyActive.set(false);
     }
 
-    if (this.matchesKey(event, this.multiSelectionKeyCode())) {
+    if (hasKeyCombination(this.multiSelectionKeyCode())) {
+      this.multiSelectionTracker().up(event);
+      this.store.multiSelectionActive.set(this.multiSelectionTracker().pressed);
+    } else if (this.matchesKey(event, this.multiSelectionKeyCode())) {
       this.store.multiSelectionActive.set(false);
     }
+
+    if (hasKeyCombination(this.deleteKeyCode())) this.deleteTracker().up(event);
 
     this.panActivationKeys.delete(this.getPhysicalKeyId(event));
     this.store.panActivationKeyActive.set(this.panActivationKeys.size > 0);
@@ -280,6 +309,9 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
   private resetHeldKeys(): void {
     this.panActivationKeys.clear();
     this.zoomActivationKeys.clear();
+    this.selectionTracker().reset();
+    this.multiSelectionTracker().reset();
+    this.deleteTracker().reset();
     this.store.selectionKeyActive.set(false);
     this.store.multiSelectionActive.set(false);
     this.store.panActivationKeyActive.set(false);
