@@ -380,32 +380,69 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   }
 
   /**
-   * Remove a group node; its direct children survive, reparented to the group's
-   * own parent (top-level if it had none) and pinned in place. Returns freed ids.
+   * Remove a group node; its direct children survive. Returns the freed ids.
+   *
+   * The children are first reparented to the group's own parent (top-level if
+   * it had none) in one raw `replace` write, staying where they are drawn
+   * (`internals.positionAbsolute`, including any `extent: 'parent'` clamp). A
+   * child of a top-level group loses `extent: 'parent'`; under a grandparent it
+   * keeps it. Only then is the group deleted, so `onBeforeDelete` sees just the
+   * group and its connected edges. If the group survives (a veto, a narrowing
+   * hook that keeps it, or a `deletable: false` group) the children's raw
+   * `parentId`/`position`/`extent` are restored and `[]` is returned. The
+   * intermediate reparent is visible in `(nodesChange)`.
    */
   async dissolveGroup(groupId: string): Promise<string[]> {
     const group = this.getNode(groupId);
     if (!group) return [];
-    const newParent = group.parentId;
+    const newParentId = group.parentId;
     const children = this.getNodes().filter((n) => n.parentId === groupId);
-    const childAbs: Record<string, { x: number; y: number }> = {};
+
+    // Capture while the group still exists.
+    const raw: Record<string, { parentId?: string; position: XYPosition; extent: NodeType['extent'] }> = {};
+    const next: Record<string, XYPosition> = {};
+    const newParentPA = newParentId
+      ? (this.getInternalNode(newParentId)?.internals.positionAbsolute ?? { x: 0, y: 0 })
+      : { x: 0, y: 0 };
     for (const c of children) {
-      const a = this.getAbsolutePosition(c.id); // capture while the group still exists
-      if (a) childAbs[c.id] = a;
+      raw[c.id] = { parentId: c.parentId, position: { ...c.position }, extent: c.extent };
+      const internal = this.getInternalNode(c.id);
+      next[c.id] = internal
+        ? this.absoluteToRelative(internal, internal.internals.positionAbsolute, newParentPA)
+        : { x: c.position.x + group.position.x, y: c.position.y + group.position.y };
     }
-    // Gate on the (vetoable) deletion FIRST: if a host onBeforeDelete vetoes,
-    // leave everything untouched rather than detaching children from a group
-    // that still exists. deleteElements does not cascade child nodes, only the
-    // group node + its connected edges, so the children survive regardless.
+
+    if (children.length > 0) {
+      this.store.triggerNodeChanges(
+        children.map((c) => ({
+          id: c.id,
+          type: 'replace',
+          item: {
+            ...c,
+            parentId: newParentId,
+            position: next[c.id],
+            ...(c.extent === 'parent' && newParentId === undefined ? { extent: undefined } : {}),
+          },
+        })) as NodeChange<NodeType>[],
+      );
+    }
+
     const { deletedNodes } = await this.deleteElements({ nodes: [{ id: groupId } as NodeType] });
-    if (deletedNodes.length === 0) return [];
-    this.store.batch(() => {
-      for (const c of children) this.updateNode(c.id, { parentId: newParent } as Partial<NodeType>);
-    });
-    if (Object.keys(childAbs).length > 0) {
-      await this.setNodePositions(childAbs, { coordinateSpace: 'absolute', animate: false });
+    const surviving = children.map((c) => this.getNode(c.id)).filter((n): n is NodeType => !!n);
+
+    if (!deletedNodes.some((n) => n.id === groupId)) {
+      if (surviving.length > 0) {
+        this.store.triggerNodeChanges(
+          surviving.map((current) => ({
+            id: current.id,
+            type: 'replace',
+            item: { ...current, ...raw[current.id] },
+          })) as NodeChange<NodeType>[],
+        );
+      }
+      return [];
     }
-    return children.map((c) => c.id);
+    return surviving.map((n) => n.id);
   }
 
   /**
@@ -508,7 +545,6 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     positions: Record<string, { x: number; y: number }>,
   ): Record<string, { x: number; y: number }> {
     const out: Record<string, { x: number; y: number }> = {};
-    const storeOrigin = this.store.nodeOrigin();
     for (const [id, abs] of Object.entries(positions)) {
       const node = this.store.nodeLookup.get(id);
       const parent = node?.parentId ? this.store.nodeLookup.get(node.parentId) : undefined;
@@ -516,13 +552,18 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
         out[id] = abs;
         continue;
       }
-      const origin = node.origin ?? storeOrigin;
-      const w = node.measured?.width ?? node.width ?? node.initialWidth ?? 0;
-      const h = node.measured?.height ?? node.height ?? node.initialHeight ?? 0;
       const pAbs = positions[node.parentId!] ?? parent.internals.positionAbsolute;
-      out[id] = { x: abs.x - pAbs.x + w * origin[0], y: abs.y - pAbs.y + h * origin[1] };
+      out[id] = this.absoluteToRelative(node, abs, pAbs);
     }
     return out;
+  }
+
+  /** Inverse of the store's child transform: the raw `position` that draws `node` at `abs` under a parent drawn at `parentAbs`. */
+  private absoluteToRelative(node: InternalNode<NodeType>, abs: XYPosition, parentAbs: XYPosition): XYPosition {
+    const origin = node.origin ?? this.store.nodeOrigin();
+    const w = node.measured?.width ?? node.width ?? node.initialWidth ?? 0;
+    const h = node.measured?.height ?? node.height ?? node.initialHeight ?? 0;
+    return { x: abs.x - parentAbs.x + w * origin[0], y: abs.y - parentAbs.y + h * origin[1] };
   }
 
   /**

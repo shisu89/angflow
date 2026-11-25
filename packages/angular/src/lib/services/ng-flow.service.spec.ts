@@ -1184,6 +1184,81 @@ describe('dissolveGroup', () => {
     expect(service.getNode('g')).toBeTruthy(); // group survives
     expect(service.getNode('a')?.parentId).toBe('g'); // child not detached
   });
+
+  it('reparents before deleting: onBeforeDelete sees only the group and its edges', async () => {
+    service.setNodes([
+      makeNode('g', { type: 'group', position: { x: 50, y: 50 }, width: 400, height: 400 }),
+      makeNode('a', { parentId: 'g', position: { x: 100, y: 100 }, width: 50, height: 50 }),
+      makeNode('x', { position: { x: 600, y: 0 } }),
+    ]);
+    service.setEdges([makeEdge('gx', 'g', 'x'), makeEdge('ax', 'a', 'x')]);
+    const seen: { nodes: string[]; edges: string[]; aParent?: string } = { nodes: [], edges: [] };
+    store.onBeforeDelete = async ({ nodes, edges }) => {
+      seen.nodes = nodes.map((n) => n.id);
+      seen.edges = edges.map((e) => e.id);
+      seen.aParent = service.getNode('a')?.parentId; // already reparented when the hook runs
+      return true;
+    };
+    expect(await service.dissolveGroup('g')).toEqual(['a']);
+    expect(seen).toEqual({ nodes: ['g'], edges: ['gx'], aParent: undefined });
+    expect(service.getEdge('ax')).toBeTruthy();
+  });
+
+  it('a top-level group frees an extent: parent child without error005 and keeps it where it was drawn', async () => {
+    const onError = vi.fn();
+    store.onError.set(onError);
+    service.setNodes([
+      makeNode('g', { type: 'group', position: { x: 50, y: 50 }, width: 200, height: 200 }),
+      // Overflows the group on the right: drawn clamped at relative x = 150 (abs 200).
+      makeNode('a', { parentId: 'g', extent: 'parent', position: { x: 180, y: 10 }, width: 50, height: 50 }),
+    ]);
+    const drawnBefore = { ...service.getInternalNode('a')!.internals.positionAbsolute };
+    expect(drawnBefore.x).toBe(200); // precondition: the clamp applies in this setup
+    await service.dissolveGroup('g');
+    const a = service.getNode('a')!;
+    expect(a.parentId).toBeUndefined();
+    expect(a.extent).toBeUndefined();
+    expect(service.getInternalNode('a')!.internals.positionAbsolute).toEqual(drawnBefore);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it('keeps extent: parent under a grandparent', async () => {
+    service.setNodes([
+      makeNode('outer', { type: 'group', position: { x: 0, y: 0 }, width: 600, height: 600 }),
+      makeNode('inner', { type: 'group', parentId: 'outer', position: { x: 40, y: 40 }, width: 300, height: 300 }),
+      makeNode('a', { parentId: 'inner', extent: 'parent', position: { x: 20, y: 20 }, width: 50, height: 50 }),
+    ]);
+    const absA = service.getAbsolutePosition('a');
+    await service.dissolveGroup('inner');
+    expect(service.getNode('a')).toMatchObject({ parentId: 'outer', extent: 'parent' });
+    expect(service.getAbsolutePosition('a')).toEqual(absA);
+  });
+
+  it('an extent: parent child that overhangs the grandparent is clamped into it (accepted)', async () => {
+    service.setNodes([
+      makeNode('outer', { type: 'group', position: { x: 0, y: 0 }, width: 300, height: 300 }),
+      // inner overhangs outer (no extent on inner itself); a sits inside inner at abs (350, 350).
+      makeNode('inner', { type: 'group', parentId: 'outer', position: { x: 200, y: 200 }, width: 200, height: 200 }),
+      makeNode('a', { parentId: 'inner', extent: 'parent', position: { x: 150, y: 150 }, width: 50, height: 50 }),
+    ]);
+    expect(service.getInternalNode('a')!.internals.positionAbsolute).toEqual({ x: 350, y: 350 }); // precondition
+    await service.dissolveGroup('inner');
+    const a = service.getNode('a')!;
+    expect(a).toMatchObject({ parentId: 'outer', extent: 'parent', position: { x: 350, y: 350 } }); // raw write
+    // Drawn position: clamped into outer (0..300 minus a's 50px size).
+    expect(service.getInternalNode('a')!.internals.positionAbsolute).toEqual({ x: 250, y: 250 });
+  });
+
+  it('a veto restores raw parentId, position and extent', async () => {
+    service.setNodes([
+      makeNode('g', { type: 'group', position: { x: 50, y: 50 }, width: 200, height: 200 }),
+      makeNode('a', { parentId: 'g', extent: 'parent', position: { x: 180, y: 10 }, width: 50, height: 50 }),
+    ]);
+    store.onBeforeDelete = async () => false;
+    expect(await service.dissolveGroup('g')).toEqual([]);
+    expect(service.getNode('g')).toBeTruthy();
+    expect(service.getNode('a')).toMatchObject({ parentId: 'g', extent: 'parent', position: { x: 180, y: 10 } }); // raw, not re-clamped
+  });
 });
 
 describe('getNodesBounds', () => {
