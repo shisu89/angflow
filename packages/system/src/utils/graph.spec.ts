@@ -1,5 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
-import { calculateNodePosition, fitViewport, getNodesBounds, isEdgeBase, isNodeBase, isInternalNodeBase } from './graph';
+import {
+  calculateNodePosition,
+  fitViewport,
+  getNodesBounds,
+  getNodesInside,
+  isEdgeBase,
+  isNodeBase,
+  isInternalNodeBase,
+} from './graph';
 import { adoptUserNodes } from './store';
 import type { NodeBase, InternalNodeBase, NodeLookup, ParentLookup, PanZoomInstance } from '../types';
 
@@ -184,5 +192,22 @@ describe('calculateNodePosition with extent: parent', () => {
       nodeOrigin: [0, 0],
     });
     expect(result.positionAbsolute).toEqual({ x: 80, y: 80 });
+  });
+});
+
+describe('getNodesInside', () => {
+  it('returns only fully-contained nodes, or also partially overlapping ones when partially is set', () => {
+    const nodes = buildLookup([sized('inside', 10, 10, 50, 50), sized('overlap', 180, 180, 100, 100)]);
+    // handleBounds marks a node as measured; without it getNodesInside force-renders the node.
+    nodes.forEach((n) => {
+      n.internals.handleBounds = { source: [], target: [] };
+    });
+    const viewport = { x: 0, y: 0, width: 200, height: 200 };
+
+    const full = getNodesInside(nodes, viewport, [0, 0, 1], false).map((n) => n.id);
+    const partial = getNodesInside(nodes, viewport, [0, 0, 1], true).map((n) => n.id);
+
+    expect(full).toEqual(['inside']);
+    expect(partial.sort()).toEqual(['inside', 'overlap']);
   });
 });
