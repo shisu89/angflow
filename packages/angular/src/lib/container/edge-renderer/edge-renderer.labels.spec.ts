@@ -112,5 +112,6 @@ describe('EdgeRendererComponent built-in edge labels', () => {
     expect(labels).toHaveLength(1);
     expect(labels[0].closest('.ng-flow__custom-edge')).not.toBeNull();
     expect(labels[0].textContent?.trim()).toBe('custom');
+    expect(labels[0].closest('.ng-flow__custom-edge')!.getAttribute('data-edge-label-for')).toBe('e1');
   });
 });

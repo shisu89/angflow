@@ -486,6 +486,7 @@ describe('setNodePositions / applyLayout', () => {
   function fakeContainer(
     nodeDims: Record<string, { w: number; h: number }>,
     labelDims: Record<string, { w: number; h: number }> = {},
+    customLabelDims: Record<string, { w: number; h: number }> = {},
   ): HTMLDivElement {
     return {
       querySelector(selector: string): object | null {
@@ -499,6 +500,11 @@ describe('setNodePositions / applyLayout', () => {
         const label = selector.match(/^\.xy-flow__edge \[data-id="(.+)"\] \.xy-flow__edge-textwrapper$/);
         if (label) {
           const d = labelDims[label[1]];
+          return d ? { getBBox: () => ({ x: 0, y: 0, width: d.w, height: d.h }) } : null;
+        }
+        const custom = selector.match(/^\.ng-flow__custom-edge\[data-edge-label-for="(.+)"\] \.xy-flow__edge-textwrapper$/);
+        if (custom) {
+          const d = customLabelDims[custom[1]];
           return d ? { getBBox: () => ({ x: 0, y: 0, width: d.w, height: d.h }) } : null;
         }
         return null;
@@ -538,6 +544,20 @@ describe('setNodePositions / applyLayout', () => {
     expect(edgesArg[0].labelWidth).toBe(140);
     expect(edgesArg[0].labelHeight).toBe(22);
     expect((store.edgeLookup.get('e') as { labelWidth?: number }).labelWidth).toBeUndefined();
+  });
+
+  it('applyLayout fills label dims for custom-edge labels in the overlay', async () => {
+    store.setNodes([
+      { id: 'a', data: {}, position: { x: 0, y: 0 } },
+      { id: 'b', data: {}, position: { x: 0, y: 0 } },
+    ]);
+    store.setEdges([{ id: 'e', source: 'a', target: 'b', label: 'rel' }]);
+    store.domNode.set(fakeContainer({}, {}, { e: { w: 90, h: 18 } }));
+    const layoutFn = vi.fn().mockReturnValue({});
+    await service.applyLayout(layoutFn);
+    const edgesArg = layoutFn.mock.calls[0][1] as Array<{ labelWidth?: number; labelHeight?: number }>;
+    expect(edgesArg[0].labelWidth).toBe(90);
+    expect(edgesArg[0].labelHeight).toBe(18);
   });
 
   it('applyLayout passes edges through unchanged when no domNode is set', async () => {

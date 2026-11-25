@@ -295,6 +295,7 @@ export function computeEdgePathFromInputs(ei: Record<string, unknown>): string {
         @let ei = getEdgeInputs(edge);
         <div
           class="ng-flow__custom-edge"
+          [attr.data-edge-label-for]="edge.id"
           [style.position]="'absolute'"
           [style.top]="'0'"
           [style.left]="'0'"

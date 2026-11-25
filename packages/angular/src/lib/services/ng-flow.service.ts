@@ -596,7 +596,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   /**
    * Fill each edge's `labelWidth`/`labelHeight` from its live label element
    * when present, so `layoutNodes` can reserve dagre space for the label.
-   * Built-in edges render their label as an SVG
+   * Edges render their label as an SVG
    * `<g class="xy-flow__edge-textwrapper">` inside the edge's `<g data-id>`;
    * it is measured with `getBBox()`, which is in the label's own user units
    * (flow units, unaffected by the viewport zoom) and includes the background
@@ -608,9 +608,13 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     if (!container) return edges;
     return edges.map((e) => {
       const escaped = NgFlowService.cssEscapeId(e.id);
-      const el = container.querySelector(
+      // Custom edges render their label through BaseEdgeComponent inside the
+      // `.ng-flow__custom-edge` overlay, which is tagged with the edge id.
+      const el = (container.querySelector(
         `.xy-flow__edge [data-id="${escaped}"] .xy-flow__edge-textwrapper`,
-      ) as SVGGraphicsElement | null;
+      ) ?? container.querySelector(
+        `.ng-flow__custom-edge[data-edge-label-for="${escaped}"] .xy-flow__edge-textwrapper`,
+      )) as SVGGraphicsElement | null;
       const box = el?.getBBox?.();
       if (!box) return e;
       const labelWidth = box.width;
