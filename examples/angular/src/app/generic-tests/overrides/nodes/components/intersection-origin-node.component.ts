@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, inject, signal } from '@angular/core';
 import { NgFlowService } from '@angflow/angular';
 
 @Component({
@@ -13,6 +13,7 @@ import { NgFlowService } from '@angflow/angular';
 })
 export class IntersectionOriginNodeComponent {
   private readonly flow = inject(NgFlowService);
+  private readonly cdr = inject(ChangeDetectorRef);
   protected readonly result = signal('');
 
   protected check(): void {
@@ -36,5 +37,9 @@ export class IntersectionOriginNodeComponent {
         child: f.isNodeIntersecting(f.getNode('child')!, { x: 426, y: 426, width: 5, height: 5 }),
       }),
     );
+    // React flushes discrete-event updates synchronously, and the upstream spec reads
+    // textContent() right after the click with no auto-wait. The zoneless scheduler
+    // renders asynchronously, which raced on slower CI runners, so render now.
+    this.cdr.detectChanges();
   }
 }
