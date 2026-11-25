@@ -123,6 +123,8 @@ npm publish --access public
 | Publish mcp | `npm publish --access public` | `packages/mcp` |
 | Run angular example | `npm run dev` | `examples/angular` |
 | Build angular example | `npm run build` | `examples/angular` |
+| Run upstream e2e (Angular) | `pnpm --filter playwright test:angular` | root |
+| Check generic-test drift | `pnpm --filter angular-examples run check:generic-tests` | root |
 
 ## Architecture
 

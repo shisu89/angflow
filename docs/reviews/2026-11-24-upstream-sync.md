@@ -90,7 +90,7 @@ measurement-race, nodes-data-hooks, reconnect-edge, viewport).
 
 | # | Sub-project | Notes |
 |---|---|---|
-| A | Angular generic-test pages + upstream e2e specs, run in CI | Mirrors `examples/{react,svelte,vue}/src/generic-tests`. Failures feed B. |
+| A | Angular generic-test pages + upstream e2e specs, run in CI | Mirrors `examples/{react,svelte,vue}/src/generic-tests`. Failures feed B. Spec: [design](../superpowers/specs/2026-11-25-shared-e2e-suite-angular-design.md), plan: [plan](../superpowers/plans/2026-11-25-shared-e2e-suite-angular.md). |
 | B | Bug-fix release: §1 upstream fixes + §2 angflow-native bugs (except deletion) | Includes #6097. system 0.1.x / angular 0.3.x |
 | C | Deletion via system `getElementsToRemove` (+ #6074/#6111) | Behaviour change, its own release note |
 | D | 0.4.0: full upstream 1.0 API alignment (all of §3, Changeset class included) | Agent tools, mcp snapshot, `AGENT_BRIDGE.md` |

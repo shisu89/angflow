@@ -74,3 +74,34 @@ export default {
 Now you can start writing you new test case under `/tests/playwright/e2e`
 
 
+
+## Angular (angflow)
+
+The Angular example runs the same upstream specs (`e2e/`) against `examples/angular`.
+
+**Running:** `pnpm --filter playwright test:angular` (sets `FRAMEWORK=ng`, uses `playwright.angular.config.ts`).
+The config's `webServer` starts `ng serve` on port 4201. Outside CI an already-running server on that port is reused.
+
+**Test pages:** `examples/angular/src/app/generic-tests/` serves upstream's `/tests/generic/*` routes through `GenericTestHostComponent`.
+- `registry.ts` maps each upstream key to its config. Data-only configs are imported directly from the React reference copy in `examples/react/src/generic-tests/`.
+- `overrides/` holds configs that use custom React nodes, reimplemented as Angular components. Each override starts with a pin line, `// upstream: <path> @ <blob>`.
+- `/examples/<name>` redirects to the Angular example. Names that differ are listed in `UPSTREAM_EXAMPLE_ALIASES` in `app.routes.ts`; unknown names fall back to `overview`.
+
+**Known failures:** `known-failures.ng.ts` lists upstream tests that fail against angflow. They run in the non-blocking `ng-known-failures` project.
+- To add one, append an entry with `file`, `titlePath` (describe titles plus test title, as Playwright reports them), `reason`, and `owner` (`B`, `C`, `D`, `E`, `flaky-upstream` or `wontfix`; `wontfix` also needs `justification`). Owner letters map to `docs/reviews/2026-11-24-upstream-sync.md` §5.
+- When `check-known-failures.mjs` reports an entry as `STALE` (now passing), delete that entry.
+- Local verdict, from `tests/playwright`:
+  ```bash
+  PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/report.json FRAMEWORK=ng pnpm exec playwright test \
+    -c playwright.angular.config.ts --project=chromium --project=ng-known-failures --reporter=list,json
+  node check-known-failures.mjs
+  ```
+  The script exits 1 on `NOT MATCHED`, `WRONG FILE`, or any failing `chromium` test.
+
+**Re-syncing an override:** when upstream changes a config, copy its data into the override file, keep the Angular components, and update the pin to `git rev-parse HEAD:<upstream path>`.
+`pnpm --filter angular-examples run check:generic-tests` reports drift: new or removed upstream keys, stale pins, DATA_ONLY imports that point elsewhere, and unsupported plugin children or imports.
+
+**Verbatim paths:** `tests/playwright/e2e/` and `playwright.{shared,react,svelte,vue}.config.ts` are kept identical to upstream. Don't edit them here. To refresh them:
+```bash
+git fetch upstream && git checkout upstream/main -- tests/playwright/e2e tests/playwright/playwright.shared.config.ts tests/playwright/playwright.react.config.ts tests/playwright/playwright.svelte.config.ts tests/playwright/playwright.vue.config.ts
+```
