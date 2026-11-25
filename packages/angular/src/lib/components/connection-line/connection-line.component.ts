@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, computed, input, Type } from '@angular/core';
 import { CommonModule, NgComponentOutlet } from '@angular/common';
-import { getBezierPath, getSmoothStepPath, getStraightPath, ConnectionLineType, Position, type ConnectionInProgress } from '@angflow/system';
+import { getBezierPath, getSmoothStepPath, getStraightPath, getConnectionStatus, ConnectionLineType, Position, type ConnectionInProgress } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 
 /**
@@ -25,7 +25,7 @@ import { FlowStore } from '../../services/flow-store.service';
       } @else {
         <svg class="ng-flow__connectionline xy-flow__connectionline"
              style="overflow: visible; position: absolute; width: 100%; height: 100%; pointer-events: none;">
-          <g>
+          <g [attr.class]="connectionClass()">
             <path
               class="ng-flow__connection-path xy-flow__connection-path"
               [attr.d]="connectionPath()"
@@ -49,6 +49,13 @@ export class ConnectionLineComponent {
     this.store.version();
     const conn = this.store.connection();
     return conn?.inProgress ?? false;
+  });
+
+  /** Upstream ConnectionLine `<g>` classes: `xy-flow__connection` plus the `valid`/`invalid` status. */
+  readonly connectionClass = computed(() => {
+    const conn = this.store.connection();
+    const status = conn?.inProgress ? getConnectionStatus(conn.isValid) : null;
+    return ['ng-flow__connection', 'xy-flow__connection', status].filter(Boolean).join(' ');
   });
 
   readonly connectionProps = computed(() => {

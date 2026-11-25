@@ -73,3 +73,48 @@ describe('ConnectionLineComponent data enrichment', () => {
     expect((props.fromHandle as Handle | null)?.data).toBeUndefined();
   });
 });
+
+describe('ConnectionLineComponent default line classes', () => {
+  let store: FlowStore;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [ConnectionLineComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    store = TestBed.inject(FlowStore);
+  });
+
+  function renderGroup(isValid: boolean | null): SVGGElement {
+    store.connection.set({ ...makeInProgressConnection(), isValid });
+    const fixture = TestBed.createComponent(ConnectionLineComponent);
+    fixture.detectChanges();
+    const g = (fixture.nativeElement as HTMLElement).querySelector('svg.xy-flow__connectionline > g');
+    expect(g).not.toBeNull();
+    return g as SVGGElement;
+  }
+
+  it('marks a valid connection like upstream', () => {
+    const g = renderGroup(true);
+    expect(g.classList.contains('ng-flow__connection')).toBe(true);
+    expect(g.classList.contains('xy-flow__connection')).toBe(true);
+    expect(g.classList.contains('valid')).toBe(true);
+    expect(g.classList.contains('invalid')).toBe(false);
+  });
+
+  it('marks an invalid connection', () => {
+    const g = renderGroup(false);
+    expect(g.classList.contains('xy-flow__connection')).toBe(true);
+    expect(g.classList.contains('invalid')).toBe(true);
+    expect(g.classList.contains('valid')).toBe(false);
+  });
+
+  it('adds no status class while validity is unknown', () => {
+    const g = renderGroup(null);
+    expect(g.classList.contains('ng-flow__connection')).toBe(true);
+    expect(g.classList.contains('xy-flow__connection')).toBe(true);
+    expect(g.classList.contains('valid')).toBe(false);
+    expect(g.classList.contains('invalid')).toBe(false);
+  });
+});

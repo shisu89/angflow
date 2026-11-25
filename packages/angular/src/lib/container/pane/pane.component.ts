@@ -329,8 +329,11 @@ export class PaneComponent implements OnDestroy {
     if (moved && (!event || event.type === 'pointercancel' || event.pointerType !== 'mouse')) {
       this.store.selectionInProgress.set(false);
     }
-    // Mark nodes selection active only if nodes were selected.
-    if (this.store.selectedNodes().length > 0) {
+    // Mark nodes selection active only after a marquee that moved and selected nodes.
+    // A zero-move gesture is a plain pane click: activating the nodes selection here
+    // would make onPaneClick consume it instead of firing (paneClick). Upstream Pane
+    // onPointerUp sets nodesSelectionActive only inside `if (selectionInProgress)`.
+    if (moved && this.store.selectedNodes().length > 0) {
       this.store.nodesSelectionActive.set(true);
     }
     if (event && emitEnd) this.selectionEnd.emit(event);

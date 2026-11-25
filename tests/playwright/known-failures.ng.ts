@@ -50,34 +50,19 @@ export const KNOWN_FAILURES: KnownFailure[] = [
     file: 'click-connect.spec.ts',
     titlePath: ['Click connections', 'pane click cancels a pending connection (click-connect)'],
     reason:
-      'A pane click cancels the pending click connection without emitting `clickConnectEnd` (report §2); ' +
-      'the end-state payload is also missing (D).',
-    owner: 'B',
+      'The pane click now cancels the pending connection and emits `(clickConnectEnd)` (fixed in B), but the ' +
+      "output's payload is only the MouseEvent; the spec JSON-parses upstream's second argument, the final " +
+      'connection state, which is the #6117 / `FinalConnectionState` API change (D).',
+    owner: 'D',
   },
   {
     file: 'click-connect.spec.ts',
     titlePath: ['Click connections', 'pane click cancels a pending connection (click-connect-selection)'],
     reason:
-      'A pane click cancels the pending click connection without emitting `clickConnectEnd` (report §2); ' +
-      'the end-state payload is also missing (D).',
-    owner: 'B',
-  },
-  {
-    file: 'click-connect.spec.ts',
-    titlePath: ['Click connections', 'dragging a selection does not cancel a pending click connection'],
-    reason:
-      'The click synthesised after a marquee drag reaches `onPaneClick`, which clears ' +
-      '`connectionClickStartHandle` before its `selectionInProgress` guard, so the target click starts a new ' +
-      'connection instead of completing it (new bug).',
-    owner: 'B',
-  },
-  {
-    file: 'click-connect.spec.ts',
-    titlePath: ['Click connections', 'dropping a dragged connection on the pane does not fire pane click'],
-    reason:
-      'The connection line `<g>` has no `ng-flow__connection` (or valid/invalid status) class, unlike upstream ' +
-      '(new bug); behind it, `(paneClick)` fires when a connection drag ends on the pane (report §2).',
-    owner: 'B',
+      'The pane click now cancels the pending connection and emits `(clickConnectEnd)` (fixed in B), but the ' +
+      "output's payload is only the MouseEvent; the spec JSON-parses upstream's second argument, the final " +
+      'connection state, which is the #6117 / `FinalConnectionState` API change (D).',
+    owner: 'D',
   },
 
   // ── edges.spec.ts ─────────────────────────────────────────────────────────

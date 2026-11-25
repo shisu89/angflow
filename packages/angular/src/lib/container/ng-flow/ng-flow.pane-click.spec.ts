@@ -15,6 +15,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { NgFlowComponent } from './ng-flow.component';
 import { PaneComponent } from '../pane/pane.component';
 import { FlowStore } from '../../services/flow-store.service';
+import { Position, type ConnectionInProgress } from '@angflow/system';
 
 class FakeResizeObserver {
   observe(): void {}
@@ -28,6 +29,27 @@ function makePaneClick(x = 0, y = 0): MouseEvent {
   const ev = new MouseEvent('click', { clientX: x, clientY: y, bubbles: true, cancelable: true });
   Object.defineProperty(ev, 'target', { value: el, writable: false });
   return ev;
+}
+
+function makeInProgressConnection(): ConnectionInProgress {
+  return {
+    inProgress: true,
+    isValid: null,
+    from: { x: 0, y: 0 },
+    fromHandle: { id: null, nodeId: '1', x: 0, y: 0, position: Position.Bottom, type: 'source', width: 10, height: 10 },
+    fromPosition: Position.Bottom,
+    fromNode: null as never,
+    to: { x: 100, y: 100 },
+    toHandle: null,
+    toPosition: Position.Top,
+    toNode: null,
+    pointer: { x: 100, y: 100 },
+  };
+}
+
+function makePanePointerUp(pointerType: string): PointerEvent {
+  const paneEl = document.createElement('div');
+  return { target: paneEl, currentTarget: paneEl, pointerType } as unknown as PointerEvent;
 }
 
 describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
@@ -198,6 +220,28 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
     expect(store.selectionInProgress()).toBe(false);
   });
 
+  it('PaneComponent does not activate the nodes selection on a zero-move click with a node already selected', () => {
+    // Upstream sets nodesSelectionActive only when a marquee actually ran (selectionInProgress);
+    // otherwise a plain pane click with selectionOnDrag never reaches (paneClick).
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [PaneComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    const fixture = TestBed.createComponent(PaneComponent);
+    const paneInst = fixture.componentInstance;
+    const store = TestBed.inject(FlowStore);
+    fixture.detectChanges();
+    store.setNodes([{ id: '1', position: { x: 0, y: 0 }, data: {}, selected: true }]);
+    expect(store.selectedNodes().length).toBe(1);
+
+    (paneInst as any).isSelecting = true;
+    (paneInst as any).activePointerId = 1;
+    (paneInst as any).onPointerUp({ clientX: 100, clientY: 100, pointerId: 1, pointerType: 'mouse' } as PointerEvent);
+
+    expect(store.nodesSelectionActive()).toBe(false);
+  });
+
   function endMovedMarquee(pointerType: string): FlowStore {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
@@ -227,5 +271,96 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
     // next genuine pane tap's deselect/(paneClick).
     const store = endMovedMarquee('touch');
     expect(store.selectionInProgress()).toBe(false);
+  });
+
+  describe('upstream Pane onClick order', () => {
+    const armedHandle = { nodeId: '1', type: 'source' as const, handleId: null };
+
+    function setup() {
+      const fixture = TestBed.createComponent(NgFlowComponent);
+      const inst = fixture.componentInstance;
+      fixture.detectChanges();
+      const store = inst.store;
+      const clickConnectEndSpy = vi.spyOn(inst.clickConnectEnd, 'emit');
+      const paneClickSpy = vi.spyOn(inst.paneClick, 'emit');
+      const resetSpy = vi.spyOn(store, 'resetSelectedElements');
+      return { inst, store, clickConnectEndSpy, paneClickSpy, resetSpy };
+    }
+
+    it('a pane click cancels a pending click-connect and emits (clickConnectEnd)', () => {
+      const { inst, store, clickConnectEndSpy, paneClickSpy } = setup();
+      store.connectionClickStartHandle.set(armedHandle);
+
+      const ev = makePaneClick();
+      inst.onPaneClick(ev);
+
+      expect(clickConnectEndSpy).toHaveBeenCalledTimes(1);
+      expect(clickConnectEndSpy).toHaveBeenCalledWith(ev);
+      expect(store.connectionClickStartHandle()).toBeNull();
+      expect(paneClickSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('the click that ends a marquee keeps a pending click-connect', () => {
+      const { inst, store, clickConnectEndSpy, paneClickSpy } = setup();
+      store.connectionClickStartHandle.set(armedHandle);
+      store.selectionInProgress.set(true);
+
+      inst.onPaneClick(makePaneClick());
+
+      expect(store.connectionClickStartHandle()).toEqual(armedHandle);
+      expect(clickConnectEndSpy).not.toHaveBeenCalled();
+      expect(paneClickSpy).not.toHaveBeenCalled();
+      expect(store.selectionInProgress()).toBe(false);
+    });
+
+    it('the click after a connection drag dropped on the pane is swallowed once', () => {
+      const { inst, store, paneClickSpy, resetSpy } = setup();
+      store.connection.set({ ...makeInProgressConnection() });
+
+      inst.onPanePointerUp(makePanePointerUp('mouse'));
+      store.cancelConnection();
+      inst.onPaneClick(makePaneClick());
+
+      expect(paneClickSpy).not.toHaveBeenCalled();
+      expect(resetSpy).not.toHaveBeenCalled();
+
+      inst.onPaneClick(makePaneClick());
+      expect(paneClickSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('a touch connection drop sets no flag (no synthesised click follows)', () => {
+      const { inst, store, paneClickSpy } = setup();
+      store.connection.set({ ...makeInProgressConnection() });
+
+      inst.onPanePointerUp(makePanePointerUp('touch'));
+      store.cancelConnection();
+      inst.onPaneClick(makePaneClick());
+
+      expect(paneClickSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('swallows any click while a connection drag is in progress', () => {
+      const { inst, store, paneClickSpy, resetSpy } = setup();
+      store.connection.set({ ...makeInProgressConnection() });
+
+      inst.onPaneClick(makePaneClick());
+
+      expect(paneClickSpy).not.toHaveBeenCalled();
+      expect(resetSpy).not.toHaveBeenCalled();
+    });
+
+    it('an armed click-connect with a moved preview (inProgress) still cancels on a pane click', () => {
+      const { inst, store, clickConnectEndSpy, paneClickSpy } = setup();
+      store.connectionClickStartHandle.set(armedHandle);
+      // What ClickConnectPreview writes on pointermove while a handle is armed.
+      store.connection.set({ ...makeInProgressConnection() });
+
+      inst.onPanePointerUp(makePanePointerUp('mouse'));
+      inst.onPaneClick(makePaneClick());
+
+      expect(clickConnectEndSpy).toHaveBeenCalledTimes(1);
+      expect(paneClickSpy).toHaveBeenCalledTimes(1);
+      expect(store.connectionClickStartHandle()).toBeNull();
+    });
   });
 });

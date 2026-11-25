@@ -198,6 +198,7 @@ function viewportsEqual(a: Viewport, b: Viewport): boolean {
         [autoPanOnSelection]="autoPanOnSelection()"
         [autoPanSpeed]="autoPanSpeed()"
         (pointerdown)="onPanePointerDown($event)"
+        (pointerup)="onPanePointerUp($event)"
         (click)="onPaneClick($event)"
         (contextmenu)="onPaneContextMenu($event)"
         (mouseenter)="onPaneMouseEnter($event)"
@@ -1119,6 +1120,21 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     (event.target as HTMLElement).scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }
 
+  /** Set when a connection drag is released over the empty pane; the synthesised click consumes it. */
+  private connectionEndedOnPane = false;
+
+  onPanePointerUp(event: PointerEvent): void {
+    // The pane's pointerup bubbles before XYHandle's document listener ends the connection,
+    // so the connection is still in progress here. Only a mouse release is followed by a
+    // synthesised click; a moved touch/pen gesture fires none, and the flag would otherwise
+    // swallow the next genuine tap (same reasoning as pane.component.ts finishSelection).
+    // An armed click-to-connect preview also reports inProgress; its cancelling click must not be eaten.
+    const connectionDragInProgress = this.store.connection().inProgress && !this.store.connectionClickStartHandle();
+    if (event.pointerType === 'mouse' && event.target === event.currentTarget && connectionDragInProgress) {
+      this.connectionEndedOnPane = true;
+    }
+  }
+
   onPaneClick(event: MouseEvent): void {
     const threshold = this.paneClickDistance();
     if (threshold > 0 && this.panePointerDownPos) {
@@ -1135,20 +1151,24 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       return;
     }
 
-    // A genuine empty-canvas click cancels a pending click-to-connect (and its
-    // preview line). Placed after the handle/node/edge guard so the first click
-    // that ARMS a handle — which also bubbles here — doesn't immediately cancel it.
-    if (this.store.connectionClickStartHandle()) {
-      this.store.connectionClickStartHandle.set(null);
+    // Upstream Pane onClick order: the click that ends a marquee, the click after a
+    // connection drag dropped on the pane, and any click while a connection is in progress
+    // are swallowed — they must not cancel a pending click-to-connect or reset the selection.
+    // An armed click-to-connect also reports inProgress (ClickConnectPreview writes the preview
+    // state on pointermove), so only a connection *drag* counts here.
+    const connectionDragInProgress = this.store.connection().inProgress && !this.store.connectionClickStartHandle();
+    if (this.store.selectionInProgress() || this.connectionEndedOnPane || connectionDragInProgress) {
+      this.store.selectionInProgress.set(false);
+      this.connectionEndedOnPane = false;
+      return;
     }
 
-    // Don't deselect right after a selection drag ended (the click fires from mouseup).
-    // Consume the selectionInProgress flag so only THIS synthesised click is swallowed;
-    // the next genuine pane click will proceed normally.
-    // Ported from React's selectionInProgress ref (Pane/index.tsx).
-    if (this.store.selectionInProgress()) {
-      this.store.selectionInProgress.set(false);
-      return;
+    // A genuine empty-canvas click cancels a pending click-to-connect (and its
+    // preview line) and reports it. Placed after the handle/node/edge guard so the
+    // first click that ARMS a handle — which also bubbles here — doesn't cancel it.
+    if (this.store.connectionClickStartHandle()) {
+      this.store.onClickConnectEnd?.(event);
+      this.store.connectionClickStartHandle.set(null);
     }
 
     if (this.store.nodesSelectionActive()) {
