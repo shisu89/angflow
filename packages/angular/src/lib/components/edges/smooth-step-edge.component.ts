@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, input, computed } from '@angular/core';
 import { getSmoothStepPath, Position, type SmoothStepPathOptions, type Handle } from '@angflow/system';
+import type { CSSProperties } from '../../types/general';
 import { BaseEdgeComponent } from './base-edge.component';
 
 /** Edge rendered as orthogonal step segments with rounded corners. */
@@ -14,6 +15,14 @@ import { BaseEdgeComponent } from './base-edge.component';
       [markerStart]="markerStart()"
       [markerEnd]="markerEnd()"
       [interactionWidth]="interactionWidth() ?? 20"
+      [label]="label()"
+      [labelX]="edgeLabelX()"
+      [labelY]="edgeLabelY()"
+      [labelStyle]="labelStyle()"
+      [labelShowBg]="labelShowBg()"
+      [labelBgStyle]="labelBgStyle()"
+      [labelBgPadding]="labelBgPadding()"
+      [labelBgBorderRadius]="labelBgBorderRadius()"
     />
   `,
 })
@@ -33,11 +42,18 @@ export class SmoothStepEdgeComponent {
   readonly interactionWidth = input<number>();
   readonly pathOptions = input<SmoothStepPathOptions>();
   readonly label = input<string>();
+  readonly labelX = input<number>();
+  readonly labelY = input<number>();
+  readonly labelStyle = input<CSSProperties>();
+  readonly labelShowBg = input<boolean | undefined>();
+  readonly labelBgStyle = input<CSSProperties>();
+  readonly labelBgPadding = input<[number, number] | undefined>();
+  readonly labelBgBorderRadius = input<number | undefined>();
   readonly sourceHandle = input<Handle | null>(null);
   readonly targetHandle = input<Handle | null>(null);
 
-  readonly edgePath = computed(() => {
-    const [path] = getSmoothStepPath({
+  private readonly pathData = computed(() => {
+    return getSmoothStepPath({
       sourceX: this.sourceX(),
       sourceY: this.sourceY(),
       targetX: this.targetX(),
@@ -46,6 +62,10 @@ export class SmoothStepEdgeComponent {
       targetPosition: this.targetPosition(),
       ...this.pathOptions(),
     });
-    return path;
   });
+
+  readonly edgePath = computed(() => this.pathData()[0]);
+  // Falls back to the computed on-path anchor, like upstream's built-in edges.
+  protected readonly edgeLabelX = computed(() => this.labelX() ?? this.pathData()[1]);
+  protected readonly edgeLabelY = computed(() => this.labelY() ?? this.pathData()[2]);
 }

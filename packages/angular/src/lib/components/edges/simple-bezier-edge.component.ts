@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, input, computed } from '@angular/core';
 import { getSimpleBezierPath, Position, type Handle } from '@angflow/system';
+import type { CSSProperties } from '../../types/general';
 import { BaseEdgeComponent } from './base-edge.component';
 
 /**
@@ -17,6 +18,14 @@ import { BaseEdgeComponent } from './base-edge.component';
       [markerStart]="markerStart()"
       [markerEnd]="markerEnd()"
       [interactionWidth]="interactionWidth() ?? 20"
+      [label]="label()"
+      [labelX]="edgeLabelX()"
+      [labelY]="edgeLabelY()"
+      [labelStyle]="labelStyle()"
+      [labelShowBg]="labelShowBg()"
+      [labelBgStyle]="labelBgStyle()"
+      [labelBgPadding]="labelBgPadding()"
+      [labelBgBorderRadius]="labelBgBorderRadius()"
     />
   `,
 })
@@ -35,11 +44,18 @@ export class SimpleBezierEdgeComponent {
   readonly markerEnd = input<string>();
   readonly interactionWidth = input<number>();
   readonly label = input<string>();
+  readonly labelX = input<number>();
+  readonly labelY = input<number>();
+  readonly labelStyle = input<CSSProperties>();
+  readonly labelShowBg = input<boolean | undefined>();
+  readonly labelBgStyle = input<CSSProperties>();
+  readonly labelBgPadding = input<[number, number] | undefined>();
+  readonly labelBgBorderRadius = input<number | undefined>();
   readonly sourceHandle = input<Handle | null>(null);
   readonly targetHandle = input<Handle | null>(null);
 
-  readonly edgePath = computed(() => {
-    const [path] = getSimpleBezierPath({
+  private readonly pathData = computed(() => {
+    return getSimpleBezierPath({
       sourceX: this.sourceX(),
       sourceY: this.sourceY(),
       targetX: this.targetX(),
@@ -47,6 +63,10 @@ export class SimpleBezierEdgeComponent {
       sourcePosition: this.sourcePosition(),
       targetPosition: this.targetPosition(),
     });
-    return path;
   });
+
+  readonly edgePath = computed(() => this.pathData()[0]);
+  // Falls back to the computed on-path anchor, like upstream's built-in edges.
+  protected readonly edgeLabelX = computed(() => this.labelX() ?? this.pathData()[1]);
+  protected readonly edgeLabelY = computed(() => this.labelY() ?? this.pathData()[2]);
 }

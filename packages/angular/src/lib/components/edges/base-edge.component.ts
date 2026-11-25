@@ -1,4 +1,6 @@
-import { Component, ChangeDetectionStrategy, input, NO_ERRORS_SCHEMA } from '@angular/core';
+import { Component, ChangeDetectionStrategy, computed, input, NO_ERRORS_SCHEMA } from '@angular/core';
+import type { CSSProperties } from '../../types/general';
+import { EdgeTextComponent } from './edge-text.component';
 
 /**
  * Low-level edge renderer. Draws the SVG path and an invisible wider
@@ -21,6 +23,7 @@ import { Component, ChangeDetectionStrategy, input, NO_ERRORS_SCHEMA } from '@an
 @Component({
   selector: 'ng-flow-base-edge',
   standalone: true,
+  imports: [EdgeTextComponent],
   schemas: [NO_ERRORS_SCHEMA],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { 'style': 'display: contents;' },
@@ -48,6 +51,19 @@ import { Component, ChangeDetectionStrategy, input, NO_ERRORS_SCHEMA } from '@an
         [attr.marker-end]="markerEnd()"
         [attr.style]="style()"
       />
+      @if (showLabel()) {
+        <g
+          ngFlowEdgeText
+          [x]="labelX()!"
+          [y]="labelY()!"
+          [label]="label()"
+          [labelStyle]="labelStyle()"
+          [labelShowBg]="labelShowBg()"
+          [labelBgStyle]="labelBgStyle()"
+          [labelBgPadding]="labelBgPadding()"
+          [labelBgBorderRadius]="labelBgBorderRadius()"
+        />
+      }
     </svg>
   `,
 })
@@ -62,4 +78,22 @@ export class BaseEdgeComponent {
   readonly style = input<string>();
   /** Width of the invisible interaction path used for pointer targeting. Set to `0` to disable. */
   readonly interactionWidth = input<number>(20);
+  /** Label text, drawn at `(labelX, labelY)` like upstream `BaseEdge`. Needs both coordinates. */
+  readonly label = input<string>();
+  /** Flow x of the label centre. */
+  readonly labelX = input<number>();
+  /** Flow y of the label centre. */
+  readonly labelY = input<number>();
+  readonly labelStyle = input<CSSProperties>();
+  /** Defaults to `true`. */
+  readonly labelShowBg = input<boolean | undefined>();
+  readonly labelBgStyle = input<CSSProperties>();
+  /** `[horizontal, vertical]` padding of the label background. Defaults to `[2, 4]`. */
+  readonly labelBgPadding = input<[number, number] | undefined>();
+  /** Defaults to `2`. */
+  readonly labelBgBorderRadius = input<number | undefined>();
+
+  protected readonly showLabel = computed(
+    () => !!this.label() && typeof this.labelX() === 'number' && typeof this.labelY() === 'number',
+  );
 }

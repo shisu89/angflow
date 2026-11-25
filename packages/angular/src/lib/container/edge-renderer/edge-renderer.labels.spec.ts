@@ -8,6 +8,7 @@ import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { EdgeRendererComponent } from './edge-renderer.component';
 import { FlowStore } from '../../services/flow-store.service';
+import { BezierEdgeComponent } from '../../components/edges/bezier-edge.component';
 import type { Edge } from '../../types';
 
 function makeEdge(overrides: Partial<Edge> = {}): Edge {
@@ -101,5 +102,15 @@ describe('EdgeRendererComponent built-in edge labels', () => {
     text.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(store.selectedEdges().map((e) => e.id)).toEqual(['e1']);
+  });
+
+  it('a custom edge type mapped to BezierEdgeComponent renders exactly one label, inside the custom-edge overlay', async () => {
+    fixture.componentRef.setInput('customEdgeTypes', { fancy: BezierEdgeComponent });
+    await render(makeEdge({ type: 'fancy', label: 'custom' }));
+
+    const labels = root.querySelectorAll('.xy-flow__edge-textwrapper');
+    expect(labels).toHaveLength(1);
+    expect(labels[0].closest('.ng-flow__custom-edge')).not.toBeNull();
+    expect(labels[0].textContent?.trim()).toBe('custom');
   });
 });
