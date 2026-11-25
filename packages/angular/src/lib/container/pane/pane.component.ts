@@ -77,17 +77,19 @@ export class PaneComponent implements OnDestroy {
 
     // preventDefault(pointerdown) suppresses the compat mouse events (so d3-zoom's
     // mousedown.zoom never fires alongside a marquee), but it does NOT suppress
-    // touchstart — so d3-zoom's touchstart.zoom would still pan while a touch
-    // marquee runs. This capture-phase touchstart handler kills d3's same-element
-    // touchstart.zoom synchronously (mirroring the old mousedown approach). It
-    // decides independently of pointerdown (via shouldStartSelectionFor) because
-    // the pointerdown/touchstart firing order is not guaranteed across browsers,
-    // and the d3 filter's userSelectionActive is a stale snapshot on the
-    // initiating event so it can't be relied on here. Single-finger only — a
-    // two-finger gesture is a pinch, left to d3.
+    // touchstart, so d3-zoom's touchstart.zoom would still pan while a marquee
+    // runs. This capture-phase touchstart handler kills d3's same-element
+    // touchstart.zoom synchronously, but only when the touch is meant to select
+    // (touchPans() false: selection key held or panOnDrag off). Otherwise a touch
+    // pans, as upstream: mouse-button arrays only restrict mouse input. It decides
+    // independently of pointerdown (via shouldStartSelectionFor) because the
+    // pointerdown/touchstart firing order is not guaranteed across browsers, and
+    // the d3 filter's userSelectionActive is a stale snapshot on the initiating
+    // event. Single-finger only: a two-finger gesture is a pinch, left to d3.
     this.nativeTouchStartHandler = (e: Event) => {
       const touchEv = e as TouchEvent;
       if (touchEv.touches && touchEv.touches.length > 1) return;
+      if (this.touchPans()) return;
       if (this.shouldStartSelectionFor(e.target)) {
         e.stopImmediatePropagation();
         e.preventDefault();
@@ -128,11 +130,21 @@ export class PaneComponent implements OnDestroy {
     return true;
   }
 
+  /**
+   * Mouse-button arrays only restrict mouse input: a touch gesture pans (d3-zoom) unless
+   * the user explicitly activated selection with the selection key, or panning is off.
+   * Upstream Pane onPointerDownCapture.
+   */
+  private touchPans(): boolean {
+    return this.panOnDrag() !== false && !this.store.selectionKeyActive();
+  }
+
   private onPointerDown(event: PointerEvent): void {
     // Only the primary, left button. `isPrimary === false` filters secondary
     // touch points; `=== false` (not `!isPrimary`) so synthetic events without
     // the property still work.
     if (event.button !== 0 || event.isPrimary === false) return;
+    if (event.pointerType === 'touch' && this.touchPans()) return;
     if (!this.shouldStartSelectionFor(event.target)) return;
 
     // Prevent d3-zoom from seeing this event

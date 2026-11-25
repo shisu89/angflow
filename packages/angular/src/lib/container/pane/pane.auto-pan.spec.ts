@@ -339,12 +339,49 @@ describe('PaneComponent box selection auto-pan', () => {
     expect(vi.mocked(store.panBy).mock.lastCall?.[0].x).toBeLessThan(0);
   });
 
-  it.each(['mouse', 'touch', 'pen'])('uses the same box selection path for %s', (pointerType) => {
+  it.each(['mouse', 'pen'])('uses the same box selection path for %s', (pointerType) => {
     startSelectionAt(80, 80, pointerType);
     moveSelectionTo(120, 120, pointerType);
     expect(store.userSelectionActive()).toBe(true);
     endSelectionAt(120, 120, pointerType);
     expect(store.userSelectionActive()).toBe(false);
+  });
+
+  it('uses the box selection path for touch when the selection key is held', () => {
+    store.selectionKeyActive.set(true);
+    startSelectionAt(80, 80, 'touch');
+    moveSelectionTo(120, 120, 'touch');
+    expect(store.userSelectionActive()).toBe(true);
+    endSelectionAt(120, 120, 'touch');
+    expect(store.userSelectionActive()).toBe(false);
+  });
+
+  it('a touch drag does not start a marquee unless the selection key is held', () => {
+    startSelectionAt(80, 80, 'touch');
+    moveSelectionTo(120, 120, 'touch');
+    expect(store.userSelectionActive()).toBe(false);
+  });
+
+  it('a touch drag still starts a marquee when panOnDrag is false', () => {
+    setSignalInput(pane, 'panOnDrag', false);
+    startSelectionAt(80, 80, 'touch');
+    moveSelectionTo(120, 120, 'touch');
+    expect(store.userSelectionActive()).toBe(true);
+  });
+
+  it('the touchstart suppressor lets d3 see the touch', () => {
+    const event = new Event('touchstart', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'touches', { value: [{ identifier: 1 }] });
+    paneElement.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('the touchstart suppressor still blocks d3 when the selection key is held', () => {
+    store.selectionKeyActive.set(true);
+    const event = new Event('touchstart', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'touches', { value: [{ identifier: 1 }] });
+    paneElement.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
   });
 
   it('removes the exact document listeners and emits once on pointerup', () => {

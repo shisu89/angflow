@@ -77,21 +77,6 @@ export const KNOWN_FAILURES: KnownFailure[] = [
     owner: 'B',
   },
 
-  // ── pane.spec.ts ──────────────────────────────────────────────────────────
-  {
-    file: 'pane.spec.ts',
-    titlePath: [
-      'Pane non-default',
-      'pan & zoom',
-      'touch input',
-      'touch drag pans when primary mouse drag is reserved for selection',
-    ],
-    reason:
-      'Touch drag starts a marquee instead of panning with panOnDrag=[1,2] + selectionOnDrag ' +
-      '(deliberate divergence in pane.component.ts; upstream 12.11.3 fix, react appendix row #48).',
-    owner: 'B',
-  },
-
   // ── props.spec.ts ─────────────────────────────────────────────────────────
   {
     file: 'props.spec.ts',
