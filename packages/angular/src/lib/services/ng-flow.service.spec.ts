@@ -998,6 +998,41 @@ describe('groupNodes', () => {
     expect(service.getAbsolutePosition('a')).toEqual({ x: 100, y: 100 });
     expect(service.getAbsolutePosition('b')).toEqual({ x: 300, y: 200 });
   });
+
+  it('resolves members listed before their group (#5915): parent lookup and internal absolutes', async () => {
+    const store = TestBed.inject(FlowStore);
+    service.setNodes([
+      makeNode('a', { position: { x: 100, y: 100 }, width: 50, height: 50 }),
+      makeNode('b', { position: { x: 300, y: 200 }, width: 50, height: 50 }),
+    ]);
+    const before = {
+      a: { ...store.nodeLookup.get('a')!.internals.positionAbsolute },
+      b: { ...store.nodeLookup.get('b')!.internals.positionAbsolute },
+    };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const gid = await service.groupNodes(['a', 'b']);
+    expect(warn).not.toHaveBeenCalled();
+    // the service appends the group after its members
+    const ids = service.getNodes().map((n) => n.id);
+    expect(ids.indexOf(gid)).toBeGreaterThan(ids.indexOf('a'));
+    expect(ids.indexOf(gid)).toBeGreaterThan(ids.indexOf('b'));
+    const children = store.parentLookup.get(gid);
+    expect(children?.has('a')).toBe(true);
+    expect(children?.has('b')).toBe(true);
+    expect(store.nodeLookup.get('a')!.internals.positionAbsolute).toEqual(before.a);
+    expect(store.nodeLookup.get('b')!.internals.positionAbsolute).toEqual(before.b);
+
+    // A later update re-adopts the same members-first order. Moving the group
+    // must carry its members, and they must stay in the group's parent lookup.
+    const g = service.getNode(gid)!;
+    service.updateNode(gid, { position: { x: g.position.x + 1000, y: g.position.y + 500 } });
+    expect(warn).not.toHaveBeenCalled();
+    expect(store.parentLookup.get(gid)?.has('a')).toBe(true);
+    expect(store.parentLookup.get(gid)?.has('b')).toBe(true);
+    expect(store.nodeLookup.get('a')!.internals.positionAbsolute).toEqual({ x: before.a.x + 1000, y: before.a.y + 500 });
+    expect(store.nodeLookup.get('b')!.internals.positionAbsolute).toEqual({ x: before.b.x + 1000, y: before.b.y + 500 });
+    warn.mockRestore();
+  });
 });
 
 describe('setNodeGroup', () => {
