@@ -240,10 +240,12 @@ function viewportsEqual(a: Viewport, b: Viewport): boolean {
       @if (!hideAttribution()) {
         <ng-flow-attribution />
       }
-      <div class="xy-flow__a11y-descriptions" aria-live="assertive" aria-atomic="true"
-           style="position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); border: 0;">
-        {{ store.ariaLiveMessage() }}
-      </div>
+      @if (!disableKeyboardA11y()) {
+        <div [id]="'ng-flow__aria-live-' + store.rfId()" class="ng-flow__aria-live xy-flow__aria-live xy-flow__a11y-descriptions" aria-live="assertive" aria-atomic="true"
+             style="position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); border: 0;">
+          {{ store.ariaLiveMessage() }}
+        </div>
+      }
     </div>
   `,
 })

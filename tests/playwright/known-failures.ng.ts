@@ -68,14 +68,6 @@ export const KNOWN_FAILURES: KnownFailure[] = [
   // ── edges.spec.ts ─────────────────────────────────────────────────────────
 
   // ── nodes.spec.ts ─────────────────────────────────────────────────────────
-  {
-    file: 'nodes.spec.ts',
-    titlePath: ['Nodes', 'keyboard', 'moving a selected node with arrow keys announces its new position'],
-    reason:
-      'No `[id^="ng-flow__aria-live"]` element: the aria-live region has no such id and `ariaLiveMessage` ' +
-      'is never written on arrow-key moves (report §2).',
-    owner: 'B',
-  },
 
   // ── props.spec.ts ─────────────────────────────────────────────────────────
   {

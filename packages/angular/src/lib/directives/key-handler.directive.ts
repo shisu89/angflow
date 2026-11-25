@@ -6,7 +6,15 @@ import {
   OnInit,
   OnDestroy,
 } from '@angular/core';
-import { isInputDOMNode, type NodeChange, type EdgeChange, type KeyCode } from '@angflow/system';
+import {
+  isInputDOMNode,
+  snapPosition,
+  calculateNodePosition,
+  type NodeChange,
+  type EdgeChange,
+  type KeyCode,
+  type XYPosition,
+} from '@angflow/system';
 import { FlowStore } from '../services/flow-store.service';
 import { elementToRemoveChange } from '../utils/changes';
 import type { Node, Edge } from '../types';
@@ -205,32 +213,68 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
     this.store.triggerEdgeChanges(edgeChanges as EdgeChange[]);
   }
 
-  private handleArrowKey(event: KeyboardEvent): void {
-    const selectedNodes = this.store.selectedNodes();
-    if (selectedNodes.length === 0) return;
+  private static readonly arrowDirections: Record<string, XYPosition> = {
+    ArrowUp: { x: 0, y: -1 },
+    ArrowDown: { x: 0, y: 1 },
+    ArrowLeft: { x: -1, y: 0 },
+    ArrowRight: { x: 1, y: 0 },
+  };
 
+  private handleArrowKey(event: KeyboardEvent): void {
+    const direction = KeyHandlerDirective.arrowDirections[event.key];
+    const nodesDraggable = this.store.nodesDraggable();
+    const selected = this.store.selectedNodes().filter((n) => n.draggable ?? nodesDraggable);
+    if (!direction || selected.length === 0) return;
     event.preventDefault();
 
-    const step = this.store.snapToGrid() ? this.store.snapGrid()[0] : 1;
-    let dx = 0, dy = 0;
+    // A node moves 5px per press, the snap grid when snapping; Shift x4 (upstream).
+    const snapToGrid = this.store.snapToGrid();
+    const snapGrid = this.store.snapGrid();
+    const factor = event.shiftKey ? 4 : 1;
+    const dx = direction.x * (snapToGrid ? snapGrid[0] : 5) * factor;
+    const dy = direction.y * (snapToGrid ? snapGrid[1] : 5) * factor;
+    const focusedId = this.focusedNodeId();
+    let focusedAbsolute: XYPosition | undefined;
 
-    switch (event.key) {
-      case 'ArrowUp': dy = -step; break;
-      case 'ArrowDown': dy = step; break;
-      case 'ArrowLeft': dx = -step; break;
-      case 'ArrowRight': dx = step; break;
+    const changes: NodeChange[] = [];
+    for (const node of selected) {
+      const internal = this.store.nodeLookup.get(node.id);
+      if (!internal) continue;
+      let nextPosition = {
+        x: internal.internals.positionAbsolute.x + dx,
+        y: internal.internals.positionAbsolute.y + dy,
+      };
+      if (snapToGrid) nextPosition = snapPosition(nextPosition, snapGrid);
+      const { position, positionAbsolute } = calculateNodePosition({
+        nodeId: node.id,
+        nextPosition,
+        nodeLookup: this.store.nodeLookup,
+        nodeExtent: this.store.nodeExtent(),
+        nodeOrigin: this.store.nodeOrigin(),
+        onError: this.store.onError(),
+      });
+      changes.push({ id: node.id, type: 'position', position, positionAbsolute } as NodeChange);
+      if (node.id === focusedId) focusedAbsolute = positionAbsolute;
     }
+    this.store.triggerNodeChanges(changes);
 
-    const changes = selectedNodes.map((node) => ({
-      id: node.id,
-      type: 'position' as const,
-      position: {
-        x: node.position.x + dx,
-        y: node.position.y + dy,
-      },
-    }));
+    if (focusedAbsolute) {
+      this.store.ariaLiveMessage.set(
+        this.store.ariaLabelConfig()['node.a11yDescription.ariaLiveMessage']({
+          direction: event.key.replace('Arrow', '').toLowerCase(),
+          x: ~~focusedAbsolute.x,
+          y: ~~focusedAbsolute.y,
+        }),
+      );
+    }
+  }
 
-    this.store.triggerNodeChanges(changes as NodeChange[]);
+  /** The node wrapper inside this flow that has focus, if any. */
+  private focusedNodeId(): string | null {
+    const root = this.store.domNode();
+    const active = root?.ownerDocument.activeElement;
+    if (!root || !active || !root.contains(active)) return null;
+    return active.closest('.xy-flow__node')?.getAttribute('data-id') ?? null;
   }
 
   private resetHeldKeys(): void {

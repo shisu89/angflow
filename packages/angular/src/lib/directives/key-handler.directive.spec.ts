@@ -4,7 +4,7 @@
  * Asserts that Ctrl+A (handleSelectAll) respects per-element `selectable`
  * flags and does not add nodes or edges where `selectable === false`.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Component, provideZonelessChangeDetection, ɵSIGNAL } from '@angular/core';
 import { By } from '@angular/platform-browser';
@@ -211,5 +211,93 @@ describe('KeyHandlerDirective select-all', () => {
     directive.onContextMenu();
     expect(store.multiSelectionActive()).toBe(false);
     expect(store.zoomActivationKeyActive()).toBe(false);
+  });
+});
+
+describe('KeyHandlerDirective arrow keys', () => {
+  let store: FlowStore;
+  let directive: KeyHandlerDirective;
+  let root: HTMLDivElement;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [HostComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    store = TestBed.inject(FlowStore);
+    const fixture = TestBed.createComponent(HostComponent);
+    fixture.detectChanges();
+    directive = fixture.debugElement
+      .query(By.directive(KeyHandlerDirective))
+      .injector.get(KeyHandlerDirective);
+    root = document.createElement('div');
+    document.body.appendChild(root);
+    store.domNode.set(root);
+  });
+
+  afterEach(() => {
+    root.remove();
+  });
+
+  const press = (key: string, init: KeyboardEventInit = {}) =>
+    directive.onKeyDown(new KeyboardEvent('keydown', { key, ...init }));
+  const pos = (id: string) => store.nodeLookup.get(id)!.internals.positionAbsolute;
+
+  function focusNode(id: string): void {
+    const el = document.createElement('div');
+    el.className = 'xy-flow__node';
+    el.setAttribute('data-id', id);
+    el.tabIndex = 0;
+    root.appendChild(el);
+    el.focus();
+  }
+
+  it('ArrowRight moves a selected node by 5', () => {
+    store.setNodes([makeNode('n1', { selected: true })]);
+    press('ArrowRight');
+    expect(pos('n1')).toEqual({ x: 5, y: 0 });
+  });
+
+  it('Shift+ArrowRight moves by 20', () => {
+    store.setNodes([makeNode('n1', { selected: true })]);
+    press('ArrowRight', { shiftKey: true });
+    expect(pos('n1')).toEqual({ x: 20, y: 0 });
+  });
+
+  it('moves by the snap grid when snapping, and the result snaps', () => {
+    store.snapToGrid.set(true);
+    store.snapGrid.set([15, 15]);
+    store.setNodes([makeNode('n1', { selected: true, position: { x: 7, y: 0 } })]);
+    press('ArrowRight');
+    expect(pos('n1')).toEqual({ x: 15, y: 0 });
+  });
+
+  it('clamps to nodeExtent', () => {
+    store.nodeExtent.set([[0, 0], [100, 100]]);
+    store.setNodes([makeNode('n1', { selected: true, position: { x: 98, y: 0 } })]);
+    press('ArrowRight');
+    expect(pos('n1').x).toBeLessThanOrEqual(100);
+    expect(pos('n1').x).toBeGreaterThanOrEqual(98);
+  });
+
+  it('does not move a non-draggable selected node', () => {
+    store.setNodes([makeNode('n1', { selected: true, draggable: false })]);
+    press('ArrowRight');
+    expect(pos('n1')).toEqual({ x: 0, y: 0 });
+  });
+
+  it('announces the focused node new position', () => {
+    store.setNodes([makeNode('n1', { selected: true })]);
+    focusNode('n1');
+    press('ArrowRight');
+    expect(store.ariaLiveMessage()).toBe('Moved selected node right. New position, x: 5, y: 0');
+  });
+
+  it('moves without announcing when no node is focused', () => {
+    store.setNodes([makeNode('n1', { selected: true })]);
+    press('ArrowRight');
+    expect(pos('n1')).toEqual({ x: 5, y: 0 });
+    expect(store.ariaLiveMessage()).toBe('');
   });
 });
