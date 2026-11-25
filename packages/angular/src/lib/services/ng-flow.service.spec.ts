@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, onTestFinished } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection, DOCUMENT } from '@angular/core';
 import { FlowStore } from './flow-store.service';
@@ -1010,6 +1010,7 @@ describe('groupNodes', () => {
       b: { ...store.nodeLookup.get('b')!.internals.positionAbsolute },
     };
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    onTestFinished(() => warn.mockRestore());
     const gid = await service.groupNodes(['a', 'b']);
     expect(warn).not.toHaveBeenCalled();
     // the service appends the group after its members
@@ -1031,7 +1032,6 @@ describe('groupNodes', () => {
     expect(store.parentLookup.get(gid)?.has('b')).toBe(true);
     expect(store.nodeLookup.get('a')!.internals.positionAbsolute).toEqual({ x: before.a.x + 1000, y: before.a.y + 500 });
     expect(store.nodeLookup.get('b')!.internals.positionAbsolute).toEqual({ x: before.b.x + 1000, y: before.b.y + 500 });
-    warn.mockRestore();
   });
 });
 

@@ -58,10 +58,22 @@ function mergeObjects<T extends Record<string, unknown>>(base: T, incoming?: Par
   return result;
 }
 
+// Pass stamps for updateAbsolutePositions' nested children, one id -> pass map per node
+// lookup, reused across calls so a drag frame doesn't allocate a visited set.
+const absolutePassStamps = new WeakMap<object, Map<string, number>>();
+let absolutePass = 0;
+
 /**
  * DELIBERATE DIVERGENCE FROM xyflow UPSTREAM (which no longer calls this): parents are
  * resolved before their children, whatever the lookup's insertion order, so a child
  * listed before its parent (#5915) never reads the parent's previous-pass position.
+ *
+ * This runs on every drag frame, so the common case does no bookkeeping: roots are updated
+ * first, then every child of a root. Only a child whose parent is itself a child resolves
+ * its parent chain first, marking visited ids with a pass stamp (also the cycle guard).
+ * `updateChildNode` is idempotent for a resolved parent, so the few chain nodes that get
+ * updated twice in one pass end up the same. Iterating the lookup while `updateChildNode`
+ * replaces entries is safe: `Map.set` on an existing key keeps the iteration order.
  */
 export function updateAbsolutePositions<NodeType extends NodeBase>(
   nodeLookup: NodeLookup<InternalNodeBase<NodeType>>,
@@ -69,35 +81,74 @@ export function updateAbsolutePositions<NodeType extends NodeBase>(
   options?: UpdateNodesOptions<NodeType>
 ) {
   const _options = mergeObjects(defaultOptions, options);
-  const done = new Set<string>();
 
-  const visit = (id: string) => {
-    if (done.has(id)) {
-      return;
-    }
-    // marked before recursing, so a parentId cycle can't loop
-    done.add(id);
-
-    const node = nodeLookup.get(id);
-    if (!node) {
-      return;
-    }
-
-    if (node.parentId) {
-      visit(node.parentId);
-      // read the entry again rather than reusing `node`: updateChildNode replaces entries
-      updateChildNode(nodeLookup.get(id)!, nodeLookup, parentLookup, _options);
-    } else {
+  for (const node of nodeLookup.values()) {
+    if (!node.parentId) {
       const positionWithOrigin = getNodePositionWithOrigin(node, _options.nodeOrigin);
       const extent = isCoordinateExtent(node.extent) ? node.extent : _options.nodeExtent;
       const clampedPosition = clampPosition(positionWithOrigin, extent, getNodeDimensions(node));
       node.internals.positionAbsolute = clampedPosition;
     }
-  };
-
-  for (const id of [...nodeLookup.keys()]) {
-    visit(id);
   }
+
+  let stamps: Map<string, number> | undefined;
+  let pass = 0;
+
+  for (const node of nodeLookup.values()) {
+    if (!node.parentId) {
+      continue;
+    }
+    const parent = nodeLookup.get(node.parentId);
+    // A missing parent is skipped silently: adoptUserNodes already warned once, and this
+    // runs on every drag frame.
+    if (!parent) {
+      continue;
+    }
+    if (parent.parentId) {
+      if (!stamps) {
+        stamps = absolutePassStamps.get(nodeLookup);
+        // drop stamps of removed ids once they outnumber the live ones
+        if (!stamps || stamps.size > nodeLookup.size * 2) {
+          stamps = new Map();
+          absolutePassStamps.set(nodeLookup, stamps);
+        }
+        pass = ++absolutePass;
+      }
+      if (stamps.get(node.id) === pass) {
+        continue;
+      }
+      stamps.set(node.id, pass);
+      resolveNestedParent(parent.id, nodeLookup, parentLookup, _options, stamps, pass);
+    }
+    // `node` is the current entry: Map iteration yields the value at the time it is reached,
+    // and resolving the parent chain replaces only ancestors' entries
+    updateChildNode(node, nodeLookup, parentLookup, _options);
+  }
+}
+
+/** Updates a child that is itself a parent, after its own parent chain. */
+function resolveNestedParent<NodeType extends NodeBase>(
+  id: string,
+  nodeLookup: NodeLookup<InternalNodeBase<NodeType>>,
+  parentLookup: ParentLookup<InternalNodeBase<NodeType>>,
+  options: typeof defaultOptions,
+  stamps: Map<string, number>,
+  pass: number
+) {
+  if (stamps.get(id) === pass) {
+    return;
+  }
+  // stamped before recursing, so a parentId cycle can't loop
+  stamps.set(id, pass);
+
+  const parent = nodeLookup.get(nodeLookup.get(id)!.parentId!);
+  if (!parent) {
+    return;
+  }
+  if (parent.parentId) {
+    resolveNestedParent(parent.id, nodeLookup, parentLookup, options, stamps, pass);
+  }
+  updateChildNode(nodeLookup.get(id)!, nodeLookup, parentLookup, options);
 }
 
 function parseHandles(userNode: NodeBase, internalNode?: InternalNodeBase): NodeHandleBounds | undefined {

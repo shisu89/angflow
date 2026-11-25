@@ -98,4 +98,43 @@ describe('subflow order (#5915)', () => {
     expect(nodeLookup.get('g')!.internals.positionAbsolute).toEqual({ x: 500, y: 500 });
     expect(nodeLookup.get('c')!.internals.positionAbsolute).toEqual({ x: 510, y: 520 });
   });
+
+  it('updateAbsolutePositions resolves three generations listed grandchild, child, group', () => {
+    const { nodeLookup, parentLookup } = lookups();
+    adoptUserNodes(
+      [
+        node('gc', { parentId: 'c', position: { x: 1, y: 2 } }),
+        node('c', { parentId: 'g', position: { x: 10, y: 20 } }),
+        node('g', { position: { x: 100, y: 200 }, width: 300, height: 300 }),
+      ],
+      nodeLookup,
+      parentLookup
+    );
+    nodeLookup.get('g')!.position = { x: 500, y: 500 };
+    updateAbsolutePositions(nodeLookup, parentLookup);
+    expect(nodeLookup.get('c')!.internals.positionAbsolute).toEqual({ x: 510, y: 520 });
+    expect(nodeLookup.get('gc')!.internals.positionAbsolute).toEqual({ x: 511, y: 522 });
+  });
+
+  it('updateAbsolutePositions terminates on a parentId cycle', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { nodeLookup, parentLookup } = lookups();
+    adoptUserNodes(
+      [node('a', { parentId: 'b' }), node('b', { parentId: 'a' }), node('r', { position: { x: 5, y: 5 } })],
+      nodeLookup,
+      parentLookup
+    );
+    updateAbsolutePositions(nodeLookup, parentLookup);
+    expect(nodeLookup.get('r')!.internals.positionAbsolute).toEqual({ x: 5, y: 5 });
+  });
+
+  it('updateAbsolutePositions does not warn again for an orphan child', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { nodeLookup, parentLookup } = lookups();
+    adoptUserNodes([node('c', { parentId: 'g', position: { x: 10, y: 20 } })], nodeLookup, parentLookup);
+    expect(warn).toHaveBeenCalledTimes(1);
+    updateAbsolutePositions(nodeLookup, parentLookup);
+    updateAbsolutePositions(nodeLookup, parentLookup);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
 });
