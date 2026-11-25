@@ -69,15 +69,25 @@
 .xy-flow__pane {
   z-index: 1;
 
-  &.draggable {
+  /* Keep cursor changes off the pane so they aren't inherited by the entire flow.
+   * A pseudo-element still targets the pane for pointer and mouse events. */
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  &.draggable::before {
     cursor: grab;
   }
 
-  &.dragging {
+  &.dragging::before {
     cursor: grabbing;
   }
 
-  &.selection {
+  /* selection uses pointer capture on the pane, so the cursor has to be on the pane itself */
+  &.selection,
+  &.selection::before {
     cursor: pointer;
   }
 }
