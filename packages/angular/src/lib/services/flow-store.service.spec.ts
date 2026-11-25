@@ -761,9 +761,10 @@ describe('FlowStore', () => {
       expect(updateConnectionSpy).toHaveBeenCalled();
       const updatedConnection = updateConnectionSpy.mock.calls[0][0];
       // Verify the connection.from was recomputed (it should reflect the handle position on the moved node)
-      expect(updatedConnection.from).toBeDefined();
-      expect(typeof updatedConnection.from.x).toBe('number');
-      expect(typeof updatedConnection.from.y).toBe('number');
+      expect(updatedConnection.from).not.toEqual({ x: 0, y: 0 });
+      // The handle centre (10x10 at 0,0), not the seeded `from`. Like upstream, the follow reads
+      // nodeLookup before this call applies the move.
+      expect(updatedConnection.from).toEqual({ x: 5, y: 5 });
     });
   });
 

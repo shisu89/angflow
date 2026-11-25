@@ -126,25 +126,25 @@ export class HandleComponent implements OnDestroy {
    * which left disabled handles interactive.
    */
   readonly showConnectionIndicator = computed(() => {
-    const conn = this.store.connection();
+    const conn = this.store.rawConnection();
     return this.effectiveConnectable() && (conn.inProgress ? this.effectiveConnectableEnd() : this.effectiveConnectableStart());
   });
 
   // Per-handle connection feedback classes (shipped CSS targets these).
   readonly connectingFrom = computed(() => {
-    const conn = this.store.connection();
+    const conn = this.store.rawConnection();
     if (!conn.inProgress) return false;
     const f = conn.fromHandle;
     return f.nodeId === this.nodeId && (f.id ?? null) === this.handleId() && f.type === this.type();
   });
   readonly connectingTo = computed(() => {
-    const conn = this.store.connection();
+    const conn = this.store.rawConnection();
     if (!conn.inProgress || !conn.toHandle) return false;
     const t = conn.toHandle;
     return t.nodeId === this.nodeId && (t.id ?? null) === this.handleId() && t.type === this.type();
   });
   readonly connectionValid = computed(() => {
-    const conn = this.store.connection();
+    const conn = this.store.rawConnection();
     return this.connectingTo() && conn.inProgress && conn.isValid === true;
   });
 

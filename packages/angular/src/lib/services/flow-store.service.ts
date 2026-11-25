@@ -198,7 +198,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       this.userSelectionActive() ||
       this.nodeDragging() ||
       this.nodeResizing() ||
-      this.connection().inProgress
+      this.rawConnection().inProgress
   );
 
   /**
