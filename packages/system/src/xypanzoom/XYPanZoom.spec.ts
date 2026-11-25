@@ -90,19 +90,19 @@ describe('XYPanZoom selection lifecycle', () => {
 });
 
 describe('createFilter middle-click pan', () => {
-  function middleClickOnNode() {
+  // The element carries `nopan`, so the middle-button branch is the ONLY path that
+  // can return true (the nopan check rejects everything after it).
+  function middleClickOn(className: string) {
     const node = document.createElement('div');
-    node.className = 'ng-flow__node';
+    node.className = className;
     return { type: 'mousedown', button: 1, target: node, composedPath: () => [node] };
   }
 
-  function filterFor(userSelectionActive: boolean) {
+  function filterFor(userSelectionActive: boolean, panOnDrag: boolean | number[]) {
     return createFilter({
       zoomOnScroll: true,
       zoomOnPinch: true,
-      // Left-button only, so the middle-click-on-node branch is the ONLY thing
-      // that can return true here — every later check rejects button 1.
-      panOnDrag: [0],
+      panOnDrag,
       panOnScroll: false,
       zoomOnDoubleClick: true,
       userSelectionActive,
@@ -112,15 +112,31 @@ describe('createFilter middle-click pan', () => {
     });
   }
 
-  it('allows a middle-click pan that starts on a node', () => {
-    expect(filterFor(false)(middleClickOnNode())).toBe(true);
+  it('allows a middle-click pan that starts on a node when panOnDrag includes button 1', () => {
+    expect(filterFor(false, [0, 1])(middleClickOn('ng-flow__node nopan'))).toBe(true);
+  });
+
+  it('blocks it on a node when panOnDrag excludes button 1 (#6119)', () => {
+    expect(filterFor(false, [0])(middleClickOn('ng-flow__node nopan'))).toBe(false);
   });
 
   it('blocks it while a box selection is active', () => {
     // Regression guard for the branch that returns true ahead of the blanket
     // userSelectionActive check — mousedown.zoom is no longer torn down during a
     // selection, so the filter is the only thing stopping a competing d3 pan.
-    expect(filterFor(true)(middleClickOnNode())).toBe(false);
+    expect(filterFor(true, [0, 1])(middleClickOn('ng-flow__node nopan'))).toBe(false);
+  });
+
+  it('allows it from the nodes selection (#5902)', () => {
+    expect(filterFor(false, true)(middleClickOn('ng-flow__nodesselection nopan'))).toBe(true);
+  });
+
+  it('allows it from the selection rect class (#5902)', () => {
+    expect(filterFor(false, true)(middleClickOn('ng-flow__selection nopan'))).toBe(true);
+  });
+
+  it('blocks it from the nodes selection when panOnDrag is false (#6119)', () => {
+    expect(filterFor(false, false)(middleClickOn('ng-flow__nodesselection nopan'))).toBe(false);
   });
 });
 

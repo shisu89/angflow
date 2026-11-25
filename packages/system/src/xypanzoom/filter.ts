@@ -35,18 +35,28 @@ export function createFilter({
     const pinchZoom = zoomOnPinch && event.ctrlKey;
     const isWheelEvent = event.type === 'wheel';
 
+    const middleMousePanAllowed = panOnDrag === true || (Array.isArray(panOnDrag) && panOnDrag.includes(1));
+
     /*
-     * Middle-click on a node/edge pans instead of being swallowed by the element.
+     * Nodes, edges and selections are marked nopan, but a middle-button drag on them still
+     * pans as long as panOnDrag allows button 1.
      * `!userSelectionActive` is load-bearing: this is the one branch that returns
      * true before the blanket selection check below, and since XYPanZoom.update()
      * no longer tears down mousedown.zoom during a selection (see the note there),
      * without it a middle-press mid-marquee would start a competing d3 pan.
      */
     if (
+      middleMousePanAllowed &&
       event.button === 1 &&
       event.type === 'mousedown' &&
       !userSelectionActive &&
-      (isWrappedWithClass(event, `${lib}-flow__node`) || isWrappedWithClass(event, `${lib}-flow__edge`))
+      (isWrappedWithClass(event, `${lib}-flow__node`) ||
+        isWrappedWithClass(event, `${lib}-flow__edge`) ||
+        // Unreachable for the user-selection rect under angflow's !userSelectionActive guard:
+        // that rect only exists while a marquee runs. Kept for upstream parity. It still
+        // matches the nodes-selection box, which carries both __selection and __nodesselection.
+        isWrappedWithClass(event, `${lib}-flow__selection`) ||
+        isWrappedWithClass(event, `${lib}-flow__nodesselection`))
     ) {
       return true;
     }
