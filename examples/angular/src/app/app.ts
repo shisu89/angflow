@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map, startWith } from 'rxjs/operators';
@@ -24,6 +24,8 @@ export class App {
     ),
     { initialValue: 'overview' },
   );
+
+  protected readonly showHeader = computed(() => !this.currentPath().startsWith('tests/'));
 
   protected onChange(event: Event): void {
     const value = (event.target as HTMLSelectElement).value;

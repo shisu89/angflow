@@ -48,6 +48,7 @@ import { LayoutingExampleComponent } from './examples/layouting/layouting.compon
 import { StressExampleComponent } from './examples/stress/stress.component';
 import { AgentBridgeExampleComponent } from './examples/agent-bridge/agent-bridge.component';
 import { AgentChatExampleComponent } from './examples/agent-chat/agent-chat.component';
+import { GenericTestHostComponent } from './generic-tests/generic-test-host.component';
 import { KitchenSinkComponent } from './kitchen-sink/kitchen-sink.component';
 
 export interface HarnessRoute {
@@ -112,4 +113,5 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'overview' },
   ...HARNESS_ROUTES.map((r) => ({ path: r.path, component: r.component as never })),
+  { path: 'tests/generic', children: [{ path: '**', component: GenericTestHostComponent }] },
 ];

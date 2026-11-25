@@ -1,3 +1,4 @@
+@if (showHeader()) {
 <header class="harness-header">
   <strong>angflow dev harness</strong>
   <select [value]="currentPath()" (change)="onChange($event)" aria-label="Select an example">
@@ -6,4 +7,5 @@
     }
   </select>
 </header>
+}
 <router-outlet />
