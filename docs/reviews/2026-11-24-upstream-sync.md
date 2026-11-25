@@ -101,3 +101,30 @@ measurement-race, nodes-data-hooks, reconnect-edge, viewport).
 **Decisions (2026-11-24):** order A→B→C→D→E→F. For breaking changes, match upstream fully rather
 than deprecate-and-alias. UI components ship as a separate `@angflow/ui` package. Upstream triage
 runs monthly on a schedule.
+
+### A — first-run findings
+
+First full run of upstream's `tests/playwright` suite against `examples/angular` (2026-11-25,
+chromium, Playwright 1.65.1): **85 tests, 52 passed, 6 skipped by the specs themselves**
+(React-only hook/measurement specs, the React selection-rectangle drag test and the Vue-only
+`fitView` test), **27 failed**. All 27 are listed in `tests/playwright/known-failures.ng.ts` and
+were stable across `--repeat-each=3`. None was caused by the generic host, the overrides or the
+example pages.
+
+| Owner | Entries | What |
+|---|---|---|
+| B | 25 | 14 hit rows already in §1/§2: #6064 ×7, #5922, #6055 ×2, the arrow-key announcement, `elevateEdgesOnSelect`, pane click cancelling click-to-connect without `onClickConnectEnd` ×2. 1 is the touch pan-vs-marquee divergence (react appendix row #48). The other 10 trace to 5 new bugs (below). |
+| C | 0 | |
+| D | 2 | `forceColorMode` and the page-theme colour model (`props.spec` colorMode) |
+| E | 0 | |
+| flaky-upstream / wontfix | 0 | The 4 former in-spec Angular skips were re-checked: node-toolbar positioning and pane panning now pass; edges `deletable=false` and `interactionWidth` are real bugs (edge-label row below), not hit-test fragility |
+
+**New bugs not yet in §1/§2** (all owner B):
+
+| Bug | Where | Failing tests |
+|---|---|---|
+| HTML edge labels are rendered as `.xy-flow__edge-label[data-id]` siblings outside the edge `<g>`. They duplicate the edge's `data-id`, and with `pointer-events: all` they cover the edge centre without selecting the edge (upstream renders the label inside the edge). | `edge-renderer.component.ts:294-308` | `edges.spec` animated, selectable=false, deletable=false, aria-label, interactionWidth |
+| Background pattern ids ignore the flow id: `id` is used verbatim (upstream `pattern-<flowId><id>`), so several flows on one page share `#0` and every flow paints the first one's pattern. No half-gap `patternTransform` either. | `background.component.ts:121` | `background.spec` (both) |
+| The click synthesised after a marquee drag cancels a pending click-to-connect: `onPaneClick` clears `connectionClickStartHandle` before its `selectionInProgress` guard. | `ng-flow.component.ts` `onPaneClick` | `click-connect.spec` dragging a selection does not cancel a pending click connection |
+| The default connection line's `<g>` lacks the `ng-flow__connection` class and the valid/invalid status classes. | `connection-line.component.ts:27` | `click-connect.spec` dropping a dragged connection on the pane does not fire pane click |
+| The pane's `selection` class tracks only an active marquee (`userSelectionActive`), not upstream's `isSelecting` (selection key held or `selectionOnDrag`). | `pane.component.ts:22` | `pane.spec` selection key keeps touch drag in selection mode |
