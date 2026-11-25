@@ -1109,7 +1109,49 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
   // ── Reset ─────────────────────────────────────────────────────────────
 
+  /**
+   * Clears everything a mounted <ng-flow> wired into this store (output callbacks,
+   * DOM node, size, panZoom, connection/interaction state), keeping the graph and
+   * configuration. Called when a flow unmounts, so a provider-shared store holds no
+   * reference to the destroyed component (e.g. emitting into a destroyed OutputRef).
+   */
+  detachFlow(): void {
+    this.onNodesChange = null;
+    this.onEdgesChange = null;
+    this.onConnect = null;
+    this.onConnectStart = null;
+    this.onConnectEnd = null;
+    this.onClickConnectStart = null;
+    this.onClickConnectEnd = null;
+    this.onBeforeDelete = null;
+    this.onNodeDragStart = null;
+    this.onNodeDrag = null;
+    this.onNodeDragStop = null;
+    this.onSelectionDragStart = null;
+    this.onSelectionDrag = null;
+    this.onSelectionDragStop = null;
+    this.onNodesDelete = null;
+    this.onEdgesDelete = null;
+    this.onDelete = null;
+    this.domNode.set(null);
+    this.width.set(0);
+    this.height.set(0);
+    this.panZoom.set(null);
+    this.cancelConnection();
+    this.connectionClickStartHandle.set(null);
+    this.paneDragging.set(false);
+    this.userSelectionActive.set(false);
+    this.userSelectionRect.set(null);
+    this.selectionInProgress.set(false);
+    this.nodesSelectionActive.set(false);
+    this.multiSelectionActive.set(false);
+    this.selectionKeyActive.set(false);
+    this.panActivationKeyActive.set(false);
+    this.zoomActivationKeyActive.set(false);
+  }
+
   reset(): void {
+    this.detachFlow();
     this.nodeLookup.clear();
     this.parentLookup.clear();
     this.edgeLookup.clear();
@@ -1119,15 +1161,6 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     this.edges.set([]);
     this.transform.set([0, 0, 1]);
     this.nodesInitialized.set(false);
-    this.connection.set({ ...initialConnection });
-    this.paneDragging.set(false);
-    this.nodesSelectionActive.set(false);
-    this.userSelectionActive.set(false);
-    this.userSelectionRect.set(null);
-    this.multiSelectionActive.set(false);
-    this.selectionKeyActive.set(false);
-    this.panActivationKeyActive.set(false);
-    this.zoomActivationKeyActive.set(false);
     this.fitViewQueued.set(false);
     this._handleData.set(new Map());
   }

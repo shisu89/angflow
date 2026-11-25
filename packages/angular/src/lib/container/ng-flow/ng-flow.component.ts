@@ -1058,14 +1058,14 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   ngOnDestroy(): void {
     this.resizeObserver?.disconnect();
     this.panZoomInstance?.destroy();
-    // panZoom is cleared for both branches (fresh-store and provider-reuse):
-    // the XYPanZoom instance is owned by this component and is destroyed above,
-    // so whatever store is in use must no longer reference it.
+    // detachFlow() runs for both branches (fresh-store and provider-reuse): the
+    // XYPanZoom instance, DOM node, size and output callbacks all belong to this
+    // component, so whatever store is in use must no longer reference them.
     // Graph state (nodes/edges/etc.) is reset only when this component owns the
     // store (fresh branch) — that is handled via the factory's DestroyRef
     // callback above. An enclosing provider's store keeps its graph state across
-    // inner <ng-flow> unmounts, matching ReactFlow's provider semantics.
-    this.store.panZoom.set(null);
+    // inner <ng-flow> unmounts.
+    this.store.detachFlow();
     if (this.colorSchemeQuery && this.colorSchemeHandler) {
       this.colorSchemeQuery.removeEventListener('change', this.colorSchemeHandler);
     }

@@ -7,6 +7,7 @@ import { NgFlowComponent } from '../../container/ng-flow/ng-flow.component';
 import { FlowStore } from '../../services/flow-store.service';
 import { NgFlowService } from '../../services/ng-flow.service';
 import type { Node } from '../../types';
+import { initialConnection } from '@angflow/system';
 
 @Component({ selector: 'test-sidebar', standalone: true, template: '' })
 class SidebarComponent {
@@ -130,5 +131,56 @@ describe('NgFlowProviderComponent state sharing', () => {
 
     expect(store.nodes().map((n) => n.id)).toEqual(['n1']); // state survives inner unmount
     expect(store.panZoom()).toBeNull(); // but the dead panZoom was cleared
+  });
+
+  it('unmounting the inner <ng-flow> clears that flow\'s wiring from the shared store', () => {
+    @Component({
+      standalone: true,
+      imports: [NgFlowProviderComponent, NgFlowComponent],
+      template: `
+        <ng-flow-provider>
+          @if (showFlow()) {
+            <ng-flow />
+          }
+        </ng-flow-provider>
+      `,
+    })
+    class ToggleHostComponent {
+      readonly showFlow = signal(true);
+    }
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [ToggleHostComponent],
+      providers: [provideZonelessChangeDetection()],
+    });
+    const fixture = TestBed.createComponent(ToggleHostComponent);
+    fixture.detectChanges();
+
+    const providerInjector = fixture.debugElement.query(By.directive(NgFlowProviderComponent)).injector;
+    const store = providerInjector.get(FlowStore);
+    store.setNodes([{ id: 'n1', position: { x: 0, y: 0 }, data: {} } as Node]);
+    fixture.detectChanges();
+    expect(store.onNodesChange).toBeTruthy(); // wired while mounted
+
+    fixture.componentInstance.showFlow.set(false);
+    fixture.detectChanges();
+
+    for (const key of [
+      'onNodesChange', 'onEdgesChange', 'onConnect', 'onConnectStart', 'onConnectEnd',
+      'onClickConnectStart', 'onClickConnectEnd', 'onNodeDragStart', 'onNodeDrag', 'onNodeDragStop',
+      'onSelectionDragStart', 'onSelectionDrag', 'onSelectionDragStop',
+      'onNodesDelete', 'onEdgesDelete', 'onDelete', 'onBeforeDelete',
+    ] as const) {
+      expect(store[key], key).toBeNull();
+    }
+    expect(store.domNode()).toBeNull();
+    expect(store.width()).toBe(0);
+    expect(store.height()).toBe(0);
+    expect(store.connection()).toEqual(initialConnection);
+    expect(() =>
+      store.triggerNodeChanges([{ id: 'n1', type: 'select', selected: true }])
+    ).not.toThrow();
+    expect(store.nodes().map((n) => n.id)).toEqual(['n1']); // graph kept
   });
 });

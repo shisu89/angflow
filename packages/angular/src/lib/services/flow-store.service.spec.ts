@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { computed } from '@angular/core';
-import type { NodeChange } from '@angflow/system';
+import type { NodeChange, ConnectionState } from '@angflow/system';
 import { FlowStore } from './flow-store.service';
 import { getCollapsedHiddenIds } from '../graph/collapse';
 import type { Node, Edge } from '../types';
-import { Position, getViewportForBounds, type Handle } from '@angflow/system';
+import { Position, initialConnection, getViewportForBounds, type Handle } from '@angflow/system';
 
 vi.mock('../graph/collapse', { spy: true });
 
@@ -41,6 +41,30 @@ describe('FlowStore', () => {
     // Configuration is retained across graph reset, matching the other
     // auto-pan options; the NgFlow input remains its source of truth.
     expect(store.autoPanOnSelection()).toBe(false);
+  });
+
+  it('reset() also clears per-flow wiring (callbacks, dom node, size, connection state)', () => {
+    store.onNodesChange = () => {};
+    store.onConnect = () => {};
+    store.onDelete = () => {};
+    store.domNode.set(document.createElement('div'));
+    store.width.set(100);
+    store.height.set(50);
+    store.connection.set({ ...initialConnection, inProgress: true } as unknown as ConnectionState);
+    store.connectionClickStartHandle.set({ nodeId: 'a', handleId: null, type: 'source' });
+    store.selectionInProgress.set(true);
+
+    store.reset();
+
+    expect(store.onNodesChange).toBeNull();
+    expect(store.onConnect).toBeNull();
+    expect(store.onDelete).toBeNull();
+    expect(store.domNode()).toBeNull();
+    expect(store.width()).toBe(0);
+    expect(store.height()).toBe(0);
+    expect(store.connection()).toEqual(initialConnection);
+    expect(store.connectionClickStartHandle()).toBeNull();
+    expect(store.selectionInProgress()).toBe(false);
   });
 
   // ── setNodes: lookup population & internals ───────────────────────────
