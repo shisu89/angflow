@@ -175,7 +175,7 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
    * deselect / (paneClick) still fire. React parity: selectionInProgress is set
    * in onPointerMove, not unconditionally on pointerup.
    */
-  it('PaneComponent sets selectionInProgress on first move, not on a zero-move click', () => {
+  it('PaneComponent sets selectionInProgress on the move that passes paneDragThreshold', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [PaneComponent],
@@ -196,11 +196,10 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
     // Simulate an in-progress marquee.
     (paneInst as any).marqueeActive = true;
     (paneInst as any).activePointerId = 1;
-    (paneInst as any).startX = 100;
-    (paneInst as any).startY = 100;
+    (paneInst as any).selectionOrigin = { x: 100, y: 100 };
     expect(store.selectionInProgress()).toBe(false);
 
-    // A pointer move (even selecting nothing) marks the marquee in progress.
+    // A move past paneDragThreshold (even selecting nothing) marks the marquee in progress.
     (paneInst as any).onPointerMove({ clientX: 150, clientY: 150, pointerId: 1 } as PointerEvent);
     expect(store.selectionInProgress()).toBe(true);
   });
@@ -420,7 +419,7 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
       inst.onPaneClick(makePaneClick(100, 100));
       expect(paneClickSpy).not.toHaveBeenCalled();
       expect((inst as any).connectionEndedOnPane).toBe(false);
-      inst.onPanePointerDown({ clientX: 200, clientY: 200 } as PointerEvent);
+      inst.onPanePointerDown();
       inst.onPaneClick(makePaneClick(200, 200));
       expect(paneClickSpy).toHaveBeenCalledTimes(1);
     });
@@ -428,7 +427,7 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
     it('onPaneClick measures no distance: a click that arrives is a pane click (d3-zoom suppresses post-pan clicks)', () => {
       const { inst, paneClickSpy } = setup();
       inst.fixtureRef.setInput('paneDragThreshold', 5);
-      inst.onPanePointerDown({ clientX: 0, clientY: 0 } as PointerEvent);
+      inst.onPanePointerDown();
       inst.onPaneClick(makePaneClick(100, 100));
       expect(paneClickSpy).toHaveBeenCalledTimes(1);
     });
@@ -449,7 +448,7 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
       store.selectionInProgress.set(true);
       expect((inst as any).connectionEndedOnPane).toBe(true);
 
-      inst.onPanePointerDown({ clientX: 10, clientY: 10 } as PointerEvent);
+      inst.onPanePointerDown();
 
       expect((inst as any).connectionEndedOnPane).toBe(false);
       expect(store.selectionInProgress()).toBe(false);

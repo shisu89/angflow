@@ -2,6 +2,7 @@ import { Component, ChangeDetectionStrategy, computed, input, output, inject, On
 import {
   calcAutoPan,
   getNodesInside,
+  isLeftClickPan,
   pointToRendererPoint,
   rendererPointToPoint,
   SelectionMode,
@@ -9,9 +10,6 @@ import {
   type XYPosition,
 } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
-
-/** Upstream FlowRenderer isLeftClickPan: the primary button pans. */
-const isLeftClickPan = (panOnDrag: boolean | number[]) => panOnDrag === true || (Array.isArray(panOnDrag) && panOnDrag.includes(0));
 
 @Component({
   selector: 'ng-flow-pane',
@@ -33,10 +31,7 @@ export class PaneComponent implements OnDestroy {
 
   readonly panOnDrag = input<boolean | number[]>(true);
   /** Upstream: draggable only for `true` or an array including the primary button (0). */
-  readonly draggable = computed(() => {
-    const p = this.panOnDrag();
-    return p === true || (Array.isArray(p) && p.includes(0));
-  });
+  readonly draggable = computed(() => isLeftClickPan(this.panOnDrag()));
   readonly selectionOnDrag = input(false);
   readonly selectionKeyCode = input<KeyCode | null>(null);
   readonly selectionMode = input<SelectionMode>(SelectionMode.Full);
@@ -176,17 +171,10 @@ export class PaneComponent implements OnDestroy {
       // setPointerCapture can throw if the pointer is already gone; ignore.
     }
 
+    // The rect, (selectionStart) and selectionInProgress wait for onPointerMove to
+    // pass paneDragThreshold. userSelectionActive is set now: the box-select
+    // guards depend on it from the press on.
     this.store.userSelectionActive.set(true);
-    this.store.userSelectionRect.set({
-      x: this.pointerPosition.x,
-      y: this.pointerPosition.y,
-      width: 0,
-      height: 0,
-      startX: this.pointerPosition.x,
-      startY: this.pointerPosition.y,
-    });
-
-    this.selectionStart.emit(event);
 
     this.boundOnPointerMove = (e: PointerEvent) => this.onPointerMove(e);
     this.boundOnPointerUp = (e: PointerEvent) => this.onPointerUp(e);
@@ -201,15 +189,6 @@ export class PaneComponent implements OnDestroy {
     if (!this.marqueeActive) return;
     if (this.activePointerId !== null && event.pointerId !== this.activePointerId) return;
 
-    // First actual movement marks the selection in progress. Doing this on move
-    // (not unconditionally on pointerup) means a zero-movement click is NOT
-    // treated as a marquee, so click-to-deselect and (paneClick) fire on the
-    // first click with selectionOnDrag. React parity (set in onPointerMove).
-    if (!this.moved) {
-      this.moved = true;
-      this.store.selectionInProgress.set(true);
-    }
-
     const containerEl = this.store.domNode();
     if (!containerEl) return;
 
@@ -218,6 +197,19 @@ export class PaneComponent implements OnDestroy {
       x: event.clientX - bounds.left,
       y: event.clientY - bounds.top,
     };
+
+    // Upstream Pane onPointerMove: the marquee starts only once the pointer passes
+    // paneDragThreshold (0 while the selection key is held). Below it, the press is a click.
+    if (!this.moved) {
+      if (!this.selectionOrigin) return;
+      const start = rendererPointToPoint(this.selectionOrigin, this.store.transform());
+      const required = this.store.selectionKeyActive() ? 0 : this.store.paneDragThreshold();
+      if (Math.hypot(this.pointerPosition.x - start.x, this.pointerPosition.y - start.y) <= required) return;
+      this.moved = true;
+      this.store.selectionInProgress.set(true);
+      this.selectionStart.emit(event);
+    }
+
     this.updateSelectionFromPointer();
     this.scheduleAutoPan();
   }
@@ -345,23 +337,24 @@ export class PaneComponent implements OnDestroy {
     this.pointerPosition = null;
     this.store.userSelectionActive.set(false);
     this.store.userSelectionRect.set(null);
-    // selectionInProgress (set in onPointerMove on the first real movement)
+    // selectionInProgress (set in onPointerMove once the pointer passes paneDragThreshold)
     // exists to make the marquee absorb the synthesised `click` that a mouse
     // gesture fires afterwards. A moved TOUCH/pen gesture fires NO click, so the
     // flag would otherwise stay stuck and swallow the next genuine pane tap —
     // clear it here for those pointer types. For mouse, leave it for onPaneClick
-    // to consume. (A zero-movement gesture never set the flag.)
+    // to consume. (A press that never crossed the threshold never set the flag.)
     if (moved && (!event || event.type === 'pointercancel' || event.pointerType !== 'mouse')) {
       this.store.selectionInProgress.set(false);
     }
-    // Mark nodes selection active only after a marquee that moved and selected nodes.
-    // A zero-move gesture is a plain pane click: activating the nodes selection here
+    // Mark nodes selection active only after a marquee that started and selected nodes.
+    // A press that never passed paneDragThreshold is a plain pane click: activating the nodes selection here
     // would make onPaneClick consume it instead of firing (paneClick). Upstream Pane
     // onPointerUp sets nodesSelectionActive only inside `if (selectionInProgress)`.
     if (moved && this.store.selectedNodes().length > 0) {
       this.store.nodesSelectionActive.set(true);
     }
-    if (event && emitEnd) this.selectionEnd.emit(event);
+    // (selectionEnd) pairs with (selectionStart): only a marquee that started emits it.
+    if (event && emitEnd && moved) this.selectionEnd.emit(event);
   }
 
   ngOnDestroy(): void {

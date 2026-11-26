@@ -195,7 +195,7 @@ function viewportsEqual(a: Viewport, b: Viewport): boolean {
         [selectionMode]="selectionMode()"
         [autoPanOnSelection]="autoPanOnSelection()"
         [autoPanSpeed]="autoPanSpeed()"
-        (pointerdown)="onPanePointerDown($event)"
+        (pointerdown)="onPanePointerDown()"
         (pointerup)="onPanePointerUp($event)"
         (click)="onPaneClick($event)"
         (contextmenu)="onPaneContextMenu($event)"
@@ -1075,7 +1075,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     }
   }
 
-  onPanePointerDown(_event: PointerEvent): void {
+  onPanePointerDown(): void {
     // A new gesture starts: drop swallow flags whose click never arrived, so
     // they can't eat this gesture's click.
     this.connectionEndedOnPane = false;

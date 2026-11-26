@@ -16,6 +16,7 @@ import { FloatingEdgesExampleComponent } from './examples/floating-edges/floatin
 import { FloatingTidyExampleComponent } from './examples/floating-tidy/floating-tidy.component';
 import { CardinalEdgesExampleComponent } from './examples/cardinal-edges/cardinal-edges.component';
 import { ClickDistanceExampleComponent } from './examples/click-distance/click-distance.component';
+import { DragThresholdExampleComponent } from './examples/drag-threshold/drag-threshold.component';
 import { ZIndexModeExampleComponent } from './examples/z-index-mode/z-index-mode.component';
 import { CancelConnectionExampleComponent } from './examples/cancel-connection/cancel-connection.component';
 import { ColorModeExampleComponent } from './examples/color-mode/color-mode.component';
@@ -78,6 +79,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Floating mode + tidy',  path: 'floating-tidy',         component: FloatingTidyExampleComponent },
   { name: 'Cardinal edges',        path: 'cardinal-edges',        component: CardinalEdgesExampleComponent },
   { name: 'Click distance',        path: 'click-distance',        component: ClickDistanceExampleComponent },
+  { name: 'Drag threshold',        path: 'drag-threshold',        component: DragThresholdExampleComponent },
   { name: 'Cancel connection',     path: 'cancel-connection',     component: CancelConnectionExampleComponent },
   { name: 'Color mode',            path: 'color-mode',            component: ColorModeExampleComponent },
   { name: 'Interaction',           path: 'interaction',           component: InteractionExampleComponent },

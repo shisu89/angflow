@@ -3,6 +3,10 @@ import { PanOnScrollMode, type CoordinateExtent, type PanZoomUpdateOptions } fro
 import { XYPanZoom } from './XYPanZoom';
 import { createFilter } from './filter';
 
+// d3 removes its post-drag click suppressor after setTimeout(0); draining it keeps one test's
+// suppressor from swallowing the next test's click.
+const flush = () => new Promise<void>((r) => setTimeout(r, 0));
+
 const extent: CoordinateExtent = [
   [-Infinity, -Infinity],
   [Infinity, Infinity],
@@ -286,18 +290,20 @@ describe('createFilter pan activation key (#5922)', () => {
 });
 
 describe('XYPanZoom paneDragThreshold (#6115)', () => {
-  let attached: HTMLElement | null = null;
+  let attached: ReturnType<typeof setup> | null = null;
   function setupAttached() {
     const s = setup();
     document.body.appendChild(s.domNode);
-    attached = s.domNode;
+    attached = s;
     s.onTransformChange.mockClear();
     s.onDraggingChange.mockClear();
     return s;
   }
-  afterEach(() => {
-    attached?.remove();
+  afterEach(async () => {
+    attached?.panZoom.destroy();
+    attached?.domNode.remove();
     attached = null;
+    await flush();
   });
   // jsdom rejects `view: window` under vitest's global proxy, so the real Window is attached afterwards.
   const view = document.defaultView as Window;
