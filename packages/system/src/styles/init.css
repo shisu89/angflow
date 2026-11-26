@@ -68,6 +68,7 @@
 
 .xy-flow__pane {
   z-index: 1;
+  touch-action: none;
 
   /* Keep cursor changes off the pane so they aren't inherited by the entire flow.
    * A pseudo-element still targets the pane for pointer and mouse events. */
