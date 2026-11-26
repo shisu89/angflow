@@ -1,4 +1,5 @@
-import { Component, ChangeDetectionStrategy, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, DestroyRef, inject, signal } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import {
   NgFlowComponent,
   BackgroundComponent,
@@ -27,12 +28,12 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
   template: `
     <app-example-card
       title="Color mode"
-      description="Toggle light / dark / system color themes. The flow reads the OS preference in system mode and updates live when the OS theme changes."
+      description="Page theme sets data-theme on <html>; force colour mode overrides it on the flow."
     >
       <ng-flow
         [nodes]="nodes"
         [edges]="edges"
-        [colorMode]="colorMode()"
+        [forceColorMode]="forceColorMode()"
         [fitView]="true"
         (nodesChange)="onNodesChange($event)"
         (edgesChange)="onEdgesChange($event)"
@@ -43,16 +44,28 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
         <ng-flow-controls [showDelete]="true" />
         <ng-flow-panel position="top-right">
           <label class="cm-label">
-            <span>color mode</span>
+            <span>Page theme (html data-theme)</span>
             <select
               class="cm-select"
-              [value]="colorMode()"
-              (change)="setMode($event)"
-              aria-label="Color mode"
+              data-testid="colormode-select"
+              [value]="pageTheme()"
+              (change)="onPageThemeChange($event)"
             >
+              <option value="system">system</option>
               <option value="light">light</option>
               <option value="dark">dark</option>
-              <option value="system">system</option>
+            </select>
+          </label>
+          <label class="cm-label">
+            <span>Force color mode (flow only)</span>
+            <select
+              class="cm-select"
+              data-testid="force-colormode-select"
+              (change)="onForceColorModeChange($event)"
+            >
+              <option value="none">none</option>
+              <option value="light">light</option>
+              <option value="dark">dark</option>
             </select>
           </label>
         </ng-flow-panel>
@@ -61,7 +74,7 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
   `,
   styles: [`
     :host { display: flex; flex: 1; min-width: 0; min-height: 0; }
-    .cm-label { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #475569; }
+    .cm-label { display: flex; flex-direction: column; align-items: flex-start; align-items: center; gap: 8px; font-size: 12px; color: #475569; }
     .cm-select {
       padding: 4px 8px;
       border-radius: 4px;
@@ -70,7 +83,15 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
   `],
 })
 export class ColorModeExampleComponent {
-  readonly colorMode = signal<ColorMode>('light');
+  private readonly document = inject(DOCUMENT);
+
+  readonly pageTheme = signal<'system' | ColorMode>('system');
+  readonly forceColorMode = signal<ColorMode | undefined>(undefined);
+
+  constructor() {
+    // Don't leave the page themed when navigating to other routes.
+    inject(DestroyRef).onDestroy(() => this.document.documentElement.removeAttribute('data-theme'));
+  }
 
   nodes: Node[] = [
     { id: 'A', type: 'input', position: { x:   0, y: 150 }, data: { label: 'A' }, sourcePosition: Position.Right, targetPosition: Position.Left },
@@ -89,7 +110,18 @@ export class ColorModeExampleComponent {
   onEdgesChange(changes: EdgeChange[]): void { this.edges = applyEdgeChanges(changes, this.edges); }
   onConnect(connection: Connection): void { this.edges = addEdge(connection, this.edges) as Edge[]; }
 
-  setMode(event: Event): void {
-    this.colorMode.set((event.target as HTMLSelectElement).value as ColorMode);
+  onPageThemeChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value as 'system' | ColorMode;
+    this.pageTheme.set(value);
+    if (value === 'system') {
+      this.document.documentElement.removeAttribute('data-theme');
+    } else {
+      this.document.documentElement.setAttribute('data-theme', value);
+    }
+  }
+
+  onForceColorModeChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.forceColorMode.set(value === 'none' ? undefined : (value as ColorMode));
   }
 }

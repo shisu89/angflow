@@ -14,7 +14,6 @@ import {
   Type,
   inject,
   DestroyRef,
-  signal,
   computed,
   TemplateRef,
 } from '@angular/core';
@@ -170,8 +169,8 @@ function viewportsEqual(a: Viewport, b: Viewport): boolean {
     'class': 'ng-flow xy-flow',
     'role': 'application',
     '(scroll)': 'onWrapperScroll($event)',
-    '[class.dark]': 'resolvedColorMode() === "dark"',
-    '[class.light]': 'resolvedColorMode() === "light"',
+    '[class.dark]': 'forceColorMode() === "dark"',
+    '[class.light]': 'forceColorMode() === "light"',
     '[style.width.px]': 'widthInput()',
     '[style.height.px]': 'heightInput()',
     'style': 'display: block; position: relative; overflow: hidden; width: 100%; height: 100%; isolation: isolate;',
@@ -273,21 +272,6 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
   private resizeObserver: ResizeObserver | null = null;
   private panZoomInstance: PanZoomInstance | null = null;
-  private colorSchemeQuery: MediaQueryList | null = null;
-  private colorSchemeHandler: ((e: MediaQueryListEvent) => void) | null = null;
-
-  /** Resolves 'system' color mode to 'light' or 'dark' based on prefers-color-scheme. */
-  private readonly systemPrefersDark = signal(
-    typeof window !== 'undefined' ? window.matchMedia('(prefers-color-scheme: dark)').matches : false
-  );
-
-  readonly resolvedColorMode = computed(() => {
-    const mode = this.colorMode();
-    if (mode === 'system') {
-      return this.systemPrefersDark() ? 'dark' : 'light';
-    }
-    return mode;
-  });
 
   // ── Data (controlled-mode inputs; pair with the *Change outputs) ──────
 
@@ -514,8 +498,12 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
   // ── Appearance ────────────────────────────────────────────────────────
 
-  /** `'light'` | `'dark'` | `'system'`. When `'system'`, resolves via `prefers-color-scheme`. */
-  readonly colorMode = input<ColorMode>('light');
+  /**
+   * Forces a colour scheme on the flow by adding a `light` / `dark` class, overriding the page
+   * (`<html data-theme>`, `.dark`/`.light` ancestors) and the system preference. Leave unset to
+   * follow them. Page-level theming is typically done with `data-theme` on `<html>`.
+   */
+  readonly forceColorMode = input<ColorMode | undefined>(undefined);
 
   /** Raise a node's `z-index` when selected. */
   readonly elevateNodesOnSelect = input(true);
@@ -1006,15 +994,6 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       this.store.fitViewQueued.set(true);
       this.store.fitViewOptions.set(this.fitViewOptions());
     }
-
-    // Set up system color mode listener
-    if (typeof window !== 'undefined') {
-      this.colorSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      this.colorSchemeHandler = (e: MediaQueryListEvent) => {
-        this.systemPrefersDark.set(e.matches);
-      };
-      this.colorSchemeQuery.addEventListener('change', this.colorSchemeHandler);
-    }
   }
 
   ngAfterViewInit(): void {
@@ -1073,9 +1052,6 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       domNode: this.ownDomNode,
       callbacks: this.installedCallbacks,
     });
-    if (this.colorSchemeQuery && this.colorSchemeHandler) {
-      this.colorSchemeQuery.removeEventListener('change', this.colorSchemeHandler);
-    }
   }
 
   onPanePointerDown(): void {

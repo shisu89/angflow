@@ -32,22 +32,6 @@ export const KNOWN_FAILURES: KnownFailure[] = [
   // ── nodes.spec.ts ─────────────────────────────────────────────────────────
 
   // ── props.spec.ts ─────────────────────────────────────────────────────────
-  {
-    file: 'props.spec.ts',
-    titlePath: ['Props', 'colorMode', 'render dark page theme via html data-theme'],
-    reason:
-      'Times out on `colormode-select`: the flow does not follow the page theme and the Angular color-mode page ' +
-      'lacks the upstream page-theme / force-colour-mode selects, which need `forceColorMode` (report §3). Owner D2 (sub-project D2: forceColorMode / light-dark()).',
-    owner: 'D',
-  },
-  {
-    file: 'props.spec.ts',
-    titlePath: ['Props', 'colorMode', 'forceColorMode overrides the page theme'],
-    reason:
-      'Times out on `colormode-select`: angflow has `colorMode` but no `forceColorMode`, and the color-mode ' +
-      'page lacks the upstream testids (report §3). Owner D2 (sub-project D2: forceColorMode / light-dark()).',
-    owner: 'D',
-  },
 ];
 
 function escapeRegExp(s: string): string {

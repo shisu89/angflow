@@ -96,7 +96,7 @@ interface KitchenSinkSettings {
   debug: boolean;
 
   // Appearance
-  colorMode: ColorMode;
+  forceColorMode: ColorMode | undefined;
   defaultMarkerColor: string;
   elevateNodesOnSelect: boolean;
   elevateEdgesOnSelect: boolean;
@@ -177,7 +177,7 @@ const DEFAULTS: KitchenSinkSettings = {
   isValidConnectionEnabled: false,
   debug: false,
   // Appearance
-  colorMode: 'system',
+  forceColorMode: undefined,
   defaultMarkerColor: '#b1b1b7',
   elevateNodesOnSelect: true,
   elevateEdgesOnSelect: false,
@@ -226,7 +226,7 @@ const CATEGORY_KEYS: Record<string, (keyof KitchenSinkSettings)[]> = {
     'nodeOriginPreset', 'isValidConnectionEnabled', 'debug',
   ],
   Appearance: [
-    'colorMode', 'defaultMarkerColor', 'elevateNodesOnSelect', 'elevateEdgesOnSelect',
+    'forceColorMode', 'defaultMarkerColor', 'elevateNodesOnSelect', 'elevateEdgesOnSelect',
     'zIndexMode', 'backgroundVariant',
   ],
   Selection: ['selectionOnDrag', 'selectionMode'],
@@ -306,7 +306,7 @@ function parseKeyCode(raw: string): string | string[] {
           [nodeOrigin]="computedNodeOrigin()"
           [isValidConnection]="computedIsValidConnection()"
           [debug]="settings().debug"
-          [colorMode]="settings().colorMode"
+          [forceColorMode]="settings().forceColorMode"
           [defaultMarkerColor]="settings().defaultMarkerColor"
           [elevateNodesOnSelect]="settings().elevateNodesOnSelect"
           [elevateEdgesOnSelect]="settings().elevateEdgesOnSelect"
@@ -633,11 +633,11 @@ function parseKeyCode(raw: string): string | string[] {
                 (toggle)="toggleSection('Appearance')"
               >
                 <div class="ctrl ctrl--select">
-                  <span class="ctrl__label">colorMode</span>
-                  <select [value]="settings().colorMode" (change)="set('colorMode', $any($event.target).value)">
+                  <span class="ctrl__label">forceColorMode</span>
+                  <select [value]="settings().forceColorMode ?? 'none'" (change)="set('forceColorMode', $any($event.target).value === 'none' ? undefined : $any($event.target).value)">
+                    <option [value]="'none'">none</option>
                     <option [value]="'light'">light</option>
                     <option [value]="'dark'">dark</option>
-                    <option [value]="'system'">system</option>
                   </select>
                 </div>
                 <div class="ctrl ctrl--color">

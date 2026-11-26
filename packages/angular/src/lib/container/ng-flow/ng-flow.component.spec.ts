@@ -454,3 +454,52 @@ describe('NgFlowComponent keyboard delete outputs', () => {
     fixture.destroy();
   });
 });
+
+describe('NgFlowComponent forceColorMode', () => {
+  beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NgFlowComponent],
+      providers: [provideZonelessChangeDetection()],
+    });
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('adds neither dark nor light class when forceColorMode is unset', () => {
+    const fixture = TestBed.createComponent(NgFlowComponent);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.classList.contains('xy-flow')).toBe(true);
+    expect(el.classList.contains('dark')).toBe(false);
+    expect(el.classList.contains('light')).toBe(false);
+  });
+
+  it("adds only the dark class when forceColorMode is 'dark'", () => {
+    const fixture = TestBed.createComponent(NgFlowComponent);
+    setSignalInput(fixture.componentInstance, 'forceColorMode', 'dark');
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.classList.contains('dark')).toBe(true);
+    expect(el.classList.contains('light')).toBe(false);
+  });
+
+  it("follows forceColorMode through 'dark' -> 'light' -> undefined", () => {
+    const fixture = TestBed.createComponent(NgFlowComponent);
+    const el = fixture.nativeElement as HTMLElement;
+    setSignalInput(fixture.componentInstance, 'forceColorMode', 'dark');
+    fixture.detectChanges();
+    expect(el.classList.contains('dark')).toBe(true);
+
+    setSignalInput(fixture.componentInstance, 'forceColorMode', 'light');
+    fixture.detectChanges();
+    expect(el.classList.contains('light')).toBe(true);
+    expect(el.classList.contains('dark')).toBe(false);
+
+    setSignalInput(fixture.componentInstance, 'forceColorMode', undefined);
+    fixture.detectChanges();
+    expect(el.classList.contains('light')).toBe(false);
+    expect(el.classList.contains('dark')).toBe(false);
+  });
+});

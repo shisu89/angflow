@@ -164,7 +164,6 @@ export type {
   SnapGrid,
   KeyCode,
   ColorMode,
-  ColorModeClass,
 
   // Node types
   NodeBase,
