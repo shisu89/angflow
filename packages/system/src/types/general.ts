@@ -168,31 +168,6 @@ export type FitViewOptionsBase<NodeType extends NodeBase = NodeBase> = {
 };
 
 /**
- * Result of a fit-to-content operation.
- */
-export type FitViewResult = {
-  /**
-   * Achieved zoom after the fit. `NaN` when there was nothing to fit (no nodes).
-   * Note: `NaN` serializes to JSON `null`, so JSON-RPC consumers (e.g. the agent
-   * bridge) see `null` for the empty case.
-   */
-  zoom: number;
-  /**
-   * True when the ideal zoom was below `minZoom` and had to be clamped up — i.e.
-   * the content is larger than the viewport can frame. Clamping at `maxZoom`
-   * (content smaller than the viewport, over-zoom) is intentionally NOT flagged.
-   */
-  clamped: boolean;
-  /**
-   * False when a user gesture or another viewport call interrupted the fit's
-   * animation before it finished. True when it ran to the end, or when there
-   * was nothing to animate (no nodes to fit, or duration 0). False when pan/zoom
-   * is not initialised yet, so no fit was attempted.
-   */
-  ended: boolean;
-};
-
-/**
  * Internally, React Flow maintains a coordinate system that is independent of the
  * rest of the page. The `Viewport` type tells you where in that system your flow
  * is currently being display at and how zoomed in or out it is.

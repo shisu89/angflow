@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   calculateNodePosition,
   fitViewport,
+  getFitViewport,
   getNodesBounds,
   getNodesInside,
   getElementsToRemove,
@@ -30,112 +31,76 @@ const sized = (id: string, x: number, y: number, w = 100, h = 50): NodeBase => (
   measured: { width: w, height: h },
 });
 
-describe('fitViewport', () => {
-  it('returns clamped: true when the board is too big to fit at minZoom', async () => {
-    const nodes = buildLookup([sized('a', 0, 0), sized('b', 100000, 0)]);
-    const result = await fitViewport(
-      { nodes, width: 800, height: 600, panZoom: fakePanZoom(), minZoom: 0.5, maxZoom: 2 },
-      { padding: 0.1 },
-    );
-    expect(result.clamped).toBe(true);
-    expect(result.zoom).toBeCloseTo(0.5, 5);
+describe('getFitViewport', () => {
+  const params = (nodes: NodeLookup<InternalNodeBase<NodeBase>>, minZoom = 0.5, maxZoom = 2) => ({
+    nodes,
+    width: 800,
+    height: 600,
+    minZoom,
+    maxZoom,
   });
 
-  it('returns clamped: false when the board fits inside [minZoom, maxZoom]', async () => {
+  it('clamps to minZoom when the board is too big', () => {
+    const nodes = buildLookup([sized('a', 0, 0), sized('b', 100000, 0)]);
+    expect(getFitViewport(params(nodes), { padding: 0.1 })!.zoom).toBeCloseTo(0.5, 5);
+  });
+
+  it('lands strictly inside [minZoom, maxZoom] when the board fits', () => {
     const nodes = buildLookup([sized('a', 0, 0), sized('b', 300, 200)]);
-    const result = await fitViewport(
-      { nodes, width: 800, height: 600, panZoom: fakePanZoom(), minZoom: 0.1, maxZoom: 2 },
-      { padding: 0.1 },
-    );
-    expect(result.clamped).toBe(false);
+    const zoom = getFitViewport(params(nodes), { padding: 0.1 })!.zoom;
+    expect(zoom).toBeGreaterThan(0.5);
+    expect(zoom).toBeLessThan(2);
   });
 
-  it('does not flag clamped when clamped at maxZoom (tiny board, over-zoom)', async () => {
+  it('clamps to maxZoom for a tiny board', () => {
     const nodes = buildLookup([sized('a', 0, 0, 10, 10)]);
-    const result = await fitViewport(
-      { nodes, width: 800, height: 600, panZoom: fakePanZoom(), minZoom: 0.5, maxZoom: 2 },
-      { padding: 0.1 },
-    );
-    expect(result.zoom).toBeCloseTo(2, 5);
-    expect(result.clamped).toBe(false);
+    expect(getFitViewport(params(nodes), { padding: 0.1 })!.zoom).toBeCloseTo(2, 5);
   });
 
-  it('honors an options.minZoom override that loosens the floor', async () => {
+  it('honors an options.minZoom override', () => {
     const nodes = buildLookup([sized('a', 0, 0), sized('b', 100000, 0)]);
-    const result = await fitViewport(
-      { nodes, width: 800, height: 600, panZoom: fakePanZoom(), minZoom: 0.5, maxZoom: 2 },
-      { padding: 0.1, minZoom: 0.0001 },
-    );
-    expect(result.clamped).toBe(false);
+    expect(getFitViewport(params(nodes), { padding: 0.1, minZoom: 0.0001 })!.zoom).toBeLessThan(0.1);
   });
 
-  it('returns { zoom: NaN, clamped: false } when there are no nodes to fit', async () => {
-    const nodes = new Map() as NodeLookup<InternalNodeBase<NodeBase>>;
-    const result = await fitViewport(
-      { nodes, width: 800, height: 600, panZoom: fakePanZoom(), minZoom: 0.5, maxZoom: 2 },
-      {},
-    );
-    expect(Number.isNaN(result.zoom)).toBe(true);
-    expect(result.clamped).toBe(false);
-    expect(result.ended).toBe(true);
+  it('returns null for an empty lookup, `nodes: []` and all-hidden nodes', () => {
+    expect(getFitViewport(params(new Map() as NodeLookup<InternalNodeBase<NodeBase>>), {})).toBeNull();
+    expect(getFitViewport(params(buildLookup([sized('a', 0, 0)])), { nodes: [] } as never)).toBeNull();
+    expect(getFitViewport(params(buildLookup([{ ...sized('a', 0, 0), hidden: true }])), {})).toBeNull();
+  });
+});
+
+describe('fitViewport', () => {
+  const base = (nodes: NodeLookup<InternalNodeBase<NodeBase>>, panZoom: PanZoomInstance) => ({
+    nodes,
+    width: 800,
+    height: 600,
+    panZoom,
+    minZoom: 0.5,
+    maxZoom: 2,
   });
 
-  it('reports ended: true when the animation runs to the end', async () => {
-    const nodes = buildLookup([sized('a', 0, 0)]);
-    const result = await fitViewport(
-      { nodes, width: 800, height: 600, panZoom: fakePanZoom(), minZoom: 0.5, maxZoom: 2 },
-      {},
-    );
-    expect(result.ended).toBe(true);
+  it('resolves true when the animation runs to the end', async () => {
+    expect(await fitViewport(base(buildLookup([sized('a', 0, 0)]), fakePanZoom()), {})).toBe(true);
   });
 
-  it('reports ended: false when setViewport is interrupted', async () => {
-    const nodes = buildLookup([sized('a', 0, 0)]);
+  it('resolves false when setViewport is interrupted', async () => {
     const panZoom = { setViewport: async () => false } as unknown as PanZoomInstance;
-    const result = await fitViewport({ nodes, width: 800, height: 600, panZoom, minZoom: 0.5, maxZoom: 2 }, {});
-    expect(result.ended).toBe(false);
+    expect(await fitViewport(base(buildLookup([sized('a', 0, 0)]), panZoom), {})).toBe(false);
   });
 
-  it('keeps the viewport when no node is fittable (#6158)', async () => {
-    const setViewport = vi.fn(async () => true);
+  it('resolves true without calling setViewport when there is nothing to fit', async () => {
+    const setViewport = vi.fn(async () => false);
     const panZoom = { setViewport } as unknown as PanZoomInstance;
     const unsized: NodeBase = { id: 'u', position: { x: 0, y: 0 }, data: {} };
-    const nodes = buildLookup([unsized]);
-    const result = await fitViewport({ nodes, width: 800, height: 600, panZoom, minZoom: 0.5, maxZoom: 2 }, {});
-    expect(Number.isNaN(result.zoom)).toBe(true);
-    expect(result.clamped).toBe(false);
-    expect(result.ended).toBe(true);
-    expect(setViewport).not.toHaveBeenCalled();
-
-    const sizedNodes = buildLookup([sized('a', 0, 0)]);
-    const r2 = await fitViewport(
-      { nodes: sizedNodes, width: 800, height: 600, panZoom, minZoom: 0.5, maxZoom: 2 },
-      { nodes: [{ id: 'missing' }] } as never,
-    );
-    expect(Number.isNaN(r2.zoom)).toBe(true);
-    expect(setViewport).not.toHaveBeenCalled();
-  });
-
-  it('fits nothing for `nodes: []` (an empty selection is not "all nodes")', async () => {
-    const setViewport = vi.fn(async () => true);
-    const panZoom = { setViewport } as unknown as PanZoomInstance;
-    const nodes = buildLookup([sized('a', 0, 0)]);
-    const result = await fitViewport(
-      { nodes, width: 800, height: 600, panZoom, minZoom: 0.5, maxZoom: 2 },
-      { nodes: [] } as never,
-    );
-    expect(Number.isNaN(result.zoom)).toBe(true);
-    expect(result.ended).toBe(true);
-    expect(setViewport).not.toHaveBeenCalled();
-  });
-
-  it('fits nothing when every node is hidden', async () => {
-    const setViewport = vi.fn(async () => true);
-    const panZoom = { setViewport } as unknown as PanZoomInstance;
-    const nodes = buildLookup([{ ...sized('a', 0, 0), hidden: true }]);
-    const result = await fitViewport({ nodes, width: 800, height: 600, panZoom, minZoom: 0.5, maxZoom: 2 }, {});
-    expect(Number.isNaN(result.zoom)).toBe(true);
-    expect(result.ended).toBe(true);
+    // empty lookup
+    expect(await fitViewport(base(new Map() as NodeLookup<InternalNodeBase<NodeBase>>, panZoom), {})).toBe(true);
+    // no fittable node (#6158)
+    expect(await fitViewport(base(buildLookup([unsized]), panZoom), {})).toBe(true);
+    expect(await fitViewport(base(buildLookup([sized('a', 0, 0)]), panZoom), { nodes: [{ id: 'missing' }] } as never)).toBe(true);
+    // `nodes: []` is not "all nodes"
+    expect(await fitViewport(base(buildLookup([sized('a', 0, 0)]), panZoom), { nodes: [] } as never)).toBe(true);
+    // every node hidden
+    expect(await fitViewport(base(buildLookup([{ ...sized('a', 0, 0), hidden: true }]), panZoom), {})).toBe(true);
     expect(setViewport).not.toHaveBeenCalled();
   });
 });

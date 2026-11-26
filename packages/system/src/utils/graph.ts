@@ -19,7 +19,7 @@ import {
   type EdgeBase,
   type FitViewParamsBase,
   type FitViewOptionsBase,
-  type FitViewResult,
+  type Viewport,
   CoordinateExtent,
   OnError,
   OnBeforeDeleteBase,
@@ -375,40 +375,36 @@ function getFitViewNodes<
   return fitViewNodes;
 }
 
-/** Tolerance for detecting that a fit's zoom was clamped to the minimum floor. */
-const ZOOM_CLAMP_EPSILON = 1e-6;
+/**
+ * The viewport `fitViewport` animates to, or `null` when there is nothing to fit.
+ * angflow-only: the agent bridge measures a fit's target with it before starting the fit.
+ * @internal
+ */
+export function getFitViewport<
+  Params extends Omit<FitViewParamsBase<NodeBase>, 'panZoom'>,
+  Options extends FitViewOptionsBase<NodeBase>
+>(
+  { nodes, width, height, minZoom, maxZoom }: Params,
+  options?: Omit<Options, 'nodes' | 'includeHiddenNodes'>
+): Viewport | null {
+  if (nodes.size === 0) return null;
+  const nodesToFit = getFitViewNodes(nodes, options);
+  if (nodesToFit.size === 0) return null;
+  const bounds = getInternalNodesBounds(nodesToFit);
+  return getViewportForBounds(bounds, width, height, options?.minZoom ?? minZoom, options?.maxZoom ?? maxZoom, options?.padding ?? 0.1);
+}
 
 export async function fitViewport<
   Params extends FitViewParamsBase<NodeBase>,
   Options extends FitViewOptionsBase<NodeBase>
->(
-  { nodes, width, height, panZoom, minZoom, maxZoom }: Params,
-  options?: Omit<Options, 'nodes' | 'includeHiddenNodes'>
-): Promise<FitViewResult> {
-  if (nodes.size === 0) {
-    return { zoom: NaN, clamped: false, ended: true };
-  }
-
-  const nodesToFit = getFitViewNodes(nodes, options);
-  if (nodesToFit.size === 0) {
-    return { zoom: NaN, clamped: false, ended: true };
-  }
-  const bounds = getInternalNodesBounds(nodesToFit);
-
-  const effMin = options?.minZoom ?? minZoom;
-  const effMax = options?.maxZoom ?? maxZoom;
-
-  const viewport = getViewportForBounds(bounds, width, height, effMin, effMax, options?.padding ?? 0.1);
-
-  const ended = await panZoom.setViewport(viewport, {
+>(params: Params, options?: Omit<Options, 'nodes' | 'includeHiddenNodes'>): Promise<boolean> {
+  const viewport = getFitViewport(params, options);
+  if (!viewport) return true;
+  return params.panZoom.setViewport(viewport, {
     duration: options?.duration,
     ease: options?.ease,
     interpolate: options?.interpolate,
   });
-
-  // getViewportForBounds clamps the ideal zoom to >= effMin, so zoom landing at
-  // the floor means the ideal zoom was below it — the content couldn't be framed.
-  return { zoom: viewport.zoom, clamped: viewport.zoom <= effMin + ZOOM_CLAMP_EPSILON, ended };
 }
 
 /**

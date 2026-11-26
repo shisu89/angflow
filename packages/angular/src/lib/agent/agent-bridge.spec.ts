@@ -8,7 +8,6 @@ import { provideAgentBridge } from './provide-agent-bridge';
 import { WindowTransport } from './transports/window';
 import type { AgentOutbound, AgentTransport, AgentInbound, AgentResponse } from './types';
 import type { Node, Edge } from '../types';
-import type { FitViewResult } from '@angflow/system';
 import type { AgentLayoutFn } from '../types/node-template';
 import { getElementsToRemove } from '@angflow/system';
 
@@ -2158,8 +2157,35 @@ describe('AngflowAgentBridge — bulk payload caps', () => {
         makeNode('b', { position: { x: 300, y: 0 }, width: 100, height: 50 }),
       ]);
       stubPanZoom(flow, vi.fn().mockResolvedValue(false));
-      const res = (await bridge.callTool('fit_view', { duration: 500 })) as FitViewResult;
+      const res = (await bridge.callTool('fit_view', { duration: 500 })) as { zoom: number; clamped: boolean; ended: boolean };
       expect(res.ended).toBe(false);
+    });
+
+    it('an interrupted fit still reports its target zoom and clamped', async () => {
+      const { bridge, newFlow } = setup();
+      const flow = newFlow();
+      bridge.register('main', flow);
+      flow.setNodes([makeNode('a', { width: 100, height: 50 }), makeNode('b', { position: { x: 100000, y: 0 }, width: 100, height: 50 })]);
+      stubPanZoom(flow, vi.fn().mockResolvedValue(false));
+      const res = (await bridge.callTool('fit_view', { duration: 500, minZoom: 0.5 })) as { zoom: number; clamped: boolean; ended: boolean };
+      expect(res.ended).toBe(false);
+      expect(res.clamped).toBe(true);
+      expect(res.zoom).toBeCloseTo(0.5, 5);
+    });
+
+    it('a graph change during the animation does not change the reported target', async () => {
+      const { bridge, newFlow } = setup();
+      const flow = newFlow();
+      bridge.register('main', flow);
+      flow.setNodes([makeNode('a', { width: 100, height: 50 })]);
+      let finish!: (ended: boolean) => void;
+      stubPanZoom(flow, () => new Promise<boolean>((r) => (finish = r)));
+      const expected = flow.measureFitView({})!.zoom;
+      const call = bridge.callTool('fit_view', { duration: 500 });
+      await Promise.resolve();
+      flow.setNodes([makeNode('a', { width: 100, height: 50 }), makeNode('far', { position: { x: 50000, y: 0 }, width: 100, height: 50 })]);
+      finish(true);
+      expect(await call).toEqual({ zoom: expected, clamped: false, ended: true });
     });
 
     it('set_viewport awaits the animation and returns its boolean', async () => {

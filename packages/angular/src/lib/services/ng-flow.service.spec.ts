@@ -513,13 +513,58 @@ describe('NgFlowService', () => {
 
   describe('fitBounds', () => {
     it('delegates to the store so overlapping calls share its fit chain', async () => {
-      const result = { zoom: 2, clamped: false, ended: true };
+      const result = true;
       const spy = vi.spyOn(store, 'fitBounds').mockResolvedValue(result);
       const bounds = { x: 0, y: 0, width: 10, height: 10 };
-      const options = { padding: 0.2, duration: 100 };
+      const options = { padding: 0.2, duration: 100, ease: (t: number) => t };
 
       await expect(service.fitBounds(bounds, options)).resolves.toBe(result);
       expect(spy).toHaveBeenCalledWith(bounds, options);
+    });
+  });
+
+  describe('measureFitView / measureFitBounds (@internal)', () => {
+    function withPanZoom() {
+      store.panZoom.set({ setViewport: async () => true, getViewport: () => ({ x: 0, y: 0, zoom: 1 }) } as never);
+      store.width.set(800);
+      store.height.set(600);
+    }
+
+    it('return null without panZoom', () => {
+      service.setNodes([makeNode('a')]);
+      expect(service.measureFitView()).toBeNull();
+      expect(service.measureFitBounds({ x: 0, y: 0, width: 10, height: 10 })).toBeNull();
+    });
+
+    it('measureFitView flags a min-zoom clamp', () => {
+      withPanZoom();
+      store.minZoom.set(0.5);
+      service.setNodes([
+        makeNode('a', { width: 100, height: 50 }),
+        makeNode('b', { position: { x: 100000, y: 0 }, width: 100, height: 50 }),
+      ]);
+      const m = service.measureFitView()!;
+      expect(m.clamped).toBe(true);
+      expect(m.zoom).toBeCloseTo(0.5, 5);
+    });
+
+    it('measureFitView does not flag a single small node', () => {
+      withPanZoom();
+      store.minZoom.set(0.5);
+      service.setNodes([makeNode('a', { width: 100, height: 50 })]);
+      expect(service.measureFitView()!.clamped).toBe(false);
+    });
+
+    it('measureFitView is null with no nodes', () => {
+      withPanZoom();
+      expect(service.measureFitView()).toBeNull();
+    });
+
+    it('measureFitBounds reports a finite unclamped zoom', () => {
+      withPanZoom();
+      const m = service.measureFitBounds({ x: 0, y: 0, width: 200, height: 100 }, { minZoom: 0.2 })!;
+      expect(m.clamped).toBe(false);
+      expect(Number.isFinite(m.zoom)).toBe(true);
     });
   });
 

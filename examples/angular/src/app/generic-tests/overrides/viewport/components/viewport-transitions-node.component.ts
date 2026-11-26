@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { NgFlowService, type FitViewResult } from '@angflow/angular';
+import { NgFlowService } from '@angflow/angular';
 
 // long enough for a test to interrupt the transition halfway
 const duration = 5000;
 
-// fitView resolves { zoom, clamped, ended }; the other helpers resolve a boolean.
-type Transition = () => Promise<unknown>;
+// every helper resolves a boolean: true when it ran to the end, false when interrupted.
+type Transition = () => Promise<boolean>;
 
 @Component({
   selector: 'viewport-transitions-node',
@@ -31,8 +31,7 @@ export class ViewportTransitionsNodeComponent {
 
   protected async track(name: string, transition: Transition): Promise<void> {
     this.status.set(`${name}: pending`);
-    const result = await transition();
-    const ended = typeof result === 'boolean' ? result : (result as FitViewResult).ended;
+    const ended = await transition();
     this.status.set(`${name}: ${ended ? 'ended' : 'interrupted'}`);
   }
 

@@ -1256,8 +1256,8 @@ describe('shared fit promise', () => {
     await flush();
     expect(firstSettled).toBe(false);
     pending[1](true);
-    await expect(first).resolves.toMatchObject({ ended: true });
-    await expect(second).resolves.toMatchObject({ ended: true });
+    await expect(first).resolves.toBe(true);
+    await expect(second).resolves.toBe(true);
   });
 
   it('a non-fit interruption settles the pending fit with ended: false', async () => {
@@ -1265,7 +1265,7 @@ describe('shared fit promise', () => {
     store.panZoom.set(pz as never);
     const fit = store.fitView({ duration: 5000 });
     pending[0](false);
-    await expect(fit).resolves.toMatchObject({ ended: false });
+    await expect(fit).resolves.toBe(false);
   });
 
   it('a fitView after the shared promise settled gets a fresh promise', async () => {
@@ -1273,16 +1273,16 @@ describe('shared fit promise', () => {
     store.panZoom.set(pz as never);
     const first = store.fitView({ duration: 100 });
     pending[0](false);
-    await expect(first).resolves.toMatchObject({ ended: false });
+    await expect(first).resolves.toBe(false);
 
     const second = store.fitView({ duration: 100 });
     expect(second).not.toBe(first);
     pending[1](true);
-    await expect(second).resolves.toMatchObject({ ended: true });
+    await expect(second).resolves.toBe(true);
   });
 
   it('fitBounds keeps its own chain', async () => {
-    const { pz, pending } = deferredPanZoom();
+    const { pz, pending, setViewport } = deferredPanZoom();
     store.panZoom.set(pz as never);
     const firstBounds = store.fitBounds({ x: 0, y: 0, width: 100, height: 100 }, { duration: 5000 });
     const secondBounds = store.fitBounds({ x: 0, y: 0, width: 400, height: 300 }, { duration: 2000 });
@@ -1293,19 +1293,18 @@ describe('shared fit promise', () => {
     void firstBounds.then(() => (boundsSettled = true));
     pending[0](false); // the second fitBounds interrupted the first
     pending[2](true); // the interleaved fitView ends on its own chain
-    await expect(fit).resolves.toMatchObject({ ended: true });
+    await expect(fit).resolves.toBe(true);
     await flush();
     expect(boundsSettled).toBe(false);
 
     pending[1](true);
-    const settled = await firstBounds;
-    expect(settled).toMatchObject({ ended: true });
-    await expect(secondBounds).resolves.toEqual(settled);
+    await expect(firstBounds).resolves.toBe(true);
+    await expect(secondBounds).resolves.toBe(true);
     // the second call's viewport, not the first's
     const expected = (w: number, h: number) =>
       getViewportForBounds({ x: 0, y: 0, width: w, height: h }, 800, 600, store.minZoom(), store.maxZoom(), 0.1).zoom;
     expect(expected(400, 300)).not.toBe(expected(100, 100));
-    expect(settled.zoom).toBe(expected(400, 300));
+    expect((setViewport.mock.calls[1] as unknown as [{ zoom: number }])[0].zoom).toBe(expected(400, 300));
   });
 
   it('a fitBounds interrupting a pending fitView resolves the fitView with ended: false', async () => {
@@ -1315,9 +1314,9 @@ describe('shared fit promise', () => {
     const bounds = store.fitBounds({ x: 0, y: 0, width: 400, height: 300 }, { duration: 1000 });
     expect(bounds).not.toBe(fit);
     pending[0](false); // fitBounds interrupted the fit
-    await expect(fit).resolves.toMatchObject({ ended: false });
+    await expect(fit).resolves.toBe(false);
     pending[1](true);
-    await expect(bounds).resolves.toMatchObject({ ended: true });
+    await expect(bounds).resolves.toBe(true);
   });
 
   it('destroying the store settles pending fits with ended: false', async () => {
@@ -1326,8 +1325,8 @@ describe('shared fit promise', () => {
     const fit = store.fitView({ duration: 5000 });
     const bounds = store.fitBounds({ x: 0, y: 0, width: 400, height: 300 }, { duration: 5000 });
     store.ngOnDestroy();
-    await expect(fit).resolves.toEqual({ zoom: NaN, clamped: false, ended: false });
-    await expect(bounds).resolves.toEqual({ zoom: NaN, clamped: false, ended: false });
+    await expect(fit).resolves.toBe(false);
+    await expect(bounds).resolves.toBe(false);
   });
 
   it('detachFlow of the owning flow settles pending fits; a non-owner leaves them', async () => {
@@ -1342,7 +1341,7 @@ describe('shared fit promise', () => {
     await Promise.resolve();
     expect(settled).toBe(false);
     store.detachFlow({ domNode: el, callbacks: {} });
-    await expect(fit).resolves.toEqual({ zoom: NaN, clamped: false, ended: false });
+    await expect(fit).resolves.toBe(false);
   });
 
   it('a rejected fit joined to the queued initial fit rejects only the caller', async () => {
@@ -1371,12 +1370,8 @@ describe('shared fit promise', () => {
     }
   });
 
-  it('fitBounds resolves ended: false without panZoom', async () => {
-    await expect(store.fitBounds({ x: 0, y: 0, width: 10, height: 10 })).resolves.toEqual({
-      zoom: NaN,
-      clamped: false,
-      ended: false,
-    });
+  it('fitBounds resolves false without panZoom', async () => {
+    await expect(store.fitBounds({ x: 0, y: 0, width: 10, height: 10 })).resolves.toBe(false);
   });
 });
 

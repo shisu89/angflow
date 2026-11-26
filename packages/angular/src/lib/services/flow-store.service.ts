@@ -40,7 +40,7 @@ import {
   type ZIndexMode,
   type AriaLabelConfig,
   type FitViewOptionsBase,
-  type FitViewResult,
+  type FitBoundsOptions,
   type Rect,
   type HandleType,
   type OnConnectEnd,
@@ -66,14 +66,14 @@ import { applyNodeChanges, applyEdgeChanges, createSelectionChange, getSelection
 import { sampleTween, prefersReducedMotion, type TweenEntry } from '../utils/position-tween';
 import { getCollapsedHiddenIds, rewriteEdgesForCollapse, type DisplayEdge } from '../graph/collapse';
 
-type FitResolver = { promise: Promise<FitViewResult>; resolve: (r: FitViewResult) => void; reject: (e: unknown) => void };
+type FitResolver = { promise: Promise<boolean>; resolve: (r: boolean) => void; reject: (e: unknown) => void };
 type FitChain = { latestId: number; resolver: FitResolver | null };
 
 /** Hand-rolled `Promise.withResolvers` (ES2024; the package targets ES2022). */
 function createFitResolver(): FitResolver {
-  let resolve!: (r: FitViewResult) => void;
+  let resolve!: (r: boolean) => void;
   let reject!: (e: unknown) => void;
-  const promise = new Promise<FitViewResult>((res, rej) => {
+  const promise = new Promise<boolean>((res, rej) => {
     resolve = res;
     reject = rej;
   });
@@ -930,11 +930,11 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
    * Fit the viewport to the nodes. Overlapping calls share one promise (as upstream
    * React's store): a fit superseded by a later fit doesn't settle on its own
    * interruption, every caller receives the last fit's result. Non-fit viewport calls
-   * still interrupt it and settle it with `ended: false`.
+   * still interrupt it and settle it with `false`.
    */
-  fitView(options?: FitViewOptionsBase<NodeType>): Promise<FitViewResult> {
+  fitView(options?: FitViewOptionsBase<NodeType>): Promise<boolean> {
     const pz = this.panZoom();
-    if (!pz) return Promise.resolve({ zoom: NaN, clamped: false, ended: false });
+    if (!pz) return Promise.resolve(false);
 
     return this.runFitChain('fitView', () =>
       fitViewport(
@@ -956,23 +956,20 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
    * promise on their own chain (separate from `fitView`'s), settled with the last
    * call's result.
    */
-  fitBounds(
-    bounds: Rect,
-    options?: { padding?: number; duration?: number; minZoom?: number; maxZoom?: number }
-  ): Promise<FitViewResult> {
+  fitBounds(bounds: Rect, options?: FitBoundsOptions & { minZoom?: number; maxZoom?: number }): Promise<boolean> {
     const pz = this.panZoom();
-    if (!pz) return Promise.resolve({ zoom: NaN, clamped: false, ended: false });
+    if (!pz) return Promise.resolve(false);
 
-    return this.runFitChain('fitBounds', async () => {
-      const effMin = options?.minZoom ?? this.minZoom();
-      const effMax = options?.maxZoom ?? this.maxZoom();
-      const viewport = getViewportForBounds(bounds, this.width(), this.height(), effMin, effMax, options?.padding ?? 0.1);
-      const ended = await pz.setViewport(
-        { x: viewport.x, y: viewport.y, zoom: viewport.zoom },
-        { duration: options?.duration }
+    return this.runFitChain('fitBounds', () => {
+      const viewport = getViewportForBounds(
+        bounds,
+        this.width(),
+        this.height(),
+        options?.minZoom ?? this.minZoom(),
+        options?.maxZoom ?? this.maxZoom(),
+        options?.padding ?? 0.1
       );
-      // 1e-6 matches ZOOM_CLAMP_EPSILON in @angflow/system (utils/graph.ts).
-      return { zoom: viewport.zoom, clamped: viewport.zoom <= effMin + 1e-6, ended };
+      return pz.setViewport(viewport, { duration: options?.duration, ease: options?.ease, interpolate: options?.interpolate });
     });
   }
 
@@ -1210,10 +1207,10 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
    * Runs `run` and settles the chain's shared promise with the LATEST call's result.
    * A call superseded by a newer one on the same chain never settles on its own
    * interruption; it receives the newer call's result. Non-fit viewport calls
-   * (scroll, setViewport, zoom*) still interrupt it and settle it with ended: false.
+   * (scroll, setViewport, zoom*) still interrupt it and settle it with `false`.
    * Mirrors upstream React's `latestFitViewId` / `fitViewResolver` (store/index.ts).
    */
-  private runFitChain(kind: 'fitView' | 'fitBounds', run: () => Promise<FitViewResult>): Promise<FitViewResult> {
+  private runFitChain(kind: 'fitView' | 'fitBounds', run: () => Promise<boolean>): Promise<boolean> {
     const chain = this.fitChains[kind];
     const resolver = (chain.resolver ??= createFitResolver());
     const id = ++chain.latestId;
@@ -1234,7 +1231,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   }
 
   /**
-   * Settle every pending fit promise with `ended: false` and drop it. Called on destroy:
+   * Settle every pending fit promise with `false` and drop it. Called on destroy:
    * the store can't rely on d3 firing `end` on removed elements. Bumping `latestId`
    * makes any run still in flight a superseded one, so it can't settle the promise again.
    */
@@ -1243,7 +1240,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       chain.latestId++;
       const resolver = chain.resolver;
       chain.resolver = null;
-      resolver?.resolve({ zoom: NaN, clamped: false, ended: false });
+      resolver?.resolve(false);
     }
   }
 

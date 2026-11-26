@@ -10,12 +10,15 @@ import {
   getIncomers as getIncomersSystem,
   shallowNodeData,
   getConnectionsFromLookup,
+  getFitViewport,
+  getViewportForBounds,
   type XYPosition,
   type SnapGrid,
   type Viewport,
   type Rect,
   type FitViewOptionsBase,
-  type FitViewResult,
+  type FitBoundsOptions,
+  type Padding,
   type NodeConnection,
   type ConnectionState,
   type NodeBase,
@@ -32,6 +35,9 @@ import type { Node, Edge, InternalNode, DeleteElementsOptions } from '../types';
 import type { NodeTemplateSpec } from '../types/node-template';
 import { prefersReducedMotion } from '../utils/position-tween';
 import { getGroupBounds, type GroupBoundsOptions } from '../graph/group-bounds';
+
+/** Zoom at or below `minZoom + FIT_CLAMP_EPSILON` counts as clamped at the floor. */
+const FIT_CLAMP_EPSILON = 1e-6;
 
 /** Keep in sync with `builtInNodeTypes` in container/node-renderer/node-renderer.component.ts. */
 const BUILT_IN_NODE_TYPE_NAMES = ['default', 'input', 'output', 'group'] as const;
@@ -112,12 +118,11 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   /**
    * Zoom and pan so all nodes (or `options.nodes`) fit in the canvas.
    * Respects `minZoom`, `maxZoom`, and `padding`.
-   * Resolves `{ zoom, clamped, ended }`: the achieved zoom, whether it was clamped at the min-zoom floor,
-   * and `ended` (`false` when a user gesture or another viewport call interrupted the animation).
-   * Overlapping `fitView` calls share one promise: a fit superseded by a later `fitView` doesn't
-   * resolve `ended: false`, every caller receives the last fit's result.
+   * Resolves `true` when the fit ran to the end or there was nothing to fit, and `false` when a user
+   * gesture or another viewport call interrupted it, or pan/zoom isn't initialised.
+   * Overlapping `fitView` calls share one promise, which settles with the last fit's result.
    */
-  fitView(options?: FitViewOptionsBase<NodeType>): Promise<FitViewResult> {
+  fitView(options?: FitViewOptionsBase<NodeType>): Promise<boolean> {
     return this.store.fitView(options);
   }
 
@@ -141,11 +146,13 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     return this.store.setCenter(x, y, options);
   }
 
-  /** Fit the viewport to a specific `Rect` in flow coordinates. Resolves `{ zoom: NaN, clamped: false, ended: false }` if pan/zoom isn't yet initialized; `ended` is `false` when a gesture or another viewport call interrupted the animation. Overlapping `fitBounds` calls share one promise and all receive the last call's result. */
-  fitBounds(
-    bounds: Rect,
-    options?: { padding?: number; duration?: number; minZoom?: number; maxZoom?: number },
-  ): Promise<FitViewResult> {
+  /**
+   * Fit the viewport to a specific `Rect` in flow coordinates. `minZoom`/`maxZoom` are an angflow extension.
+   * Resolves `true` when the fit ran to the end, and `false` when a user gesture or another viewport call
+   * interrupted it, or pan/zoom isn't initialised. Overlapping `fitBounds` calls share one promise, which
+   * settles with the last call's result.
+   */
+  fitBounds(bounds: Rect, options?: FitBoundsOptions & { minZoom?: number; maxZoom?: number }): Promise<boolean> {
     return this.store.fitBounds(bounds, options);
   }
 
@@ -796,6 +803,40 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    */
   hasOnBeforeDeleteHook(): boolean {
     return this.store.onBeforeDelete !== null;
+  }
+
+  /**
+   * @internal Agent-bridge helper, not public API (like hasOnBeforeDeleteHook): the zoom
+   * `fitView(options)` would land on and whether the min-zoom floor clamps it, from the same
+   * inputs as the fit. `null` when there is nothing to fit or pan/zoom isn't initialised.
+   */
+  measureFitView(options?: FitViewOptionsBase<NodeType>): { zoom: number; clamped: boolean } | null {
+    if (!this.store.panZoom()) return null;
+    const viewport = getFitViewport(
+      {
+        nodes: this.store.nodeLookup,
+        width: this.store.width(),
+        height: this.store.height(),
+        minZoom: this.store.minZoom(),
+        maxZoom: this.store.maxZoom(),
+      },
+      options
+    );
+    if (!viewport) return null;
+    const effMin = options?.minZoom ?? this.store.minZoom();
+    return { zoom: viewport.zoom, clamped: viewport.zoom <= effMin + FIT_CLAMP_EPSILON };
+  }
+
+  /** @internal Agent-bridge helper: the target of `fitBounds(bounds, options)`; `null` without pan/zoom. */
+  measureFitBounds(
+    bounds: Rect,
+    options?: { padding?: Padding; minZoom?: number; maxZoom?: number }
+  ): { zoom: number; clamped: boolean } | null {
+    if (!this.store.panZoom()) return null;
+    const effMin = options?.minZoom ?? this.store.minZoom();
+    const effMax = options?.maxZoom ?? this.store.maxZoom();
+    const viewport = getViewportForBounds(bounds, this.store.width(), this.store.height(), effMin, effMax, options?.padding ?? 0.1);
+    return { zoom: viewport.zoom, clamped: viewport.zoom <= effMin + FIT_CLAMP_EPSILON };
   }
 
   /**

@@ -12,7 +12,6 @@ import {
 } from '@angular/core';
 
 import { getElementsToRemove } from '@angflow/system';
-import type { FitViewResult } from '@angflow/system';
 import type { NgFlowService } from '../services/ng-flow.service';
 import type { Node, Edge } from '../types';
 import type { AgentLayoutFn, NodeTemplateSpec } from '../types/node-template';
@@ -743,7 +742,7 @@ export class AngflowAgentBridge {
       flow.setEdges(edges);
     });
 
-    this.handlers.set('fit_view', (flow, params) => {
+    this.handlers.set('fit_view', async (flow, params) => {
       const padding = typeof params['padding'] === 'number' ? (params['padding'] as number) : undefined;
       const duration = typeof params['duration'] === 'number' ? (params['duration'] as number) : undefined;
       const minZoom = optionalPositiveNumber(params, 'minZoom');
@@ -754,7 +753,11 @@ export class AngflowAgentBridge {
             .filter((n): n is Node => !!n)
             .map((n) => ({ id: n.id }))
         : undefined;
-      return flow.fitView({ padding, duration, minZoom, nodes });
+      const options = { padding, duration, minZoom, nodes };
+      // Measure first: an interrupted fit, or a graph change mid-animation, still reports this call's target.
+      const target = flow.measureFitView(options);
+      const ended = await flow.fitView(options);
+      return { zoom: target?.zoom ?? NaN, clamped: target?.clamped ?? false, ended };
     });
 
     this.handlers.set('set_viewport', (flow, params) => {
@@ -887,12 +890,14 @@ export class AngflowAgentBridge {
       return flow.setCenter(x, y, { zoom, duration });
     });
 
-    this.handlers.set('fit_bounds', (flow, params) => {
+    this.handlers.set('fit_bounds', async (flow, params) => {
       const bounds = requireObject(params, 'bounds') as { x: number; y: number; width: number; height: number };
       const padding = typeof params['padding'] === 'number' ? (params['padding'] as number) : undefined;
       const duration = typeof params['duration'] === 'number' ? (params['duration'] as number) : undefined;
       const minZoom = optionalPositiveNumber(params, 'minZoom');
-      return flow.fitBounds(bounds, { padding, duration, minZoom });
+      const target = flow.measureFitBounds(bounds, { padding, minZoom });
+      const ended = await flow.fitBounds(bounds, { padding, duration, minZoom });
+      return { zoom: target?.zoom ?? NaN, clamped: target?.clamped ?? false, ended };
     });
 
     this.handlers.set('add_nodes', (flow, params) => {
@@ -1225,10 +1230,12 @@ export class AngflowAgentBridge {
       await flow.setNodePositions(actuallyApplied, { coordinateSpace: 'absolute' });
 
       const shouldFit = params['fitView'] !== false;
-      let fit: FitViewResult | null = null;
+      let fit: { zoom: number; clamped: boolean; ended: boolean } | null = null;
       if (shouldFit && Object.keys(actuallyApplied).length > 0) {
         try {
-          fit = await flow.fitView({ minZoom });
+          const target = flow.measureFitView({ minZoom });
+          const ended = await flow.fitView({ minZoom });
+          fit = { zoom: target?.zoom ?? NaN, clamped: target?.clamped ?? false, ended };
         } catch (err) {
           // Best-effort viewport fit: never fail the tool over a cosmetic step,
           // but surface the error to hosts observing onError.
