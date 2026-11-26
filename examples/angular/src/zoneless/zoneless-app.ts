@@ -32,6 +32,7 @@ const seed = makeSeedGraph(200);
       [nodesDraggable]="true"
       [elementsSelectable]="true"
       [selectionOnDrag]="true"
+      [panOnDrag]="[1, 2]"
       [deleteKeyCode]="['Delete', 'Backspace']"
       (nodesChange)="onNodesChange($event)"
       (edgesChange)="onEdgesChange($event)"

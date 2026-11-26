@@ -6,21 +6,99 @@ Requires `@angflow/system` 0.2.0. Contains the unreleased 0.3.22 bug-fix (B) and
 
 ### Breaking changes
 
-<!-- D1: filled in by the release-docs task (Task 12). -->
+Upstream `@xyflow/system` 1.0 / React 13 API alignment. Renamed and removed APIs have no deprecated aliases.
+
+**Two changes compile silently:** `(connectEnd)` / `(clickConnectEnd)` handlers that read `$event.target` now get an object, and a numeric fit padding such as `0.1` now means 0px.
+
+```ts
+// 1. Handle bounds type
+import { type SystemHandle } from '@angflow/angular';          // before
+import { type HandleBounds } from '@angflow/angular';          // after (also new: NodeHandle)
+readonly sourceHandle = input<HandleBounds | null>(null);
+
+// 2. Connection queries
+flow.getHandleConnections({ nodeId: 'a', type: 'source', id: 'h1' });   // before
+flow.getNodeConnections({ nodeId: 'a', type: 'source', handleId: 'h1' }); // after
+flow.getNodeConnections('a');                                           // before
+flow.getNodeConnections({ nodeId: 'a' });                               // after
+flow.selectHandleConnections({ nodeId: 'a', type: 'target' });          // before
+flow.selectNodeConnections({ nodeId: 'a', type: 'target' });           // after
+// type HandleConnection → NodeConnection. Agents: get_handle_connections → get_node_connections { nodeId, type?, handleId? }
+```
+
+```html
+<!-- 3. nodeClickDistance is gone: clicks are suppressed only when a drag moved the node -->
+<ng-flow [nodeClickDistance]="5" />          <!-- before -->
+<ng-flow [nodeDragThreshold]="5" />          <!-- after: below the threshold it is a click -->
+
+<!-- 4. Connection-end payloads -->
+<ng-flow (connectEnd)="onEnd($event)" />     <!-- before: $event = MouseEvent | TouchEvent -->
+<ng-flow (connectEnd)="onEnd($event.event, $event.connectionState)" />   <!-- after -->
+<ng-flow (clickConnectEnd)="onClickEnd($event.event, $event.connectionState)" />
+
+<!-- 5. Pane threshold -->
+<ng-flow [paneClickDistance]="10" />         <!-- before: click tolerance, panning started at once -->
+<ng-flow [paneDragThreshold]="10" />         <!-- after: no pan or marquee until 10px; default 1 -->
+```
+
+```ts
+// 4b. `to` is in flow coordinates in (connectEnd), (clickConnectEnd), (reconnectEnd) and flow.connection()
+const p = flow.screenToFlowPosition(state.to);   // before: `to` was pane/screen-relative
+const p = state.to;                               // after   (state.pointer stays in screen coordinates)
+
+// 6. Fits resolve boolean
+const { zoom, clamped } = await flow.fitView();  // before
+const ended = await flow.fitView(); const zoom = flow.getZoom();   // after (false = interrupted / not ready)
+
+// 7. Fit padding: numbers are pixels now, default '5%'
+flow.fitView({ padding: 0.1 });    // before: ≈4.5% per side. After: 0px
+flow.fitView({ padding: '5%' });   // after. Legacy ≈ %: 0.1→4.5%, 0.2→8.3%, 0.5→16.7%, 1→25%, 2→33%
+flow.fitBounds(rect, { padding: 40 });            // 40px per side
+// Same for [fitViewOptions], <ng-flow-controls [fitViewOptions]> and the agent tools fit_view / fit_bounds.
+// Padding left unset (fitView(), fitBounds(), [fitView]="true" with no [fitViewOptions].padding, the
+// Controls fit button) changes default from legacy 0.1 (≈4.5% per side) to '5%': nearly identical framing.
+```
+
+```ts
+// 8. FlowStore (public): click-connect end state
+store.connection.set(state);                 // before: writable, screen-space `to`
+store.updateConnection(state);               // after: `connection` is a read-only computed (flow `to`);
+                                             //        `rawConnection` holds the screen-space state
+const s = store.getFinalClickConnectionState();   // new: the payload (clickConnectEnd) emits
+```
+
+Behaviour notes for the same entry:
+
+- Jittery node clicks below `nodeDragThreshold` fire `(nodeClick)`. A drag's crossing move only starts the drag (upstream semantics), so the first move past the threshold doesn't move the node.
+- A pane press below `paneDragThreshold` fires no `(moveStart)`/`(moveEnd)`.
+- `(selectionStart)` fires when the marquee crosses the threshold, not on press.
+- Click-connect no longer fires `(connectStart)`/`(connectEnd)`.
+- Reconnect drags fire them, and `(reconnectStart)` waits for `connectionDragThreshold`.
+- `FlowStore` (public): `connection` is read-only (new `rawConnection`), and `getFinalClickConnectionState()` is new; `paneDragThreshold` replaces `paneClickDistance`, and `nodeClickDistance` is gone; `fitView`/`fitBounds` resolve `boolean`.
+- A press on an edge's reconnect anchor that doesn't start a drag no longer hides the edge.
+- `(selectionEnd)` fires only after a marquee started.
+- Programmatic viewport transitions still fire `(moveStart)`/`(moveEnd)` (this differs from upstream React).
+- Crossing the marquee threshold doesn't reset the current selection: unlike upstream's Pane, angflow doesn't call `resetSelectedElements()` there.
+- `[selectionOnDrag]` now applies only when the primary button does not pan (`!isLeftClickPan(panOnDrag)`), as upstream. With the default `panOnDrag=true` a plain drag pans and `selectionOnDrag` no longer draws a marquee; use `[panOnDrag]="[1, 2]"` (or hold the selection key).
+- On a completing click, `isValid` / `toHandle` in the `(clickConnectEnd)` connection state come from angflow's click-to-connect preview line's nearest-handle snap. Upstream has no preview line, so its click-end state carries no such snap.
+- Agent tools: `fit_view` / `fit_bounds` still return `{ zoom, clamped, ended }`; `padding` units are described in the tool schema (see `@angflow/mcp`).
 
 ### Added (additive API)
 
 - `setViewport` resolves `boolean`; `setCenter` / `zoomIn` / `zoomOut` / `zoomTo` resolve
   `false` when interrupted.
-- `FitViewResult.ended`. Overlapping `fitView` calls share one promise (every caller gets
+- Overlapping `fitView` calls share one promise (every caller gets
   the last fit's result), and `fitBounds` calls share theirs. Pending fits settle with
-  `ended: false` when the flow is destroyed.
+  `false` when the flow is destroyed.
 - Agent tools: `fit_view` / `fit_bounds` results gain `ended`; `set_viewport` now awaits
   its animation and returns a boolean (its JSON-RPC reply arrives after the animation).
 - `BaseEdgeComponent` label inputs (`label`, `labelX`, `labelY`, style inputs).
 - Key combinations for `deleteKeyCode`, `selectionKeyCode` and `multiSelectionKeyCode`
   (e.g. `'Meta+Backspace'`), with upstream `useKeyPress` semantics.
 - `ReconnectEdgeOptions.onError` / `AddEdgeOptions.onError` (from `@angflow/system`).
+- `HandleBounds`, `NodeHandle` exports.
+- `FlowStore.rawConnection` and `FlowStore.getFinalClickConnectionState()`.
+- Examples: the `drag-threshold` example (port of upstream DragThreshold), in the examples app.
 - `onBeforeDelete` may return `{ nodes, edges }` to delete exactly that set (the
   `OnBeforeDelete` type widens; boolean returns keep working).
 

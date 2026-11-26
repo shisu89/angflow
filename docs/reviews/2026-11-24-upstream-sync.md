@@ -47,13 +47,13 @@ These are not upstream ports; the comparison surfaced them. Each one was checked
 |---|---|---|---|
 | `getNodesBounds` doesn't pass `nodeLookup`, so sub-flow children are bounded by their *relative* positions. The `get_nodes_bounds` agent tool inherits this. Fix together with upstream #5871. | `services/ng-flow.service.ts:859` | XS | B ✓ a450c4298 |
 | `elevateEdgesOnSelect` does nothing: the input default `false` overrides the store default, the edge renderer never reads it, and `EdgeToolbar` uses `edge.zIndex + 1` instead of `getElevatedEdgeZIndex`. | `ng-flow.component.ts:520`, `edge-renderer.component.ts:392`, `edge-toolbar.component.ts:69` | S | B ✓ 3b2ec12e9 |
-| `nodeClickDistance` is a dead input: the store signal is never read and `ngFlowDragClickDistance` is never bound. | `ng-flow.component.ts:509`, `drag.directive.ts:44` | XS (see §3) | D |
+| `nodeClickDistance` is a dead input: the store signal is never read and `ngFlowDragClickDistance` is never bound. | `ng-flow.component.ts:509`, `drag.directive.ts:44` | XS (see §3) | D1 ✓ 35bb42d24 |
 | The arrow-key a11y live announcement is missing entirely: `ariaLiveMessage` is rendered but never written. No Shift ×4 step and no snap/extent post-read. | `key-handler.directive.ts:225`, `flow-store.service.ts:295` | S | B ✓ d1139cfc6 |
 | `(paneClick)` fires, and the selection resets, when a connection drag ends on the pane. | `ng-flow.component.ts` `onPaneClick` | S | B ✓ cf05e1cc3, 882902101 |
 | A pane click cancels click-to-connect without firing `onClickConnectEnd`. | | S | B ✓ cf05e1cc3 (`(clickConnectEnd)` emitted; its `FinalConnectionState` payload stays D) |
 | Programmatic `deleteElements` doesn't cascade a parent's children, ignores `deletable: false`, and merges edges quadratically. Switching to system `getElementsToRemove` fixes all three and picks up #6074/#6111 perf, but it's a **behaviour change** and needs its own release note. | `ng-flow.service.ts:742` | M | C ✓ ae51254f7, 63875b8b8, 46145dc89, 73382f3a8, 48630023f, ff43a6b19, 346fe2de8, e083f0f2b, 7826af094 |
 | Smaller issues: store `reset()` leaves state behind for a provider-shared store; MiniMap keeps a stale `panZoom` after remount; `selectNodesData` has no equality function; key combinations like `Meta+Backspace` aren't supported. | | S each | B ✓ 92ea25a81, eeb20bbee (store reset / shared store), 0bdafc7ad, ee5b6c33d (MiniMap), cc81221fa (`selectNodesData`), 81c535327 (key combinations) |
-| `(connectEnd)` emits no `FinalConnectionState`, and `NgFlowService.connection.to` is in screen coordinates while React's `useConnection` uses flow coordinates. | | S | D |
+| `(connectEnd)` emits no `FinalConnectionState`, and `NgFlowService.connection.to` is in screen coordinates while React's `useConnection` uses flow coordinates. | | S | D1 ✓ 4734b80f4, c4778393e, 525057729 |
 
 ## 3. Breaking API changes in upstream 1.0 / React 13
 
@@ -61,16 +61,16 @@ Each needs a decision: adopt now with a deprecated alias (non-breaking, 0.4.0), 
 
 | Change | Angflow blast radius | Non-breaking path? |
 |---|---|---|
-| `Handle` type → `HandleBounds` (#5987) | `public-api.ts`, `types/edges.ts`, 5 edge components, one example | Yes: deprecated type alias |
-| `getHandleConnections` removed; `getNodeConnections({nodeId, type?, handleId?})`; `HandleConnection` → `NodeConnection` (#6114) | service, instance type, `get_handle_connections` agent tool, mcp snapshot, `AGENT_BRIDGE.md`, README | Yes: overload, deprecate, alias |
-| `nodeClickDistance` removed; a click is suppressed only if the drag moved the node (#5556, prerequisite for #6168 touch drag) | Input is already dead, so it's a no-op for consumers | Yes: keep as a deprecated no-op |
-| `onConnectEnd` / `onReconnectEnd` `to` in flow coordinates (#6117) | Only `(reconnectEnd)`'s `connectionState` | Yes in practice (document it) |
-| `paneClickDistance` → `paneDragThreshold` (default 1; gates pan **and** box-select start) (#6115) | System panzoom, `ng-flow.component.ts` input/effect/`onPaneClick`, pane marquee start, 3 examples | Yes: new input, old one becomes a deprecated alias. Largest item: hand-merge with angflow's `XYPanZoom.update()` changes, then touch testing. |
-| Default fit padding becomes `'5%'`; **numeric padding is read as pixels** (#5927) | `fitBounds` default `0.1`, `fit_view`/`fit_bounds` agent schemas, mcp snapshot. An agent sending `0.1` would get 0px. | `'5%'` default is safe now (0.1 ≈ 4.5%). Pixel semantics only in a breaking release. |
-| `setViewport` resolves `boolean` (#6064) | Direct `@angflow/system` users only | Yes |
-| `colorMode` → `forceColorMode`, default follows the system scheme, CSS `light-dark()` | Host classes, `ng-flow.css` dark rules, matchMedia listener | Breaking release |
-| Styles in `@layer xyflow` | Angflow's unlayered `ng-flow.css` would always override a layered theme | Breaking release (or ship angflow CSS in the same layer) |
-| `onNodesChange` / `onEdgesChange` receive a `NodeChangeset` / `EdgeChangeset` class | Every app using `applyNodeChanges(changes, nodes)` | Probably skip, or offer it opt-in |
+| `Handle` type → `HandleBounds` (#5987) | `public-api.ts`, `types/edges.ts`, 5 edge components, one example | Yes: deprecated type alias **D1 ✓** 21f9e39bf |
+| `getHandleConnections` removed; `getNodeConnections({nodeId, type?, handleId?})`; `HandleConnection` → `NodeConnection` (#6114) | service, instance type, `get_handle_connections` agent tool, mcp snapshot, `AGENT_BRIDGE.md`, README | Yes: overload, deprecate, alias **D1 ✓** a8c1dd275 |
+| `nodeClickDistance` removed; a click is suppressed only if the drag moved the node (#5556, prerequisite for #6168 touch drag) | Input is already dead, so it's a no-op for consumers | Yes: keep as a deprecated no-op **D1 ✓** 35bb42d24, 48e112d6a |
+| `onConnectEnd` / `onReconnectEnd` `to` in flow coordinates (#6117) | Only `(reconnectEnd)`'s `connectionState` | Yes in practice (document it) **D1 ✓** 4734b80f4, bc26279de, c4778393e, 525057729, 761312dde |
+| `paneClickDistance` → `paneDragThreshold` (default 1; gates pan **and** box-select start) (#6115) | System panzoom, `ng-flow.component.ts` input/effect/`onPaneClick`, pane marquee start, 3 examples | Yes: new input, old one becomes a deprecated alias. Largest item: hand-merge with angflow's `XYPanZoom.update()` changes, then touch testing. **D1 ✓** 768dbe548, cfb93c138, 3f34382f6 |
+| Default fit padding becomes `'5%'`; **numeric padding is read as pixels** (#5927) | `fitBounds` default `0.1`, `fit_view`/`fit_bounds` agent schemas, mcp snapshot. An agent sending `0.1` would get 0px. | `'5%'` default is safe now (0.1 ≈ 4.5%). Pixel semantics only in a breaking release. **D1 ✓** 61e01fa3b |
+| `setViewport` resolves `boolean` (#6064) | Direct `@angflow/system` users only | Yes **D1 ✓** B; 5dc910013 (`fitView` / `fitBounds`) |
+| `colorMode` → `forceColorMode`, default follows the system scheme, CSS `light-dark()` | Host classes, `ng-flow.css` dark rules, matchMedia listener | Breaking release → D2 |
+| Styles in `@layer xyflow` | Angflow's unlayered `ng-flow.css` would always override a layered theme | Breaking release (or ship angflow CSS in the same layer) → D2 |
+| `onNodesChange` / `onEdgesChange` receive a `NodeChangeset` / `EdgeChangeset` class | Every app using `applyNodeChanges(changes, nodes)` | Probably skip, or offer it opt-in → D3 |
 
 ## 4. Feature and quality opportunities
 
@@ -93,7 +93,9 @@ measurement-race, nodes-data-hooks, reconnect-edge, viewport).
 | A | Angular generic-test pages + upstream e2e specs, run in CI | Mirrors `examples/{react,svelte,vue}/src/generic-tests`. Failures feed B. Spec: [design](../superpowers/specs/2026-11-25-shared-e2e-suite-angular-design.md), plan: [plan](../superpowers/plans/2026-11-25-shared-e2e-suite-angular.md). |
 | B | Bug-fix release: §1 upstream fixes + §2 angflow-native bugs (except deletion) | Includes #6097. system 0.1.x / angular 0.3.x. Plan: [plan](../superpowers/plans/2026-11-25-bug-fix-release.md). Done: system 0.1.14 / angular 0.3.22 / mcp 0.0.4 |
 | C | Deletion via system `getElementsToRemove` (+ #6074/#6111) | Behaviour change, its own release note. Plan: [plan](../superpowers/plans/2026-11-25-deletion.md). Done (unpublished, in 0.1.14 / 0.3.22 / 0.0.4) |
-| D | 0.4.0: full upstream 1.0 API alignment (all of §3, Changeset class included) | Agent tools, mcp snapshot, `AGENT_BRIDGE.md` |
+| D1 | Upstream 1.0 API and callback alignment (§3 rows 1–7) | Spec: [design](../superpowers/specs/2026-11-25-api-alignment-d1-design.md), plan: [plan](../superpowers/plans/2026-11-25-api-alignment-d1.md). Done (unpublished, in system 0.2.0 / angular 0.4.0 / mcp 0.1.0) |
+| D2 | `forceColorMode`, `light-dark()`, `@layer xyflow`; the 2 colour-mode known failures | |
+| D3 | `NodeChangeset` / `EdgeChangeset` | |
 | E | Feature parity: `selectNode`/`selectEdge`, `changeParent`, `xy-theme.css`, DevTools panel, missing React examples (refresh `docs/examples-parity.md`), optional #5996 perf subset with #6109 | |
 | F | `@angflow/ui`: Angular port of the React Flow UI components, as a new package with no Tailwind/spartan dependency | Verify the upstream license first. Never port React Flow **Pro** examples (not open source). |
 | G | Monthly scheduled upstream triage (report only, no code changes) | Prevents drift from piling up again |
@@ -142,3 +144,21 @@ Known failures unchanged at 4 (all D), verified by the full e2e verdict (0 NOT M
 delete, Controls delete, the `delete_elements` tool and the `apply_changes` op) and
 `dissolveGroup` all go through `getElementsToRemove`. Upstream #6074 / #6111 are ported
 into system `getElementsToRemove` (ae51254f7). Commit range: `d54d18f8d..HEAD`.
+
+### D1 — results
+
+Known failures 4 → 2: the two click-connect payload entries are fixed (Task 7), and the 2 colour-mode entries remain, re-pointed to D2. Full verdict: 0 NOT MATCHED, 0 STALE, 0 chromium failures. Every D1 system change is a hand-port of one upstream PR, keeping angflow's deliberate system divergences (no-teardown `XYPanZoom.update()`, the start handler's `internal` guard, XYDrag's abort path, and so on). Commit range: `3b96f518e..HEAD`.
+
+Differences from upstream, recorded in the changelog: `selectionOnDrag` applies only when the primary button doesn't pan (matches upstream, 3f34382f6); on a completing click, `isValid` / `toHandle` come from angflow's preview-line snap; the marquee crossing doesn't call `resetSelectedElements()`; a drag's crossing move only starts the drag.
+
+Touch matrix (#6115), emulated with Playwright and CDP touch on chromium:
+
+| # | Case | Result |
+|---|---|---|
+| 1 | Tap, and tap with 3px jitter → `(paneClick)`, no pan | pass (Chrome emulation drops sub-~15px touchmoves, so a real device should confirm the jitter case) |
+| 2 | 30px drag under a 40px threshold doesn't pan; 100px pans | pass |
+| 3 | Pinch zooms at once (threshold 100) | pass |
+| 4 | Selection key held: marquee starts after 2px (threshold 50) | pass |
+| 5 | Node drag identical at threshold 0 and 50 | pass |
+| 6 | Threshold 0 pans on the first move | pass |
+| 7 | Real touch device | pending (user) |

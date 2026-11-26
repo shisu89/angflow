@@ -4,7 +4,14 @@
 
 ### Breaking changes
 
-<!-- D1: filled in by the release-docs task (Task 12). -->
+- `Handle` renamed `HandleBounds`; `NodeHandle` redefined (`Omit<HandleBounds, 'nodeId' | 'width' | 'height'>` with optional size); `HandleConnection` removed in favour of `NodeConnection` (#5987, #6114).
+- New `getConnectionLookupKey` / `getConnectionsFromLookup` (#6114).
+- `DragUpdateParams.nodeClickDistance` removed; XYDrag suppresses the click after a moved drag itself and binds once per element (#5556, #6168). The drag's crossing move only starts the drag (upstream semantics), so the first move past `nodeDragThreshold` doesn't move the node.
+- `PanZoomUpdateOptions.paneDragThreshold` replaces `paneClickDistance` / `selectionOnDrag`; `PanZoomInstance.setClickDistance` removed; `isLeftClickPan` exported (#6115).
+- XYHandle's final connection state reports `to` in flow coordinates (#6117).
+- `fitViewport` resolves `boolean`; `FitViewResult` removed; `@internal` `getFitViewport` added (#6064).
+- `defaultFitViewPadding` (`'5%'`); numeric padding is pixels; `getViewportForBounds` defaults `minZoom 0` / `maxZoom Infinity` / `padding 0`; `FitBoundsOptions.padding: Padding` (#5927).
+- The `toHandleBounds` fallback is removed from `getEdgePosition` (#5987).
 
 ### Changed (type)
 
@@ -14,10 +21,9 @@
 
 ### Added (mostly additive)
 
-- `FitViewResult.ended` (#6064), a required field (code that constructs a `FitViewResult`
-  must add it): `false` when a user gesture or another viewport call
-  interrupted the animation. Nothing to fit resolves `ended: true`; pan/zoom not
-  initialised resolves `ended: false`.
+- `fitViewport` resolves `false` when a user gesture or another viewport call
+  interrupted the animation (#6064). Nothing to fit resolves `true`; pan/zoom not
+  initialised resolves `false`. (`FitViewResult` itself is removed, see Breaking changes.)
 - New export `getRectsOverlappingArea`.
 - `ReconnectEdgeOptions.onError` and `AddEdgeOptions.onError`: validation errors from
   `reconnectEdge` / `addEdge` go there, falling back to the dev-warn sink.
