@@ -208,6 +208,31 @@ Apply-semantics differences (upstream's apply):
 
 No agent tool schema change; the `@angflow/mcp` snapshot is unchanged. Ported from xyflow/xyflow#5944 (5ff09ef77).
 
+#### API parity (E1)
+
+React / Svelte instance-API parity: `{ replace }` on the update APIs, `changeParent`, and node / edge selector signals. The updater argument change is breaking and compiles silently for loosely typed callbacks.
+
+```ts
+// 1. The updateNodeData / updateEdgeData updater receives the node / edge, not its data
+flow.updateNodeData('1', (data) => ({ count: data.count + 1 }));         // before
+flow.updateNodeData('1', (node) => ({ count: node.data.count + 1 }));    // after
+flow.updateEdgeData('e1', (data) => ({ weight: data.weight * 2 }));      // before
+flow.updateEdgeData('e1', (edge) => ({ weight: edge.data.weight * 2 })); // after
+```
+
+There is no compatibility overload. Object-form callers, including the agent bridge, are unaffected.
+
+- **Breaking (small):** `updateNode(id, { data: undefined })` and `updateEdge(id, { data: undefined })` no longer clear `data`. `data` is only applied when truthy, as in Svelte. Other keys set to `undefined` still clear their field.
+- **New:** `updateNode`, `updateNodeData`, `updateEdge` and `updateEdgeData` take `options?: { replace: boolean }` (default `false`). `updateNode` / `updateEdge` with `replace` and a full node / edge emit one `'replace'` change; `updateNodeData` / `updateEdgeData` with `replace` swap `data` wholesale instead of merging.
+- **New:** `changeParent(nodeId, parentId | null)` on `NgFlowService` and `NgFlowInstance`. It reparents a node and keeps it visually in place (position is corrected for the node's origin). `parentId === nodeId` is a no-op; a missing node or parent warns and changes nothing.
+- **New:** `selectNode(id)`, `selectEdge(id)` and `selectInternalNodes(ids)` signals (React's `useNode`, `useEdge`, `useInternalNodes`). `selectInternalNodes` keeps the given order, collapses duplicate ids and skips missing ones.
+- **Behaviour:** `updateNode` emits split `'position'` / `'data'` / `'update'` changes in one changeset, so `changes.getByType('position')` in `(nodesChange)` now sees moves made through `updateNode`. A call that produces no change emits nothing.
+- **Behaviour:** a position-only `updateNode` now goes through the drag fast path and mutates the node object in place, as drags do, instead of replacing it.
+- **Behaviour:** `setNodeGroup` reparents in one batch through `changeParent`, without the former second `setNodePositions` step. Its signature and the `set_node_group` agent tool are unchanged; `groupNodes` / `dissolveGroup` are unchanged.
+- **Behaviour:** the node selectors (`selectNode`, `selectInternalNode`, `selectInternalNodes`) notify on their own node's position and drag changes, which mutate in place. Unrelated nodes' changes still do not notify.
+- **Fixed:** pinch and pan are now blocked during a connection drag (handle drag, edge reconnect). The click-to-connect preview is deliberately excluded, so panning while a click connection is pending still works.
+- **Fixed:** with `panOnDrag` including `2`, a right-drag pan no longer fires `(paneContextMenu)`, and a plain right-click still fires it exactly once.
+
 ### Added (additive API)
 
 - `setViewport` resolves `boolean`; `setCenter` / `zoomIn` / `zoomOut` / `zoomTo` resolve

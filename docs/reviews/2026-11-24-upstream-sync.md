@@ -74,7 +74,7 @@ Each needs a decision: adopt now with a deprecated alias (non-breaking, 0.4.0), 
 
 ## 4. Feature and quality opportunities
 
-- **Upstream features angflow lacks:** `selectNode` / `selectEdge` signals (the `useNode` / `useEdge` equivalents, trivial), `changeParent` (S), `xy-theme.css` (S).
+- **Upstream features angflow lacks:** `selectNode` / `selectEdge` signals (the `useNode` / `useEdge` equivalents, trivial) **done (E1)**, `changeParent` (S) **done (E1)**, `xy-theme.css` (S).
 - **Perf (optional, L):** a subset of #5996: skip subflow work when there are none, and use an incremental connection lookup (safe because angflow clones changed edges). Must ship with #6109 plus its follow-ups c7a19b8ab and 74d510a22. Avoid #5972's `updateNodeInternals` refactor, which would require re-porting angflow's `initial` flag.
 - **Tests:** upstream added cross-framework `generic-tests` covering pane activation keys, click-connect, intersection with origin, viewport transitions and reconnect, plus Playwright specs and examples (DragThreshold, MeasurementRace, Remount, FixedExtentNode). Port these as regression scenarios into `tests/playwright` / `examples/angular`.
 - **Process:** keep the reference copies tracking upstream and repeat this triage per upstream minor release, so the drift doesn't grow to ~1000 commits again.
@@ -96,7 +96,7 @@ measurement-race, nodes-data-hooks, reconnect-edge, viewport).
 | D1 | Upstream 1.0 API and callback alignment (§3 rows 1–7) | Spec: [design](../superpowers/specs/2026-11-25-api-alignment-d1-design.md), plan: [plan](../superpowers/plans/2026-11-25-api-alignment-d1.md). Done (unpublished, in system 0.2.0 / angular 0.4.0 / mcp 0.1.0) |
 | D2 | `forceColorMode`, `light-dark()`, `@layer xyflow`; the 2 colour-mode known failures | Done. Spec: [design](../superpowers/specs/2026-11-26-theming-d2-design.md), plan: [plan](../superpowers/plans/2026-11-26-theming-d2.md). Unpublished, in system 0.2.0 / angular 0.4.0 / mcp 0.1.0 |
 | D3 | `NodeChangeset` / `EdgeChangeset` (#5944 and follow-ups) | Done. Spec: [design](../superpowers/specs/2026-11-26-changesets-d3-design.md), plan: [plan](../superpowers/plans/2026-11-26-changesets-d3.md). Unpublished, in system 0.2.0 / angular 0.4.0 / mcp 0.1.0 |
-| E | Feature parity: `selectNode`/`selectEdge`, `changeParent`, DevTools panel, missing React examples (refresh `docs/examples-parity.md`), optional #5996 perf subset with #6109 | |
+| E | Feature parity. **E1 ✓** (`selectNode`/`selectEdge`/`selectInternalNodes`, `changeParent`, update-API alignment); **E2** and **E3** pending (DevTools panel, missing React examples (refresh `docs/examples-parity.md`), optional #5996 perf subset with #6109). | E1 done, unpublished, in system 0.2.0 / angular 0.4.0 / mcp 0.1.0. Spec: [design](../superpowers/specs/2026-11-26-feature-parity-e1-design.md), plan: [plan](../superpowers/plans/2026-11-26-feature-parity-e1.md). |
 | F | `@angflow/ui`: Angular port of the React Flow UI components, as a new package with no Tailwind/spartan dependency | Verify the upstream license first. Never port React Flow **Pro** examples (not open source). |
 | G | Monthly scheduled upstream triage (report only, no code changes) | Prevents drift from piling up again |
 
@@ -202,3 +202,17 @@ Found during execution:
 Behaviour notes: `setNodeCollapsed` and `dissolveGroup` still emit `'replace'`; `addNodes` / `addEdges` store items by reference; a key set to `undefined` in `updateNode` clears it; clearing a changeset inside a handler does nothing, as in React.
 
 Final-review fixes (after the docs commit): the agent add tools (`add_node`, `add_nodes`, `add_edge`, `add_edges` and the matching `apply_changes` ops) reject ids that already exist, because changesets ignore an `'add'` for an existing id; `NgFlowService.groupNodes` throws when the group id exists; `recordOp` deep-clones params so a later fast-path move cannot rewrite a logged op; and doc corrections (README, changelog qualifiers, review-report counts and citations).
+
+### E1 — results
+
+Commits: 3136449f0 (selectors), f0cba51ee (selectors notify on in-place drag), a766a0eed (system `changeParentNode`), 839a7dd79 (update APIs and `changeParent`), 7a75ccef8 (pan/zoom fixes), plus the docs commit.
+
+Known failures stay at 0. Full e2e verdict: 0 known failures, `verdict: OK` (79 passed, 6 skipped). Tests: system 187, angular 1155, mcp 65, examples `ng test` 6. The mcp snapshot is unchanged (no agent tool change).
+
+Deviations from the plan, as executed:
+
+1. `connectionInProgress` excludes the click-connect preview, so panning while a click connection is pending still works.
+2. `positionAbsolute` is compared by value in the internal-node selectors, because `updateAbsolutePositions` reassigns a fresh object for every root node on parented moves, which would otherwise notify unrelated nodes.
+3. `groupNodes` / `dissolveGroup` do not use `changeParent` (see the 839a7dd79 body): they are unchanged, and only `setNodeGroup` delegates to it.
+
+Manual Chromium check (7a75ccef8 work): on the figma example a right-click emits `(paneContextMenu)` once and a right-drag pan does not; on the subflows example `changeParent` keeps the node at the same on-screen position.

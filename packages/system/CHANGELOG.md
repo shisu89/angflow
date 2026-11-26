@@ -38,6 +38,7 @@
   interrupted the animation (#6064). Nothing to fit resolves `true`; pan/zoom not
   initialised resolves `false`. (`FitViewResult` itself is removed, see Breaking changes.)
 - New export `getRectsOverlappingArea`.
+- New export `changeParentNode(nodeId, nodeLookup, parentId, nodeOrigin, callback)`: computes the position a node needs under a new parent (or at the root for `null`) so it stays visually in place, corrected for the node's own origin (falls back to `nodeOrigin`). Ported from xyflow/xyflow#5939 (8843870d5).
 - `ReconnectEdgeOptions.onError` and `AddEdgeOptions.onError`: validation errors from
   `reconnectEdge` / `addEdge` go there, falling back to the dev-warn sink.
 

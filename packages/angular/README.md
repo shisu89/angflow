@@ -223,10 +223,23 @@ flowService.fitView();
 flowService.zoomIn();
 flowService.addNodes({ id: '4', position: { x: 0, y: 0 }, data: { label: 'New' } });
 flowService.updateNodeData('2', { label: 'Updated' });
+flowService.updateNodeData('2', (node) => ({ count: node.data.count + 1 })); // updater receives the node
+flowService.updateNode('2', { position: { x: 10, y: 20 } }, { replace: false });
+flowService.changeParent('2', 'group-1'); // reparent, keeping the node in place; null detaches
 flowService.deleteElements({ nodes: [{ id: '1' }] });
 flowService.screenToFlowPosition({ x: event.clientX, y: event.clientY });
 flowService.toObject(); // { nodes, edges, viewport }
 ```
+
+Reactive selectors return signals:
+
+```typescript
+const node = flowService.selectNode('2');                    // Signal of the node (or undefined)
+const edge = flowService.selectEdge('e1');                   // Signal of the edge (or undefined)
+const internals = flowService.selectInternalNodes(['1', '2']); // Signal of internal nodes, in the given order
+```
+
+`updateNode`, `updateNodeData`, `updateEdge` and `updateEdgeData` take an optional `{ replace: true }` to swap the element (or its `data`) wholesale instead of merging.
 
 ## Floating Edges
 

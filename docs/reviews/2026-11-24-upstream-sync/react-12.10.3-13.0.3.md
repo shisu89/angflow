@@ -22,11 +22,11 @@ Kinds: BUG = bug fix, FEAT = feature, BRK = breaking, PERF = perf.
 | 15 | 13.0.0 | BRK: fitViewOptions.padding numbers are pixels (0.1 ~ 4.5%) | BRK | SYS (see #8) | same as #8 | - |
 | 16 | 13.0.0 | Min React 18; UMD removal; style.css import path | BRK | N/A | n/a (Angular peer >=19, ESM only) | - |
 | 17 | 13.0.0 | BRK: `onNodesChange`/`onEdgesChange` receive `NodeChangeset`/`EdgeChangeset` class (not array) | BRK | PRESENT (D3: 49c7d0700, cba6dc331, d7dc98c1e; #5944) | Was: Angular emitted plain `NodeChange[]` (ng-flow.component.ts:903 `store.onNodesChange`, `(nodesChange)` output) and has its own utils/changes.ts (applyNodeChanges etc.) rather than system changes module. System 1.0 has `packages/system/src/changes/*` (Changeset, `.applyTo`, `getByType`, new `update`/`data` change types, `changeParentNode`). Matching = swap utils/changes.ts for system's and change output payload; very invasive for apps using `applyNodeChanges(changes, nodes)` | large (breaking) |
-| 18 | 13.0.0 | `changeParent` on useReactFlow | FEAT | ABSENT | services/ng-flow.service.ts has `updateNode(id,{parentId})` (:381,:408) + setNodeGroup (:376) but no position-preserving re-parent helper; system `changeParentNode` (8843870d5) not in local system | small (after system bump; setNodeGroup partially covers) |
+| 18 | 13.0.0 | `changeParent` on useReactFlow | FEAT | PRESENT (E1: a766a0eed, 839a7dd79) | Was: services/ng-flow.service.ts has `updateNode(id,{parentId})` (:381,:408) + setNodeGroup (:376) but no position-preserving re-parent helper; system `changeParentNode` (8843870d5) not in local system | small (after system bump; setNodeGroup partially covers) |
 | 19 | 13.0.0 | `elevateEdgesOnSelect` defaults true | BRK/FEAT | ABSENT (and a latent no-op) | ng-flow.component.ts:520 default false; flow-store :231 default true but overwritten by effect :807. container/edge-renderer/edge-renderer.component.ts:392 `getEdgeZIndex` = `edge.zIndex ?? max(sourceZ,targetZ)`; never uses elevateEdgesOnSelect/zIndexMode/`getElevatedEdgeZIndex`. So the input is documented but has no effect on edge rendering today (selected edges only elevated if CSS does it) | small |
 | 20 | 13.0.0 | Exported styles in `@layer xyflow` | FEAT/BRK | PARTIAL | styles/base.css imports system CSS verbatim (4 lines), so layering is inherited on a system bump, but angflow's own styles/ng-flow.css (461 lines) and inline styles stay un-layered and would always win over layered theme; consumers' override assumptions change | small |
 | 21 | 13.0.0 | `xy-theme.css` (default theme on top of base) | FEAT | ABSENT | styles/ has base.css/style.css/ng-flow.css only; package exports dist/style.css, dist/base.css (package.json:36-37). Needs SYS theme.css then an `ng-theme.css` wrapper | small |
-| 22 | 13.0.0 | `useNode` / `useEdge` hooks | FEAT | ABSENT | NgFlowService has `selectNodesData`, `selectInternalNode` (:918-975), `selectNodeConnections`; no `selectNode(id)` / `selectEdge(id)` / `selectInternalNodes(ids)` | trivial |
+| 22 | 13.0.0 | `useNode` / `useEdge` hooks | FEAT | PRESENT (E1: 3136449f0, f0cba51ee) | Was: NgFlowService has `selectNodesData`, `selectInternalNode` (:918-975), `selectNodeConnections`; no `selectNode(id)` / `selectEdge(id)` / `selectInternalNodes(ids)` | trivial |
 | 23 | 13.0.0 | Fine-grained reactivity, perf (pubsub, React Compiler, optimized processing, handles, pane cursor style recalc) | PERF | N/A | React render model. Angular already signal/OnPush. Only analogue: selectNodesData (ng-flow.service.ts:921) returns a fresh array each version bump with no `equal`, so consumers re-run on every graph version (see #26) | - |
 | 24 | 13.0.0 | `useEqualSelector` | FEAT | N/A | React hook | - |
 | 25 | 13.0.0 | Source maps/src in package | pkg | N/A | - | - |
@@ -70,12 +70,12 @@ Kinds: BUG = bug fix, FEAT = feature, BRK = breaking, PERF = perf.
 | 63 | 12.11.0 | Fix node resizing beyond absolute extents | BUG | SYS | inherited via XYResizer | - |
 
 ## Counts (63 rows; some rows merge several changelog bullets)
-- PRESENT: 8 (#1, 17 via D3, 37, 43, 46, 52, 58, 60; #46 is PRESENT/SYS)
+- PRESENT: 10 (#1, 17 via D3, 18 and 22 via E1, 37, 43, 46, 52, 58, 60; #46 is PRESENT/SYS)
 - PARTIAL: 12 (#3, 5, 8, 20, 26, 29, 33, 35, 39, 41, 48, 61)
-- ABSENT: 11 (#2, 11, 12, 13, 18, 19, 21, 22, 34, 49, 56), plus #50, which is N/A / ABSENT (a feature gap)
+- ABSENT: 9 (#2, 11, 12, 13, 19, 21, 34, 49, 56), plus #50, which is N/A / ABSENT (a feature gap)
 - SYS (inherited on system bump, little/no wrapper work): 10 (#6, 7, 14, 15, 27, 38, 45, 47, 54, 63), plus bits of 8/29
 - N/A (React-specific or not affected): 21
-- Total: 8 + 12 + 11 + 1 (#50) + 10 + 21 = 63
+- Total: 10 + 12 + 9 + 1 (#50) + 10 + 21 = 63
 
 ## Ranked work list (ABSENT/PARTIAL), by user impact
 
