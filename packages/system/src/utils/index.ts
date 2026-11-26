@@ -9,3 +9,4 @@ export * from './edge-toolbar';
 export * from './store';
 export * from './types';
 export * from './shallow-node-data';
+export * from './subflows';
