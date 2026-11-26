@@ -1,0 +1,24 @@
+/*
+ * Angular-only colour rules for @angflow/angular. Internal: the build bundles
+ * this file into `@angflow/angular/style.css` only (not base.css), inside
+ * `@layer xyflow`, after `ng-flow.css`. Colours come from system tokens, which
+ * follow the colour scheme through `light-dark()`.
+ */
+
+/* ── Nodes ──────────────────────────────────────────────────────── */
+/* System applies these shadows to the built-in node types only; angflow
+   applies them to every selectable node, custom types included. */
+.xy-flow__node.selectable:hover {
+  box-shadow: var(--xy-node-boxshadow-hover, var(--xy-node-boxshadow-hover-default));
+}
+.xy-flow__node.selectable.selected,
+.xy-flow__node.selectable:focus,
+.xy-flow__node.selectable:focus-visible {
+  box-shadow: var(--xy-node-boxshadow-selected, var(--xy-node-boxshadow-selected-default));
+}
+
+/* Drop target while a connection is dragged over a node. */
+.xy-flow__node.connection-target {
+  outline: 2px dashed var(--xy-connection-target-outline-color, #3b82f6);
+  outline-offset: 4px;
+}

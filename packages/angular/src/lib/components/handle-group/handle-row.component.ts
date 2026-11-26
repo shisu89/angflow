@@ -31,7 +31,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
     }
     .af-handle-row__label {
       font-size: 0.75rem;
-      color: var(--text-secondary, #666);
+      color: var(--text-secondary, light-dark(#666, #a1a1aa));
     }
   `,
 })

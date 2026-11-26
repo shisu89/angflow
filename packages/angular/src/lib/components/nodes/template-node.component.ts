@@ -117,15 +117,15 @@ const ICONS: Record<string, string> = {
         min-width: 140px;
         max-width: 280px;
         padding: 8px 10px;
-        border: 1px solid #d4d4d8;
-        border-left: 3px solid #94a3b8;
+        border: 1px solid var(--ngf-template-node-border-color, light-dark(#d4d4d8, #3c3c3c));
+        border-left: 3px solid var(--ngf-template-node-accent, light-dark(#94a3b8, #64748b));
         border-radius: 6px;
-        background: #ffffff;
+        background: var(--ngf-template-node-bg, light-dark(#ffffff, #1e1e1e));
         font-size: 12px;
-        color: #1e293b;
+        color: var(--ngf-template-node-color, light-dark(#1e293b, #f8f8f8));
       }
       .ng-flow__template-node--selected {
-        box-shadow: 0 0 0 1px #6366f1;
+        box-shadow: 0 0 0 1px var(--ngf-template-node-selected-ring, #6366f1);
       }
       .ng-flow__template-node--compact {
         padding: 4px 8px;
@@ -154,11 +154,26 @@ const ICONS: Record<string, string> = {
         font-size: 10px;
         line-height: 16px;
       }
-      .ng-flow__template-node__badge--slate { background: #f1f5f9; color: #475569; }
-      .ng-flow__template-node__badge--indigo { background: #e0e7ff; color: #4338ca; }
-      .ng-flow__template-node__badge--emerald { background: #d1fae5; color: #047857; }
-      .ng-flow__template-node__badge--amber { background: #fef3c7; color: #b45309; }
-      .ng-flow__template-node__badge--rose { background: #ffe4e6; color: #be123c; }
+      .ng-flow__template-node__badge--slate {
+        background: var(--ngf-template-node-badge-slate-bg, light-dark(#f1f5f9, #334155));
+        color: var(--ngf-template-node-badge-slate-color, light-dark(#475569, #cbd5e1));
+      }
+      .ng-flow__template-node__badge--indigo {
+        background: var(--ngf-template-node-badge-indigo-bg, light-dark(#e0e7ff, #312e81));
+        color: var(--ngf-template-node-badge-indigo-color, light-dark(#4338ca, #c7d2fe));
+      }
+      .ng-flow__template-node__badge--emerald {
+        background: var(--ngf-template-node-badge-emerald-bg, light-dark(#d1fae5, #064e3b));
+        color: var(--ngf-template-node-badge-emerald-color, light-dark(#047857, #a7f3d0));
+      }
+      .ng-flow__template-node__badge--amber {
+        background: var(--ngf-template-node-badge-amber-bg, light-dark(#fef3c7, #78350f));
+        color: var(--ngf-template-node-badge-amber-color, light-dark(#b45309, #fde68a));
+      }
+      .ng-flow__template-node__badge--rose {
+        background: var(--ngf-template-node-badge-rose-bg, light-dark(#ffe4e6, #881337));
+        color: var(--ngf-template-node-badge-rose-color, light-dark(#be123c, #fecdd3));
+      }
       .ng-flow__template-node__fields {
         margin: 6px 0 0;
       }
@@ -168,7 +183,7 @@ const ICONS: Record<string, string> = {
         gap: 8px;
       }
       .ng-flow__template-node__field dt {
-        color: #64748b;
+        color: var(--ngf-template-node-label-color, light-dark(#64748b, #a1a1aa));
         font-weight: 400;
       }
       .ng-flow__template-node__field dd {
@@ -177,7 +192,7 @@ const ICONS: Record<string, string> = {
       }
       .ng-flow__template-node__body {
         margin: 6px 0 0;
-        color: #475569;
+        color: var(--ngf-template-node-body-color, light-dark(#475569, #d4d4d8));
       }
     `,
   ],
