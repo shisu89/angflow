@@ -214,24 +214,28 @@ React / Svelte instance-API parity: `{ replace }` on the update APIs, `changePar
 
 ```ts
 // 1. The updateNodeData / updateEdgeData updater receives the node / edge, not its data
-flow.updateNodeData('1', (data) => ({ count: data.count + 1 }));         // before
-flow.updateNodeData('1', (node) => ({ count: node.data.count + 1 }));    // after
-flow.updateEdgeData('e1', (data) => ({ weight: data.weight * 2 }));      // before
-flow.updateEdgeData('e1', (edge) => ({ weight: edge.data.weight * 2 })); // after
+flow.updateNodeData('1', (data) => ({ count: (data['count'] as number) + 1 }));              // before
+flow.updateNodeData('1', (node) => ({ count: (node.data['count'] as number) + 1 }));         // after
+flow.updateEdgeData('e1', (data) => ({ weight: (data?.['weight'] as number) * 2 }));         // before
+flow.updateEdgeData('e1', (edge) => ({ weight: (edge.data?.['weight'] as number) * 2 }));    // after
 ```
 
-There is no compatibility overload. Object-form callers, including the agent bridge, are unaffected.
+With the default `Record<string, unknown>` data the casts are needed; a typed node / edge generic (`NgFlowService<MyNode, MyEdge>`) makes them unnecessary. There is no compatibility overload. Object-form callers, including the agent bridge, are unaffected.
 
-- **Breaking (small):** `updateNode(id, { data: undefined })` and `updateEdge(id, { data: undefined })` no longer clear `data`. `data` is only applied when truthy, as in Svelte. Other keys set to `undefined` still clear their field.
+- **Breaking (small):** `updateNode(id, { data: undefined })` and `updateEdge(id, { data: undefined })` no longer clear `data`. `data` is only applied when truthy, as in Svelte. `position: undefined` is ignored as well (no position change). Other keys set to `undefined` still clear their field.
 - **New:** `updateNode`, `updateNodeData`, `updateEdge` and `updateEdgeData` take `options?: { replace: boolean }` (default `false`). `updateNode` / `updateEdge` with `replace` and a full node / edge emit one `'replace'` change; `updateNodeData` / `updateEdgeData` with `replace` swap `data` wholesale instead of merging.
 - **New:** `changeParent(nodeId, parentId | null)` on `NgFlowService` and `NgFlowInstance`. It reparents a node and keeps it visually in place (position is corrected for the node's origin). `parentId === nodeId` is a no-op; a missing node or parent warns and changes nothing.
 - **New:** `selectNode(id)`, `selectEdge(id)` and `selectInternalNodes(ids)` signals (React's `useNode`, `useEdge`, `useInternalNodes`). `selectInternalNodes` keeps the given order, collapses duplicate ids and skips missing ones.
 - **Behaviour:** `updateNode` emits split `'position'` / `'data'` / `'update'` changes in one changeset, so `changes.getByType('position')` in `(nodesChange)` now sees moves made through `updateNode`. A call that produces no change emits nothing.
+- **Behaviour:** `updateNode(id, { data })` sends a `'data'` change only when `data` is a new object. Changing `node.data` in place and then calling `updateNode(id, { data: node.data })` now sends no data change, because it is the same reference. Pass a new object instead, e.g. `updateNode(id, { data: { ...node.data, label: 'x' } })`.
 - **Behaviour:** a position-only `updateNode` emits a `'position'` change. It is applied immutably, as in React and Svelte: the node object is replaced and the host's `[nodes]` object is never mutated.
 - **Behaviour:** `setNodeGroup` reparents in one batch through `changeParent`, without the former second `setNodePositions` step. Its signature and the `set_node_group` agent tool are unchanged; `groupNodes` / `dissolveGroup` are unchanged.
 - **Behaviour:** the node selectors (`selectNode`, `selectInternalNode`, `selectInternalNodes`) notify on their own node's position and drag changes, which mutate in place. Unrelated nodes' changes still do not notify.
-- **Fixed:** pinch and pan are now blocked during a connection drag (handle drag, edge reconnect). The click-to-connect preview is deliberately excluded, so panning while a click connection is pending still works.
-- **Fixed:** with `panOnDrag` including `2`, a right-drag pan no longer fires `(paneContextMenu)`, and a plain right-click still fires it exactly once.
+- **Fixed:** touch pinch and drag-pan are now blocked during a connection drag (handle drag, edge reconnect). Wheel and trackpad zoom still work, as upstream (the pan/zoom filter lets wheel events through). The click-to-connect preview is deliberately excluded, so panning while a click connection is pending still works.
+- **Fixed:** with `panOnDrag` including `2`, a right-drag pan no longer fires `(paneContextMenu)`, and a plain right-click still fires it exactly once. In that mode it is emitted on mouseup and carries the `mouseup` event (not the native `contextmenu` event), as upstream does.
+- **Fixed:** `(paneContextMenu)` fires only when the right-click targets the pane itself, as React's Pane does. A right-click on a node, edge or the nodes-selection box used to fire it as well, next to `(nodeContextMenu)` / `(edgeContextMenu)` / `(selectionContextMenu)`. The browser menu is still suppressed anywhere in the pane.
+- **Fixed:** draggable nodes, every edge and the nodes-selection box carry `noPanClassName` (`nopan`), as in React. With `panOnDrag` including `2`, a right-drag starting on a node used to pan the view and emit `(paneContextMenu)` on mouseup. A drag starting on an edge or the nodes-selection box no longer pans, and with `panOnScroll` a wheel over them no longer pans.
+- **Fixed:** `setNodeGroup(id, null)` (and the `set_node_group` tool) clears `extent: 'parent'` when detaching, as `dissolveGroup` does. A detached node kept it and logged error 005 on every drag frame.
 
 ### Added (additive API)
 

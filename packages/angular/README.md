@@ -223,7 +223,7 @@ flowService.fitView();
 flowService.zoomIn();
 flowService.addNodes({ id: '4', position: { x: 0, y: 0 }, data: { label: 'New' } });
 flowService.updateNodeData('2', { label: 'Updated' });
-flowService.updateNodeData('2', (node) => ({ count: node.data.count + 1 })); // updater receives the node
+flowService.updateNodeData('2', (node) => ({ count: (node.data['count'] as number) + 1 })); // updater receives the node
 flowService.updateNode('2', { position: { x: 10, y: 20 } }, { replace: false });
 flowService.changeParent('2', 'group-1'); // reparent, keeping the node in place; null detaches
 flowService.deleteElements({ nodes: [{ id: '1' }] });

@@ -215,4 +215,6 @@ Deviations from the plan, as executed:
 2. `positionAbsolute` is compared by value in the internal-node selectors, because `updateAbsolutePositions` reassigns a fresh object for every root node on parented moves, which would otherwise notify unrelated nodes.
 3. `groupNodes` / `dissolveGroup` do not use `changeParent` (see the 839a7dd79 body): they are unchanged, and only `setNodeGroup` delegates to it.
 
+Final-review fixes (after the docs commit dad2ed5b7): `updateNode` is applied immutably and never takes the in-place position fast path, so a host's `[nodes]` objects are not mutated; `(paneContextMenu)` fires only for a right-click on the pane itself, and draggable nodes, edges and the nodes-selection box carry `nopan` (React's Pane, NodeWrapper, EdgeWrapper, NodesSelection); `selectNode` / `selectEdge` read the lookups instead of `find()`; `connectionIsClickPreview` is a signal; `setNodeGroup(id, null)` clears `extent: 'parent'`; and doc corrections (wheel zoom during a connection, the mouseup `(paneContextMenu)`, `position: undefined`, same-reference `data`, type-checking updater snippets).
+
 Manual Chromium check (7a75ccef8 work): on the figma example a right-click emits `(paneContextMenu)` once and a right-drag pan does not; on the subflows example `changeParent` keeps the node at the same on-screen position.
