@@ -180,7 +180,7 @@ Angular can't use (b) without moving from the global `store.version()` signal to
 
 Recommended subset (medium effort, low risk):
 - (a) as-is
-- (c) incremental lookup, plus #6109 + c7a19b8ab + 74d510a22. Safe in angflow: `applyEdgeChanges` clones changed edges (`angular/src/lib/utils/changes.ts:48-57`), no angular code mutates edge endpoints in place, and `edgeLookup` persists in `FlowStore`. It turns per-edge-change cost from "reallocate every lookup map" into an identity scan.
+- (c) incremental lookup, plus #6109 + c7a19b8ab + 74d510a22. Safe in angflow: `applyEdgeChanges` clones changed edges (`system/src/changes/apply.ts`, `{ ...element }` before applying; D3), no angular code mutates edge endpoints in place, and `edgeLookup` persists in `FlowStore`. It turns per-edge-change cost from "reallocate every lookup map" into an identity scan.
 - Make `isParent` optional if (b) is ever taken.
 
 Skip #5972 unless you also take #5989 + #6126 and re-add `initial`.
