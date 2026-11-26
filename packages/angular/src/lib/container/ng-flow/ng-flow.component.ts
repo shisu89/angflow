@@ -919,6 +919,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       // here explicitly — the method body short-circuits while panZoomInstance
       // is null on first run, so the inner read never registers a dependency.
       this.store.userSelectionActive();
+      this.store.connectionInProgress();
       this.updatePanZoomOptions();
     });
 
@@ -1175,8 +1176,22 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     this.paneClick.emit(event);
   }
 
+  /**
+   * Native `contextmenu` on the pane. Always suppresses the browser menu. When right-drag panning
+   * is enabled (`panOnDrag` includes 2), XYPanZoom emits `(paneContextMenu)` itself on a
+   * right-click that did not drag, so this handler must not emit a second time. Mirrors React's
+   * `Pane.onContextMenu`.
+   */
   onPaneContextMenu(event: MouseEvent): void {
     event.preventDefault();
+    const panOnDrag = this.effectivePanOnDrag();
+    if (Array.isArray(panOnDrag) && panOnDrag.includes(2)) {
+      return;
+    }
+    this.emitPaneContextMenu(event);
+  }
+
+  private emitPaneContextMenu(event: MouseEvent): void {
     // Right-click also cancels a pending click-to-connect.
     if (this.store.connectionClickStartHandle()) {
       this.store.connectionClickStartHandle.set(null);
@@ -1247,6 +1262,8 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       noPanClassName: this.noPanClassName(),
       noWheelClassName: this.noWheelClassName(),
       userSelectionActive: this.store.userSelectionActive(),
+      connectionInProgress: this.store.connectionInProgress(),
+      onPaneContextMenu: (event: MouseEvent) => this.emitPaneContextMenu(event),
       lib: 'ng',
       onTransformChange: (transform: Transform) => {
         this.store.transform.set(transform);

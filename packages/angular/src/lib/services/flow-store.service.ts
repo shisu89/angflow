@@ -269,6 +269,13 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
    * unless you need the raw screen-space state.
    */
   readonly rawConnection = signal<ConnectionState>({ ...initialConnection });
+  /**
+   * True while a connection *drag* is in progress (XYHandle, edge reconnect); not for the
+   * click-to-connect preview line, which must not block panning. A boolean `computed`, so it
+   * doesn't notify on every pointer move. `connectionIsClickPreview` is a plain field, but it is
+   * always written immediately before `rawConnection`, which re-evaluates this computed.
+   */
+  readonly connectionInProgress = computed(() => this.rawConnection().inProgress && !this.connectionIsClickPreview);
 
   /**
    * The current connection with `to` in flow coordinates, like upstream React's store
