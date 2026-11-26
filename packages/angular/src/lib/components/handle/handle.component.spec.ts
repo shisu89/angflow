@@ -11,7 +11,7 @@
  * vi.mock with { spy: true } wraps every @angflow/system export in a spy but
  * keeps real implementations, so the data-registration tests are unaffected.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection, ɵSIGNAL } from '@angular/core';
 import * as system from '@angflow/system';
@@ -24,6 +24,20 @@ import type { HandleType } from '@angflow/system';
 // This lets tests call vi.spyOn(system.XYHandle, 'onPointerDown') to intercept
 // the call from HandleComponent.onPointerDown without mocking its logic.
 vi.mock('@angflow/system', { spy: true });
+
+/**
+ * jsdom does not implement elementFromPoint, which XYHandle.isValid calls. Stub it when missing;
+ * the returned function restores the original state (call it in afterEach).
+ */
+function stubElementFromPoint(): () => void {
+  const original = Object.getOwnPropertyDescriptor(document, 'elementFromPoint');
+  if (typeof document.elementFromPoint === 'function') return () => {};
+  Object.defineProperty(document, 'elementFromPoint', { value: () => null, writable: true, configurable: true });
+  return () => {
+    if (original) Object.defineProperty(document, 'elementFromPoint', original);
+    else delete (document as unknown as Record<string, unknown>)['elementFromPoint'];
+  };
+}
 
 /** Set an input() signal's value directly without going through the template. */
 function setSignalInput<T>(instance: unknown, inputName: string, value: T): void {
@@ -424,6 +438,12 @@ describe('HandleComponent — connection-start gating', () => {
 
 describe('HandleComponent — click-connect fires only click-connect events', () => {
   let store: FlowStore;
+  let restoreElementFromPoint = (): void => {};
+
+  afterEach(() => {
+    restoreElementFromPoint();
+    restoreElementFromPoint = () => {};
+  });
 
   beforeEach(() => {
     TestBed.resetTestingModule();
@@ -471,10 +491,7 @@ describe('HandleComponent — click-connect fires only click-connect events', ()
   });
 
   it('second click completing on another handle fires onClickConnectEnd only', () => {
-    // jsdom does not implement elementFromPoint, which XYHandle.isValid calls.
-    if (!document.elementFromPoint) {
-      Object.defineProperty(document, 'elementFromPoint', { value: () => null, writable: true, configurable: true });
-    }
+    restoreElementFromPoint = stubElementFromPoint();
     const fixture = mountSource();
     store.connectionClickStartHandle.set({ nodeId: 'other', handleId: null, type: 'source' });
     click(fixture);
@@ -491,6 +508,7 @@ describe('HandleComponent — click-connect end payload (#6117)', () => {
     to: null, toHandle: null, toPosition: null, toNode: null, pointer: null,
   };
   let store: FlowStore;
+  let restoreElementFromPoint = (): void => {};
 
   beforeEach(() => {
     TestBed.resetTestingModule();
@@ -505,11 +523,10 @@ describe('HandleComponent — click-connect end payload (#6117)', () => {
     store = TestBed.inject(FlowStore);
     store.onConnectEnd = vi.fn();
     store.onClickConnectEnd = vi.fn();
-    // jsdom does not implement elementFromPoint, which XYHandle.isValid calls.
-    if (!document.elementFromPoint) {
-      Object.defineProperty(document, 'elementFromPoint', { value: () => null, writable: true, configurable: true });
-    }
+    restoreElementFromPoint = stubElementFromPoint();
   });
+
+  afterEach(() => restoreElementFromPoint());
 
   function mountSource() {
     const fixture = TestBed.createComponent(HandleComponent);
@@ -576,6 +593,14 @@ describe('HandleComponent — click-connect end payload (#6117)', () => {
     expect(evt).toBe(event);
     expect(state['to']).toEqual({ x: 100, y: 100 });
     expect('inProgress' in state).toBe(false);
+    expect(store.connectionClickStartHandle()).toBeNull();
+  });
+
+  it('a re-click of the armed handle without a preview reports the empty state', () => {
+    const fixture = mountSource();
+    click(fixture);
+    click(fixture);
+    expect(endCall()[1]).toEqual(EMPTY_FINAL);
     expect(store.connectionClickStartHandle()).toBeNull();
   });
 
