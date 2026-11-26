@@ -14,8 +14,8 @@ import type {
   SelectionRect,
   ZIndexMode,
   AriaLabelConfig,
-  NodeChange,
-  EdgeChange,
+  NodeChangeset,
+  EdgeChangeset,
 } from '@angflow/system';
 
 import type { Node, Edge, DefaultEdgeOptions } from '.';
@@ -39,8 +39,8 @@ export interface FlowStoreState<NodeType extends Node = Node, EdgeType extends E
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   connectionLookup: Map<string, Map<string, any>>; // store interface mirrors xyflow boundary types
 
-  onNodesChange: ((changes: NodeChange<NodeType>[]) => void) | null;
-  onEdgesChange: ((changes: EdgeChange<EdgeType>[]) => void) | null;
+  onNodesChange: ((changes: NodeChangeset<NodeType>) => void) | null;
+  onEdgesChange: ((changes: EdgeChangeset<EdgeType>) => void) | null;
 
   hasDefaultNodes: boolean;
   hasDefaultEdges: boolean;

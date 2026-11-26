@@ -7,7 +7,7 @@ import { NgFlowComponent } from '../../container/ng-flow/ng-flow.component';
 import { FlowStore } from '../../services/flow-store.service';
 import { NgFlowService } from '../../services/ng-flow.service';
 import type { Node } from '../../types';
-import { initialConnection } from '@angflow/system';
+import { initialConnection, NodeChangeset } from '@angflow/system';
 
 @Component({ selector: 'test-sidebar', standalone: true, template: '' })
 class SidebarComponent {
@@ -217,6 +217,7 @@ describe('NgFlowProviderComponent state sharing', () => {
     seen.length = 0;
     store.triggerNodeChanges([{ id: 'n1', type: 'select', selected: true }]);
     expect(seen.length).toBe(1);
+    expect(seen[0]).toBeInstanceOf(NodeChangeset);
   });
 
   it('destroying one <ng-flow> keeps a sibling flow\'s wiring in the shared store', () => {

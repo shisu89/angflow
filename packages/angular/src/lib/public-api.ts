@@ -59,7 +59,7 @@ export { NODE_ID, EDGE_ID } from './services/tokens';
 export * from './types';
 
 // Utilities
-export { applyNodeChanges, applyEdgeChanges, applyDimensionChanges } from './utils/changes';
+export { applyDimensionChanges } from './utils/changes';
 export type { DisplayEdge } from './graph/collapse';
 export { getGroupBounds } from './graph/group-bounds';
 export type { GroupBounds, GroupBoundsOptions } from './graph/group-bounds';
@@ -148,6 +148,10 @@ export {
 
   // Constants
   infiniteExtent,
+
+  // Changesets (upstream 1.0: the payload of (nodesChange) / (edgesChange))
+  NodeChangeset,
+  EdgeChangeset,
 } from '@angflow/system';
 
 // Re-export all types from @angflow/system

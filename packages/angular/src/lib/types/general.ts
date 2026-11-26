@@ -12,6 +12,8 @@ import type {
   Connection,
   NodeChange,
   EdgeChange,
+  NodeChangeset,
+  EdgeChangeset,
   SnapGrid,
   Rect,
   Viewport,
@@ -32,8 +34,29 @@ export type CSSProperties = {
   [key: string]: string | number | null | undefined;
 };
 
-export type OnNodesChange<NodeType extends Node = Node> = (changes: NodeChange<NodeType>[]) => void;
-export type OnEdgesChange<EdgeType extends Edge = Edge> = (changes: EdgeChange<EdgeType>[]) => void;
+/**
+ * Type of the `(nodesChange)` handler for a custom node type.
+ *
+ * @example
+ * ```ts
+ * const onNodesChange: OnNodesChange<MyNodeType> = (changes) => {
+ *   this.nodes.update((nodes) => changes.applyTo(nodes));
+ * };
+ * ```
+ */
+export type OnNodesChange<NodeType extends Node = Node> = (changes: NodeChangeset<NodeType>) => void;
+
+/**
+ * Type of the `(edgesChange)` handler for a custom edge type.
+ *
+ * @example
+ * ```ts
+ * const onEdgesChange: OnEdgesChange<MyEdgeType> = (changes) => {
+ *   this.edges.update((edges) => changes.applyTo(edges));
+ * };
+ * ```
+ */
+export type OnEdgesChange<EdgeType extends Edge = Edge> = (changes: EdgeChangeset<EdgeType>) => void;
 
 export type NodesChangeMiddleware<NodeType extends Node = Node> = (changes: NodeChange<NodeType>[]) => NodeChange<NodeType>[];
 export type EdgesChangeMiddleware<EdgeType extends Edge = Edge> = (changes: EdgeChange<EdgeType>[]) => EdgeChange<EdgeType>[];

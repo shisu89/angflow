@@ -41,8 +41,8 @@ import {
   type FinalConnectionState,
   type HandleType,
   type Connection,
-  type NodeChange,
-  type EdgeChange,
+  type NodeChangeset,
+  type EdgeChangeset,
   type OnConnectStartParams,
 } from '@angflow/system';
 
@@ -90,7 +90,7 @@ function viewportsEqual(a: Viewport, b: Viewport): boolean {
  *
  * `nodes`, `edges`, and `viewport` are input-bound — for controlled mode, bind
  * `[nodes]` / `[edges]` and re-assign them from `(nodesChange)` / `(edgesChange)`
- * after running the deltas through `applyNodeChanges` / `applyEdgeChanges`. For
+ * after applying the emitted changeset with `changes.applyTo(...)`. For
  * uncontrolled mode hand off initial state via `defaultNodes` / `defaultEdges`.
  *
  * @example
@@ -107,6 +107,16 @@ function viewportsEqual(a: Viewport, b: Viewport): boolean {
  *   <ng-flow-controls />
  *   <ng-flow-minimap />
  * </ng-flow>
+ * ```
+ *
+ * ```typescript
+ * onNodesChange(changes: NodeChangeset) {
+ *   this.nodes = changes.applyTo(this.nodes);
+ * }
+ *
+ * onEdgesChange(changes: EdgeChangeset) {
+ *   this.edges = changes.applyTo(this.edges);
+ * }
  * ```
  */
 @Component({
@@ -276,8 +286,8 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   // ── Data (controlled-mode inputs; pair with the *Change outputs) ──────
 
   /**
-   * Nodes to render. Re-bind from `(nodesChange)` after running deltas through
-   * `applyNodeChanges` to stay in sync.
+   * Nodes to render. Re-bind from `(nodesChange)` with `changes.applyTo(nodes)`
+   * to stay in sync.
    *
    * Defaults to `undefined` (not `[]`) so an unbound `[nodes]` is distinguishable
    * from an explicit empty array: the input-sync effect skips `undefined`, which
@@ -285,7 +295,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
    */
   readonly nodesModel = input<NodeType[] | undefined>(undefined, { alias: 'nodes' });
 
-  /** Edges to render. Re-bind from `(edgesChange)` after running deltas through `applyEdgeChanges` to stay in sync. */
+  /** Edges to render. Re-bind from `(edgesChange)` with `changes.applyTo(edges)` to stay in sync. */
   readonly edgesModel = input<EdgeType[] | undefined>(undefined, { alias: 'edges' });
 
   /** Controlled viewport ({ x, y, zoom }). Re-bind from (viewportChange) to keep it in sync; equal values are not re-applied. */
@@ -588,11 +598,18 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
   // ── Event outputs ─────────────────────────────────────────────────────
 
-  /** Fires with an array of `NodeChange` whenever the internal node state is about to change. Apply with `applyNodeChanges`. */
-  readonly nodesChange = output<NodeChange[]>({ alias: 'nodesChange' });
+  /**
+   * Fires with a `NodeChangeset` whenever the internal node state changes. Apply
+   * with `changes.applyTo(nodes)`. angflow has already applied it internally, so
+   * clearing or editing the changeset in the handler does not cancel anything.
+   */
+  readonly nodesChange = output<NodeChangeset<NodeType>>({ alias: 'nodesChange' });
 
-  /** Fires with an array of `EdgeChange` whenever the internal edge state is about to change. Apply with `applyEdgeChanges`. */
-  readonly edgesChange = output<EdgeChange[]>({ alias: 'edgesChange' });
+  /**
+   * Fires with an `EdgeChangeset` whenever the internal edge state changes. Apply
+   * with `changes.applyTo(edges)`. Already applied internally, as for `nodesChange`.
+   */
+  readonly edgesChange = output<EdgeChangeset<EdgeType>>({ alias: 'edgesChange' });
 
   /** Fires once after the pan/zoom viewport is initialized. Payload is the `NgFlowService` for imperative calls. */
   readonly init = output<NgFlowService<NodeType, EdgeType>>({ alias: 'init' });
@@ -906,11 +923,11 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     });
 
     // Wire store change callbacks to outputs
-    this.store.onNodesChange = (changes: NodeChange<NodeType>[]) => {
+    this.store.onNodesChange = (changes: NodeChangeset<NodeType>) => {
       this.nodesChange.emit(changes);
     };
 
-    this.store.onEdgesChange = (changes: EdgeChange<EdgeType>[]) => {
+    this.store.onEdgesChange = (changes: EdgeChangeset<EdgeType>) => {
       this.edgesChange.emit(changes);
     };
 

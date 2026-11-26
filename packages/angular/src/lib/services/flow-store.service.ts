@@ -22,6 +22,10 @@ import {
   type NodeChange,
   type EdgeChange,
   type SelectionChange,
+  NodeChangeset,
+  EdgeChangeset,
+  selectionChange,
+  getSelectionChanges,
   type ParentExpandChild,
   type Transform,
   type Viewport,
@@ -62,7 +66,6 @@ export type ViewportAnimationOptions = {
   ease?: (t: number) => number;
   interpolate?: 'smooth' | 'linear';
 };
-import { applyNodeChanges, applyEdgeChanges, createSelectionChange, getSelectionChanges } from '../utils/changes';
 import { sampleTween, prefersReducedMotion, type TweenEntry } from '../utils/position-tween';
 import { getCollapsedHiddenIds, rewriteEdgesForCollapse, type DisplayEdge } from '../graph/collapse';
 
@@ -360,8 +363,8 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
   // ── Callback references ───────────────────────────────────────────────
 
-  onNodesChange: ((changes: NodeChange<NodeType>[]) => void) | null = null;
-  onEdgesChange: ((changes: EdgeChange<EdgeType>[]) => void) | null = null;
+  onNodesChange: ((changes: NodeChangeset<NodeType>) => void) | null = null;
+  onEdgesChange: ((changes: EdgeChangeset<EdgeType>) => void) | null = null;
   // Fired by programmatic deletion (NgFlowService.deleteElements, dissolveGroup,
   // the delete_elements agent tool) so those paths notify (nodesDelete)/(edgesDelete)/
   // (delete) too. The apply_changes delete_elements op writes via setNodes/setEdges
@@ -730,6 +733,11 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       if (!changes?.length) return;
     }
 
+    // Built once after the middleware: the same instance is applied (full path)
+    // and emitted (both paths). angflow applies before emitting, as React does,
+    // so clearing the changeset inside the handler cannot cancel it.
+    const changeset = new NodeChangeset<NodeType>(changes);
+
     // Fast path: if all changes are position-only, update nodeLookup in-place
     // instead of rebuilding everything via setNodes
     const allPosition = changes.every(c => c.type === 'position');
@@ -837,15 +845,14 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       }
     } else {
       // Full path: apply all change types (add, remove, select, dimensions, etc.)
-      const updatedNodes = applyNodeChanges(changes, this.nodes());
-      this.setNodes(updatedNodes);
+      this.setNodes(changeset.applyTo(this.nodes()));
     }
 
     if (this.debug()) {
       console.log('Angular Flow: trigger node changes', changes);
     }
 
-    this.onNodesChange?.(changes);
+    this.onNodesChange?.(changeset);
   }
 
   triggerEdgeChanges(changes: EdgeChange<EdgeType>[]): void {
@@ -857,43 +864,38 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       if (!changes?.length) return;
     }
 
-    // Always apply changes internally for immediate visual feedback
-    const updatedEdges = applyEdgeChanges(changes, this.edges());
-    this.setEdges(updatedEdges);
+    // Always apply changes internally for immediate visual feedback. The same
+    // changeset instance is applied and emitted.
+    const changeset = new EdgeChangeset<EdgeType>(changes);
+    this.setEdges(changeset.applyTo(this.edges()));
 
     if (this.debug()) {
       console.log('Angular Flow: trigger edge changes', changes);
     }
 
-    this.onEdgesChange?.(changes);
+    this.onEdgesChange?.(changeset);
   }
 
   addSelectedNodes(selectedNodeIds: string[]): void {
     if (this.multiSelectionActive()) {
-      const nodeChanges = selectedNodeIds.map((nodeId) => createSelectionChange(nodeId, true));
-      this.triggerNodeChanges(nodeChanges as NodeChange<NodeType>[]);
+      const nodeChanges = selectedNodeIds.map((nodeId) => selectionChange(nodeId, true));
+      this.triggerNodeChanges(nodeChanges);
       return;
     }
 
-    this.triggerNodeChanges(
-      getSelectionChanges(this.nodeLookup, new Set([...selectedNodeIds])) as NodeChange<NodeType>[]
-    );
-    this.triggerEdgeChanges(getSelectionChanges(this.edgeLookup) as EdgeChange<EdgeType>[]);
+    this.triggerNodeChanges(getSelectionChanges(this.nodeLookup, new Set([...selectedNodeIds])));
+    this.triggerEdgeChanges(getSelectionChanges(this.edgeLookup));
   }
 
   addSelectedEdges(selectedEdgeIds: string[]): void {
     if (this.multiSelectionActive()) {
-      const changedEdges = selectedEdgeIds.map((edgeId) => createSelectionChange(edgeId, true));
-      this.triggerEdgeChanges(changedEdges as EdgeChange<EdgeType>[]);
+      const changedEdges = selectedEdgeIds.map((edgeId) => selectionChange(edgeId, true));
+      this.triggerEdgeChanges(changedEdges);
       return;
     }
 
-    this.triggerEdgeChanges(
-      getSelectionChanges(this.edgeLookup, new Set([...selectedEdgeIds])) as EdgeChange<EdgeType>[]
-    );
-    this.triggerNodeChanges(
-      getSelectionChanges(this.nodeLookup, new Set()) as NodeChange<NodeType>[]
-    );
+    this.triggerEdgeChanges(getSelectionChanges(this.edgeLookup, new Set([...selectedEdgeIds])));
+    this.triggerNodeChanges(getSelectionChanges(this.nodeLookup, new Set()));
   }
 
   unselectNodesAndEdges(params: { nodes?: NodeType[]; edges?: EdgeType[] } = {}): void {
@@ -903,17 +905,17 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     const nodeChanges: SelectionChange[] = [];
     for (const node of nodesToUnselect) {
       if (!node.selected) continue;
-      nodeChanges.push(createSelectionChange(node.id, false) as SelectionChange);
+      nodeChanges.push(selectionChange(node.id, false));
     }
 
     const edgeChanges: SelectionChange[] = [];
     for (const edge of edgesToUnselect) {
       if (!edge.selected) continue;
-      edgeChanges.push(createSelectionChange(edge.id, false) as SelectionChange);
+      edgeChanges.push(selectionChange(edge.id, false));
     }
 
-    this.triggerNodeChanges(nodeChanges as NodeChange<NodeType>[]);
-    this.triggerEdgeChanges(edgeChanges as EdgeChange<EdgeType>[]);
+    this.triggerNodeChanges(nodeChanges);
+    this.triggerEdgeChanges(edgeChanges);
   }
 
   // ── Viewport actions ──────────────────────────────────────────────────

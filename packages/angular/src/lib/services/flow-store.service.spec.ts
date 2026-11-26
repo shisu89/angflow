@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { computed } from '@angular/core';
 import type { NodeChange, ConnectionInProgress, XYPosition } from '@angflow/system';
+import { NodeChangeset, EdgeChangeset } from '@angflow/system';
 import { FlowStore } from './flow-store.service';
 import { getCollapsedHiddenIds } from '../graph/collapse';
 import type { Node, Edge } from '../types';
@@ -141,10 +142,10 @@ describe('FlowStore', () => {
   // ── triggerNodeChanges: fast-path vs full-path ────────────────────────
 
   describe('triggerNodeChanges', () => {
-    let changeSpy: ReturnType<typeof vi.fn<(changes: NodeChange<Node>[]) => void>>;
+    let changeSpy: ReturnType<typeof vi.fn<(changes: NodeChangeset<Node>) => void>>;
 
     beforeEach(() => {
-      changeSpy = vi.fn<(changes: NodeChange<Node>[]) => void>();
+      changeSpy = vi.fn<(changes: NodeChangeset<Node>) => void>();
       store.onNodesChange = changeSpy;
       store.setNodes([
         makeNode('1', { position: { x: 0, y: 0 } }),
@@ -171,7 +172,7 @@ describe('FlowStore', () => {
       expect(store.version()).toBe(vBefore + 1);
     });
 
-    it('full-path: non-position changes go through applyNodeChanges + setNodes', () => {
+    it('full-path: non-position changes go through changeset.applyTo + setNodes', () => {
       store.triggerNodeChanges([
         { id: '1', type: 'select', selected: true },
       ]);
@@ -194,9 +195,77 @@ describe('FlowStore', () => {
       store.triggerNodeChanges([
         { id: '1', type: 'position', position: { x: 10, y: 20 } },
       ]);
-      expect(changeSpy).toHaveBeenCalledWith([
+      expect(changeSpy).toHaveBeenCalledOnce();
+      expect(changeSpy.mock.calls[0][0].toArray()).toEqual([
         expect.objectContaining({ id: '1', type: 'position' }),
       ]);
+    });
+
+    it('fast path emits a NodeChangeset carrying the (post-middleware) changes', () => {
+      const change: NodeChange<Node> = { id: '1', type: 'position', position: { x: 5, y: 6 }, dragging: true };
+      store.triggerNodeChanges([change]);
+      const emitted = changeSpy.mock.calls[0][0];
+      expect(emitted).toBeInstanceOf(NodeChangeset);
+      expect(emitted.toArray()).toEqual([change]);
+      expect(emitted.getByType('position')[0]).toBe(change);
+    });
+
+    it('full path applies and emits the SAME changeset instance', () => {
+      const applyTo = vi.spyOn(NodeChangeset.prototype, 'applyTo');
+      try {
+        store.triggerNodeChanges([{ id: '2', type: 'select', selected: true }]);
+        expect(applyTo).toHaveBeenCalledOnce();
+        const emitted = changeSpy.mock.calls[0][0];
+        expect(emitted).toBeInstanceOf(NodeChangeset);
+        expect(applyTo.mock.contexts[0]).toBe(emitted);
+        expect(emitted.getByType('select')).toEqual([{ id: '2', type: 'select', selected: true }]);
+      } finally {
+        applyTo.mockRestore();
+      }
+    });
+
+    it('the fast path does not call applyTo', () => {
+      const applyTo = vi.spyOn(NodeChangeset.prototype, 'applyTo');
+      try {
+        store.triggerNodeChanges([{ id: '1', type: 'position', position: { x: 1, y: 1 } }]);
+        expect(applyTo).not.toHaveBeenCalled();
+        expect(changeSpy.mock.calls[0][0]).toBeInstanceOf(NodeChangeset);
+      } finally {
+        applyTo.mockRestore();
+      }
+    });
+
+    it('clearing the emitted changeset in the handler does not undo the internal apply', () => {
+      changeSpy.mockImplementation((changes) => changes.clear());
+      store.triggerNodeChanges([{ id: '1', type: 'select', selected: true }]);
+      expect(store.nodes().find((n) => n.id === '1')?.selected).toBe(true);
+    });
+
+    it('middleware still receives a plain array', () => {
+      let seen: unknown;
+      store.nodesChangeMiddleware.set('probe', (changes) => {
+        seen = changes;
+        return changes;
+      });
+      store.triggerNodeChanges([{ id: '1', type: 'select', selected: true }]);
+      expect(Array.isArray(seen)).toBe(true);
+    });
+
+    it('triggerEdgeChanges applies and emits the SAME EdgeChangeset instance', () => {
+      store.setEdges([makeEdge('e1', '1', '2')]);
+      const edgeSpy = vi.fn<(changes: EdgeChangeset<Edge>) => void>();
+      store.onEdgesChange = edgeSpy;
+      const applyTo = vi.spyOn(EdgeChangeset.prototype, 'applyTo');
+      try {
+        store.triggerEdgeChanges([{ id: 'e1', type: 'select', selected: true }]);
+        const emitted = edgeSpy.mock.calls[0][0];
+        expect(emitted).toBeInstanceOf(EdgeChangeset);
+        expect(applyTo.mock.contexts[0]).toBe(emitted);
+        expect(emitted.toArray()).toEqual([{ id: 'e1', type: 'select', selected: true }]);
+        expect(store.edges()[0].selected).toBe(true);
+      } finally {
+        applyTo.mockRestore();
+      }
     });
 
     it('no-ops on empty changes array', () => {
@@ -331,8 +400,8 @@ describe('FlowStore', () => {
       store.addSelectedNodes(['1']);
 
       // Middleware blocked all select changes, so callback should receive empty or no call
-      const allChanges = spy.mock.calls.flatMap(([c]) => c);
-      expect(allChanges.filter((c: any) => c.type === 'select')).toHaveLength(0);
+      const allChanges = spy.mock.calls.flatMap(([c]) => (c as NodeChangeset<Node>).toArray());
+      expect(allChanges.filter((c) => c.type === 'select')).toHaveLength(0);
     });
 
     it('middleware can transform position values', () => {
@@ -360,7 +429,7 @@ describe('FlowStore', () => {
         { id: '1', type: 'position', position: { x: 13, y: 27 } },
       ]);
 
-      const posChanges = spy.mock.calls[0][0].filter((c: any) => c.type === 'position');
+      const posChanges = (spy.mock.calls[0][0] as NodeChangeset<Node>).getByType('position');
       expect(posChanges[0].position).toEqual({ x: 10, y: 30 });
     });
 
@@ -455,7 +524,7 @@ describe('FlowStore', () => {
 
       // All emitted changes should have meaningful state transitions
       if (spy.mock.calls.length > 0) {
-        const changes = spy.mock.calls[0][0];
+        const changes = (spy.mock.calls[0][0] as NodeChangeset<Node>).toArray();
         for (const change of changes) {
           if (change.type === 'select') {
             const _node = store.nodeLookup.get(change.id);
@@ -514,7 +583,7 @@ describe('FlowStore', () => {
     });
   });
 
-  // ── applyNodeChanges (via triggerNodeChanges full path) ───────────────
+  // ── changeset.applyTo (via triggerNodeChanges full path) ──────────────
 
   describe('change application', () => {
     beforeEach(() => {
@@ -534,19 +603,27 @@ describe('FlowStore', () => {
     it('add change inserts a new node', () => {
       store.triggerNodeChanges([{
         type: 'add',
+        id: '4',
         item: makeNode('4', { position: { x: 300, y: 300 } }),
-      } as any]);
+      }]);
       expect(store.nodes()).toHaveLength(4);
       expect(store.nodes().find(n => n.id === '4')).toBeDefined();
     });
 
-    it('add with index inserts at specific position', () => {
+    it('add with index: index is ignored, the node is appended (upstream 1.0)', () => {
       store.triggerNodeChanges([{
         type: 'add',
+        id: '4',
         item: makeNode('4'),
         index: 1,
-      } as any]);
-      expect(store.nodes()[1].id).toBe('4');
+      }]);
+      expect(store.nodes().map((n) => n.id)).toEqual(['1', '2', '3', '4']);
+    });
+
+    it('add for an id that already exists keeps the existing node', () => {
+      store.triggerNodeChanges([{ type: 'add', id: '2', item: makeNode('2', { data: { dup: true } }) }]);
+      expect(store.nodes().map((n) => n.id)).toEqual(['1', '2', '3']);
+      expect(store.nodes()[1].data).toEqual({});
     });
 
     it('select change updates selected flag', () => {
@@ -697,7 +774,7 @@ describe('FlowStore', () => {
       store.updateNodePositions(dragItems, true);
 
       expect(spy).toHaveBeenCalled();
-      const changes = spy.mock.calls[0][0];
+      const changes = (spy.mock.calls[0][0] as NodeChangeset<Node>).toArray();
       expect(changes[0]).toEqual(expect.objectContaining({
         id: '1',
         type: 'position',
@@ -1422,7 +1499,7 @@ describe('tweenNodePositions', () => {
     const store = new FlowStore();
     store.setNodes([makeNode('a')]);
     const seen: NodeChange[] = [];
-    store.onNodesChange = (changes) => seen.push(...changes);
+    store.onNodesChange = (changes) => seen.push(...changes.toArray());
 
     store.tweenNodePositions({ a: { x: 100, y: 0 } }, 100);
     tick(50);

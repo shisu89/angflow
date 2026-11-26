@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { provideZonelessChangeDetection, ɵSIGNAL } from '@angular/core';
+import { Component, provideZonelessChangeDetection, signal, ɵSIGNAL } from '@angular/core';
 import { By } from '@angular/platform-browser';
-import type { Viewport } from '@angflow/system';
+import { NodeChangeset, EdgeChangeset, type Viewport } from '@angflow/system';
 import { NgFlowComponent } from './ng-flow.component';
+import { NgFlowService } from '../../services/ng-flow.service';
+import type { Node, Edge } from '../../types';
 import { PaneComponent } from '../pane/pane.component';
 
 /** Set an input() signal's value directly without going through the template. */
@@ -501,5 +503,141 @@ describe('NgFlowComponent forceColorMode', () => {
     fixture.detectChanges();
     expect(el.classList.contains('light')).toBe(false);
     expect(el.classList.contains('dark')).toBe(false);
+  });
+});
+
+@Component({
+  standalone: true,
+  imports: [NgFlowComponent],
+  template: `
+    <ng-flow
+      [nodes]="nodes()"
+      [edges]="edges()"
+      (nodesChange)="onNodesChange($event)"
+      (edgesChange)="onEdgesChange($event)"
+    />
+  `,
+})
+class ControlledChangesetHostComponent {
+  readonly nodes = signal<Node[]>([
+    { id: 'a', position: { x: 0, y: 0 }, data: { label: 'A' } },
+    { id: 'b', position: { x: 100, y: 100 }, data: {} },
+  ]);
+  readonly edges = signal<Edge[]>([{ id: 'e1', source: 'a', target: 'b' }]);
+  readonly nodeChangesets: NodeChangeset<Node>[] = [];
+  readonly edgeChangesets: EdgeChangeset<Edge>[] = [];
+
+  onNodesChange(changes: NodeChangeset<Node>): void {
+    this.nodeChangesets.push(changes);
+    this.nodes.update((ns) => changes.applyTo(ns));
+  }
+
+  onEdgesChange(changes: EdgeChangeset<Edge>): void {
+    this.edgeChangesets.push(changes);
+    this.edges.update((es) => changes.applyTo(es));
+  }
+}
+
+describe('NgFlowComponent (nodesChange)/(edgesChange) changesets', () => {
+  beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [ControlledChangesetHostComponent],
+      providers: [provideZonelessChangeDetection()],
+    });
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  function setup() {
+    const fixture = TestBed.createComponent(ControlledChangesetHostComponent);
+    fixture.detectChanges();
+    const flowDe = fixture.debugElement.query(By.directive(NgFlowComponent));
+    const inst = flowDe.componentInstance as NgFlowComponent;
+    const flow = flowDe.injector.get(NgFlowService);
+    const host = fixture.componentInstance;
+    host.nodeChangesets.length = 0;
+    host.edgeChangesets.length = 0;
+    return { fixture, inst, flow, host };
+  }
+
+  it('a drag (position fast path) emits a NodeChangeset the host can applyTo', () => {
+    const { fixture, inst, host } = setup();
+    inst.store.updateNodePositions(
+      new Map([['a', { position: { x: 40, y: 30 }, internals: { positionAbsolute: { x: 40, y: 30 } }, measured: {} }]]),
+      true,
+    );
+    fixture.detectChanges();
+
+    expect(host.nodeChangesets).toHaveLength(1);
+    const changes = host.nodeChangesets[0];
+    expect(changes).toBeInstanceOf(NodeChangeset);
+    expect(changes.getByType('position')).toEqual([
+      expect.objectContaining({ id: 'a', type: 'position', position: { x: 40, y: 30 }, dragging: true }),
+    ]);
+    expect(host.nodes().find((n) => n.id === 'a')?.position).toEqual({ x: 40, y: 30 });
+  });
+
+  it('a select (full path) emits a NodeChangeset the host can applyTo', () => {
+    const { fixture, inst, host } = setup();
+    inst.store.addSelectedNodes(['b']);
+    fixture.detectChanges();
+
+    const changes = host.nodeChangesets[0];
+    expect(changes).toBeInstanceOf(NodeChangeset);
+    expect(changes.getByType('select')).toEqual([{ id: 'b', type: 'select', selected: true }]);
+    expect(host.nodes().find((n) => n.id === 'b')?.selected).toBe(true);
+    expect(inst.store.nodes().find((n) => n.id === 'b')?.selected).toBe(true);
+  });
+
+  it('(edgesChange) emits an EdgeChangeset the host can applyTo', () => {
+    const { fixture, inst, host } = setup();
+    inst.store.addSelectedEdges(['e1']);
+    fixture.detectChanges();
+
+    const changes = host.edgeChangesets[0];
+    expect(changes).toBeInstanceOf(EdgeChangeset);
+    expect(changes.getByType('select')).toEqual([{ id: 'e1', type: 'select', selected: true }]);
+    expect(host.edges()[0].selected).toBe(true);
+  });
+
+  it('updateNode then updateNodeData on the same node in one tick both take effect', () => {
+    const { fixture, inst, flow, host } = setup();
+    flow.updateNode('a', { width: 120 });
+    flow.updateNodeData('a', { extra: 1 });
+    fixture.detectChanges();
+
+    expect(host.nodeChangesets.map((c) => c.toArray())).toEqual([
+      [{ id: 'a', type: 'update', item: { width: 120 } }],
+      [{ id: 'a', type: 'data', data: { extra: 1 } }],
+    ]);
+    for (const nodes of [host.nodes(), inst.store.nodes()]) {
+      const a = nodes.find((n) => n.id === 'a')!;
+      expect(a.width).toBe(120);
+      expect(a.data).toEqual({ label: 'A', extra: 1 });
+    }
+  });
+
+  it('updateEdge then updateEdgeData on the same edge in one tick both take effect', () => {
+    const { fixture, inst, flow, host } = setup();
+    flow.updateEdge('e1', { label: 'L' });
+    flow.updateEdgeData('e1', { weight: 2 });
+    fixture.detectChanges();
+
+    expect(host.edgeChangesets.map((c) => c.toArray())).toEqual([
+      [{ id: 'e1', type: 'update', item: { label: 'L' } }],
+      [{ id: 'e1', type: 'data', data: { weight: 2 } }],
+    ]);
+    for (const edges of [host.edges(), inst.store.edges()]) {
+      expect(edges[0].label).toBe('L');
+      expect(edges[0].data).toEqual({ weight: 2 });
+    }
   });
 });

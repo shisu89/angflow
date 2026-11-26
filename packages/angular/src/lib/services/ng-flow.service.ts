@@ -27,9 +27,12 @@ import {
   type HandleType,
   type NodeChange,
   type EdgeChange,
+  addChange,
+  removeChange,
+  updateChange,
+  dataChange,
 } from '@angflow/system';
 
-import { elementToRemoveChange } from '../utils/changes';
 import { injectFlowStore } from '../utils/inject-flow-store';
 import type { ViewportAnimationOptions } from './flow-store.service';
 import type { Node, Edge, InternalNode, DeleteElementsOptions } from '../types';
@@ -261,32 +264,32 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   addNodes(nodes: NodeType | NodeType[]): void {
     const toAdd = Array.isArray(nodes) ? nodes : [nodes];
     if (!toAdd.length) return;
-    const changes: NodeChange<NodeType>[] = toAdd.map((item) => ({ type: 'add', id: item.id, item }));
-    this.store.triggerNodeChanges(changes);
+    this.store.triggerNodeChanges(toAdd.map((item) => addChange(item)));
   }
 
   /**
    * Apply a shallow merge (or updater function result) to a single node.
-   * Other nodes are left untouched.
+   * Other nodes are left untouched. Emits an `'update'` change carrying only
+   * the partial (an updater function is resolved against the current node
+   * first). A key set to `undefined` in the partial clears that field.
    */
   updateNode(id: string, nodeUpdate: Partial<NodeType> | ((node: NodeType) => Partial<NodeType>)): void {
     const current = this.store.nodes().find((n) => n.id === id);
     if (!current) return;
     const update = typeof nodeUpdate === 'function' ? nodeUpdate(current) : nodeUpdate;
-    const next = { ...current, ...update } as NodeType;
-    this.store.triggerNodeChanges([{ id, type: 'replace', item: next }]);
+    this.store.triggerNodeChanges([updateChange<NodeType>(id, update)]);
   }
 
   /**
-   * Merge `dataUpdate` into a node's `data` object. Equivalent to
-   * `updateNode(id, n => ({ data: { ...n.data, ...dataUpdate } }))`.
+   * Merge `dataUpdate` into a node's `data` object. Emits a `'data'` change
+   * (a merge) carrying only the partial; an updater function is resolved
+   * against the current `data` first.
    */
   updateNodeData(id: string, dataUpdate: Record<string, unknown> | ((data: NodeType['data']) => Record<string, unknown>)): void {
     const current = this.store.nodes().find((n) => n.id === id);
     if (!current) return;
     const update = typeof dataUpdate === 'function' ? dataUpdate(current.data) : dataUpdate;
-    const next = { ...current, data: { ...current.data, ...update } } as NodeType;
-    this.store.triggerNodeChanges([{ id, type: 'replace', item: next }]);
+    this.store.triggerNodeChanges([dataChange<NodeType['data']>(id, update as Partial<NodeType['data']>)]);
   }
 
   /**
@@ -728,26 +731,31 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   addEdges(edges: EdgeType | EdgeType[]): void {
     const toAdd = Array.isArray(edges) ? edges : [edges];
     if (!toAdd.length) return;
-    const changes: EdgeChange<EdgeType>[] = toAdd.map((item) => ({ type: 'add', id: item.id, item }));
-    this.store.triggerEdgeChanges(changes);
+    this.store.triggerEdgeChanges(toAdd.map((item) => addChange(item)));
   }
 
-  /** Apply a shallow merge (or updater function) to a single edge. */
+  /**
+   * Apply a shallow merge (or updater function) to a single edge. Emits an
+   * `'update'` change carrying only the partial.
+   */
   updateEdge(id: string, edgeUpdate: Partial<EdgeType> | ((edge: EdgeType) => Partial<EdgeType>)): void {
     const current = this.store.edges().find((e) => e.id === id);
     if (!current) return;
     const update = typeof edgeUpdate === 'function' ? edgeUpdate(current) : edgeUpdate;
-    const next = { ...current, ...update } as EdgeType;
-    this.store.triggerEdgeChanges([{ id, type: 'replace', item: next }]);
+    this.store.triggerEdgeChanges([updateChange<EdgeType>(id, update)]);
   }
 
-  /** Merge `dataUpdate` into a single edge's `data` object. */
+  /**
+   * Merge `dataUpdate` into a single edge's `data` object. Emits a `'data'`
+   * change (a merge) carrying only the partial.
+   */
   updateEdgeData(id: string, dataUpdate: Record<string, unknown> | ((data: EdgeType['data']) => Record<string, unknown>)): void {
     const current = this.store.edges().find((e) => e.id === id);
     if (!current) return;
     const update = typeof dataUpdate === 'function' ? dataUpdate(current.data) : dataUpdate;
-    const next = { ...current, data: { ...current.data, ...update } } as EdgeType;
-    this.store.triggerEdgeChanges([{ id, type: 'replace', item: next }]);
+    this.store.triggerEdgeChanges([
+      dataChange<NonNullable<EdgeType['data']>>(id, update as Partial<NonNullable<EdgeType['data']>>),
+    ]);
   }
 
   /**
@@ -873,11 +881,11 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
     if (matchingEdges.length > 0) {
       this.store.onEdgesDelete?.(matchingEdges);
-      this.store.triggerEdgeChanges(matchingEdges.map((e) => elementToRemoveChange(e)) as EdgeChange<EdgeType>[]);
+      this.store.triggerEdgeChanges(matchingEdges.map((e) => removeChange(e.id)));
     }
     if (matchingNodes.length > 0) {
       this.store.onNodesDelete?.(matchingNodes);
-      this.store.triggerNodeChanges(matchingNodes.map((n) => elementToRemoveChange(n)) as NodeChange<NodeType>[]);
+      this.store.triggerNodeChanges(matchingNodes.map((n) => removeChange(n.id)));
     }
     if (matchingNodes.length > 0 || matchingEdges.length > 0) {
       this.store.onDelete?.({ nodes: matchingNodes, edges: matchingEdges });

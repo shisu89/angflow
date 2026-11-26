@@ -10,6 +10,8 @@ import {
   isInputDOMNode,
   snapPosition,
   calculateNodePosition,
+  selectionChange,
+  positionChange,
   type NodeChange,
   type EdgeChange,
   type KeyCode,
@@ -175,23 +177,15 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
   }
 
   private handleSelectAll(): void {
-    const nodeChanges = this.store.nodes()
+    const nodeChanges: NodeChange[] = this.store.nodes()
       .filter((n) => n.selectable !== false)
-      .map((n) => ({
-        id: n.id,
-        type: 'select' as const,
-        selected: true,
-      }));
-    const edgeChanges = this.store.edges()
+      .map((n) => selectionChange(n.id, true));
+    const edgeChanges: EdgeChange[] = this.store.edges()
       .filter((e) => e.selectable !== false)
-      .map((e) => ({
-        id: e.id,
-        type: 'select' as const,
-        selected: true,
-      }));
+      .map((e) => selectionChange(e.id, true));
 
-    this.store.triggerNodeChanges(nodeChanges as NodeChange[]);
-    this.store.triggerEdgeChanges(edgeChanges as EdgeChange[]);
+    this.store.triggerNodeChanges(nodeChanges);
+    this.store.triggerEdgeChanges(edgeChanges);
   }
 
   private static readonly arrowDirections: Record<string, XYPosition> = {
@@ -234,7 +228,7 @@ export class KeyHandlerDirective implements OnInit, OnDestroy {
         nodeOrigin: this.store.nodeOrigin(),
         onError: this.store.onError(),
       });
-      changes.push({ id: node.id, type: 'position', position, positionAbsolute } as NodeChange);
+      changes.push({ ...positionChange(node.id, position), positionAbsolute });
       if (node.id === focusedId) focusedAbsolute = positionAbsolute;
     }
     this.store.triggerNodeChanges(changes);

@@ -132,8 +132,8 @@ describe('NgFlowService', () => {
     it('routes deletions through the change pipeline (emits remove changes)', async () => {
       const nodeChanges: unknown[] = [];
       const edgeChanges: unknown[] = [];
-      store.onNodesChange = (c) => nodeChanges.push(...c);
-      store.onEdgesChange = (c) => edgeChanges.push(...c);
+      store.onNodesChange = (c) => nodeChanges.push(...c.toArray());
+      store.onEdgesChange = (c) => edgeChanges.push(...c.toArray());
 
       await service.deleteElements({ nodes: [{ id: 'b' } as Node] });
 
@@ -325,6 +325,93 @@ describe('NgFlowService', () => {
       // Nodes array replaced (map always creates new array) but content unchanged
       expect(store.nodes()).toHaveLength(1);
       expect(store.nodes()[0].id).toBe('1');
+    });
+  });
+
+  // ── update APIs emit upstream 1.0 'update' / 'data' changes ───────────
+
+  describe('update APIs emit update/data changes', () => {
+    let nodeChanges: unknown[][];
+    let edgeChanges: unknown[][];
+
+    beforeEach(() => {
+      service.setNodes([makeNode('1', { data: { label: 'old', keep: true } })]);
+      service.setEdges([makeEdge('e1', '1', '2', { data: { a: 1 } })]);
+      nodeChanges = [];
+      edgeChanges = [];
+      store.onNodesChange = (c) => nodeChanges.push(c.toArray());
+      store.onEdgesChange = (c) => edgeChanges.push(c.toArray());
+    });
+
+    it('updateNode emits a single update change carrying only the partial', () => {
+      service.updateNode('1', { width: 80 });
+      expect(nodeChanges).toEqual([[{ id: '1', type: 'update', item: { width: 80 } }]]);
+      expect(store.nodes()[0].width).toBe(80);
+    });
+
+    it('updateNode resolves an updater function against the current node first', () => {
+      service.updateNode('1', (n) => ({ position: { x: n.position.x + 5, y: 7 } }));
+      expect(nodeChanges).toEqual([[{ id: '1', type: 'update', item: { position: { x: 5, y: 7 } } }]]);
+    });
+
+    it('updateNodeData emits a merging data change (no replace flag)', () => {
+      service.updateNodeData('1', { label: 'new' });
+      expect(nodeChanges).toEqual([[{ id: '1', type: 'data', data: { label: 'new' } }]]);
+      expect(store.nodes()[0].data).toEqual({ label: 'new', keep: true });
+    });
+
+    it('updateNodeData resolves an updater function against the current data first', () => {
+      service.updateNodeData('1', (d) => ({ label: `${d['label']}!` }));
+      expect(nodeChanges).toEqual([[{ id: '1', type: 'data', data: { label: 'old!' } }]]);
+    });
+
+    it('updateEdge / updateEdgeData emit update / data changes', () => {
+      service.updateEdge('e1', { animated: true });
+      service.updateEdgeData('e1', { b: 2 });
+      expect(edgeChanges).toEqual([
+        [{ id: 'e1', type: 'update', item: { animated: true } }],
+        [{ id: 'e1', type: 'data', data: { b: 2 } }],
+      ]);
+      expect(store.edges()[0].animated).toBe(true);
+      expect(store.edges()[0].data).toEqual({ a: 1, b: 2 });
+    });
+
+    it('all four return early for an unknown id', () => {
+      service.updateNode('ghost', { width: 1 });
+      service.updateNodeData('ghost', { x: 1 });
+      service.updateEdge('ghost', { animated: true });
+      service.updateEdgeData('ghost', { x: 1 });
+      expect(nodeChanges).toEqual([]);
+      expect(edgeChanges).toEqual([]);
+    });
+
+    it('addNodes / addEdges emit add changes carrying the id', () => {
+      const n2 = makeNode('2');
+      const e2 = makeEdge('e2', '1', '2');
+      service.addNodes(n2);
+      service.addEdges([e2]);
+      expect(nodeChanges).toEqual([[{ id: '2', type: 'add', item: n2 }]]);
+      expect(edgeChanges).toEqual([[{ id: 'e2', type: 'add', item: e2 }]]);
+      expect(store.nodes().map((n) => n.id)).toEqual(['1', '2']);
+      expect(store.edges().map((e) => e.id)).toEqual(['e1', 'e2']);
+    });
+
+    it('updateNode with parentId: undefined clears the parent (store, lookup and parentLookup)', () => {
+      service.setNodes([
+        makeNode('g', { type: 'group', position: { x: 50, y: 50 }, width: 300, height: 300 }),
+        makeNode('a', { parentId: 'g', position: { x: 10, y: 10 } }),
+      ]);
+      expect(store.parentLookup.get('g')?.has('a')).toBe(true);
+      nodeChanges = [];
+
+      service.updateNode('a', { parentId: undefined });
+
+      expect(nodeChanges).toEqual([[{ id: 'a', type: 'update', item: { parentId: undefined } }]]);
+      expect(store.nodes().find((n) => n.id === 'a')?.parentId).toBeUndefined();
+      expect(store.nodeLookup.get('a')?.parentId).toBeUndefined();
+      expect(store.parentLookup.get('g')?.has('a') ?? false).toBe(false);
+      // Unparented, its absolute position is now its own position.
+      expect(store.nodeLookup.get('a')?.internals.positionAbsolute).toEqual({ x: 10, y: 10 });
     });
   });
 
@@ -870,7 +957,7 @@ describe('collapse writers', () => {
   it('setNodeCollapsed emits a replace change carrying collapsed', () => {
     store.setNodes([{ id: 'g', data: {}, position: { x: 0, y: 0 } }]);
     const changes: unknown[] = [];
-    store.onNodesChange = (c) => changes.push(...c);
+    store.onNodesChange = (c) => changes.push(...c.toArray());
     service.setNodeCollapsed('g', true);
     expect(store.nodeLookup.get('g')!.collapsed).toBe(true);
     expect(changes).toEqual([{ id: 'g', type: 'replace', item: expect.objectContaining({ id: 'g', collapsed: true }) }]);

@@ -114,12 +114,13 @@ describe('FlowStore.nodeDragging via updateNodePositions', () => {
   it('still marks the emitted changes as not-dragging when the flag is omitted', () => {
     const seen: Array<{ dragging?: boolean }> = [];
     store.setNodes([{ id: 'a', position: { x: 0, y: 0 }, data: {} } as never]);
-    store.onNodesChange = (changes) => seen.push(...(changes as Array<{ dragging?: boolean }>));
+    store.onNodesChange = (changes) => seen.push(...changes.getByType('position'));
 
     store.updateNodePositions(
       new Map([['a', { id: 'a', position: { x: 5, y: 5 }, internals: {}, measured: {} }]]),
     );
 
+    expect(seen.length).toBeGreaterThan(0);
     expect(seen.some((c) => c.dragging === true)).toBe(false);
   });
 });
