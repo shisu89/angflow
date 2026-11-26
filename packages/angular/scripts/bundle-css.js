@@ -10,6 +10,7 @@
  * every rule inside `@layer xyflow`.
  */
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { realpathSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import postcss from 'postcss';
@@ -32,4 +33,5 @@ export async function bundleCss(outDir = resolve(pkgRoot, 'dist')) {
   console.log('CSS bundled: dist/style.css, dist/base.css, dist/xy-theme.css');
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await bundleCss();
+// Run when invoked directly (realpath, so a symlinked path to this script still runs it), not when imported.
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) await bundleCss();

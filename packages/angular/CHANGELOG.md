@@ -95,9 +95,9 @@ Upstream 1.0 theming: colour mode follows the system / page by default, all CSS 
 **Silent change:** angflow's CSS is now in `@layer xyflow`, so an app's **unlayered** global reset (e.g. `* { margin: 0; padding: 0; box-sizing: border-box }`) beats it and strips node padding, panel margins and control-button padding. It compiles fine and only shows up visually. Upstream behaves the same way. Put the reset in a layer declared before xyflow:
 
 ```css
-@layer reset, xyflow;               /* declare the order first */
+@layer reset, xyflow;                 /* declare the order first */
+@import '@angflow/angular/style.css'; /* @import must precede every other rule */
 @layer reset { * { margin: 0; padding: 0; box-sizing: border-box; } }
-@import '@angflow/angular/style.css';
 ```
 
 The examples app does exactly this in `examples/angular/src/styles.css`.
@@ -111,6 +111,7 @@ The examples app does exactly this in `examples/angular/src/styles.css`.
 | Flow background, light mode | `#fafafa` | transparent |
 | Node, controls-button and edge-label text, light mode | `inherit` | `CanvasText` |
 | Handle size | 8px | 6px |
+| MiniMap background, light mode | `#f0f0f0` | `#fff` |
 
 Dark mode also gets its own attribution background (`rgba(150, 150, 150, 0.25)`) and selection colours.
 
@@ -140,7 +141,7 @@ Dark mode also gets its own attribution background (`rgba(150, 150, 150, 0.25)`)
 ```
 
 - `@layer xyflow`: CSS overrides that only beat angflow by specificity or order still win, and now win more reliably, because unlayered CSS beats any layer. An app that put angflow's CSS in its own layer must order its layers (`@layer base, xyflow, overrides;`).
-- `base.css` now matches upstream's minimal `base.css`: no built-in node padding or width, no handle size or border, no control-button styling, no theme colours. Apps that imported `base.css` and relied on those styles should import `style.css` (or `xy-theme.css`) instead.
+- `base.css` now matches upstream's minimal `base.css`: no built-in node padding or width, no handle size or border, no control-button styling, and none of angflow's own colour rules (the hover / selected box-shadow on custom node types, the connection-target drop outline). It keeps system's base tokens (edge, background, minimap colours; node border `#bbb`, handle `#333`), as upstream's does. Apps that imported `base.css` and relied on the removed styles should import `style.css` instead; `xy-theme.css` builds on `base.css` and doesn't carry them either.
 - Short export paths: `@angflow/angular/style.css`, `base.css` and `xy-theme.css`. The old `@angflow/angular/dist/style.css` and `dist/base.css` keep working.
 - Browser floor: `light-dark()` needs Chrome/Edge 123, Firefox 120, Safari 17.5.
 
@@ -282,9 +283,10 @@ Then, the `ColorModeClass` export is removed (`ColorMode` is `'light' | 'dark'`)
   `deletedEdges`); the tool returns `deletedNodeIds` / `deletedEdgeIds`.
 - Shared-store unmount; MiniMap follows a new `panZoom` after remount;
   `selectNodesData` only emits when node data changes.
-- `base.css` no longer includes theme colours.
+- `base.css` no longer includes angflow's theme token block (it carried `style.css`'s colours).
 - MiniMap: its background follows the colour scheme. `bgColor` now writes `--xy-minimap-background-color-props`, as upstream does; it used to paint an opaque `#f0f0f0` rect, so the minimap stayed light in dark mode.
-- Built-in default, input and output nodes honour `sourcePosition` / `targetPosition`; they were hard-coded to top / bottom.
+- Built-in default, input and output nodes honour `sourcePosition` / `targetPosition`; they were hard-coded to top / bottom. As upstream's NodeWrapper, any node whose `type`, `sourcePosition` or `targetPosition` changes is re-measured, so its edges follow the moved handles.
+- `NgFlowService.updateNodeInternals()` re-routes edges when only handle positions changed (same node size); edges used to keep the old handle bounds until an unrelated update.
 - The shipped CSS contained un-flattened native `&` nesting (32 selectors in `style.css`, 24 in `base.css`), which browsers without CSS nesting dropped. The CSS is now bundled with postcss (`postcss-import`, `postcss-nested`, `autoprefixer`), which flattens everything.
 
 

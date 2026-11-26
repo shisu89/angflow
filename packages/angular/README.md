@@ -106,7 +106,7 @@ Import one stylesheet in your global styles:
 @import '@angflow/angular/style.css';   /* structure + angflow's default look (dist/style.css still works) */
 ```
 
-- `style.css`: everything. `base.css`: structure only (no node, handle or control chrome). `xy-theme.css`: `base.css` plus upstream's optional full theme; import it **instead of** `style.css`.
+- `style.css`: everything. `base.css`: structure plus upstream's minimal base look (no built-in node padding, handle sizing or control-button styling). `xy-theme.css`: `base.css` plus upstream's optional full theme; import it **instead of** `style.css`.
 - All styles are in `@layer xyflow`, so your unlayered CSS always wins. An unlayered global reset (`* { margin: 0; padding: 0 }`) also wins, so put it in an earlier layer: `@layer reset, xyflow;`.
 - The colour scheme follows the system (`prefers-color-scheme`) by default. For page-level theming set `<html data-theme="dark">` (or a `.dark` / `.light` class on an ancestor).
 - Force one flow with `<ng-flow forceColorMode="dark" />`.

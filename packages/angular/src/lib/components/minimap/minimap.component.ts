@@ -350,7 +350,7 @@ export class MiniMapComponent {
   // minimap's internal coordinate system is.
   readonly scaledMaskStrokeWidth = computed(() => this.maskStrokeWidth() * this.viewBoxData().viewScale);
 
-  // Outer rect for the background + mask, derived from the viewBox with a
+  // Outer rect for the mask path, derived from the viewBox with a
   // generous margin so it always covers the visible minimap area regardless of
   // how large the graph's coordinates are (replaces a fixed ±10000 box).
   readonly outerRect = computed(() => {
