@@ -51,7 +51,8 @@ export type GetMiniMapNodeAttribute<NodeType extends Node = Node> = (node: NodeT
         [attr.aria-label]="ariaLabel()"
         [style.width.px]="mmWidth()"
         [style.height.px]="mmHeight()"
-        style="border-radius: 4px; overflow: hidden; border: 1px solid #ddd; box-shadow: 0 1px 4px rgba(0,0,0,0.1); cursor: pointer;"
+        [style.--xy-minimap-background-color-props]="bgColor() ?? null"
+        style="border-radius: 4px; overflow: hidden; border: 1px solid light-dark(#ddd, #3c3c3c); box-shadow: 0 1px 4px rgba(0,0,0,0.1); cursor: pointer;"
       >
         <svg
           #minimapSvg
@@ -61,15 +62,6 @@ export type GetMiniMapNodeAttribute<NodeType extends Node = Node> = (node: NodeT
           [attr.viewBox]="viewBox()"
           (click)="onMinimapClick($event)"
         >
-          <!-- Background: sized to the viewBox (not a fixed ±10000 box, which
-               clipped for graphs whose coordinates exceed ~10000). -->
-          <rect
-            [attr.x]="outerRect().x"
-            [attr.y]="outerRect().y"
-            [attr.width]="outerRect().width"
-            [attr.height]="outerRect().height"
-            [attr.fill]="bgColor() ?? '#f0f0f0'"
-          />
           <!-- Nodes -->
           <!--
             Colors are bound as inline [style.*], NOT [attr.*]: the bundled
@@ -176,7 +168,10 @@ export class MiniMapComponent {
   /** Custom Angular component to render each minimap node (mirrors React's MiniMapNode). When unset, a default <rect> is rendered. */
   readonly nodeComponent = input<Type<unknown> | null>(null);
 
-  /** Background fill behind the nodes. Defaults to `#f0f0f0`. */
+  /**
+   * Background behind the nodes. Unset → the theme's `--xy-minimap-background-color`
+   * (follows the colour scheme). Set → written to `--xy-minimap-background-color-props`, as upstream.
+   */
   readonly bgColor = input<string>();
   /**
    * Overlay fill for the area outside the current viewport. Unset → falls back

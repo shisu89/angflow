@@ -146,6 +146,26 @@ describe('MiniMapComponent color inputs', () => {
     expect(path.style.fill).toBe('rgba(10, 20, 30, 0.5)');
   });
 
+  it('leaves the background to the theme (no hard-coded fill) when bgColor is unset', () => {
+    const fixture = createMinimap();
+    fixture.detectChanges();
+
+    const container = fixture.nativeElement.querySelector('.xy-flow__minimap') as HTMLElement;
+    // The container's CSS background (--xy-minimap-background-color, light-dark()) shows through:
+    // no opaque background rect in the SVG and no props override.
+    expect(fixture.nativeElement.querySelector('svg rect[fill]:not([fill="none"])')).toBeNull();
+    expect(container.style.getPropertyValue('--xy-minimap-background-color-props')).toBe('');
+  });
+
+  it('routes bgColor into --xy-minimap-background-color-props (as upstream)', () => {
+    const fixture = createMinimap();
+    setSignalInput(fixture.componentInstance, 'bgColor', '#123456');
+    fixture.detectChanges();
+
+    const container = fixture.nativeElement.querySelector('.xy-flow__minimap') as HTMLElement;
+    expect(container.style.getPropertyValue('--xy-minimap-background-color-props')).toBe('#123456');
+  });
+
   it('renders the mask path (deferring fill to CSS) when maskColor is unset', () => {
     const fixture = createMinimap();
     fixture.detectChanges();
