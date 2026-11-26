@@ -1,11 +1,16 @@
+/* Declare the reset layer before angflow's, so angflow's @layer xyflow rules win over it */
+@layer reset, xyflow;
+
 /* Import the complete ng-flow stylesheet from the library */
 @import '@angflow/angular/dist/style.css';
 
 /* App-specific reset */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+@layer reset {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
 }
 
 html, body {

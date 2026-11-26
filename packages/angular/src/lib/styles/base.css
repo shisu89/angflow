@@ -1,4 +1,5 @@
 /* base.css - basic structural styling for ng-flow */
-@import '../../../../system/src/styles/init.css';
-@import '../../../../system/src/styles/base.css';
-@import '../../../../system/src/styles/node-resizer.css';
+@import '../../../../system/src/styles/init.css' layer(xyflow);
+@import '../../../../system/src/styles/base.css' layer(xyflow);
+@import '../../../../system/src/styles/node-resizer.css' layer(xyflow);
+@import './ng-flow.css' layer(xyflow);

@@ -33,6 +33,8 @@
       "types": "./dist/esm/lib/layout/index.d.ts",
       "default": "./dist/esm/lib/layout/index.js"
     },
+    "./base.css": "./dist/base.css",
+    "./style.css": "./dist/style.css",
     "./dist/style.css": "./dist/style.css",
     "./dist/base.css": "./dist/base.css"
   },
@@ -75,8 +77,13 @@
     "@angular/platform-browser": "^21.2.15",
     "@angular/platform-browser-dynamic": "^21.2.7",
     "@dagrejs/dagre": "^3.0.0",
+    "@types/node": "^25.9.1",
+    "autoprefixer": "^10.5.0",
     "eslint": "^9.29.0",
     "jsdom": "^29.0.1",
+    "postcss": "^8.5.33",
+    "postcss-import": "^15.1.0",
+    "postcss-nested": "^6.2.0",
     "typescript": "5.9.3",
     "typescript-eslint": "8.34.0",
     "vitest": "^4.1.2"
