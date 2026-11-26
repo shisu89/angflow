@@ -4,7 +4,7 @@ import { Position } from '@angflow/system';
 import { injectNgFlowNode } from '../../utils/inject-ng-flow-node';
 
 /**
- * Built-in node renderer with only a source handle on the bottom.
+ * Built-in node renderer with only a source handle, on `sourcePosition` (default bottom).
  * Used when a node has `type: 'input'`. Reads per-node state through
  * `injectNgFlowNode()` (no `@Input()`s).
  */
@@ -15,7 +15,7 @@ import { injectNgFlowNode } from '../../utils/inject-ng-flow-node';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div>{{ node.data()?.label }}</div>
-    <ng-flow-handle type="source" [position]="Position.Bottom" [isConnectable]="node.isConnectable()" />
+    <ng-flow-handle type="source" [position]="node.sourcePosition() ?? Position.Bottom" [isConnectable]="node.isConnectable()" />
   `,
 })
 export class InputNodeComponent {

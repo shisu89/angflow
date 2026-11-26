@@ -4,8 +4,8 @@ import { Position } from '@angflow/system';
 import { injectNgFlowNode } from '../../utils/inject-ng-flow-node';
 
 /**
- * Built-in node renderer with a target handle on top and a source handle on
- * bottom. Used when a node has no `type` or `type: 'default'`. Reads per-node
+ * Built-in node renderer with a target handle on `targetPosition` (default top) and a
+ * source handle on `sourcePosition` (default bottom). Used when a node has no `type` or `type: 'default'`. Reads per-node
  * state through `injectNgFlowNode()` (no `@Input()`s).
  */
 @Component({
@@ -14,9 +14,9 @@ import { injectNgFlowNode } from '../../utils/inject-ng-flow-node';
   imports: [HandleComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <ng-flow-handle type="target" [position]="Position.Top" [isConnectable]="node.isConnectable()" />
+    <ng-flow-handle type="target" [position]="node.targetPosition() ?? Position.Top" [isConnectable]="node.isConnectable()" />
     <div>{{ node.data()?.label }}</div>
-    <ng-flow-handle type="source" [position]="Position.Bottom" [isConnectable]="node.isConnectable()" />
+    <ng-flow-handle type="source" [position]="node.sourcePosition() ?? Position.Bottom" [isConnectable]="node.isConnectable()" />
   `,
 })
 export class DefaultNodeComponent {
