@@ -701,6 +701,71 @@ describe('AngflowAgentBridge', () => {
     });
   });
 
+  describe('add tools reject existing ids', () => {
+    let flow: NgFlowService;
+    const N = (id: string) => ({ id, position: { x: 0, y: 0 }, data: {} });
+    const errOf = (res: unknown) => (res as { error: { code: number; message: string } }).error;
+    beforeEach(() => {
+      flow = newFlow();
+      bridge.register('f', flow);
+      flow.setNodes([makeNode('a'), makeNode('b')]);
+      flow.setEdges([{ id: 'e', source: 'a', target: 'b' } as Edge]);
+    });
+
+    it('add_node / add_nodes reject an existing node id', async () => {
+      for (const [tool, params] of [
+        ['add_node', { node: N('a') }],
+        ['add_nodes', { nodes: [N('new'), N('a')] }],
+      ] as const) {
+        const err = errOf(await transport.call(tool, params as never));
+        expect(err.code).toBe(-32602);
+        expect(err.message).toContain('already exists');
+      }
+      expect(flow.getNodes().map((n) => n.id)).toEqual(['a', 'b']);
+    });
+
+    it('add_edge / add_edges reject an existing edge id', async () => {
+      for (const [tool, params] of [
+        ['add_edge', { edge: { id: 'e', source: 'a', target: 'b' } }],
+        ['add_edges', { edges: [{ id: 'e2', source: 'a', target: 'b' }, { id: 'e', source: 'b', target: 'a' }] }],
+      ] as const) {
+        const err = errOf(await transport.call(tool, params as never));
+        expect(err.code).toBe(-32602);
+        expect(err.message).toContain('already exists');
+      }
+      expect(flow.getEdges().map((e) => e.id)).toEqual(['e']);
+    });
+
+    it('rejects duplicate ids within one batch', async () => {
+      const n = errOf(await transport.call('add_nodes', { nodes: [N('x'), N('x')] }));
+      expect(n.code).toBe(-32602);
+      expect(n.message).toContain('duplicate');
+      const e = errOf(
+        await transport.call('add_edges', {
+          edges: [{ id: 'y', source: 'a', target: 'b' }, { id: 'y', source: 'b', target: 'a' }],
+        }),
+      );
+      expect(e.code).toBe(-32602);
+      expect(flow.getNodes()).toHaveLength(2);
+      expect(flow.getEdges()).toHaveLength(1);
+    });
+
+    it('apply_changes rolls back when an add reuses an existing or earlier-added id', async () => {
+      for (const ops of [
+        [{ op: 'add_node', node: N('p') }, { op: 'add_node', node: N('a') }],
+        [{ op: 'add_node', node: N('p') }, { op: 'add_nodes', nodes: [N('q'), N('p')] }],
+        [{ op: 'add_edge', edge: { id: 'e3', source: 'a', target: 'b' } }, { op: 'add_edge', edge: { id: 'e', source: 'a', target: 'b' } }],
+        [{ op: 'add_edge', edge: { id: 'e3', source: 'a', target: 'b' } }, { op: 'add_edges', edges: [{ id: 'e3', source: 'a', target: 'b' }] }],
+      ]) {
+        const err = errOf(await transport.call('apply_changes', { ops }));
+        expect(err.code).toBe(-32603);
+        expect((err as { data?: { failedIndex?: number } }).data?.failedIndex).toBe(1);
+        expect(flow.getNodes().map((n) => n.id)).toEqual(['a', 'b']);
+        expect(flow.getEdges().map((x) => x.id)).toEqual(['e']);
+      }
+    });
+  });
+
   describe('apply_changes', () => {
     async function flushEffects(): Promise<void> {
       TestBed.tick();
@@ -2658,6 +2723,17 @@ describe('provenance: op-log + onOp + flow.history source', () => {
     expect(ops[0].method).toBe('add_node');
     expect(ops[0].source).toBe('user');
     expect(ops[0].cursor).toBe(1);
+  });
+
+  it('a logged add_nodes op keeps its original position after a later move', async () => {
+    const ops: any[] = [];
+    const { bridge, newFlow } = setupLogged({ onOp: (e: any) => ops.push(e) });
+    const flow = newFlow();
+    bridge.register('main', flow);
+    await bridge.callTool('add_nodes', { nodes: [{ id: 'a', position: { x: 1, y: 2 }, data: {} }] });
+    await flow.setNodePositions({ a: { x: 50, y: 60 } }, { animate: false });
+    expect(flow.getNode('a')?.position).toEqual({ x: 50, y: 60 });
+    expect(ops[0].params.nodes[0].position).toEqual({ x: 1, y: 2 });
   });
 
   it('a throwing onOp does not break the call', async () => {

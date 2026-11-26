@@ -426,9 +426,9 @@ export class AngflowAgentBridge {
 
   private recordOp(flowId: string, method: string, params: Record<string, unknown>, source?: string): void {
     if (!this.opLog) return;
-    // Shallow-clone params so a later in-place mutation of the caller's object
-    // can't corrupt a stored (replay-able) log entry.
-    const entry = this.opLog.append(flowId, { method, params: { ...params }, source });
+    // Deep-clone params (JSON-RPC data): the store keeps param node objects by
+    // reference and later in-place moves would otherwise rewrite the logged op.
+    const entry = this.opLog.append(flowId, { method, params: cloneParams(params), source });
     if (this.onOp) {
       try { this.onOp(entry); } catch (err) { this.reportError(err, { kind: 'dispatch', method }); }
     }
@@ -627,6 +627,7 @@ export class AngflowAgentBridge {
         raw['id'] = this.mintId(flow, 'node');
       }
       const node = validateNodeShape(raw, 'add_node');
+      assertNewIds(flow, 'node', [node], 'add_node');
       flow.addNodes(node);
       return flow.getNode(node.id) ?? null;
     });
@@ -695,6 +696,7 @@ export class AngflowAgentBridge {
 
     this.handlers.set('add_edge', (flow, params) => {
       const edge = validateEdgeShape(requireObject(params, 'edge'), 'add_edge');
+      assertNewIds(flow, 'edge', [edge], 'add_edge');
       flow.addEdges(edge);
       return flow.getEdge(edge.id) ?? null;
     });
@@ -904,6 +906,7 @@ export class AngflowAgentBridge {
       const nodes = requireArray(params, 'nodes').map((n, i) =>
         validateNodeShape(n, `add_nodes[${i}]`),
       );
+      assertNewIds(flow, 'node', nodes, 'add_nodes');
       flow.addNodes(nodes);
       return nodes.map((n) => flow.getNode(n.id)).filter((n): n is Node => !!n);
     });
@@ -912,6 +915,7 @@ export class AngflowAgentBridge {
       const edges = requireArray(params, 'edges').map((e, i) =>
         validateEdgeShape(e, `add_edges[${i}]`),
       );
+      assertNewIds(flow, 'edge', edges, 'add_edges');
       flow.addEdges(edges);
       return edges.map((e) => flow.getEdge(e.id)).filter((e): e is Edge => !!e);
     });
@@ -1249,6 +1253,38 @@ export class AngflowAgentBridge {
 
 class FlowNotFoundError extends Error {}
 class InvalidParamsError extends Error {}
+
+/**
+ * Reject adds whose id already exists in the flow (changesets ignore an 'add'
+ * for an existing id, which would otherwise look like a successful create) or
+ * repeats within the same batch. Inside apply_changes the flow already holds
+ * earlier ops' adds, so those count as existing.
+ */
+function assertNewIds(
+  flow: NgFlowService,
+  kind: 'node' | 'edge',
+  items: ReadonlyArray<{ id: string }>,
+  label: string,
+): void {
+  const seen = new Set<string>();
+  for (const { id } of items) {
+    const exists = kind === 'node' ? !!flow.getNode(id) : !!flow.getEdge(id);
+    if (exists) throw new InvalidParamsError(`${label}: a ${kind} with id "${id}" already exists.`);
+    if (seen.has(id)) throw new InvalidParamsError(`${label}: duplicate ${kind} id "${id}" in the batch.`);
+    seen.add(id);
+  }
+}
+
+function cloneParams(params: Record<string, unknown>): Record<string, unknown> {
+  try {
+    return typeof structuredClone === 'function'
+      ? structuredClone(params)
+      : (JSON.parse(JSON.stringify(params)) as Record<string, unknown>);
+  } catch {
+    // Non-cloneable values (functions etc.): fall back to a shallow clone.
+    return { ...params };
+  }
+}
 /** Tool exists in the catalog but the deployment lacks a required capability. Maps to -32601. */
 class MethodUnavailableError extends Error {}
 class MutationDeniedError extends Error {}
@@ -1336,6 +1372,7 @@ function executeOp(flow: NgFlowService, op: Record<string, unknown>): unknown {
   switch (kind) {
     case 'add_node': {
       const node = validateNodeShape(op['node'], 'apply_changes/add_node');
+      assertNewIds(flow, 'node', [node], 'apply_changes/add_node');
       flow.addNodes(node);
       return flow.getNode(node.id) ?? null;
     }
@@ -1350,11 +1387,13 @@ function executeOp(flow: NgFlowService, op: Record<string, unknown>): unknown {
       const validated = nodes.map((n, i) =>
         validateNodeShape(n, `apply_changes/add_nodes[${i}]`),
       );
+      assertNewIds(flow, 'node', validated, 'apply_changes/add_nodes');
       flow.addNodes(validated);
       return validated.map((n) => flow.getNode(n.id)).filter((n): n is Node => !!n);
     }
     case 'add_edge': {
       const edge = validateEdgeShape(op['edge'], 'apply_changes/add_edge');
+      assertNewIds(flow, 'edge', [edge], 'apply_changes/add_edge');
       flow.addEdges(edge);
       return flow.getEdge(edge.id) ?? null;
     }
@@ -1369,6 +1408,7 @@ function executeOp(flow: NgFlowService, op: Record<string, unknown>): unknown {
       const validated = edges.map((e, i) =>
         validateEdgeShape(e, `apply_changes/add_edges[${i}]`),
       );
+      assertNewIds(flow, 'edge', validated, 'apply_changes/add_edges');
       flow.addEdges(validated);
       return validated.map((e) => flow.getEdge(e.id)).filter((e): e is Edge => !!e);
     }

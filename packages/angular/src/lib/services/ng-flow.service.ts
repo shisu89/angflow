@@ -345,6 +345,9 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     opts?: { groupId?: string; label?: string; collapsed?: boolean; padding?: number; headerHeight?: number },
   ): Promise<string> {
     const groupId = opts?.groupId ?? `group_${nodeIds.join('-')}`;
+    if (this.getNode(groupId)) {
+      throw new Error(`groupNodes: a node with id "${groupId}" already exists.`);
+    }
     const members = nodeIds
       .map((id) => this.getInternalNode(id))
       .filter((n): n is InternalNode<NodeType> => n != null);

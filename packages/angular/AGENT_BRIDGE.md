@@ -136,10 +136,10 @@ Every tool takes an optional `flowId` (omit when only one flow is registered; re
 
 | Tool | Params | Notes |
 |---|---|---|
-| `add_node` | `node: { id?, position:{x,y}, data, type?, … }` | Returns the created `Node` (`id` is optional — minted and returned when omitted) |
-| `add_nodes` | `nodes: Node[]` | Bulk version of `add_node`; returns `Node[]` |
-| `add_edge` | `edge: { id, source, target, sourceHandle?, targetHandle?, type?, animated?, label?, data? }` | Use this to **link nodes**; returns the created `Edge` |
-| `add_edges` | `edges: Edge[]` | Bulk version of `add_edge`; returns `Edge[]` |
+| `add_node` | `node: { id?, position:{x,y}, data, type?, … }` | Returns the created `Node` (`id` is optional — minted and returned when omitted). An id that already exists in the flow fails with `-32602` |
+| `add_nodes` | `nodes: Node[]` | Bulk version of `add_node`; returns `Node[]`. An existing id, or a duplicate id within the batch, fails with `-32602` |
+| `add_edge` | `edge: { id, source, target, sourceHandle?, targetHandle?, type?, animated?, label?, data? }` | Use this to **link nodes**; returns the created `Edge`. An id that already exists in the flow fails with `-32602` |
+| `add_edges` | `edges: Edge[]` | Bulk version of `add_edge`; returns `Edge[]`. An existing id, or a duplicate id within the batch, fails with `-32602` |
 | `update_node` | `id: string`, `patch: Partial<Node>` | Shallow merge. Move with `patch.position`; returns updated `Node` |
 | `update_node_data` | `id: string`, `dataPatch: Record<string, unknown>` | Shallow-merges only the `data` property; returns updated `Node` |
 | `update_edge` | `id: string`, `patch: Partial<Edge>` | Shallow merge; returns updated `Edge` |
@@ -510,6 +510,8 @@ cursor = next;
 | `-32603` | Internal error from the underlying `NgFlowService` call |
 
 **Note:** `apply_changes` rollback errors use code `-32603` and carry `data: { failedIndex }` in the error object indicating which op caused the failure.
+
+**Duplicate ids:** `add_node`, `add_nodes`, `add_edge` and `add_edges` reject an id that already exists in the flow (and, for the bulk tools, a repeated id within one call) with `-32602` before any mutation. Changesets ignore an `'add'` for an existing id, so without the check the call would look like a successful create. The same ops inside `apply_changes` fail the batch with `-32603` and roll back, and an earlier op's add in the same batch counts as existing. Use `update_node` / `update_edge` / `set_nodes` / `set_edges` to change existing elements.
 
 **Bulk caps:** array params above 5000 elements return `-32602` at the top level; an oversized nested `add_nodes`/`add_edges` op inside `apply_changes` rolls the batch back and returns `-32603` with `data: { failedIndex }`.
 

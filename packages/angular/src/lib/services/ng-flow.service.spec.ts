@@ -1306,6 +1306,16 @@ describe('groupNodes', () => {
     expect(service.getAbsolutePosition('b')).toEqual({ x: 300, y: 200 });
   });
 
+  it('throws when the group id already exists, leaving the flow untouched', async () => {
+    service.setNodes([
+      makeNode('a', { position: { x: 100, y: 100 }, width: 50, height: 50 }),
+      makeNode('g'),
+    ]);
+    await expect(service.groupNodes(['a'], { groupId: 'g' })).rejects.toThrow(/already exists/);
+    expect(service.getNode('a')?.parentId).toBeUndefined();
+    expect(service.getNodes()).toHaveLength(2);
+  });
+
   it('resolves members listed before their group (#5915): parent lookup and internal absolutes', async () => {
     const store = TestBed.inject(FlowStore);
     service.setNodes([
