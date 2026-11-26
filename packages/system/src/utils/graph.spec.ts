@@ -42,30 +42,37 @@ describe('getFitViewport', () => {
 
   it('clamps to minZoom when the board is too big', () => {
     const nodes = buildLookup([sized('a', 0, 0), sized('b', 100000, 0)]);
-    expect(getFitViewport(params(nodes), { padding: 0.1 })!.zoom).toBeCloseTo(0.5, 5);
+    expect(getFitViewport(params(nodes), { padding: '10%' })!.zoom).toBeCloseTo(0.5, 5);
   });
 
   it('lands strictly inside [minZoom, maxZoom] when the board fits', () => {
     const nodes = buildLookup([sized('a', 0, 0), sized('b', 300, 200)]);
-    const zoom = getFitViewport(params(nodes), { padding: 0.1 })!.zoom;
+    const zoom = getFitViewport(params(nodes), { padding: '10%' })!.zoom;
     expect(zoom).toBeGreaterThan(0.5);
     expect(zoom).toBeLessThan(2);
   });
 
   it('clamps to maxZoom for a tiny board', () => {
     const nodes = buildLookup([sized('a', 0, 0, 10, 10)]);
-    expect(getFitViewport(params(nodes), { padding: 0.1 })!.zoom).toBeCloseTo(2, 5);
+    expect(getFitViewport(params(nodes), { padding: '10%' })!.zoom).toBeCloseTo(2, 5);
   });
 
   it('honors an options.minZoom override', () => {
     const nodes = buildLookup([sized('a', 0, 0), sized('b', 100000, 0)]);
-    expect(getFitViewport(params(nodes), { padding: 0.1, minZoom: 0.0001 })!.zoom).toBeLessThan(0.1);
+    expect(getFitViewport(params(nodes), { padding: '10%', minZoom: 0.0001 })!.zoom).toBeLessThan(0.1);
   });
 
   it('returns null for an empty lookup, `nodes: []` and all-hidden nodes', () => {
     expect(getFitViewport(params(new Map() as NodeLookup<InternalNodeBase<NodeBase>>), {})).toBeNull();
     expect(getFitViewport(params(buildLookup([sized('a', 0, 0)])), { nodes: [] } as never)).toBeNull();
     expect(getFitViewport(params(buildLookup([{ ...sized('a', 0, 0), hidden: true }])), {})).toBeNull();
+  });
+});
+
+describe('getFitViewport default padding', () => {
+  it('defaults to 5% padding (#5927)', () => {
+    const zoom = getFitViewport({ nodes: buildLookup([sized('a', 0, 0)]), width: 800, height: 600, minZoom: 0.1, maxZoom: 100 })!.zoom;
+    expect(zoom).toBeCloseTo(7.2); // 5% of 800 is 40 per side: (800 - 80) / 100
   });
 });
 

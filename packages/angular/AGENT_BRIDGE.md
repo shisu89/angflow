@@ -175,15 +175,17 @@ Every tool takes an optional `flowId` (omit when only one flow is registered; re
 
 | Tool | Params | Notes |
 |---|---|---|
-| `fit_view` | `nodeIds?`, `padding?`, `duration?`, `minZoom?` | Animates to fit the given nodes (all if omitted). Returns `{ zoom, clamped, ended }` — `clamped` is true when the fit hit the min-zoom floor (board too big to frame). |
+| `fit_view` | `nodeIds?`, `padding?: number \| string`, `duration?`, `minZoom?` | Animates to fit the given nodes (all if omitted). `padding` is pixels when a number (`40` = 40px per side), or a string `'10%'` (share of the viewport) / `'20px'`; default `'5%'`. It is not a ratio: `0.1` is 0px. Returns `{ zoom, clamped, ended }` — `clamped` is true when the fit hit the min-zoom floor (board too big to frame). |
 | `set_viewport` | `viewport: { x, y, zoom }`, `duration?` | Animate to an explicit viewport. Awaits the animation; returns `true` when it ran to the end, `false` when interrupted (a user gesture or another viewport call). The JSON-RPC reply therefore arrives after the animation. |
 | `zoom_in` | `duration?: number` | Incremental zoom in. Returns `true`, or `false` if the animation was interrupted. |
 | `zoom_out` | `duration?: number` | Incremental zoom out. Returns `true`, or `false` if the animation was interrupted. |
 | `zoom_to` | `level: number`, `duration?: number` | Set zoom to an absolute level. Returns `true`, or `false` if the animation was interrupted. |
 | `set_center` | `x: number`, `y: number`, `zoom?: number`, `duration?: number` | Center the viewport on a flow coordinate. Returns `true`, or `false` if the animation was interrupted. |
-| `fit_bounds` | `bounds: { x, y, width, height }`, `padding?: number`, `duration?: number`, `minZoom?` | Fit the viewport to an explicit bounding rect. Returns `{ zoom, clamped, ended }`. |
+| `fit_bounds` | `bounds: { x, y, width, height }`, `padding?: number \| string`, `duration?: number`, `minZoom?` | Fit the viewport to an explicit bounding rect. `padding` is pixels when a number (`40` = 40px per side), or a string `'10%'` (share of the viewport) / `'20px'`; default `'5%'`. It is not a ratio: `0.1` is 0px. Returns `{ zoom, clamped, ended }`. |
 
 No viewport tool can hang any more: an interrupted animation settles its call.
+
+The library's per-side padding object (`{ top, right, bottom, left, x, y }`) is not accepted by the tools (`-32602`), which keeps the schema simple for LLM providers.
 
 **Fit result** (`fit_view`, `fit_bounds`, and `layout_nodes`' `fit`) — `{ zoom: number; clamped: boolean; ended: boolean }`, computed by the bridge, not a library type. `zoom` and `clamped` are this call's target, measured before the animation starts, so an interrupted fit or a graph change mid-animation still reports the target. `zoom` is JSON `null` when the fit is a no-op: nothing to fit, or the canvas isn't initialized (no panZoom). `clamped` means the min-zoom floor limited the fit (content larger than the viewport can show), a signal to split into regions or use `set_center`; clamping at `maxZoom` is not flagged. `ended` is `false` when a user gesture or another viewport call interrupted the animation, and when pan/zoom isn't initialized. Overlapping fits of the same kind share `ended` (the last one's), but each reports its own target `zoom`/`clamped`.
 

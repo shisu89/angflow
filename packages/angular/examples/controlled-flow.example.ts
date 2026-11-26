@@ -103,6 +103,6 @@ export class ControlledFlowExample {
   }
 
   fitView(): void {
-    this.flowService.fitView({ padding: 0.2 });
+    this.flowService.fitView({ padding: '10%' });
   }
 }

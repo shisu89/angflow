@@ -314,7 +314,12 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
       type: 'object',
       properties: {
         flowId: { type: 'string' },
-        padding: { type: 'number' },
+        padding: {
+          type: ['number', 'string'],
+          description:
+            "Pixels when a number (40 = 40px per side). A string may be a percentage of the viewport ('10%') " +
+            "or pixels ('20px'). Default '5%'. Not a ratio: 0.1 is 0px.",
+        },
         duration: { type: 'number' },
         nodeIds: { type: 'array', items: { type: 'string' } },
         minZoom: { type: 'number', description: 'Per-call min-zoom floor for this fit (overrides host minZoom). Returns { zoom, clamped, ended } where clamped means the board could not be fully framed.' },
@@ -595,7 +600,12 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
           },
           required: ['x', 'y', 'width', 'height'],
         },
-        padding: { type: 'number' },
+        padding: {
+          type: ['number', 'string'],
+          description:
+            "Pixels when a number (40 = 40px per side). A string may be a percentage of the viewport ('10%') " +
+            "or pixels ('20px'). Default '5%'. Not a ratio: 0.1 is 0px.",
+        },
         duration: { type: 'number' },
         minZoom: { type: 'number', description: 'Per-call min-zoom floor for this fit (overrides host minZoom). Returns { zoom, clamped, ended }.' },
       },

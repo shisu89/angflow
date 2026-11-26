@@ -2148,6 +2148,47 @@ describe('AngflowAgentBridge — bulk payload caps', () => {
       store.panZoom.set({ setViewport, getViewport: () => ({ x: 0, y: 0, zoom: 1 }) } as never);
     }
 
+    describe('padding units (#5927)', () => {
+      async function call(tool: 'fit_view' | 'fit_bounds', padding: unknown) {
+        const { bridge, newFlow } = setup();
+        const flow = newFlow();
+        bridge.register('main', flow);
+        flow.setNodes([makeNode('a', { width: 100, height: 50 })]);
+        const spy = vi.spyOn(flow, tool === 'fit_view' ? 'fitView' : 'fitBounds').mockResolvedValue(true);
+        const params = tool === 'fit_view' ? { padding } : { bounds: { x: 0, y: 0, width: 100, height: 100 }, padding };
+        const promise = bridge.callTool(tool, params);
+        return { spy, promise };
+      }
+      const optionsOf = (spy: ReturnType<typeof vi.spyOn>) => (spy.mock.calls[0] as unknown[]).at(-1);
+
+      it('fit_view passes a percentage string through', async () => {
+        const { spy, promise } = await call('fit_view', '10%');
+        await promise;
+        expect(optionsOf(spy)).toEqual(expect.objectContaining({ padding: '10%' }));
+      });
+      it('fit_bounds passes a pixel string through', async () => {
+        const { spy, promise } = await call('fit_bounds', '20px');
+        await promise;
+        expect(optionsOf(spy)).toEqual(expect.objectContaining({ padding: '20px' }));
+      });
+      it.each(['fit_view', 'fit_bounds'] as const)('%s passes a number as pixels', async (tool) => {
+        const { spy, promise } = await call(tool, 40);
+        await promise;
+        expect(optionsOf(spy)).toEqual(expect.objectContaining({ padding: 40 }));
+      });
+      it.each(['fit_view', 'fit_bounds'] as const)('%s treats null as omitted', async (tool) => {
+        const { spy, promise } = await call(tool, null);
+        await promise;
+        expect((optionsOf(spy) as { padding?: unknown }).padding).toBeUndefined();
+      });
+      it.each(['fit_view', 'fit_bounds'] as const)('%s rejects invalid padding with -32602', async (tool) => {
+        for (const bad of ['ten', '10em', -5, { top: 10 }]) {
+          const { promise } = await call(tool, bad);
+          await expect(promise).rejects.toMatchObject({ code: -32602 });
+        }
+      });
+    });
+
     it('an interrupted fit_view resolves with ended: false', async () => {
       const { bridge, newFlow } = setup();
       const flow = newFlow();

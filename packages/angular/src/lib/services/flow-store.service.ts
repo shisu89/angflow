@@ -46,6 +46,7 @@ import {
   type OnConnectEnd,
   type FinalConnectionState,
   setDevWarnSink,
+  defaultFitViewPadding,
 } from '@angflow/system';
 
 import type { Node, Edge, OnBeforeDelete } from '../types';
@@ -967,7 +968,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
         this.height(),
         options?.minZoom ?? this.minZoom(),
         options?.maxZoom ?? this.maxZoom(),
-        options?.padding ?? 0.1
+        options?.padding ?? defaultFitViewPadding
       );
       return pz.setViewport(viewport, { duration: options?.duration, ease: options?.ease, interpolate: options?.interpolate });
     });

@@ -1302,7 +1302,7 @@ describe('shared fit promise', () => {
     await expect(secondBounds).resolves.toBe(true);
     // the second call's viewport, not the first's
     const expected = (w: number, h: number) =>
-      getViewportForBounds({ x: 0, y: 0, width: w, height: h }, 800, 600, store.minZoom(), store.maxZoom(), 0.1).zoom;
+      getViewportForBounds({ x: 0, y: 0, width: w, height: h }, 800, 600, store.minZoom(), store.maxZoom(), '5%').zoom; // the default padding (#5927)
     expect(expected(400, 300)).not.toBe(expected(100, 100));
     expect((setViewport.mock.calls[1] as unknown as [{ zoom: number }])[0].zoom).toBe(expected(400, 300));
   });

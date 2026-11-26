@@ -27,7 +27,7 @@ import {
   InternalNodeBase,
   NodeDragItem,
 } from '../types';
-import { errorMessages } from '../constants';
+import { defaultFitViewPadding, errorMessages } from '../constants';
 
 /**
  * Test whether an object is usable as an Edge
@@ -391,7 +391,7 @@ export function getFitViewport<
   const nodesToFit = getFitViewNodes(nodes, options);
   if (nodesToFit.size === 0) return null;
   const bounds = getInternalNodesBounds(nodesToFit);
-  return getViewportForBounds(bounds, width, height, options?.minZoom ?? minZoom, options?.maxZoom ?? maxZoom, options?.padding ?? 0.1);
+  return getViewportForBounds(bounds, width, height, options?.minZoom ?? minZoom, options?.maxZoom ?? maxZoom, options?.padding ?? defaultFitViewPadding);
 }
 
 export async function fitViewport<

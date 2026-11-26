@@ -118,7 +118,10 @@ export class ControlsComponent {
    * affordance for the Delete key, which has no equivalent without a keyboard.
    */
   readonly showDelete = input(false);
-  /** Options passed to `fitView` when the button is pressed. */
+  /**
+   * Options passed to `fitView` when the button is pressed.
+   * `padding`: pixels when a number (`40` = 40px per side), or `'10%'` / `'20px'`; default `'5%'`.
+   */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly fitViewOptions = input<FitViewOptionsBase<any>>(); // node-type-agnostic fitView options
   /** Custom handler invoked instead of `fitView` when the fit button is pressed. */

@@ -452,7 +452,10 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   /** Fit all nodes into view on initial render. */
   readonly fitView = input(false);
 
-  /** Options for the initial `fitView` call (padding, specific nodes, min/max zoom). */
+  /**
+   * Options for the initial `fitView` call (padding, specific nodes, min/max zoom).
+   * `padding`: pixels when a number (`40` = 40px per side), or `'10%'` / `'20px'`; default `'5%'`.
+   */
   readonly fitViewOptions = input<FitViewOptions<NodeType>>();
 
   // ── Keyboard keys ─────────────────────────────────────────────────────

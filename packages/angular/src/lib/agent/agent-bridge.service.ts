@@ -743,7 +743,7 @@ export class AngflowAgentBridge {
     });
 
     this.handlers.set('fit_view', async (flow, params) => {
-      const padding = typeof params['padding'] === 'number' ? (params['padding'] as number) : undefined;
+      const padding = optionalPadding(params);
       const duration = typeof params['duration'] === 'number' ? (params['duration'] as number) : undefined;
       const minZoom = optionalPositiveNumber(params, 'minZoom');
       const nodeIds = optionalStringArray(params, 'nodeIds');
@@ -892,7 +892,7 @@ export class AngflowAgentBridge {
 
     this.handlers.set('fit_bounds', async (flow, params) => {
       const bounds = requireObject(params, 'bounds') as { x: number; y: number; width: number; height: number };
-      const padding = typeof params['padding'] === 'number' ? (params['padding'] as number) : undefined;
+      const padding = optionalPadding(params);
       const duration = typeof params['duration'] === 'number' ? (params['duration'] as number) : undefined;
       const minZoom = optionalPositiveNumber(params, 'minZoom');
       const target = flow.measureFitBounds(bounds, { padding, minZoom });
@@ -1473,6 +1473,15 @@ function optionalStringArray(params: Record<string, unknown>, key: string): stri
     );
   }
   return value as string[];
+}
+
+/** Fit padding param: pixels (a number >= 0) or '<n>px' / '<n>%'. null/undefined → the default. */
+function optionalPadding(params: Record<string, unknown>): number | `${number}px` | `${number}%` | undefined {
+  const v = params['padding'];
+  if (v === undefined || v === null) return undefined;
+  if (typeof v === 'number' && Number.isFinite(v) && v >= 0) return v;
+  if (typeof v === 'string' && /^\d+(\.\d+)?(px|%)$/.test(v)) return v as `${number}px`;
+  throw new InvalidParamsError('Param "padding" must be pixels (a number >= 0) or a string like "10%" or "20px".');
 }
 
 function optionalPositiveNumber(params: Record<string, unknown>, key: string): number | undefined {

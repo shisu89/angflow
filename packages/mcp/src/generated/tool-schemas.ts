@@ -512,7 +512,11 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
           "type": "string"
         },
         "padding": {
-          "type": "number"
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Pixels when a number (40 = 40px per side). A string may be a percentage of the viewport ('10%') or pixels ('20px'). Default '5%'. Not a ratio: 0.1 is 0px."
         },
         "duration": {
           "type": "number"
@@ -992,7 +996,11 @@ export const AGENT_TOOL_SCHEMAS: AgentToolSchema[] = [
           ]
         },
         "padding": {
-          "type": "number"
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Pixels when a number (40 = 40px per side). A string may be a percentage of the viewport ('10%') or pixels ('20px'). Default '5%'. Not a ratio: 0.1 is 0px."
         },
         "duration": {
           "type": "number"

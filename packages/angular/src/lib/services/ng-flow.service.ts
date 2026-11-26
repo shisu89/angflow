@@ -19,6 +19,7 @@ import {
   type FitViewOptionsBase,
   type FitBoundsOptions,
   type Padding,
+  defaultFitViewPadding,
   type NodeConnection,
   type ConnectionState,
   type NodeBase,
@@ -54,7 +55,7 @@ const BUILT_IN_EDGE_TYPE_NAMES = ['default', 'bezier', 'straight', 'step', 'smoo
  * ```typescript
  * private flow = inject(NgFlowService);
  *
- * zoomToFit() { this.flow.fitView({ padding: 0.2 }); }
+ * zoomToFit() { this.flow.fitView({ padding: '10%' }); }
  * addNode(n: Node) { this.flow.addNodes(n); }
  * ```
  */
@@ -835,7 +836,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     if (!this.store.panZoom()) return null;
     const effMin = options?.minZoom ?? this.store.minZoom();
     const effMax = options?.maxZoom ?? this.store.maxZoom();
-    const viewport = getViewportForBounds(bounds, this.store.width(), this.store.height(), effMin, effMax, options?.padding ?? 0.1);
+    const viewport = getViewportForBounds(bounds, this.store.width(), this.store.height(), effMin, effMax, options?.padding ?? defaultFitViewPadding);
     return { zoom: viewport.zoom, clamped: viewport.zoom <= effMin + FIT_CLAMP_EPSILON };
   }
 
