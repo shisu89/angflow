@@ -108,6 +108,8 @@ describe('PaneComponent box selection auto-pan', () => {
     store = TestBed.inject(FlowStore);
     paneElement = fixture.nativeElement as HTMLElement;
     setSignalInput(pane, 'selectionOnDrag', true);
+    // selectionOnDrag applies only when the primary button does not pan (upstream).
+    setSignalInput(pane, 'panOnDrag', [1, 2]);
     fixture.detectChanges();
 
     const container = document.createElement('div');

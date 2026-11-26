@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection, ɵSIGNAL } from '@angular/core';
 import { PaneComponent } from './pane.component';
+import { NgFlowComponent } from '../ng-flow/ng-flow.component';
 import { FlowStore } from '../../services/flow-store.service';
 
 class FakeResizeObserver {
@@ -114,7 +115,7 @@ describe('PaneComponent marquee paneDragThreshold (#6115)', () => {
     expect(ends).toHaveBeenCalledTimes(1);
   });
 
-  it('a press that never crosses leaves no selection state, so its click is a pane click', () => {
+  it('a press that never crosses leaves no selection state', () => {
     store.paneDragThreshold.set(5);
     down(100, 100);
     move(102, 100);
@@ -132,5 +133,52 @@ describe('PaneComponent marquee paneDragThreshold (#6115)', () => {
     down(100, 100);
     move(100.5, 100);
     expect(starts).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('NgFlowComponent pane click after a marquee press (#6115)', () => {
+  beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [NgFlowComponent],
+      providers: [provideZonelessChangeDetection()],
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function press(dx: number) {
+    const fixture = TestBed.createComponent(NgFlowComponent);
+    fixture.componentRef.setInput('selectionOnDrag', true);
+    fixture.componentRef.setInput('panOnDrag', [1, 2]);
+    fixture.componentRef.setInput('paneDragThreshold', 5);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const paneClick = vi.fn();
+    fixture.componentInstance.paneClick.subscribe(paneClick);
+    const paneEl = (fixture.nativeElement as HTMLElement).querySelector('.xy-flow__pane') as HTMLElement;
+    paneEl.dispatchEvent(pointerEvent('pointerdown', { x: 100, y: 100 }));
+    document.dispatchEvent(pointerEvent('pointermove', { x: 100 + dx, y: 100 }));
+    document.dispatchEvent(pointerEvent('pointerup', { x: 100 + dx, y: 100 }));
+    paneEl.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: 100 + dx, clientY: 100 }));
+    fixture.destroy();
+    return paneClick;
+  }
+
+  it('a press that never crosses the threshold is followed by (paneClick)', async () => {
+    expect(await press(2)).toHaveBeenCalledTimes(1);
+  });
+
+  it('the click that ends a marquee past the threshold is swallowed', async () => {
+    expect(await press(40)).not.toHaveBeenCalled();
   });
 });

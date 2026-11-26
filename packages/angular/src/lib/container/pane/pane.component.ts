@@ -42,9 +42,16 @@ export class PaneComponent implements OnDestroy {
   readonly selectionEnd = output<MouseEvent>();
   readonly paneScroll = output<WheelEvent>();
 
+  /**
+   * Upstream FlowRenderer `_selectionOnDrag`: drag-selection applies only when the
+   * primary button does not pan. With panOnDrag `true` or an array including 0, a
+   * plain drag pans and only the selection key starts a marquee.
+   */
+  private readonly selectionOnDragActive = computed(() => this.selectionOnDrag() && !isLeftClickPan(this.panOnDrag()));
+
   /** Upstream `isSelecting`: selection key held, a marquee running, or drag-selection enabled without left-click pan. */
   readonly isSelecting = computed(
-    () => this.store.selectionKeyActive() || this.store.userSelectionActive() || (this.selectionOnDrag() && !isLeftClickPan(this.panOnDrag()))
+    () => this.store.selectionKeyActive() || this.store.userSelectionActive() || this.selectionOnDragActive()
   );
 
   private marqueeActive = false;
@@ -106,14 +113,16 @@ export class PaneComponent implements OnDestroy {
    * (which starts the marquee) and the touchstart suppressor (which kills
    * d3-zoom's pan) so the two agree regardless of pointerdown/touchstart order.
    *
-   * React parity (Pane/index.tsx `onPointerDownCapture`): when selectionOnDrag is
+   * React parity (Pane/index.tsx `onPointerDownCapture`, with FlowRenderer's
+   * `selectionOnDrag && !isLeftClickPan(panOnDrag)`): when selectionOnDrag is
    * the trigger the target MUST be the pane itself (children like nodes/edges/
    * the selection box are not hijacked); key-based selection bypasses that.
    */
   private shouldStartSelectionFor(target: EventTarget | null): boolean {
-    if (!(this.selectionOnDrag() || this.store.selectionKeyActive())) return false;
+    const selectionOnDrag = this.selectionOnDragActive();
+    if (!(selectionOnDrag || this.store.selectionKeyActive())) return false;
     const eventTargetIsPane = target === this.el.nativeElement;
-    if (this.selectionOnDrag() && !eventTargetIsPane && !this.store.selectionKeyActive()) {
+    if (selectionOnDrag && !eventTargetIsPane && !this.store.selectionKeyActive()) {
       return false;
     }
     const el = target as HTMLElement | null;

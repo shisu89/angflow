@@ -79,6 +79,7 @@ describe('PaneComponent — selectionOnDrag target guard', () => {
 
     // Enable selectionOnDrag; stub domNode so nothing bails out early for a different reason.
     setSignalInput(inst, 'selectionOnDrag', true);
+    setSignalInput(inst, 'panOnDrag', [1, 2]); // the primary button does not pan
     fixture.detectChanges();
     inst.initSelectionListener();
     stubDomNode(store);
@@ -101,6 +102,7 @@ describe('PaneComponent — selectionOnDrag target guard', () => {
     const store = TestBed.inject(FlowStore);
 
     setSignalInput(inst, 'selectionOnDrag', true);
+    setSignalInput(inst, 'panOnDrag', [1, 2]); // the primary button does not pan
     fixture.detectChanges();
     inst.initSelectionListener();
     stubDomNode(store);
@@ -124,6 +126,7 @@ describe('PaneComponent — selectionOnDrag target guard', () => {
     const store = TestBed.inject(FlowStore);
 
     setSignalInput(inst, 'selectionOnDrag', true);
+    setSignalInput(inst, 'panOnDrag', [1, 2]); // the primary button does not pan
     fixture.detectChanges();
     inst.initSelectionListener();
     stubDomNode(store);
@@ -131,6 +134,44 @@ describe('PaneComponent — selectionOnDrag target guard', () => {
     // Dispatch directly on the pane element — event.target === paneEl in capture handler
     const paneEl = fixture.nativeElement as HTMLElement;
     fireMouseDown(paneEl);
+
+    expect(store.userSelectionActive()).toBe(true);
+  });
+
+  /**
+   * Upstream FlowRenderer: `selectionOnDrag && !isLeftClickPan(panOnDrag)`. When the
+   * primary button pans, a plain drag pans and selectionOnDrag does not apply.
+   */
+  it.each([[true], [[0, 1, 2]]])('does NOT start a marquee with selectionOnDrag when panOnDrag %j pans with the primary button', (panOnDrag) => {
+    const fixture = TestBed.createComponent(PaneComponent);
+    const inst = fixture.componentInstance;
+    const store = TestBed.inject(FlowStore);
+
+    setSignalInput(inst, 'selectionOnDrag', true);
+    setSignalInput(inst, 'panOnDrag', panOnDrag);
+    fixture.detectChanges();
+    inst.initSelectionListener();
+    stubDomNode(store);
+
+    const event = new MouseEvent('pointerdown', { button: 0, bubbles: true, cancelable: true });
+    (fixture.nativeElement as HTMLElement).dispatchEvent(event);
+
+    expect(store.userSelectionActive()).toBe(false);
+    expect(event.defaultPrevented).toBe(false); // d3-zoom sees the press and pans
+  });
+
+  it('starts a marquee with the selection key even when panOnDrag is true', () => {
+    const fixture = TestBed.createComponent(PaneComponent);
+    const inst = fixture.componentInstance;
+    const store = TestBed.inject(FlowStore);
+
+    setSignalInput(inst, 'selectionOnDrag', true);
+    store.selectionKeyActive.set(true);
+    fixture.detectChanges();
+    inst.initSelectionListener();
+    stubDomNode(store);
+
+    fireMouseDown(fixture.nativeElement as HTMLElement);
 
     expect(store.userSelectionActive()).toBe(true);
   });
