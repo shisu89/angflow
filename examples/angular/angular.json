@@ -23,6 +23,10 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "xy-theme.css",
+                "input": "node_modules/@angflow/angular/dist"
               }
             ],
             "styles": [
@@ -79,6 +83,10 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "xy-theme.css",
+                "input": "node_modules/@angflow/angular/dist"
               }
             ],
             "styles": [

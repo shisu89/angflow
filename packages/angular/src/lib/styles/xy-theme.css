@@ -1,0 +1,13 @@
+/* exported as @angflow/angular/xy-theme.css: the full default xyflow theme on top of base.css */
+@import './base.css';
+@import '../../../../system/src/styles/xy-theme.css' layer(xyflow);
+
+@layer xyflow {
+  .xy-flow__edge-textbg {
+    fill: var(--xy-edge-label-background-color, var(--xy-edge-label-background-color-default));
+  }
+
+  .xy-flow__edge-text {
+    fill: var(--xy-edge-label-color, var(--xy-edge-label-color-default));
+  }
+}

@@ -20,6 +20,7 @@ import { DragThresholdExampleComponent } from './examples/drag-threshold/drag-th
 import { ZIndexModeExampleComponent } from './examples/z-index-mode/z-index-mode.component';
 import { CancelConnectionExampleComponent } from './examples/cancel-connection/cancel-connection.component';
 import { ColorModeExampleComponent } from './examples/color-mode/color-mode.component';
+import { XyThemeExampleComponent } from './examples/xy-theme/xy-theme.component';
 import { InteractionExampleComponent } from './examples/interaction/interaction.component';
 import { TypedHandlesExampleComponent } from './examples/typed-handles/typed-handles.component';
 import { CustomNodeInjectExampleComponent } from './examples/custom-node-inject/custom-node-inject.component';
@@ -82,6 +83,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
   { name: 'Drag threshold',        path: 'drag-threshold',        component: DragThresholdExampleComponent },
   { name: 'Cancel connection',     path: 'cancel-connection',     component: CancelConnectionExampleComponent },
   { name: 'Color mode',            path: 'color-mode',            component: ColorModeExampleComponent },
+  { name: 'xy-theme',              path: 'xy-theme',              component: XyThemeExampleComponent },
   { name: 'Interaction',           path: 'interaction',           component: InteractionExampleComponent },
   { name: 'Typed handles',         path: 'typed-handles',         component: TypedHandlesExampleComponent },
   { name: 'Accessibility',         path: 'a11y',                  component: A11yExampleComponent },
@@ -117,6 +119,7 @@ export const HARNESS_ROUTES: HarnessRoute[] = [
 /** Upstream spec routes -> Angular example. Upstream specs goto('/examples/<name>'). */
 const UPSTREAM_EXAMPLE_ALIASES: Record<string, string> = {
   'color-mode': 'color-mode',
+  'xy-theme': 'xy-theme',
   backgrounds: 'backgrounds',
 };
 

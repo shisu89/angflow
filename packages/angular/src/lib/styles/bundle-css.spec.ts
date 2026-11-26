@@ -7,7 +7,7 @@ import postcss, { type Root, type Rule } from 'postcss';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { bundleCss } from '../../../scripts/bundle-css.js';
 
-const ENTRIES = ['style', 'base'] as const;
+const ENTRIES = ['style', 'base', 'xy-theme'] as const;
 const SYSTEM_STYLES = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../system/src/styles');
 
 const CURSOR_SELECTORS = [
@@ -61,7 +61,9 @@ function declValues(root: Root, selector: string, prop: string): string[] {
   );
 }
 
-describe.each(ENTRIES)('bundled %s.css', (entry) => {
+const COMMON_ENTRIES = ['style', 'base'] as const;
+
+describe.each(COMMON_ENTRIES)('bundled %s.css', (entry) => {
   it('puts every top-level node in @layer xyflow', () => {
     const stray = roots[entry].nodes.filter(
       (node) => node.type !== 'comment' && !(node.type === 'atrule' && node.name === 'layer' && node.params === 'xyflow'),
@@ -165,5 +167,48 @@ describe('bundled base.css (no theme colours)', () => {
   it('leaves out the Angular theme rules', () => {
     expect(rulesFor(roots.base, '.xy-flow__node.connection-target')).toEqual([]);
     expect(rulesFor(roots.base, '.xy-flow__edge-textbg')).toEqual([]);
+  });
+});
+
+describe('bundled xy-theme.css (full theme on top of base.css)', () => {
+  it('puts every top-level node in @layer xyflow', () => {
+    const stray = roots['xy-theme'].nodes.filter(
+      (node) => node.type !== 'comment' && !(node.type === 'atrule' && node.name === 'layer' && node.params === 'xyflow'),
+    );
+    expect(stray.map((node) => node.toString().slice(0, 80))).toEqual([]);
+  });
+
+  it('leaves no @import and no & in any selector', () => {
+    const imports: string[] = [];
+    roots['xy-theme'].walkAtRules('import', (rule) => {
+      imports.push(rule.params);
+    });
+    const nested: string[] = [];
+    roots['xy-theme'].walkRules((rule) => {
+      if (rule.selector.includes('&')) nested.push(rule.selector);
+    });
+    expect(imports).toEqual([]);
+    expect(nested).toEqual([]);
+  });
+
+  it('carries the xy-theme tokens and node rules', () => {
+    expect(sources['xy-theme']).toContain('--xy-theme-primary');
+    expect(rulesFor(roots['xy-theme'], '.xy-flow__node').length).toBeGreaterThan(0);
+  });
+
+  it('keeps the brand colour from the system theme (no override)', () => {
+    expect(declValues(roots['xy-theme'], ':root', '--xy-theme-primary')).toEqual(['#ff0073']);
+  });
+
+  it('builds on base.css, not style.css', () => {
+    expect(rulesFor(roots['xy-theme'], '.xy-flow__pane::before').length).toBeGreaterThan(0);
+    expect(rulesFor(roots['xy-theme'], '.xy-flow__node.connection-target')).toEqual([]);
+    expect(declValues(roots['xy-theme'], '.xy-flow', '--xy-edge-stroke-default')).toEqual(['light-dark(#b1b1b7, #3e3e3e)']);
+  });
+
+  it('has the edge-text fill rules on the rendered xy-flow__ classes', () => {
+    expect(declValues(roots['xy-theme'], '.xy-flow__edge-textbg', 'fill')).toContain(
+      'var(--xy-edge-label-background-color, var(--xy-edge-label-background-color-default))',
+    );
   });
 });

@@ -35,6 +35,7 @@
     },
     "./base.css": "./dist/base.css",
     "./style.css": "./dist/style.css",
+    "./xy-theme.css": "./dist/xy-theme.css",
     "./dist/style.css": "./dist/style.css",
     "./dist/base.css": "./dist/base.css"
   },

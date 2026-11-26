@@ -5,7 +5,8 @@
  * xyflow uses: postcss-import (inlines @import, honouring `layer()`),
  * postcss-nested (flattens `&` nesting) and autoprefixer.
  *
- * Output: dist/base.css (structural) and dist/style.css (structural + theme),
+ * Output: dist/base.css (structural), dist/style.css (structural + theme) and
+ * dist/xy-theme.css (structural + upstream's full optional theme),
  * every rule inside `@layer xyflow`.
  */
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
@@ -17,7 +18,7 @@ import postcssNested from 'postcss-nested';
 import autoprefixer from 'autoprefixer';
 
 const pkgRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const ENTRIES = ['base', 'style'];
+const ENTRIES = ['base', 'style', 'xy-theme'];
 
 export async function bundleCss(outDir = resolve(pkgRoot, 'dist')) {
   await mkdir(outDir, { recursive: true });
@@ -28,7 +29,7 @@ export async function bundleCss(outDir = resolve(pkgRoot, 'dist')) {
     const result = await processor.process(await readFile(from, 'utf-8'), { from, to });
     await writeFile(to, result.css, 'utf-8');
   }
-  console.log('CSS bundled: dist/style.css, dist/base.css');
+  console.log('CSS bundled: dist/style.css, dist/base.css, dist/xy-theme.css');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await bundleCss();
