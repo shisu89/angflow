@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, onTestFinished } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { provideZonelessChangeDetection, DOCUMENT } from '@angular/core';
+import { provideZonelessChangeDetection, DOCUMENT, effect } from '@angular/core';
 import { FlowStore } from './flow-store.service';
 import { NgFlowService } from './ng-flow.service';
 import { layoutNodes } from '../layout/layout-nodes';
@@ -477,6 +477,111 @@ describe('NgFlowService', () => {
       service.setNodes([makeNode('1')]);
       const sig = service.selectNodesData(['1', 'gone']);
       expect(sig()).toHaveLength(1);
+    });
+  });
+
+  describe('selectNode / selectEdge / selectInternalNodes', () => {
+    function countNotifications<T>(sig: () => T): { count: () => number; stop: () => void } {
+      let n = 0;
+      const ref = TestBed.runInInjectionContext(() =>
+        effect(() => {
+          sig();
+          n++;
+        }),
+      );
+      TestBed.flushEffects();
+      return { count: () => n, stop: () => ref.destroy() };
+    }
+
+    it('selectNode returns the node, undefined when missing, and updates on change', () => {
+      service.setNodes([makeNode('a', { data: { l: 1 } }), makeNode('b')]);
+      const a = service.selectNode('a');
+      expect(a()?.id).toBe('a');
+      expect(service.selectNode('nope')()).toBeUndefined();
+      service.updateNodeData('a', { l: 2 });
+      expect(a()?.data).toEqual({ l: 2 });
+    });
+
+    it('selectNode does not notify when another node changes', () => {
+      service.setNodes([makeNode('a'), makeNode('b')]);
+      const probe = countNotifications(service.selectNode('a'));
+      const before = probe.count();
+      service.updateNodeData('b', { x: 1 });
+      TestBed.flushEffects();
+      expect(probe.count()).toBe(before);
+      service.updateNodeData('a', { x: 1 });
+      TestBed.flushEffects();
+      expect(probe.count()).toBe(before + 1);
+      probe.stop();
+    });
+
+    it('selectEdge returns the edge, undefined when missing, and updates on change', () => {
+      service.setNodes([makeNode('a'), makeNode('b')]);
+      service.setEdges([makeEdge('e1', 'a', 'b'), makeEdge('e2', 'b', 'a')]);
+      const e1 = service.selectEdge('e1');
+      expect(e1()?.id).toBe('e1');
+      expect(service.selectEdge('nope')()).toBeUndefined();
+      service.updateEdgeData('e1', { w: 2 });
+      expect(e1()?.data).toEqual({ w: 2 });
+    });
+
+    it('selectEdge does not notify when another edge changes', () => {
+      service.setNodes([makeNode('a'), makeNode('b')]);
+      service.setEdges([makeEdge('e1', 'a', 'b'), makeEdge('e2', 'b', 'a')]);
+      const probe = countNotifications(service.selectEdge('e1'));
+      const before = probe.count();
+      service.updateEdgeData('e2', { w: 1 });
+      TestBed.flushEffects();
+      expect(probe.count()).toBe(before);
+      service.updateEdgeData('e1', { w: 1 });
+      TestBed.flushEffects();
+      expect(probe.count()).toBe(before + 1);
+      probe.stop();
+    });
+
+    it('selectInternalNodes keeps order, collapses duplicates, skips missing and handles empty', () => {
+      service.setNodes([makeNode('a'), makeNode('b'), makeNode('c')]);
+      expect(service.selectInternalNodes([])()).toEqual([]);
+      const sig = service.selectInternalNodes(['c', 'a', 'c', 'gone']);
+      expect(sig().map(n => n.id)).toEqual(['c', 'a']);
+    });
+
+    it('selectInternalNodes updates when a node is removed and keeps identity otherwise', () => {
+      service.setNodes([makeNode('a'), makeNode('b')]);
+      const sig = service.selectInternalNodes(['a', 'b']);
+      const first = sig();
+      service.updateNodeData('zzz', {});
+      expect(sig()).toBe(first);
+      service.setNodes([makeNode('a')]);
+      expect(sig().map(n => n.id)).toEqual(['a']);
+    });
+
+    it('selectInternalNode does not notify when an unrelated node moves', () => {
+      service.setNodes([makeNode('a'), makeNode('b')]);
+      const probe = countNotifications(service.selectInternalNode('a'));
+      const before = probe.count();
+      store.triggerNodeChanges([{ id: 'b', type: 'position', position: { x: 9, y: 9 } }]);
+      TestBed.flushEffects();
+      expect(probe.count()).toBe(before);
+      probe.stop();
+    });
+  });
+
+  describe('selectInternalNode with parented movers', () => {
+    it('does not notify for an unrelated node when a parented node moves', () => {
+      service.setNodes([
+        makeNode('a'),
+        makeNode('p'),
+        makeNode('c', { parentId: 'p' }),
+      ]);
+      let n = 0;
+      const sig = service.selectInternalNode('a');
+      TestBed.runInInjectionContext(() => effect(() => { sig(); n++; }));
+      TestBed.flushEffects();
+      const before = n;
+      store.triggerNodeChanges([{ id: 'c', type: 'position', position: { x: 9, y: 9 } }]);
+      TestBed.flushEffects();
+      expect(n).toBe(before);
     });
   });
 

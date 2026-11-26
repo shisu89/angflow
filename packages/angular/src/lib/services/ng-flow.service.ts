@@ -1047,6 +1047,44 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   }
 
   /**
+   * Returns a signal with the user node for a given ID (`undefined` when missing).
+   * Notifies only when the node object itself changes, not when other nodes change.
+   * Equivalent to React's `useNode()`.
+   */
+  selectNode(nodeId: string): Signal<NodeType | undefined> {
+    return computed(() => this.store.nodes().find(n => n.id === nodeId));
+  }
+
+  /**
+   * Returns a signal with the edge for a given ID (`undefined` when missing).
+   * Notifies only when the edge object itself changes, not when other edges change.
+   * Equivalent to React's `useEdge()`.
+   */
+  selectEdge(edgeId: string): Signal<EdgeType | undefined> {
+    return computed(() => this.store.edges().find(e => e.id === edgeId));
+  }
+
+  /**
+   * Returns a signal with the internal nodes for the given IDs, in the given
+   * order. Duplicate IDs are collapsed and missing IDs are skipped.
+   * Equivalent to React's `useInternalNodes()`.
+   */
+  selectInternalNodes(nodeIds: readonly string[]): Signal<InternalNode<NodeType>[]> {
+    return computed(
+      () => {
+        this.store.version();
+        const result: InternalNode<NodeType>[] = [];
+        for (const id of new Set(nodeIds)) {
+          const node = this.store.nodeLookup.get(id) as InternalNode<NodeType> | undefined;
+          if (node) result.push(node);
+        }
+        return result;
+      },
+      { equal: (a, b) => a.length === b.length && a.every((n, i) => n === b[i]) },
+    );
+  }
+
+  /**
    * Returns a signal with the internal node for a given ID.
    * Equivalent to React's `useInternalNode()`.
    */
