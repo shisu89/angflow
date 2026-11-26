@@ -812,7 +812,8 @@ export class EdgeRendererComponent {
         this.reconnectStart.emit({ event, edge, handleType: oppositeHandle.type });
         store.onConnectStart?.(evt, params);
       },
-      onConnectEnd: (evt: MouseEvent | TouchEvent, _connectionState: FinalConnectionState) => store.onConnectEnd?.(evt),
+      onConnectEnd: (evt: MouseEvent | TouchEvent, connectionState: FinalConnectionState) =>
+        store.onConnectEnd?.(evt, connectionState),
       onReconnectEnd: (evt: MouseEvent | TouchEvent, connectionState: FinalConnectionState) => {
         this.reconnectingEdgeId.set(null);
         this.hoveredAnchorEdgeId.set(null);

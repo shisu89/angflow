@@ -4,7 +4,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
 } from '@angflow/angular';
-import type { Node, Edge, Connection, NodeChange, EdgeChange, OnConnectStartParams } from '@angflow/angular';
+import type { Node, Edge, Connection, NodeChange, EdgeChange, OnConnectStartParams, FinalConnectionState } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -57,7 +57,7 @@ export class AddNodeOnEdgeDropExampleComponent {
     this.connectingNodeId = event.params.nodeId ?? null;
   }
 
-  onConnectEnd(event: MouseEvent | TouchEvent): void {
+  onConnectEnd({ event }: { event: MouseEvent | TouchEvent; connectionState: FinalConnectionState }): void {
     if (!this.connectingNodeId) return;
     const target = event.target as Element | null;
     if (!target?.classList?.contains('xy-flow__pane')) return;

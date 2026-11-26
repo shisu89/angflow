@@ -484,3 +484,113 @@ describe('HandleComponent — click-connect fires only click-connect events', ()
     expect(store.onConnectStart).not.toHaveBeenCalled();
   });
 });
+
+describe('HandleComponent — click-connect end payload (#6117)', () => {
+  const EMPTY_FINAL = {
+    isValid: null, from: null, fromHandle: null, fromPosition: null, fromNode: null,
+    to: null, toHandle: null, toPosition: null, toNode: null, pointer: null,
+  };
+  let store: FlowStore;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [HandleComponent],
+      providers: [
+        provideZonelessChangeDetection(),
+        FlowStore,
+        { provide: NODE_ID, useValue: 'node-A' },
+      ],
+    });
+    store = TestBed.inject(FlowStore);
+    store.onConnectEnd = vi.fn();
+    store.onClickConnectEnd = vi.fn();
+    // jsdom does not implement elementFromPoint, which XYHandle.isValid calls.
+    if (!document.elementFromPoint) {
+      Object.defineProperty(document, 'elementFromPoint', { value: () => null, writable: true, configurable: true });
+    }
+  });
+
+  function mountSource() {
+    const fixture = TestBed.createComponent(HandleComponent);
+    setSignalInput(fixture.componentInstance, 'type', 'source' as HandleType);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  function click(fixture: ReturnType<typeof mountSource>): MouseEvent {
+    const event = new MouseEvent('click', { bubbles: true });
+    (fixture.nativeElement as HTMLElement).dispatchEvent(event);
+    return event;
+  }
+
+  /** The click-to-connect preview at transform [100, 50, 2], ending at screen (300, 250). */
+  function showPreview(): void {
+    store.transform.set([100, 50, 2]);
+    store.updateClickConnectPreview({
+      inProgress: true,
+      isValid: null,
+      from: { x: 0, y: 0 },
+      fromHandle: { id: null, nodeId: 'other', x: 0, y: 0, position: system.Position.Right, type: 'source', width: 10, height: 10 },
+      fromPosition: system.Position.Right,
+      fromNode: null as never,
+      to: { x: 300, y: 250 },
+      toHandle: null,
+      toPosition: system.Position.Left,
+      toNode: null,
+      pointer: { x: 300, y: 250 },
+    });
+  }
+
+  function endCall(): [MouseEvent, Record<string, unknown>] {
+    const spy = store.onClickConnectEnd as unknown as ReturnType<typeof vi.fn>;
+    expect(spy).toHaveBeenCalledTimes(1);
+    return spy.mock.calls[0] as [MouseEvent, Record<string, unknown>];
+  }
+
+  it('a completing second click reports the preview state, then the handle is cleared', () => {
+    const fixture = mountSource();
+    store.connectionClickStartHandle.set({ nodeId: 'other', handleId: null, type: 'source' });
+    showPreview();
+    const event = click(fixture);
+    const [evt, state] = endCall();
+    expect(evt).toBe(event);
+    expect(state['to']).toEqual({ x: 100, y: 100 });
+    expect('inProgress' in state).toBe(false);
+    expect(store.connectionClickStartHandle()).toBeNull();
+  });
+
+  it('a completing second click without a preview reports the empty state', () => {
+    const fixture = mountSource();
+    store.connectionClickStartHandle.set({ nodeId: 'other', handleId: null, type: 'source' });
+    click(fixture);
+    expect(endCall()[1]).toEqual(EMPTY_FINAL);
+  });
+
+  it('a re-click of the armed handle reports the preview state', () => {
+    const fixture = mountSource();
+    click(fixture);
+    showPreview();
+    const event = click(fixture);
+    const [evt, state] = endCall();
+    expect(evt).toBe(event);
+    expect(state['to']).toEqual({ x: 100, y: 100 });
+    expect('inProgress' in state).toBe(false);
+    expect(store.connectionClickStartHandle()).toBeNull();
+  });
+
+  it('a connection drag forwards its final state to store.onConnectEnd', () => {
+    const fixture = mountSource();
+    const spy = vi.spyOn(system.XYHandle, 'onPointerDown').mockImplementation(() => {});
+    try {
+      fixture.componentInstance.onPointerDown(new MouseEvent('mousedown', { button: 0, bubbles: true }));
+      const params = spy.mock.calls[0][1] as unknown as { onConnectEnd: (e: MouseEvent, s: unknown) => void };
+      const evt = new MouseEvent('mouseup');
+      const state = { ...EMPTY_FINAL, to: { x: 1, y: 2 } };
+      params.onConnectEnd(evt, state);
+      expect(store.onConnectEnd).toHaveBeenCalledWith(evt, state);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});

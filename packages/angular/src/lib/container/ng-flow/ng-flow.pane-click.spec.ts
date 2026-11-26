@@ -47,6 +47,11 @@ function makeInProgressConnection(): ConnectionInProgress {
   };
 }
 
+const EMPTY_FINAL = {
+  isValid: null, from: null, fromHandle: null, fromPosition: null, fromNode: null,
+  to: null, toHandle: null, toPosition: null, toNode: null, pointer: null,
+};
+
 function makePanePointerUp(pointerType: string): PointerEvent {
   const paneEl = document.createElement('div');
   return { target: paneEl, currentTarget: paneEl, pointerType } as unknown as PointerEvent;
@@ -295,9 +300,37 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
       inst.onPaneClick(ev);
 
       expect(clickConnectEndSpy).toHaveBeenCalledTimes(1);
-      expect(clickConnectEndSpy).toHaveBeenCalledWith(ev);
+      expect(clickConnectEndSpy).toHaveBeenCalledWith({ event: ev, connectionState: EMPTY_FINAL });
       expect(store.connectionClickStartHandle()).toBeNull();
       expect(paneClickSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('a pane click reports the preview state (#6117), then clears the armed handle', () => {
+      const { inst, store, clickConnectEndSpy } = setup();
+      store.connectionClickStartHandle.set(armedHandle);
+      store.transform.set([100, 50, 2]);
+      store.updateClickConnectPreview({ ...makeInProgressConnection(), to: { x: 300, y: 250 } });
+
+      const ev = makePaneClick();
+      inst.onPaneClick(ev);
+
+      expect(clickConnectEndSpy).toHaveBeenCalledTimes(1);
+      const payload = clickConnectEndSpy.mock.calls[0][0] as unknown as { event: MouseEvent; connectionState: Record<string, unknown> };
+      expect(payload.event).toBe(ev);
+      expect(payload.connectionState['to']).toEqual({ x: 100, y: 100 });
+      expect('inProgress' in payload.connectionState).toBe(false);
+      expect(store.connectionClickStartHandle()).toBeNull();
+    });
+
+    it('store.onConnectEnd emits (connectEnd) with { event, connectionState } (#6117)', () => {
+      const { inst, store } = setup();
+      const connectEndSpy = vi.spyOn(inst.connectEnd, 'emit');
+      const evt = new MouseEvent('mouseup');
+      const state = { ...EMPTY_FINAL, to: { x: 1, y: 2 } };
+
+      store.onConnectEnd!(evt, state as never);
+
+      expect(connectEndSpy).toHaveBeenCalledWith({ event: evt, connectionState: state });
     });
 
     it('the click that ends a marquee keeps a pending click-connect', () => {

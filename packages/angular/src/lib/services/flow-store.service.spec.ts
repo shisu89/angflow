@@ -803,6 +803,65 @@ describe('FlowStore', () => {
     });
   });
 
+  describe('getFinalClickConnectionState (#6117)', () => {
+    const EMPTY_FINAL = {
+      isValid: null, from: null, fromHandle: null, fromPosition: null, fromNode: null,
+      to: null, toHandle: null, toPosition: null, toNode: null, pointer: null,
+    };
+
+    it('is the empty state when no preview is shown', () => {
+      const fresh = store.getFinalClickConnectionState();
+      expect(fresh).toEqual(EMPTY_FINAL);
+      expect(Object.keys(fresh).sort()).toEqual(Object.keys(EMPTY_FINAL).sort());
+
+      store.connectionClickStartHandle.set({ nodeId: 'n1', handleId: 'h1', type: 'source' });
+      const armed = store.getFinalClickConnectionState();
+      expect(armed).toEqual(EMPTY_FINAL);
+      expect(Object.keys(armed).sort()).toEqual(Object.keys(EMPTY_FINAL).sort());
+    });
+
+    it('is the preview state with `to` in flow coordinates, without inProgress', () => {
+      store.transform.set([100, 50, 2]);
+      store.updateClickConnectPreview(inProgressConnection({ x: 300, y: 250 }));
+      const state = store.getFinalClickConnectionState();
+      expect(state.to).toEqual({ x: 100, y: 100 });
+      expect(state.toPosition).toBeNull();
+      expect('inProgress' in state).toBe(false);
+      expect(Object.keys(state).sort()).toEqual(Object.keys(EMPTY_FINAL).sort());
+    });
+
+    it("takes toPosition from the preview's end handle", () => {
+      store.updateClickConnectPreview({
+        ...inProgressConnection({ x: 300, y: 250 }),
+        toHandle: { id: 't1', nodeId: 'n2', x: 0, y: 0, position: Position.Left, type: 'target', width: 10, height: 10 },
+      });
+      expect(store.getFinalClickConnectionState().toPosition).toBe(Position.Left);
+    });
+
+    it('is the empty state while a real connection drag owns the line', () => {
+      store.updateConnection(inProgressConnection({ x: 300, y: 250 }));
+      expect(store.getFinalClickConnectionState()).toEqual(EMPTY_FINAL);
+    });
+
+    it('is a shallow copy (node data holding functions does not throw)', () => {
+      const fromNode = { id: 'n1', internals: { userNode: { id: 'n1', data: { onPick: () => 1 } } } } as never;
+      store.updateClickConnectPreview({ ...inProgressConnection({ x: 300, y: 250 }), fromNode });
+      let state: ReturnType<FlowStore['getFinalClickConnectionState']> | undefined;
+      expect(() => (state = store.getFinalClickConnectionState())).not.toThrow();
+      expect(state!.fromNode).toBe(store.connection().fromNode);
+    });
+
+    it('is JSON-serialisable with a real nodeLookup entry as fromNode', () => {
+      store.setNodes([makeNode('n1', { position: { x: 0, y: 0 } })]);
+      store.updateClickConnectPreview({ ...inProgressConnection({ x: 300, y: 250 }), fromNode: store.nodeLookup.get('n1')! });
+      const state = store.getFinalClickConnectionState();
+      expect(() => JSON.stringify(state)).not.toThrow();
+      const parsed = JSON.parse(JSON.stringify(state));
+      expect(parsed).toMatchObject({ isValid: null, toNode: null, toHandle: null, toPosition: null });
+      expect(parsed).not.toHaveProperty('inProgress');
+    });
+  });
+
   // ── reset ─────────────────────────────────────────────────────────────
 
   describe('reset clears all mutable state', () => {

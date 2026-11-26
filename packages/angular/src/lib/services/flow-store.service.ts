@@ -43,6 +43,8 @@ import {
   type FitViewResult,
   type Rect,
   type HandleType,
+  type OnConnectEnd,
+  type FinalConnectionState,
   setDevWarnSink,
 } from '@angflow/system';
 
@@ -330,9 +332,9 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   // ── Connection callbacks (set by NgFlowComponent) ──────────────────
   onConnect: ((connection: import('@angflow/system').Connection) => void) | null = null;
   onConnectStart: ((event: MouseEvent | TouchEvent, params: import('@angflow/system').OnConnectStartParams) => void) | null = null;
-  onConnectEnd: ((event: MouseEvent | TouchEvent) => void) | null = null;
+  onConnectEnd: OnConnectEnd | null = null;
   onClickConnectStart: ((event: MouseEvent, params: import('@angflow/system').OnConnectStartParams) => void) | null = null;
-  onClickConnectEnd: ((event: MouseEvent) => void) | null = null;
+  onClickConnectEnd: OnConnectEnd | null = null;
 
   // ── Delete validation callback ────────────────────────────────────
   onBeforeDelete: OnBeforeDelete<NodeType, EdgeType> | null = null;
@@ -1120,6 +1122,18 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   /** Whether `connection()` currently holds the click-to-connect preview line. */
   isClickConnectPreview(): boolean {
     return this.rawConnection().inProgress && this.connectionIsClickPreview;
+  }
+
+  /**
+   * The final state of a click-to-connect, as `(clickConnectEnd)` reports it (upstream Pane/Handle
+   * onClick): the preview line's state with `to` in flow coordinates while the preview is shown,
+   * otherwise the empty state, so a concurrent connection drag never leaks into it. A shallow copy
+   * without `inProgress`; `toPosition` is the end handle's position or null.
+   */
+  getFinalClickConnectionState(): FinalConnectionState {
+    const source = this.isClickConnectPreview() ? this.connection() : initialConnection;
+    const { inProgress: _inProgress, ...rest } = source;
+    return { ...rest, toPosition: rest.toHandle ? rest.toHandle.position : null } as FinalConnectionState;
   }
 
   // ── Reset ─────────────────────────────────────────────────────────────

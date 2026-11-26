@@ -28,12 +28,12 @@ describe('partitionFlowProps', () => {
     expect(cb).toHaveBeenCalledWith('evt');
   });
 
-  it('calls onClickConnectEnd as (event, undefined)', () => {
+  it('calls onClickConnectEnd as (event, connectionState)', () => {
     const cb = vi.fn();
     const r = partitionFlowProps({ onClickConnectEnd: cb }, names);
     expect(r.outputs[0].output).toBe('clickConnectEnd');
-    r.outputs[0].handler('evt');
-    expect(cb).toHaveBeenCalledWith('evt', undefined);
+    r.outputs[0].handler({ event: 'evt', connectionState: { to: null } });
+    expect(cb).toHaveBeenCalledWith('evt', { to: null });
   });
 
   it('reports unknown props as unsupported', () => {

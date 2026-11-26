@@ -27,26 +27,6 @@ export interface KnownFailure {
 }
 
 export const KNOWN_FAILURES: KnownFailure[] = [
-  // ── click-connect.spec.ts ─────────────────────────────────────────────────
-  {
-    file: 'click-connect.spec.ts',
-    titlePath: ['Click connections', 'pane click cancels a pending connection (click-connect)'],
-    reason:
-      'The pane click now cancels the pending connection and emits `(clickConnectEnd)` (fixed in B), but the ' +
-      "output's payload is only the MouseEvent; the spec JSON-parses upstream's second argument, the final " +
-      'connection state, which is the #6117 / `FinalConnectionState` API change (D).',
-    owner: 'D',
-  },
-  {
-    file: 'click-connect.spec.ts',
-    titlePath: ['Click connections', 'pane click cancels a pending connection (click-connect-selection)'],
-    reason:
-      'The pane click now cancels the pending connection and emits `(clickConnectEnd)` (fixed in B), but the ' +
-      "output's payload is only the MouseEvent; the spec JSON-parses upstream's second argument, the final " +
-      'connection state, which is the #6117 / `FinalConnectionState` API change (D).',
-    owner: 'D',
-  },
-
   // ── edges.spec.ts ─────────────────────────────────────────────────────────
 
   // ── nodes.spec.ts ─────────────────────────────────────────────────────────

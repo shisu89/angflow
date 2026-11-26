@@ -7,9 +7,9 @@ export interface OutputAdapter {
 export const OUTPUT_ADAPTERS: Record<string, OutputAdapter> = {
   onPaneClick: { output: 'paneClick', adapt: (cb) => (e) => cb(e) },
   onClickConnectStart: { output: 'clickConnectStart', adapt: (cb) => (e) => cb(e) },
-  // Angular's clickConnectEnd emits only the MouseEvent; upstream passes
-  // (event, connection). connection stays undefined until sub-project D.
-  onClickConnectEnd: { output: 'clickConnectEnd', adapt: (cb) => (e) => cb(e, undefined) },
+  // Angular's clickConnectEnd emits { event, connectionState }; upstream calls
+  // onClickConnectEnd(event, connection). Unpack the payload into those two arguments.
+  onClickConnectEnd: { output: 'clickConnectEnd', adapt: (cb) => ({ event, connectionState }) => cb(event, connectionState) },
 };
 
 /** Keys the host owns itself (controlled state) and never forwards. */

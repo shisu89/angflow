@@ -644,14 +644,17 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   readonly connectStart = output<{ event: MouseEvent | TouchEvent; params: OnConnectStartParams }>({ alias: 'connectStart' });
   /**
    * A connection drag on a handle or an edge's reconnect anchor ended (valid or not).
-   * Click-to-connect fires `(clickConnectEnd)` instead.
+   * `connectionState.to` is in flow coordinates. Click-to-connect fires `(clickConnectEnd)` instead.
    */
-  readonly connectEnd = output<MouseEvent | TouchEvent>({ alias: 'connectEnd' });
+  readonly connectEnd = output<{ event: MouseEvent | TouchEvent; connectionState: FinalConnectionState }>({ alias: 'connectEnd' });
 
   /** The first click of a click-to-connect interaction landed on a handle. */
   readonly clickConnectStart = output<{ event: MouseEvent; params: OnConnectStartParams }>({ alias: 'clickConnectStart' });
-  /** The second click of a click-to-connect interaction landed (on any handle or elsewhere). */
-  readonly clickConnectEnd = output<MouseEvent>({ alias: 'clickConnectEnd' });
+  /**
+   * A click-to-connect ended: the second click, a re-click of the armed handle, or a pane click.
+   * `connectionState` is the preview's final state (`to` in flow coordinates) or the empty state.
+   */
+  readonly clickConnectEnd = output<{ event: MouseEvent; connectionState: FinalConnectionState }>({ alias: 'clickConnectEnd' });
 
   /** An existing edge was dragged to a new endpoint. Pair with `reconnectEdge` to update `edges`. */
   readonly reconnect = output<{ edge: Edge; connection: Connection }>({ alias: 'reconnect' });
@@ -925,14 +928,14 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     this.store.onConnectStart = (event: MouseEvent | TouchEvent, params: OnConnectStartParams) => {
       this.connectStart.emit({ event, params });
     };
-    this.store.onConnectEnd = (event: MouseEvent | TouchEvent) => {
-      this.connectEnd.emit(event);
+    this.store.onConnectEnd = (event: MouseEvent | TouchEvent, connectionState: FinalConnectionState) => {
+      this.connectEnd.emit({ event, connectionState });
     };
     this.store.onClickConnectStart = (event: MouseEvent, params: OnConnectStartParams) => {
       this.clickConnectStart.emit({ event, params });
     };
-    this.store.onClickConnectEnd = (event: MouseEvent) => {
-      this.clickConnectEnd.emit(event);
+    this.store.onClickConnectEnd = (event: MouseEvent | TouchEvent, connectionState: FinalConnectionState) => {
+      this.clickConnectEnd.emit({ event: event as MouseEvent, connectionState });
     };
 
     // Wire node drag callbacks so XYDrag can fire them for multi-node dragging
@@ -1173,7 +1176,8 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     // preview line) and reports it. Placed after the handle/node/edge guard so the
     // first click that ARMS a handle — which also bubbles here — doesn't cancel it.
     if (this.store.connectionClickStartHandle()) {
-      this.store.onClickConnectEnd?.(event);
+      const connectionState = this.store.getFinalClickConnectionState();
+      this.store.onClickConnectEnd?.(event, connectionState);
       this.store.connectionClickStartHandle.set(null);
     }
 

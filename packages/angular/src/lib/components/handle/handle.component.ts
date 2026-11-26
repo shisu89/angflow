@@ -19,6 +19,7 @@ import {
   type Connection,
   type ConnectionState,
   type IsValidConnection,
+  type FinalConnectionState,
 } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
 import { NODE_ID } from '../../services/tokens';
@@ -213,7 +214,8 @@ export class HandleComponent implements OnDestroy {
         store.onConnect?.(connection);
       },
       onConnectStart: (event: MouseEvent | TouchEvent, params: { nodeId: string | null; handleId: string | null; handleType: HandleType | null }) => store.onConnectStart?.(event, params),
-      onConnectEnd: (event: MouseEvent | TouchEvent) => store.onConnectEnd?.(event),
+      onConnectEnd: (event: MouseEvent | TouchEvent, connectionState: FinalConnectionState) =>
+        store.onConnectEnd?.(event, connectionState),
       onConnectionTargetChange: (nodeId: string | null) => {
         store.connectionTargetNodeId.set(nodeId);
       },
@@ -268,8 +270,10 @@ export class HandleComponent implements OnDestroy {
     ) {
       // Re-clicking the armed handle disarms it (cancels the pending
       // click-to-connect and its preview line) instead of self-connecting.
+      // Read the final state before clearing: the clear detaches the preview.
+      const connectionState = store.getFinalClickConnectionState();
       store.connectionClickStartHandle.set(null);
-      store.onClickConnectEnd?.(event);
+      store.onClickConnectEnd?.(event, connectionState);
     } else {
       // Second click — validate target handle via XYHandle.isValid, which
       // inspects the handle's CSS classes (`connectable`, `connectableend`)
@@ -297,8 +301,9 @@ export class HandleComponent implements OnDestroy {
         store.onConnect?.(connection);
       }
 
+      const connectionState = store.getFinalClickConnectionState();
       store.connectionClickStartHandle.set(null);
-      store.onClickConnectEnd?.(event);
+      store.onClickConnectEnd?.(event, connectionState);
     }
   }
 }
