@@ -176,16 +176,34 @@ export type NgFlowInstance<NodeType extends Node = Node, EdgeType extends Edge =
   addNodes: (nodes: NodeType | NodeType[]) => void;
   getNode: (id: string) => NodeType | undefined;
   getInternalNode: (id: string) => InternalNode<NodeType> | undefined;
-  updateNode: (id: string, nodeUpdate: Partial<NodeType> | ((node: NodeType) => Partial<NodeType>)) => void;
-  updateNodeData: (id: string, dataUpdate: Record<string, unknown> | ((data: NodeType['data']) => Record<string, unknown>)) => void;
+  updateNode: (
+    id: string,
+    nodeUpdate: Partial<NodeType> | ((node: NodeType) => Partial<NodeType>),
+    options?: { replace: boolean },
+  ) => void;
+  updateNodeData: (
+    id: string,
+    dataUpdate: Partial<NodeType['data']> | ((node: NodeType) => Partial<NodeType['data']>),
+    options?: { replace: boolean },
+  ) => void;
+  /** Changes the parent of a node (`null` for top level), keeping it visually in place. */
+  changeParent: (nodeId: string, parentId: string | null) => void;
 
   // Edge operations
   getEdges: () => EdgeType[];
   setEdges: (edges: EdgeType[]) => void;
   addEdges: (edges: EdgeType | EdgeType[]) => void;
   getEdge: (id: string) => EdgeType | undefined;
-  updateEdge: (id: string, edgeUpdate: Partial<EdgeType> | ((edge: EdgeType) => Partial<EdgeType>)) => void;
-  updateEdgeData: (id: string, dataUpdate: Record<string, unknown> | ((data: EdgeType['data']) => Record<string, unknown>)) => void;
+  updateEdge: (
+    id: string,
+    edgeUpdate: Partial<EdgeType> | ((edge: EdgeType) => Partial<EdgeType>),
+    options?: { replace: boolean },
+  ) => void;
+  updateEdgeData: (
+    id: string,
+    dataUpdate: Partial<EdgeType['data']> | ((edge: EdgeType) => Partial<EdgeType['data']>),
+    options?: { replace: boolean },
+  ) => void;
 
   // Delete
   deleteElements: (params: DeleteElementsOptions) => Promise<{ deletedNodes: NodeType[]; deletedEdges: EdgeType[] }>;

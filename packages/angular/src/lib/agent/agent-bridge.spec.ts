@@ -2577,9 +2577,11 @@ describe('group lifecycle + minted ids', () => {
       makeNode('g', { type: 'group', position: { x: 0, y: 0 }, width: 400, height: 400 }),
       makeNode('a', { position: { x: 100, y: 100 }, width: 50, height: 50 }),
     ]);
+    const before = { ...flow.getInternalNode('a')!.internals.positionAbsolute };
     const res = (await bridge.callTool('set_node_group', { nodeId: 'a', groupId: 'g' })) as { nodeId: string; groupId: string | null };
     expect(res).toEqual({ nodeId: 'a', groupId: 'g' });
     expect(flow.getNode('a')?.parentId).toBe('g');
+    expect(flow.getInternalNode('a')!.internals.positionAbsolute).toEqual(before);
     await expect(bridge.callTool('set_node_group', { nodeId: 'g', groupId: 'a' })).rejects.toMatchObject({ code: -32602 });
     // self-parent cycle
     await expect(bridge.callTool('set_node_group', { nodeId: 'a', groupId: 'a' })).rejects.toMatchObject({ code: -32602 });
@@ -2593,8 +2595,10 @@ describe('group lifecycle + minted ids', () => {
       makeNode('g', { type: 'group', position: { x: 0, y: 0 }, width: 400, height: 400 }),
       makeNode('a', { parentId: 'g', position: { x: 100, y: 100 }, width: 50, height: 50 }),
     ]);
+    const before = { ...flow.getInternalNode('a')!.internals.positionAbsolute };
     await bridge.callTool('set_node_group', { nodeId: 'a', groupId: null });
     expect(flow.getNode('a')?.parentId).toBeUndefined();
+    expect(flow.getInternalNode('a')!.internals.positionAbsolute).toEqual(before);
   });
 
   it('set_group_collapsed flips the collapsed flag', async () => {

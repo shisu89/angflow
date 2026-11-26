@@ -31,6 +31,9 @@ import {
   removeChange,
   updateChange,
   dataChange,
+  positionChange,
+  replaceChange,
+  changeParentNode,
 } from '@angflow/system';
 
 import { injectFlowStore } from '../utils/inject-flow-store';
@@ -39,6 +42,7 @@ import type { Node, Edge, InternalNode, DeleteElementsOptions } from '../types';
 import type { NodeTemplateSpec } from '../types/node-template';
 import { prefersReducedMotion } from '../utils/position-tween';
 import { getGroupBounds, type GroupBoundsOptions } from '../graph/group-bounds';
+import { isNode, isEdge } from '../utils/type-guards';
 
 /** Zoom at or below `minZoom + FIT_CLAMP_EPSILON` counts as clamped at the floor. */
 const FIT_CLAMP_EPSILON = 1e-6;
@@ -268,28 +272,96 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   }
 
   /**
-   * Apply a shallow merge (or updater function result) to a single node.
-   * Other nodes are left untouched. Emits an `'update'` change carrying only
-   * the partial (an updater function is resolved against the current node
-   * first). A key set to `undefined` in the partial clears that field.
+   * Update a single node with a partial (or an updater function, resolved
+   * against the current node first). Other nodes are left untouched; an
+   * unknown id is a no-op.
+   *
+   * With `options.replace` and a full node, emits one `'replace'` change.
+   * Otherwise the partial is split as Svelte Flow does, in one changeset:
+   * - a `'position'` change when `position` differs from the current one;
+   * - a `'data'` change replacing `data` when it is present and a new object;
+   * - an `'update'` change carrying the remaining keys, if any. A key set to
+   *   `undefined` there clears that field.
    */
-  updateNode(id: string, nodeUpdate: Partial<NodeType> | ((node: NodeType) => Partial<NodeType>)): void {
+  updateNode(
+    id: string,
+    nodeUpdate: Partial<NodeType> | ((node: NodeType) => Partial<NodeType>),
+    options: { replace: boolean } = { replace: false },
+  ): void {
     const current = this.store.nodes().find((n) => n.id === id);
     if (!current) return;
-    const update = typeof nodeUpdate === 'function' ? nodeUpdate(current) : nodeUpdate;
-    this.store.triggerNodeChanges([updateChange<NodeType>(id, update)]);
+    const nextNode = typeof nodeUpdate === 'function' ? nodeUpdate(current) : nodeUpdate;
+
+    const changes: NodeChange<NodeType>[] = [];
+    if (options.replace && isNode<NodeType>(nextNode)) {
+      changes.push(replaceChange(nextNode));
+    } else {
+      const { position, data, ...rest } = nextNode;
+      if (position && (position.x !== current.position.x || position.y !== current.position.y)) {
+        changes.push(positionChange(id, position));
+      }
+      if (data && data !== current.data) {
+        changes.push(dataChange<NodeType['data']>(id, data, true));
+      }
+      if (Object.keys(rest).length > 0) {
+        changes.push(updateChange<NodeType>(id, rest as Partial<NodeType>));
+      }
+    }
+
+    if (changes.length > 0) this.store.triggerNodeChanges(changes);
   }
 
   /**
-   * Merge `dataUpdate` into a node's `data` object. Emits a `'data'` change
-   * (a merge) carrying only the partial; an updater function is resolved
-   * against the current `data` first.
+   * Update a node's `data`. An updater function receives the current **node**
+   * (not its `data`). Emits a `'data'` change: a shallow merge into the
+   * existing `data`, or a full replacement with `options.replace`. An unknown
+   * id is a no-op.
+   *
+   * @example
+   * ```typescript
+   * flow.updateNodeData('1', { label: 'Renamed' });
+   * flow.updateNodeData('1', (node) => ({ count: (node.data['count'] as number) + 1 }));
+   * flow.updateNodeData('1', { label: 'Only key left' }, { replace: true });
+   * ```
    */
-  updateNodeData(id: string, dataUpdate: Record<string, unknown> | ((data: NodeType['data']) => Record<string, unknown>)): void {
+  updateNodeData(
+    id: string,
+    dataUpdate: Partial<NodeType['data']> | ((node: NodeType) => Partial<NodeType['data']>),
+    options: { replace: boolean } = { replace: false },
+  ): void {
     const current = this.store.nodes().find((n) => n.id === id);
     if (!current) return;
-    const update = typeof dataUpdate === 'function' ? dataUpdate(current.data) : dataUpdate;
-    this.store.triggerNodeChanges([dataChange<NodeType['data']>(id, update as Partial<NodeType['data']>)]);
+    const nextData = typeof dataUpdate === 'function' ? dataUpdate(current) : dataUpdate;
+    this.store.triggerNodeChanges([
+      options.replace
+        ? dataChange<NodeType['data']>(id, nextData as NodeType['data'], true)
+        : dataChange<NodeType['data']>(id, nextData),
+    ]);
+  }
+
+  /**
+   * Changes the parent of a node, keeping it visually in place. Equivalent to
+   * React's `changeParent`.
+   *
+   * `parentId === null` moves the node to the top level. The new position is
+   * computed by `changeParentNode` from `@angflow/system` (origin-corrected
+   * with the node's own `origin`, falling back to `nodeOrigin`) and applied
+   * through one `updateNode` call, so the changeset holds an `'update'`
+   * change (`parentId`) and, when the relative position differs, a
+   * `'position'` change. `parentId === nodeId` is a no-op; a missing node
+   * or parent logs a warning and changes nothing. The caller must avoid
+   * cycles (a parent that is a descendant of the node).
+   */
+  changeParent(nodeId: string, parentId: string | null): void {
+    changeParentNode(
+      nodeId,
+      this.store.nodeLookup,
+      parentId,
+      this.store.nodeOrigin(),
+      ({ nodeId: id, parentId: nextParentId, x, y }) => {
+        this.updateNode(id, { parentId: nextParentId ?? undefined, position: { x, y } } as Partial<NodeType>);
+      },
+    );
   }
 
   /**
@@ -386,16 +458,15 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   /**
    * Reparent a node into `groupId` (or detach to top-level when `null`), keeping
    * it visually fixed. Caller must ensure no cycle (the agent bridge guards this).
+   * Delegates to {@link changeParent}, so the reparent is one synchronous
+   * changeset; the returned promise is already settled when it resolves.
+   * A missing node or a missing (non-null) group is a silent no-op.
    */
   async setNodeGroup(nodeId: string, groupId: string | null): Promise<void> {
     if (!this.getNode(nodeId)) return;
     // Don't orphan parentId against a non-existent group (corrupts absolute coords).
     if (groupId != null && !this.getNode(groupId)) return;
-    const abs = this.getAbsolutePosition(nodeId);
-    this.updateNode(nodeId, { parentId: groupId ?? undefined } as Partial<NodeType>);
-    if (abs) {
-      await this.setNodePositions({ [nodeId]: abs }, { coordinateSpace: 'absolute', animate: false });
-    }
+    this.changeParent(nodeId, groupId);
   }
 
   /**
@@ -738,26 +809,58 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   }
 
   /**
-   * Apply a shallow merge (or updater function) to a single edge. Emits an
-   * `'update'` change carrying only the partial.
+   * Update a single edge with a partial (or an updater function, resolved
+   * against the current edge first). An unknown id is a no-op.
+   *
+   * With `options.replace` and a full edge, emits one `'replace'` change.
+   * Otherwise the partial is split: a `'data'` change replacing `data` when
+   * it is present and a new object, and an `'update'` change carrying the
+   * remaining keys, if any.
    */
-  updateEdge(id: string, edgeUpdate: Partial<EdgeType> | ((edge: EdgeType) => Partial<EdgeType>)): void {
+  updateEdge(
+    id: string,
+    edgeUpdate: Partial<EdgeType> | ((edge: EdgeType) => Partial<EdgeType>),
+    options: { replace: boolean } = { replace: false },
+  ): void {
     const current = this.store.edges().find((e) => e.id === id);
     if (!current) return;
-    const update = typeof edgeUpdate === 'function' ? edgeUpdate(current) : edgeUpdate;
-    this.store.triggerEdgeChanges([updateChange<EdgeType>(id, update)]);
+    const nextEdge = typeof edgeUpdate === 'function' ? edgeUpdate(current) : edgeUpdate;
+
+    const changes: EdgeChange<EdgeType>[] = [];
+    if (options.replace && isEdge<EdgeType>(nextEdge)) {
+      changes.push(replaceChange(nextEdge));
+    } else {
+      const { data, ...rest } = nextEdge;
+      if (data && data !== current.data) {
+        changes.push(dataChange<NonNullable<EdgeType['data']>>(id, data, true));
+      }
+      if (Object.keys(rest).length > 0) {
+        changes.push(updateChange<EdgeType>(id, rest as Partial<EdgeType>));
+      }
+    }
+
+    if (changes.length > 0) this.store.triggerEdgeChanges(changes);
   }
 
   /**
-   * Merge `dataUpdate` into a single edge's `data` object. Emits a `'data'`
-   * change (a merge) carrying only the partial.
+   * Update an edge's `data`. An updater function receives the current **edge**
+   * (not its `data`). Emits a `'data'` change: a shallow merge into the
+   * existing `data`, or a full replacement with `options.replace`. An unknown
+   * id is a no-op.
    */
-  updateEdgeData(id: string, dataUpdate: Record<string, unknown> | ((data: EdgeType['data']) => Record<string, unknown>)): void {
+  updateEdgeData(
+    id: string,
+    dataUpdate: Partial<EdgeType['data']> | ((edge: EdgeType) => Partial<EdgeType['data']>),
+    options: { replace: boolean } = { replace: false },
+  ): void {
     const current = this.store.edges().find((e) => e.id === id);
     if (!current) return;
-    const update = typeof dataUpdate === 'function' ? dataUpdate(current.data) : dataUpdate;
+    const nextData = typeof dataUpdate === 'function' ? dataUpdate(current) : dataUpdate;
+    type EdgeData = NonNullable<EdgeType['data']>;
     this.store.triggerEdgeChanges([
-      dataChange<NonNullable<EdgeType['data']>>(id, update as Partial<NonNullable<EdgeType['data']>>),
+      options.replace
+        ? dataChange<EdgeData>(id, nextData as EdgeData, true)
+        : dataChange<EdgeData>(id, nextData as Partial<EdgeData>),
     ]);
   }
 

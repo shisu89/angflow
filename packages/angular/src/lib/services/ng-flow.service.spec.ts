@@ -5,6 +5,7 @@ import { FlowStore } from './flow-store.service';
 import { NgFlowService } from './ng-flow.service';
 import { layoutNodes } from '../layout/layout-nodes';
 import type { Node, Edge } from '../types';
+import type { NodeChangeset, EdgeChangeset } from '@angflow/system';
 
 function makeNode(id: string, overrides: Partial<Node> = {}): Node {
   return { id, position: { x: 0, y: 0 }, data: {}, type: 'default', ...overrides };
@@ -351,7 +352,7 @@ describe('NgFlowService', () => {
 
     it('updateNode resolves an updater function against the current node first', () => {
       service.updateNode('1', (n) => ({ position: { x: n.position.x + 5, y: 7 } }));
-      expect(nodeChanges).toEqual([[{ id: '1', type: 'update', item: { position: { x: 5, y: 7 } } }]]);
+      expect(nodeChanges).toEqual([[{ id: '1', type: 'position', position: { x: 5, y: 7 } }]]);
     });
 
     it('updateNodeData emits a merging data change (no replace flag)', () => {
@@ -360,9 +361,16 @@ describe('NgFlowService', () => {
       expect(store.nodes()[0].data).toEqual({ label: 'new', keep: true });
     });
 
-    it('updateNodeData resolves an updater function against the current data first', () => {
-      service.updateNodeData('1', (d) => ({ label: `${d['label']}!` }));
+    it('updateNodeData passes the current node to an updater function', () => {
+      const current = store.nodes()[0];
+      let received: Node | undefined;
+      service.updateNodeData('1', (node) => {
+        received = node;
+        return { label: `${node.data['label']}!` };
+      });
+      expect(received).toBe(current);
       expect(nodeChanges).toEqual([[{ id: '1', type: 'data', data: { label: 'old!' } }]]);
+      expect(store.nodes()[0].data).toEqual({ label: 'old!', keep: true });
     });
 
     it('updateEdge / updateEdgeData emit update / data changes', () => {
@@ -412,6 +420,304 @@ describe('NgFlowService', () => {
       expect(store.parentLookup.get('g')?.has('a') ?? false).toBe(false);
       // Unparented, its absolute position is now its own position.
       expect(store.nodeLookup.get('a')?.internals.positionAbsolute).toEqual({ x: 10, y: 10 });
+    });
+  });
+
+  // ── update APIs: { replace } and the Svelte-style split (E1) ──────────
+
+  describe('update APIs: split changes and { replace }', () => {
+    let nodeSets: NodeChangeset<Node>[];
+    let edgeSets: EdgeChangeset<Edge>[];
+    const nodeChanges = () => nodeSets.map((c) => c.toArray());
+    const edgeChanges = () => edgeSets.map((c) => c.toArray());
+
+    beforeEach(() => {
+      service.setNodes([makeNode('1', { position: { x: 10, y: 20 }, data: { label: 'old', keep: true } })]);
+      service.setEdges([makeEdge('e1', '1', '2', { data: { a: 1, b: 2 } })]);
+      nodeSets = [];
+      edgeSets = [];
+      store.onNodesChange = (c) => nodeSets.push(c);
+      store.onEdgesChange = (c) => edgeSets.push(c);
+    });
+
+    it('updateNode({ position }) emits exactly one position change that getByType sees', () => {
+      service.updateNode('1', { position: { x: 30, y: 40 } });
+      expect(nodeChanges()).toEqual([[{ id: '1', type: 'position', position: { x: 30, y: 40 } }]]);
+      expect(nodeSets[0].getByType('position')).toEqual([{ id: '1', type: 'position', position: { x: 30, y: 40 } }]);
+      expect(nodeSets[0].getByType('update')).toEqual([]);
+      expect(store.nodes()[0].position).toEqual({ x: 30, y: 40 });
+      expect(store.nodeLookup.get('1')!.internals.positionAbsolute).toEqual({ x: 30, y: 40 });
+    });
+
+    it('updateNode({ position, data, className }) emits position + replacing data + update in one changeset', () => {
+      const data = { label: 'new' };
+      service.updateNode('1', { position: { x: 1, y: 2 }, data, className: 'hot' });
+      expect(nodeChanges()).toEqual([
+        [
+          { id: '1', type: 'position', position: { x: 1, y: 2 } },
+          { id: '1', type: 'data', data: { label: 'new' }, replace: true },
+          { id: '1', type: 'update', item: { className: 'hot' } },
+        ],
+      ]);
+      const n = store.nodes()[0];
+      expect(n.position).toEqual({ x: 1, y: 2 });
+      // data is replaced, not merged: `keep` is gone.
+      expect(n.data).toEqual({ label: 'new' });
+      expect(n.className).toBe('hot');
+    });
+
+    it('updateNode with an unchanged position emits no position change', () => {
+      service.updateNode('1', { position: { x: 10, y: 20 }, className: 'c' });
+      expect(nodeChanges()).toEqual([[{ id: '1', type: 'update', item: { className: 'c' } }]]);
+    });
+
+    it('updateNode with only an unchanged position (or the same data object) emits nothing', () => {
+      const sameData = store.nodes()[0].data;
+      service.updateNode('1', { position: { x: 10, y: 20 } });
+      service.updateNode('1', { data: sameData });
+      service.updateNode('1', {});
+      expect(nodeSets).toEqual([]);
+    });
+
+    it('updateNode(..., { replace: true }) with a full node emits one replace change', () => {
+      const full = makeNode('1', { position: { x: 5, y: 5 }, data: { only: 1 } });
+      service.updateNode('1', full, { replace: true });
+      expect(nodeChanges()).toEqual([[{ id: '1', type: 'replace', item: full }]]);
+      expect(store.nodes()[0].data).toEqual({ only: 1 });
+      expect(store.nodes()[0].position).toEqual({ x: 5, y: 5 });
+    });
+
+    it('updateNode(..., { replace: true }) with a partial falls back to the split', () => {
+      service.updateNode('1', { className: 'p' }, { replace: true });
+      expect(nodeChanges()).toEqual([[{ id: '1', type: 'update', item: { className: 'p' } }]]);
+    });
+
+    it('updateNodeData(..., { replace: true }) replaces data entirely', () => {
+      service.updateNodeData('1', { label: 'only' }, { replace: true });
+      expect(nodeChanges()).toEqual([[{ id: '1', type: 'data', data: { label: 'only' }, replace: true }]]);
+      expect(store.nodes()[0].data).toEqual({ label: 'only' });
+    });
+
+    it('updateNodeData updater + { replace: true } receives the node and replaces data', () => {
+      service.updateNodeData('1', (node) => ({ moved: node.position.x }), { replace: true });
+      expect(store.nodes()[0].data).toEqual({ moved: 10 });
+    });
+
+    it('updateEdge(..., { replace: true }) with a full edge emits one replace change', () => {
+      const full = makeEdge('e1', '1', '2', { animated: true });
+      service.updateEdge('e1', full, { replace: true });
+      expect(edgeChanges()).toEqual([[{ id: 'e1', type: 'replace', item: full }]]);
+      expect(store.edges()[0].data).toBeUndefined();
+      expect(store.edges()[0].animated).toBe(true);
+    });
+
+    it('updateEdge({ data, label }) emits a replacing data change + update', () => {
+      service.updateEdge('e1', { data: { z: 9 }, label: 'L' });
+      expect(edgeChanges()).toEqual([
+        [
+          { id: 'e1', type: 'data', data: { z: 9 }, replace: true },
+          { id: 'e1', type: 'update', item: { label: 'L' } },
+        ],
+      ]);
+      expect(store.edges()[0].data).toEqual({ z: 9 });
+      expect(store.edges()[0].label).toBe('L');
+    });
+
+    it('updateEdge with the same data object and nothing else emits nothing', () => {
+      service.updateEdge('e1', { data: store.edges()[0].data });
+      expect(edgeSets).toEqual([]);
+    });
+
+    it('updateEdgeData passes the current edge to an updater function', () => {
+      let received: Edge | undefined;
+      service.updateEdgeData('e1', (edge) => {
+        received = edge;
+        return { b: (edge.data!['b'] as number) + 1, from: edge.source };
+      });
+      expect(received?.id).toBe('e1');
+      expect(edgeChanges()).toEqual([[{ id: 'e1', type: 'data', data: { b: 3, from: '1' } }]]);
+      expect(store.edges()[0].data).toEqual({ a: 1, b: 3, from: '1' });
+    });
+
+    it('updateEdgeData(..., { replace: true }) replaces data entirely', () => {
+      service.updateEdgeData('e1', { only: true }, { replace: true });
+      expect(edgeChanges()).toEqual([[{ id: 'e1', type: 'data', data: { only: true }, replace: true }]]);
+      expect(store.edges()[0].data).toEqual({ only: true });
+    });
+  });
+
+  // ── updateNode({ position }) takes the position fast path ─────────────
+
+  describe('updateNode({ position }) on the position-only fast path', () => {
+    it('moves a parented child: absolute = parent absolute + new position', () => {
+      service.setNodes([
+        makeNode('g', { type: 'group', position: { x: 100, y: 50 }, width: 300, height: 300 }),
+        makeNode('a', { parentId: 'g', position: { x: 10, y: 10 }, width: 20, height: 20 }),
+      ]);
+      service.updateNode('a', { position: { x: 40, y: 60 } });
+      expect(store.nodes().find((n) => n.id === 'a')!.position).toEqual({ x: 40, y: 60 });
+      expect(store.nodeLookup.get('a')!.position).toEqual({ x: 40, y: 60 });
+      expect(store.nodeLookup.get('a')!.internals.positionAbsolute).toEqual({ x: 140, y: 110 });
+    });
+
+    it('moves a parent: its children follow', () => {
+      service.setNodes([
+        makeNode('g', { type: 'group', position: { x: 100, y: 50 }, width: 300, height: 300 }),
+        makeNode('a', { parentId: 'g', position: { x: 10, y: 10 }, width: 20, height: 20 }),
+      ]);
+      service.updateNode('g', { position: { x: 200, y: 150 } });
+      expect(store.nodeLookup.get('g')!.internals.positionAbsolute).toEqual({ x: 200, y: 150 });
+      expect(store.nodeLookup.get('a')!.internals.positionAbsolute).toEqual({ x: 210, y: 160 });
+      expect(store.nodeLookup.get('a')!.position).toEqual({ x: 10, y: 10 });
+    });
+
+    it('moves a top-level node with a non-zero origin: absolute is origin-corrected', () => {
+      store.nodeOrigin.set([0.5, 0.5]);
+      service.setNodes([makeNode('a', { position: { x: 0, y: 0 }, width: 40, height: 20 })]);
+      service.updateNode('a', { position: { x: 100, y: 100 } });
+      expect(store.nodes()[0].position).toEqual({ x: 100, y: 100 });
+      expect(store.nodeLookup.get('a')!.internals.positionAbsolute).toEqual({ x: 80, y: 90 });
+    });
+
+    it('honours a per-node origin as well', () => {
+      service.setNodes([makeNode('a', { position: { x: 0, y: 0 }, width: 40, height: 20, origin: [1, 1] })]);
+      service.updateNode('a', { position: { x: 100, y: 100 } });
+      expect(store.nodeLookup.get('a')!.internals.positionAbsolute).toEqual({ x: 60, y: 80 });
+    });
+  });
+
+  // ── changeParent (React / Svelte parity) ──────────────────────────────
+
+  describe('changeParent', () => {
+    let nodeSets: NodeChangeset<Node>[];
+    const abs = (id: string) => ({ ...store.nodeLookup.get(id)!.internals.positionAbsolute });
+
+    beforeEach(() => {
+      nodeSets = [];
+    });
+
+    function listen(): void {
+      nodeSets = [];
+      store.onNodesChange = (c) => nodeSets.push(c);
+    }
+
+    it('moves a top-level node into a parent, keeping it in place, in one update + position changeset', () => {
+      service.setNodes([
+        makeNode('g', { type: 'group', position: { x: 50, y: 60 }, width: 400, height: 400 }),
+        makeNode('a', { position: { x: 200, y: 200 }, width: 50, height: 50 }),
+      ]);
+      const before = abs('a');
+      listen();
+      service.changeParent('a', 'g');
+      expect(nodeSets.length).toBe(1);
+      expect(nodeSets[0].toArray()).toEqual([
+        { id: 'a', type: 'position', position: { x: 150, y: 140 } },
+        { id: 'a', type: 'update', item: { parentId: 'g' } },
+      ]);
+      expect(service.getNode('a')?.parentId).toBe('g');
+      expect(service.getNode('a')?.position).toEqual({ x: 150, y: 140 });
+      expect(store.parentLookup.get('g')?.has('a')).toBe(true);
+      expect(abs('a')).toEqual(before);
+    });
+
+    it('moves a child out of its parent with null, keeping it in place', () => {
+      service.setNodes([
+        makeNode('g', { type: 'group', position: { x: 50, y: 60 }, width: 400, height: 400 }),
+        makeNode('a', { parentId: 'g', position: { x: 10, y: 20 }, width: 50, height: 50 }),
+      ]);
+      const before = abs('a');
+      listen();
+      service.changeParent('a', null);
+      expect(nodeSets[0].toArray()).toEqual([
+        { id: 'a', type: 'position', position: { x: 60, y: 80 } },
+        { id: 'a', type: 'update', item: { parentId: undefined } },
+      ]);
+      expect(service.getNode('a')?.parentId).toBeUndefined();
+      expect(store.parentLookup.get('g')?.has('a') ?? false).toBe(false);
+      expect(abs('a')).toEqual(before);
+    });
+
+    it('moves a node into a nested parent, keeping it in place', () => {
+      service.setNodes([
+        makeNode('outer', { type: 'group', position: { x: 100, y: 100 }, width: 500, height: 500 }),
+        makeNode('inner', { type: 'group', parentId: 'outer', position: { x: 30, y: 40 }, width: 300, height: 300 }),
+        makeNode('a', { position: { x: 400, y: 300 }, width: 50, height: 50 }),
+      ]);
+      const before = abs('a');
+      service.changeParent('a', 'inner');
+      expect(service.getNode('a')?.parentId).toBe('inner');
+      expect(service.getNode('a')?.position).toEqual({ x: 270, y: 160 });
+      expect(abs('a')).toEqual(before);
+    });
+
+    it('moves a node between parents, keeping it in place', () => {
+      service.setNodes([
+        makeNode('g1', { type: 'group', position: { x: 0, y: 0 }, width: 300, height: 300 }),
+        makeNode('g2', { type: 'group', position: { x: 500, y: 100 }, width: 300, height: 300 }),
+        makeNode('a', { parentId: 'g1', position: { x: 20, y: 30 }, width: 50, height: 50 }),
+      ]);
+      const before = abs('a');
+      service.changeParent('a', 'g2');
+      expect(service.getNode('a')?.parentId).toBe('g2');
+      expect(service.getNode('a')?.position).toEqual({ x: -480, y: -70 });
+      expect(abs('a')).toEqual(before);
+    });
+
+    it('keeps the node in place with a non-zero nodeOrigin (into, nested and out)', () => {
+      store.nodeOrigin.set([0.5, 0.5]);
+      service.setNodes([
+        makeNode('outer', { type: 'group', position: { x: 300, y: 300 }, width: 400, height: 400 }),
+        makeNode('inner', { type: 'group', parentId: 'outer', position: { x: 100, y: 100 }, width: 200, height: 200 }),
+        makeNode('a', { position: { x: 500, y: 500 }, width: 40, height: 20 }),
+      ]);
+      const before = abs('a');
+      expect(before).toEqual({ x: 480, y: 490 });
+
+      service.changeParent('a', 'outer');
+      expect(service.getNode('a')?.parentId).toBe('outer');
+      expect(abs('a')).toEqual(before);
+
+      service.changeParent('a', 'inner');
+      expect(service.getNode('a')?.parentId).toBe('inner');
+      expect(abs('a')).toEqual(before);
+
+      service.changeParent('a', null);
+      expect(service.getNode('a')?.parentId).toBeUndefined();
+      expect(service.getNode('a')?.position).toEqual({ x: 500, y: 500 });
+      expect(abs('a')).toEqual(before);
+    });
+
+    it('keeps the node in place with a per-node origin', () => {
+      service.setNodes([
+        makeNode('g', { type: 'group', position: { x: 50, y: 50 }, width: 400, height: 400 }),
+        makeNode('a', { position: { x: 200, y: 200 }, width: 40, height: 20, origin: [1, 0.5] }),
+      ]);
+      const before = abs('a');
+      service.changeParent('a', 'g');
+      expect(service.getNode('a')?.parentId).toBe('g');
+      expect(abs('a')).toEqual(before);
+    });
+
+    it('is a no-op when parentId === nodeId', () => {
+      service.setNodes([makeNode('a', { position: { x: 1, y: 2 }, width: 10, height: 10 })]);
+      listen();
+      service.changeParent('a', 'a');
+      expect(nodeSets).toEqual([]);
+      expect(service.getNode('a')?.parentId).toBeUndefined();
+    });
+
+    it('warns and changes nothing for a missing node or a missing parent', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      onTestFinished(() => warn.mockRestore());
+      service.setNodes([makeNode('a', { position: { x: 1, y: 2 }, width: 10, height: 10 })]);
+      const before = abs('a');
+      listen();
+      service.changeParent('ghost', null);
+      service.changeParent('a', 'ghost-parent');
+      expect(warn).toHaveBeenCalledTimes(2);
+      expect(nodeSets).toEqual([]);
+      expect(service.getNode('a')?.parentId).toBeUndefined();
+      expect(abs('a')).toEqual(before);
     });
   });
 
@@ -1525,6 +1831,55 @@ describe('setNodeGroup', () => {
     await service.setNodeGroup('a', null);
     expect(service.getNode('a')?.parentId).toBeUndefined();
     expect(service.getAbsolutePosition('a')).toEqual(before);
+  });
+
+  it('reparents in one synchronous changeset (update + position), via changeParent', async () => {
+    const store = TestBed.inject(FlowStore);
+    service.setNodes([
+      makeNode('g', { type: 'group', position: { x: 50, y: 50 }, width: 400, height: 400 }),
+      makeNode('a', { position: { x: 200, y: 200 }, width: 50, height: 50 }),
+    ]);
+    const before = { ...store.nodeLookup.get('a')!.internals.positionAbsolute };
+    const sets: unknown[][] = [];
+    store.onNodesChange = (c) => sets.push(c.toArray());
+    const done = service.setNodeGroup('a', 'g');
+    // Applied before the promise settles: no animation or deferred step.
+    expect(service.getNode('a')?.parentId).toBe('g');
+    await expect(done).resolves.toBeUndefined();
+    expect(sets).toEqual([
+      [
+        { id: 'a', type: 'position', position: { x: 150, y: 150 } },
+        { id: 'a', type: 'update', item: { parentId: 'g' } },
+      ],
+    ]);
+    expect(store.nodeLookup.get('a')!.internals.positionAbsolute).toEqual(before);
+  });
+
+  it('keeps the node in place with a non-zero nodeOrigin', async () => {
+    const store = TestBed.inject(FlowStore);
+    store.nodeOrigin.set([0.5, 0.5]);
+    service.setNodes([
+      makeNode('g', { type: 'group', position: { x: 300, y: 300 }, width: 400, height: 400 }),
+      makeNode('a', { position: { x: 400, y: 400 }, width: 40, height: 20 }),
+    ]);
+    const before = { ...store.nodeLookup.get('a')!.internals.positionAbsolute };
+    await service.setNodeGroup('a', 'g');
+    expect(service.getNode('a')?.parentId).toBe('g');
+    expect(store.nodeLookup.get('a')!.internals.positionAbsolute).toEqual(before);
+  });
+
+  it('resolves and no-ops on a missing node or a missing group', async () => {
+    const store = TestBed.inject(FlowStore);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    onTestFinished(() => warn.mockRestore());
+    service.setNodes([makeNode('a', { position: { x: 1, y: 2 }, width: 10, height: 10 })]);
+    const sets: unknown[] = [];
+    store.onNodesChange = (c) => sets.push(c);
+    await expect(service.setNodeGroup('a', 'ghost')).resolves.toBeUndefined();
+    await expect(service.setNodeGroup('ghost', null)).resolves.toBeUndefined();
+    expect(sets).toEqual([]);
+    expect(warn).not.toHaveBeenCalled();
+    expect(service.getNode('a')?.parentId).toBeUndefined();
   });
 });
 
