@@ -567,6 +567,44 @@ describe('NgFlowService', () => {
     });
   });
 
+  describe('node selectors notify on in-place position/drag changes', () => {
+    function probe(sig: () => unknown) {
+      let n = 0;
+      TestBed.runInInjectionContext(() => effect(() => { sig(); n++; }));
+      TestBed.flushEffects();
+      return () => n;
+    }
+
+    it('a position change of its own node notifies, another node does not', () => {
+      service.setNodes([makeNode('a'), makeNode('b')]);
+      const c1 = probe(service.selectNode('a'));
+      const c2 = probe(service.selectInternalNode('a'));
+      const c3 = probe(service.selectInternalNodes(['a', 'b']));
+      const c4 = probe(service.selectInternalNodes(['a']));
+      const base = [c1(), c2(), c3(), c4()];
+
+      store.triggerNodeChanges([{ id: 'b', type: 'position', position: { x: 3, y: 3 } }]);
+      TestBed.flushEffects();
+      expect([c1(), c2(), c3(), c4()]).toEqual([base[0], base[1], base[2] + 1, base[3]]);
+
+      store.triggerNodeChanges([{ id: 'a', type: 'position', position: { x: 7, y: 7 } }]);
+      TestBed.flushEffects();
+      expect([c1(), c2(), c3(), c4()]).toEqual([base[0] + 1, base[1] + 1, base[2] + 2, base[3] + 1]);
+      expect(service.selectNode('a')()?.position).toEqual({ x: 7, y: 7 });
+    });
+
+    it('toggling dragging notifies', () => {
+      service.setNodes([makeNode('a'), makeNode('b')]);
+      const c1 = probe(service.selectNode('a'));
+      const c2 = probe(service.selectInternalNode('a'));
+      const c3 = probe(service.selectInternalNodes(['a', 'b']));
+      const base = [c1(), c2(), c3()];
+      store.triggerNodeChanges([{ id: 'a', type: 'position', dragging: true }]);
+      TestBed.flushEffects();
+      expect([c1(), c2(), c3()]).toEqual(base.map(v => v + 1));
+    });
+  });
+
   describe('selectInternalNode with parented movers', () => {
     it('does not notify for an unrelated node when a parented node moves', () => {
       service.setNodes([

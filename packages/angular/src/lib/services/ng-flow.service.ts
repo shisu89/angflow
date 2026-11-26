@@ -1048,11 +1048,23 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
   /**
    * Returns a signal with the user node for a given ID (`undefined` when missing).
-   * Notifies only when the node object itself changes, not when other nodes change.
+   * Notifies when the node object, its `position` or its `dragging` flag changes
+   * (the drag fast path mutates nodes in place), not when other nodes change.
    * Equivalent to React's `useNode()`.
    */
   selectNode(nodeId: string): Signal<NodeType | undefined> {
-    return computed(() => this.store.nodes().find(n => n.id === nodeId));
+    // The drag fast path mutates the user node in place (assigning fresh
+    // `position` objects and a new `dragging` value), so the node's identity
+    // alone misses moves. Track a snapshot of those fields, then notify
+    // whenever the snapshot changes.
+    const snapshot = computed(
+      () => {
+        const node = this.store.nodes().find(n => n.id === nodeId);
+        return [node, node?.position, node?.dragging] as const;
+      },
+      { equal: (a, b) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2] },
+    );
+    return computed(() => snapshot()[0], { equal: () => false });
   }
 
   /**
@@ -1066,21 +1078,35 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
 
   /**
    * Returns a signal with the internal nodes for the given IDs, in the given
-   * order. Duplicate IDs are collapsed and missing IDs are skipped.
+   * order. Duplicate IDs are collapsed and missing IDs are skipped. Notifies when
+   * a tracked node, its position or its `dragging` flag changes.
    * Equivalent to React's `useInternalNodes()`.
    */
   selectInternalNodes(nodeIds: readonly string[]): Signal<InternalNode<NodeType>[]> {
-    return computed(
+    // Snapshot of each node plus the fields the drag fast path writes in place
+    // (position, positionAbsolute, dragging); see selectNode.
+    const snapshot = computed(
       () => {
         this.store.version();
-        const result: InternalNode<NodeType>[] = [];
+        const flat: unknown[] = [];
         for (const id of new Set(nodeIds)) {
           const node = this.store.nodeLookup.get(id) as InternalNode<NodeType> | undefined;
-          if (node) result.push(node);
+          if (node) // positionAbsolute is compared by value: updateAbsolutePositions reassigns a fresh
+          // object for every root node on parented moves.
+          flat.push(node, node.position, node.internals?.positionAbsolute?.x, node.internals?.positionAbsolute?.y, node.dragging);
         }
+        return flat;
+      },
+      { equal: (a, b) => a.length === b.length && a.every((v, i) => v === b[i]) },
+    );
+    return computed(
+      () => {
+        const flat = snapshot();
+        const result: InternalNode<NodeType>[] = [];
+        for (let i = 0; i < flat.length; i += 5) result.push(flat[i] as InternalNode<NodeType>);
         return result;
       },
-      { equal: (a, b) => a.length === b.length && a.every((n, i) => n === b[i]) },
+      { equal: () => false },
     );
   }
 
@@ -1089,10 +1115,18 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * Equivalent to React's `useInternalNode()`.
    */
   selectInternalNode(nodeId: string): Signal<InternalNode<NodeType> | undefined> {
-    return computed(() => {
-      this.store.version();
-      return this.store.nodeLookup.get(nodeId) as InternalNode<NodeType> | undefined;
-    });
+    // See selectNode: the drag fast path mutates in place, so track the fields it writes.
+    const snapshot = computed(
+      () => {
+        this.store.version();
+        const node = this.store.nodeLookup.get(nodeId) as InternalNode<NodeType> | undefined;
+        // positionAbsolute by value: updateAbsolutePositions reassigns a fresh object per root node.
+        const abs = node?.internals?.positionAbsolute;
+        return [node, node?.position, abs?.x, abs?.y, node?.dragging] as const;
+      },
+      { equal: (a, b) => a.every((v, i) => v === b[i]) },
+    );
+    return computed(() => snapshot()[0], { equal: () => false });
   }
 
   /**
