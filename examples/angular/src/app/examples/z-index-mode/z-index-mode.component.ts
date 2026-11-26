@@ -6,10 +6,8 @@ import {
   MiniMapComponent,
   PanelComponent,
   Position,
-  applyNodeChanges,
-  applyEdgeChanges,
 } from '@angflow/angular';
-import type { Node, Edge, Connection, ZIndexMode, NodeChange, EdgeChange } from '@angflow/angular';
+import type { Node, Edge, Connection, ZIndexMode, NodeChangeset, EdgeChangeset } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -82,8 +80,8 @@ export class ZIndexModeExampleComponent {
     { id: 'A-C', source: 'A', target: 'C' },
   ];
 
-  onNodesChange(changes: NodeChange[]): void { this.nodes = applyNodeChanges(changes, this.nodes); }
-  onEdgesChange(changes: EdgeChange[]): void { this.edges = applyEdgeChanges(changes, this.edges); }
+  onNodesChange(changes: NodeChangeset): void { this.nodes = changes.applyTo(this.nodes); }
+  onEdgesChange(changes: EdgeChangeset): void { this.edges = changes.applyTo(this.edges); }
   onConnect(connection: Connection): void { this.edges = addEdge(connection, this.edges) as Edge[]; }
   setMode(event: Event): void { this.zIndexMode.set((event.target as HTMLSelectElement).value as ZIndexMode); }
 }

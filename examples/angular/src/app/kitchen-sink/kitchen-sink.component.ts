@@ -20,13 +20,13 @@ import {
   PanOnScrollMode,
   SelectionMode,
   infiniteExtent,
-  applyNodeChanges,
-  applyEdgeChanges,
   type BackgroundVariant,
 } from '@angflow/angular';
 import type {
   Node,
   Edge,
+  NodeChangeset,
+  EdgeChangeset,
   Connection,
   ColorMode,
   CoordinateExtent,
@@ -1183,12 +1183,12 @@ export class KitchenSinkComponent {
 
   // ── Graph mutations ─────────────────────────────────────────────────
 
-  onNodesChange(changes: any[]): void {
-    this.nodes.set(applyNodeChanges(changes, this.nodes()));
+  onNodesChange(changes: NodeChangeset): void {
+    this.nodes.set(changes.applyTo(this.nodes()));
   }
 
-  onEdgesChange(changes: any[]): void {
-    this.edges.set(applyEdgeChanges(changes, this.edges()));
+  onEdgesChange(changes: EdgeChangeset): void {
+    this.edges.set(changes.applyTo(this.edges()));
   }
 
   onConnect(connection: Connection): void {

@@ -4,10 +4,8 @@ import {
   BackgroundComponent,
   ControlsComponent,
   NgFlowService,
-  applyNodeChanges,
-  applyEdgeChanges,
 } from '@angflow/angular';
-import type { Node, Edge, Connection, NodeChange, EdgeChange } from '@angflow/angular';
+import type { Node, Edge, Connection, NodeChangeset, EdgeChangeset } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -90,12 +88,12 @@ export class SubFlowsExampleComponent {
     this.ngFlow = api;
   }
 
-  onNodesChange(changes: NodeChange[]): void {
-    this.nodes = applyNodeChanges(changes, this.nodes);
+  onNodesChange(changes: NodeChangeset): void {
+    this.nodes = changes.applyTo(this.nodes);
   }
 
-  onEdgesChange(changes: EdgeChange[]): void {
-    this.edges = applyEdgeChanges(changes, this.edges);
+  onEdgesChange(changes: EdgeChangeset): void {
+    this.edges = changes.applyTo(this.edges);
   }
 
   onConnect(connection: Connection): void {

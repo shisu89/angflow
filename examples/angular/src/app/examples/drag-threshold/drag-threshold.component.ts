@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, computed, signal } from '@angular/core';
-import { NgFlowComponent, PanelComponent, BackgroundComponent, applyNodeChanges } from '@angflow/angular';
-import type { Node, NodeChange } from '@angflow/angular';
+import { NgFlowComponent, PanelComponent, BackgroundComponent } from '@angflow/angular';
+import type { Node, NodeChangeset } from '@angflow/angular';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
 const PAN_ON_DRAG: Record<string, boolean | number[]> = {
@@ -93,7 +93,7 @@ export class DragThresholdExampleComponent {
     { id: '3', data: { label: 'Node 3' }, position: { x: 0, y: 200 } },
   ];
 
-  onNodesChange(changes: NodeChange[]): void { this.nodes = applyNodeChanges(changes, this.nodes); }
+  onNodesChange(changes: NodeChangeset): void { this.nodes = changes.applyTo(this.nodes); }
   onPaneContextMenu(event: MouseEvent): void { event.preventDefault(); this.log('pane context menu'); }
   log(message: string): void {
     this.count += 1;

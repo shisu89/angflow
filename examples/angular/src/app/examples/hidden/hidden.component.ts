@@ -4,10 +4,8 @@ import {
   ControlsComponent,
   MiniMapComponent,
   PanelComponent,
-  applyNodeChanges,
-  applyEdgeChanges,
 } from '@angflow/angular';
-import type { Node, Edge, Connection, NodeChange, EdgeChange } from '@angflow/angular';
+import type { Node, Edge, Connection, NodeChangeset, EdgeChangeset } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -86,12 +84,12 @@ export class HiddenExampleComponent {
     this.edgesState().map((e) => ({ ...e, hidden: this.isHidden() }))
   );
 
-  onNodesChange(changes: NodeChange[]): void {
-    this.nodesState.set(applyNodeChanges(changes, this.nodesState()));
+  onNodesChange(changes: NodeChangeset): void {
+    this.nodesState.set(changes.applyTo(this.nodesState()));
   }
 
-  onEdgesChange(changes: EdgeChange[]): void {
-    this.edgesState.set(applyEdgeChanges(changes, this.edgesState()));
+  onEdgesChange(changes: EdgeChangeset): void {
+    this.edgesState.set(changes.applyTo(this.edgesState()));
   }
 
   onConnect(connection: Connection): void {

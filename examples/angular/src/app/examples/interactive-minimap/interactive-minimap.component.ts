@@ -5,10 +5,8 @@ import {
   ControlsComponent,
   MiniMapComponent,
   PanelComponent,
-  applyNodeChanges,
-  applyEdgeChanges,
 } from '@angflow/angular';
-import type { Node, Edge, Connection, NodeChange, EdgeChange } from '@angflow/angular';
+import type { Node, Edge, Connection, NodeChangeset, EdgeChangeset } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -93,8 +91,8 @@ export class InteractiveMinimapExampleComponent {
   nodes: Node[] = [...INITIAL_NODES];
   edges: Edge[] = [];
 
-  onNodesChange(changes: NodeChange[]): void { this.nodes = applyNodeChanges(changes, this.nodes); }
-  onEdgesChange(changes: EdgeChange[]): void { this.edges = applyEdgeChanges(changes, this.edges); }
+  onNodesChange(changes: NodeChangeset): void { this.nodes = changes.applyTo(this.nodes); }
+  onEdgesChange(changes: EdgeChangeset): void { this.edges = changes.applyTo(this.edges); }
   onConnect(connection: Connection): void { this.edges = addEdge(connection, this.edges) as Edge[]; }
 
   resetViewport(): void { this.flow().service.setViewport({ x: 0, y: 0, zoom: 1 }); }

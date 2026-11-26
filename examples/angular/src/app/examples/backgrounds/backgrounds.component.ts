@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy } from '@angular/core';
-import { NgFlowComponent, BackgroundComponent, applyNodeChanges } from '@angflow/angular';
-import type { Node, BackgroundVariant } from '@angflow/angular';
+import { NgFlowComponent, BackgroundComponent } from '@angflow/angular';
+import type { Node, NodeChangeset, BackgroundVariant } from '@angflow/angular';
 
 interface BgProps {
   variant: BackgroundVariant;
@@ -66,7 +66,7 @@ export class BackgroundsExampleComponent {
     },
   ];
 
-  onNodesChange(changes: Parameters<typeof applyNodeChanges>[0]): void {
-    this.nodes = applyNodeChanges(changes, this.nodes);
+  onNodesChange(changes: NodeChangeset): void {
+    this.nodes = changes.applyTo(this.nodes);
   }
 }

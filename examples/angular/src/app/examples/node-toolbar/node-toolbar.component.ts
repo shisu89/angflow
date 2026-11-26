@@ -6,11 +6,9 @@ import {
   HandleComponent,
   NodeToolbarComponent,
   Position,
-  applyNodeChanges,
-  applyEdgeChanges,
   injectNgFlowNode,
 } from '@angflow/angular';
-import type { Node, Edge, Connection, NodeChange, EdgeChange } from '@angflow/angular';
+import type { Node, Edge, Connection, NodeChangeset, EdgeChangeset } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -137,12 +135,12 @@ export class NodeToolbarExampleComponent {
     { id: 'e3-4', source: '3', target: '4' },
   ]);
 
-  onNodesChange(changes: NodeChange[]): void {
-    this.nodes.update((ns) => applyNodeChanges(changes, ns));
+  onNodesChange(changes: NodeChangeset): void {
+    this.nodes.update((ns) => changes.applyTo(ns));
   }
 
-  onEdgesChange(changes: EdgeChange[]): void {
-    this.edges.update((es) => applyEdgeChanges(changes, es));
+  onEdgesChange(changes: EdgeChangeset): void {
+    this.edges.update((es) => changes.applyTo(es));
   }
 
   onConnect(connection: Connection): void {

@@ -15,12 +15,12 @@ import {
   AfHandleRowComponent,
   Position,
   addEdge,
-  applyNodeChanges,
-  applyEdgeChanges,
   NgFlowService,
   getBezierPath,
   type Node,
   type Edge,
+  type NodeChangeset,
+  type EdgeChangeset,
   type Connection,
   type IsValidConnection,
   type HandleBounds,
@@ -217,12 +217,12 @@ export class TypedHandlesExampleComponent {
     this.flow = service;
   }
 
-  onNodesChange(changes: unknown[]): void {
-    this.nodes.set(applyNodeChanges(changes as Parameters<typeof applyNodeChanges>[0], this.nodes()));
+  onNodesChange(changes: NodeChangeset): void {
+    this.nodes.set(changes.applyTo(this.nodes()));
   }
 
-  onEdgesChange(changes: unknown[]): void {
-    this.edges.set(applyEdgeChanges(changes as Parameters<typeof applyEdgeChanges>[0], this.edges()));
+  onEdgesChange(changes: EdgeChangeset): void {
+    this.edges.set(changes.applyTo(this.edges()));
   }
 
   onConnect(connection: Connection): void {

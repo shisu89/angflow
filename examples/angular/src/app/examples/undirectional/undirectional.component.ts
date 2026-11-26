@@ -5,10 +5,8 @@ import {
   ConnectionMode,
   ConnectionLineType,
   Position,
-  applyNodeChanges,
-  applyEdgeChanges,
 } from '@angflow/angular';
-import type { Node, Edge, Connection, NodeChange, EdgeChange } from '@angflow/angular';
+import type { Node, Edge, Connection, NodeChangeset, EdgeChangeset } from '@angflow/angular';
 import { addEdge, reconnectEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -117,8 +115,8 @@ export class UndirectionalExampleComponent {
     { id: 'e0-40', source: '00', target: '40', sourceHandle: 'left',   targetHandle: 'right',  type: 'smoothstep' },
   ];
 
-  onNodesChange(changes: NodeChange[]): void { this.nodes = applyNodeChanges(changes, this.nodes); }
-  onEdgesChange(changes: EdgeChange[]): void { this.edges = applyEdgeChanges(changes, this.edges); }
+  onNodesChange(changes: NodeChangeset): void { this.nodes = changes.applyTo(this.nodes); }
+  onEdgesChange(changes: EdgeChangeset): void { this.edges = changes.applyTo(this.edges); }
   onConnect(connection: Connection): void { this.edges = addEdge(connection, this.edges) as Edge[]; }
 
   onReconnect(event: { edge: Edge; connection: Connection }): void {

@@ -7,10 +7,8 @@ import {
   NgFlowComponent,
   NgFlowService,
   PanelComponent,
-  applyEdgeChanges,
-  applyNodeChanges,
 } from '@angflow/angular';
-import type { Connection, Edge, EdgeChange, Node, NodeChange } from '@angflow/angular';
+import type { Connection, Edge, EdgeChangeset, Node, NodeChangeset } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -79,12 +77,12 @@ export class AgentChatExampleComponent implements OnDestroy {
     this.unregister?.();
   }
 
-  onNodesChange(changes: NodeChange[]): void {
-    this.nodes = applyNodeChanges(changes, this.nodes);
+  onNodesChange(changes: NodeChangeset): void {
+    this.nodes = changes.applyTo(this.nodes);
   }
 
-  onEdgesChange(changes: EdgeChange[]): void {
-    this.edges = applyEdgeChanges(changes, this.edges);
+  onEdgesChange(changes: EdgeChangeset): void {
+    this.edges = changes.applyTo(this.edges);
   }
 
   onConnect(connection: Connection): void {

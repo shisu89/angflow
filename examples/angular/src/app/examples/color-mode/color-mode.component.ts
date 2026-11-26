@@ -7,10 +7,8 @@ import {
   MiniMapComponent,
   PanelComponent,
   Position,
-  applyNodeChanges,
-  applyEdgeChanges,
 } from '@angflow/angular';
-import type { Node, Edge, Connection, ColorMode, NodeChange, EdgeChange } from '@angflow/angular';
+import type { Node, Edge, Connection, ColorMode, NodeChangeset, EdgeChangeset } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -106,8 +104,8 @@ export class ColorModeExampleComponent {
     { id: 'A-D', source: 'A', target: 'D' },
   ];
 
-  onNodesChange(changes: NodeChange[]): void { this.nodes = applyNodeChanges(changes, this.nodes); }
-  onEdgesChange(changes: EdgeChange[]): void { this.edges = applyEdgeChanges(changes, this.edges); }
+  onNodesChange(changes: NodeChangeset): void { this.nodes = changes.applyTo(this.nodes); }
+  onEdgesChange(changes: EdgeChangeset): void { this.edges = changes.applyTo(this.edges); }
   onConnect(connection: Connection): void { this.edges = addEdge(connection, this.edges) as Edge[]; }
 
   onPageThemeChange(event: Event): void {

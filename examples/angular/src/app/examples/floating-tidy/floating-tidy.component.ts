@@ -4,10 +4,8 @@ import {
   ControlsComponent,
   PanelComponent,
   BackgroundComponent,
-  applyNodeChanges,
-  applyEdgeChanges,
 } from '@angflow/angular';
-import type { Node, Edge, NodeChange, EdgeChange } from '@angflow/angular';
+import type { Node, Edge, NodeChangeset, EdgeChangeset } from '@angflow/angular';
 import { layoutNodes } from '@angflow/angular/layout';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -73,8 +71,8 @@ export class FloatingTidyExampleComponent {
   animate = true;
   private counter = 0;
 
-  onNodesChange(changes: NodeChange[]): void { this.nodes = applyNodeChanges(changes, this.nodes); }
-  onEdgesChange(changes: EdgeChange[]): void { this.edges = applyEdgeChanges(changes, this.edges); }
+  onNodesChange(changes: NodeChangeset): void { this.nodes = changes.applyTo(this.nodes); }
+  onEdgesChange(changes: EdgeChangeset): void { this.edges = changes.applyTo(this.edges); }
 
   addNode(): void {
     const parent = this.nodes[Math.floor(Math.random() * this.nodes.length)];

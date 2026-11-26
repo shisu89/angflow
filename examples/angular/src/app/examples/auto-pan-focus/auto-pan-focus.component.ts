@@ -4,10 +4,8 @@ import {
   BackgroundComponent,
   ControlsComponent,
   PanelComponent,
-  applyNodeChanges,
-  applyEdgeChanges,
 } from '@angflow/angular';
-import type { Node, Edge, NodeChange, EdgeChange } from '@angflow/angular';
+import type { Node, Edge, NodeChangeset, EdgeChangeset } from '@angflow/angular';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
 /**
@@ -144,6 +142,6 @@ export class AutoPanFocusExampleComponent {
     (flow.store.domNode()?.querySelector(`.xy-flow__node[data-id="${node.id}"]`) as HTMLElement | null)?.focus({ preventScroll: true });
   }
 
-  onNodesChange(changes: NodeChange[]): void { this.nodes = applyNodeChanges(changes, this.nodes); }
-  onEdgesChange(changes: EdgeChange[]): void { this.edges = applyEdgeChanges(changes, this.edges); }
+  onNodesChange(changes: NodeChangeset): void { this.nodes = changes.applyTo(this.nodes); }
+  onEdgesChange(changes: EdgeChangeset): void { this.edges = changes.applyTo(this.edges); }
 }

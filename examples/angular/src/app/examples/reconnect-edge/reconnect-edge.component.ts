@@ -2,10 +2,8 @@ import { Component, ChangeDetectionStrategy } from '@angular/core';
 import {
   NgFlowComponent,
   ControlsComponent,
-  applyNodeChanges,
-  applyEdgeChanges,
 } from '@angflow/angular';
-import type { Node, Edge, Connection, NodeChange, EdgeChange, HandleType, FinalConnectionState } from '@angflow/angular';
+import type { Node, Edge, Connection, NodeChangeset, EdgeChangeset, HandleType, FinalConnectionState } from '@angflow/angular';
 import { addEdge, reconnectEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -52,8 +50,8 @@ export class ReconnectEdgeExampleComponent {
     { id: 'e5-6', source: '5', target: '6', label: 'This edge can be updated from both sides' },
   ];
 
-  onNodesChange(changes: NodeChange[]): void { this.nodes = applyNodeChanges(changes, this.nodes); }
-  onEdgesChange(changes: EdgeChange[]): void { this.edges = applyEdgeChanges(changes, this.edges); }
+  onNodesChange(changes: NodeChangeset): void { this.nodes = changes.applyTo(this.nodes); }
+  onEdgesChange(changes: EdgeChangeset): void { this.edges = changes.applyTo(this.edges); }
   onConnect(connection: Connection): void { this.edges = addEdge(connection, this.edges) as Edge[]; }
 
   onReconnect(event: { edge: Edge; connection: Connection }): void {

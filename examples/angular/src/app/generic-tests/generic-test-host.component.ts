@@ -14,8 +14,6 @@ import { Router } from '@angular/router';
 import {
   NgFlowComponent,
   addEdge,
-  applyEdgeChanges,
-  applyNodeChanges,
   reconnectEdge,
 } from '@angflow/angular';
 import { partitionFlowProps } from './flow-props';
@@ -77,8 +75,8 @@ export class GenericTestHostComponent {
         this.destroyRef.onDestroy(() => sub.unsubscribe());
       };
       for (const o of parts.outputs) subscribe(o.output, o.handler);
-      subscribe('nodesChange', (c) => this.nodes.update((n) => applyNodeChanges(c, n)));
-      subscribe('edgesChange', (c) => this.edges.update((e) => applyEdgeChanges(c, e)));
+      subscribe('nodesChange', (c) => this.nodes.update((n) => c.applyTo(n)));
+      subscribe('edgesChange', (c) => this.edges.update((e) => c.applyTo(e)));
       subscribe('connect', (c) => this.edges.update((e) => addEdge(c, e)));
       subscribe('reconnect', ({ edge, connection }) =>
         this.edges.update((e) => reconnectEdge(edge, connection, e)),

@@ -5,10 +5,8 @@ import {
   ControlsComponent,
   MiniMapComponent,
   PanelComponent,
-  applyNodeChanges,
-  applyEdgeChanges,
 } from '@angflow/angular';
-import type { Node, Edge, Connection, Viewport, NodeChange, EdgeChange } from '@angflow/angular';
+import type { Node, Edge, Connection, Viewport, NodeChangeset, EdgeChangeset } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { ExampleCardComponent } from '@examples-shared/example-card.component';
 
@@ -84,8 +82,8 @@ export class ControlledViewportExampleComponent {
     { id: 'e1-3', source: '1a', target: '3a' },
   ];
 
-  onNodesChange(changes: NodeChange[]): void { this.nodes = applyNodeChanges(changes, this.nodes); }
-  onEdgesChange(changes: EdgeChange[]): void { this.edges = applyEdgeChanges(changes, this.edges); }
+  onNodesChange(changes: NodeChangeset): void { this.nodes = changes.applyTo(this.nodes); }
+  onEdgesChange(changes: EdgeChangeset): void { this.edges = changes.applyTo(this.edges); }
   onConnect(connection: Connection): void { this.edges = addEdge(connection, this.edges) as Edge[]; }
 
   onViewportChange(vp: Viewport): void {

@@ -4,10 +4,8 @@ import {
   BackgroundComponent,
   ControlsComponent,
   MiniMapComponent,
-  applyNodeChanges,
-  applyEdgeChanges,
 } from '@angflow/angular';
-import type { Connection, Edge, Node } from '@angflow/angular';
+import type { Connection, Edge, EdgeChangeset, Node, NodeChangeset } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 import { makeSeedGraph } from './seed-graph-200';
 
@@ -70,12 +68,12 @@ export class ZonelessAppComponent {
   protected readonly nodes = signal<Node[]>(seed.nodes);
   protected readonly edges = signal<Edge[]>(seed.edges);
 
-  protected onNodesChange(changes: unknown[]): void {
-    this.nodes.update((current) => applyNodeChanges(changes as never, current));
+  protected onNodesChange(changes: NodeChangeset): void {
+    this.nodes.update((current) => changes.applyTo(current));
   }
 
-  protected onEdgesChange(changes: unknown[]): void {
-    this.edges.update((current) => applyEdgeChanges(changes as never, current));
+  protected onEdgesChange(changes: EdgeChangeset): void {
+    this.edges.update((current) => changes.applyTo(current));
   }
 
   protected onConnect(connection: Connection): void {
