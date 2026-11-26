@@ -824,6 +824,25 @@ describe('NgFlowService', () => {
       return { count: () => n, stop: () => ref.destroy() };
     }
 
+    it('selectNode / selectEdge return the very objects held in nodes() / edges()', () => {
+      service.setNodes([makeNode('a'), makeNode('b')]);
+      service.setEdges([{ id: 'e1', source: 'a', target: 'b' }]);
+      const a = service.selectNode('a');
+      const e1 = service.selectEdge('e1');
+      expect(a()).toBe(store.nodes()[0]);
+      expect(e1()).toBe(store.edges()[0]);
+
+      service.updateNode('a', { position: { x: 5, y: 5 } });
+      expect(a()).toBe(store.nodes()[0]);
+      store.triggerNodeChanges([{ id: 'a', type: 'position', position: { x: 9, y: 9 } }]);
+      expect(a()).toBe(store.nodes()[0]);
+      expect(a()?.position).toEqual({ x: 9, y: 9 });
+
+      service.updateEdge('e1', { label: 'x' });
+      expect(e1()).toBe(store.edges()[0]);
+      expect(e1()?.label).toBe('x');
+    });
+
     it('selectNode returns the node, undefined when missing, and updates on change', () => {
       service.setNodes([makeNode('a', { data: { l: 1 } }), makeNode('b')]);
       const a = service.selectNode('a');

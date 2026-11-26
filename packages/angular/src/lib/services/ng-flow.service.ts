@@ -1164,7 +1164,12 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
     // whenever the snapshot changes.
     const snapshot = computed(
       () => {
-        const node = this.store.nodes().find(n => n.id === nodeId);
+        // nodes() is read for the dependency only. setNodes updates the lookup
+        // before writing nodes(), and its internals.userNode is the very object
+        // held in nodes() (the fast path mutates that same object), so the O(1)
+        // lookup returns what find() would.
+        this.store.nodes();
+        const node = this.store.nodeLookup.get(nodeId)?.internals.userNode;
         return [node, node?.position, node?.dragging] as const;
       },
       { equal: (a, b) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2] },
@@ -1178,7 +1183,12 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * Equivalent to React's `useEdge()`.
    */
   selectEdge(edgeId: string): Signal<EdgeType | undefined> {
-    return computed(() => this.store.edges().find(e => e.id === edgeId));
+    return computed(() => {
+      // edges() is read for the dependency only; setEdges fills the edge lookup
+      // with the same objects before writing edges().
+      this.store.edges();
+      return this.store.edgeLookup.get(edgeId);
+    });
   }
 
   /**
