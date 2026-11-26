@@ -5,13 +5,18 @@
 ### Breaking changes
 
 - `Handle` renamed `HandleBounds`; `NodeHandle` redefined (`Omit<HandleBounds, 'nodeId' | 'width' | 'height'>` with optional size); `HandleConnection` removed in favour of `NodeConnection` (#5987, #6114).
-- New `getConnectionLookupKey` / `getConnectionsFromLookup` (#6114).
 - `DragUpdateParams.nodeClickDistance` removed; XYDrag suppresses the click after a moved drag itself and binds once per element (#5556, #6168). The drag's crossing move only starts the drag (upstream semantics), so the first move past `nodeDragThreshold` doesn't move the node.
-- `PanZoomUpdateOptions.paneDragThreshold` replaces `paneClickDistance` / `selectionOnDrag`; `PanZoomInstance.setClickDistance` removed; `isLeftClickPan` exported (#6115).
+- `PanZoomUpdateOptions.paneDragThreshold` replaces `paneClickDistance` / `selectionOnDrag`; `PanZoomInstance.setClickDistance` removed (#6115).
 - XYHandle's final connection state reports `to` in flow coordinates (#6117).
-- `fitViewport` resolves `boolean`; `FitViewResult` removed; `@internal` `getFitViewport` added (#6064).
+- `fitViewport` resolves `boolean`; `FitViewResult` removed (#6064).
 - `defaultFitViewPadding` (`'5%'`); numeric padding is pixels; `getViewportForBounds` defaults `minZoom 0` / `maxZoom Infinity` / `padding 0`; `FitBoundsOptions.padding: Padding` (#5927).
 - The `toHandleBounds` fallback is removed from `getEdgePosition` (#5987).
+
+### Added
+
+- `getConnectionLookupKey` / `getConnectionsFromLookup` (#6114).
+- `isLeftClickPan` exported (#6115).
+- `@internal` `getFitViewport` (#6064).
 
 ### Changed (type)
 

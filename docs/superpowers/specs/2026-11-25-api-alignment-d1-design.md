@@ -328,6 +328,8 @@ flow.getNodeConnections({ nodeId: 'a', type: 'source', handleId: 'h1' }); // aft
 flow.getNodeConnections('a');                                           // before
 flow.getNodeConnections({ nodeId: 'a' });                               // after
 flow.selectHandleConnections({ nodeId: 'a', type: 'target' });          // before
+flow.selectNodeConnections('a');                                        // before
+flow.selectNodeConnections({ nodeId: 'a' });                            // after
 flow.selectNodeConnections({ nodeId: 'a', type: 'target' });           // after
 // type HandleConnection → NodeConnection. Agents: get_handle_connections → get_node_connections { nodeId, type?, handleId? }
 ```

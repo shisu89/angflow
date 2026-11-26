@@ -221,7 +221,7 @@ export class HandleComponent implements OnDestroy {
       },
       getTransform: () => store.transform(),
       getFromHandle: () => {
-        const conn = store.connection();
+        const conn = store.rawConnection();
         return conn.inProgress ? conn.fromHandle : null;
       },
       autoPanSpeed: store.autoPanSpeed(),

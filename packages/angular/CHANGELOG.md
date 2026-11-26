@@ -22,6 +22,8 @@ flow.getNodeConnections({ nodeId: 'a', type: 'source', handleId: 'h1' }); // aft
 flow.getNodeConnections('a');                                           // before
 flow.getNodeConnections({ nodeId: 'a' });                               // after
 flow.selectHandleConnections({ nodeId: 'a', type: 'target' });          // before
+flow.selectNodeConnections('a');                                        // before
+flow.selectNodeConnections({ nodeId: 'a' });                            // after
 flow.selectNodeConnections({ nodeId: 'a', type: 'target' });           // after
 // type HandleConnection → NodeConnection. Agents: get_handle_connections → get_node_connections { nodeId, type?, handleId? }
 ```
@@ -69,6 +71,7 @@ const s = store.getFinalClickConnectionState();   // new: the payload (clickConn
 
 Behaviour notes for the same entry:
 
+- `nodeClickDistance` removal also drops the exported `DragDirective`'s `ngFlowDragClickDistance` input.
 - Jittery node clicks below `nodeDragThreshold` fire `(nodeClick)`. A drag's crossing move only starts the drag (upstream semantics), so the first move past the threshold doesn't move the node.
 - A pane press below `paneDragThreshold` fires no `(moveStart)`/`(moveEnd)`.
 - `(selectionStart)` fires when the marquee crosses the threshold, not on press.

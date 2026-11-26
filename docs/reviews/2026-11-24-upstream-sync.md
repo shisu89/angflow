@@ -66,7 +66,7 @@ Each needs a decision: adopt now with a deprecated alias (non-breaking, 0.4.0), 
 | `nodeClickDistance` removed; a click is suppressed only if the drag moved the node (#5556, prerequisite for #6168 touch drag) | Input is already dead, so it's a no-op for consumers | Yes: keep as a deprecated no-op **D1 ✓** 35bb42d24, 48e112d6a |
 | `onConnectEnd` / `onReconnectEnd` `to` in flow coordinates (#6117) | Only `(reconnectEnd)`'s `connectionState` | Yes in practice (document it) **D1 ✓** 4734b80f4, bc26279de, c4778393e, 525057729, 761312dde |
 | `paneClickDistance` → `paneDragThreshold` (default 1; gates pan **and** box-select start) (#6115) | System panzoom, `ng-flow.component.ts` input/effect/`onPaneClick`, pane marquee start, 3 examples | Yes: new input, old one becomes a deprecated alias. Largest item: hand-merge with angflow's `XYPanZoom.update()` changes, then touch testing. **D1 ✓** 768dbe548, cfb93c138, 3f34382f6 |
-| Default fit padding becomes `'5%'`; **numeric padding is read as pixels** (#5927) | `fitBounds` default `0.1`, `fit_view`/`fit_bounds` agent schemas, mcp snapshot. An agent sending `0.1` would get 0px. | `'5%'` default is safe now (0.1 ≈ 4.5%). Pixel semantics only in a breaking release. **D1 ✓** 61e01fa3b |
+| Default fit padding becomes `'5%'`; **numeric padding is read as pixels** (#5927) | `fitBounds` default `0.1`, `fit_view`/`fit_bounds` agent schemas, mcp snapshot. An agent sending `0.1` would get 0px. | `'5%'` default is safe now (0.1 ≈ 4.5%). Pixel semantics only in a breaking release. **D1 ✓** 61e01fa3b, 1c5560800 |
 | `setViewport` resolves `boolean` (#6064) | Direct `@angflow/system` users only | Yes **D1 ✓** B; 5dc910013 (`fitView` / `fitBounds`) |
 | `colorMode` → `forceColorMode`, default follows the system scheme, CSS `light-dark()` | Host classes, `ng-flow.css` dark rules, matchMedia listener | Breaking release → D2 |
 | Styles in `@layer xyflow` | Angflow's unlayered `ng-flow.css` would always override a layered theme | Breaking release (or ship angflow CSS in the same layer) → D2 |
@@ -147,7 +147,7 @@ into system `getElementsToRemove` (ae51254f7). Commit range: `d54d18f8d..HEAD`.
 
 ### D1 — results
 
-Known failures 4 → 2: the two click-connect payload entries are fixed (Task 7), and the 2 colour-mode entries remain, re-pointed to D2. Full verdict: 0 NOT MATCHED, 0 STALE, 0 chromium failures. Every D1 system change is a hand-port of one upstream PR, keeping angflow's deliberate system divergences (no-teardown `XYPanZoom.update()`, the start handler's `internal` guard, XYDrag's abort path, and so on). Commit range: `3b96f518e..HEAD`.
+Known failures 4 → 2: the two click-connect payload entries are fixed (Task 7), and the 2 colour-mode entries remain, re-pointed to D2. Full verdict: 0 NOT MATCHED, 0 STALE, 0 chromium failures. Every D1 system change is a hand-port of one upstream PR, keeping angflow's deliberate system divergences (no-teardown `XYPanZoom.update()`, the start handler's `internal` guard, XYDrag's abort path, and so on). Commit range: `3b96f518e..HEAD`. The only remaining grep hits for the removed names (`SystemHandle`, `getHandleConnections`, `nodeClickDistance`, `paneClickDistance`, …) are negative tests.
 
 Differences from upstream, recorded in the changelog: `selectionOnDrag` applies only when the primary button doesn't pan (matches upstream, 3f34382f6); on a completing click, `isValid` / `toHandle` come from angflow's preview-line snap; the marquee crossing doesn't call `resetSelectedElements()`; a drag's crossing move only starts the drag.
 
