@@ -68,8 +68,8 @@ Each needs a decision: adopt now with a deprecated alias (non-breaking, 0.4.0), 
 | `paneClickDistance` → `paneDragThreshold` (default 1; gates pan **and** box-select start) (#6115) | System panzoom, `ng-flow.component.ts` input/effect/`onPaneClick`, pane marquee start, 3 examples | Yes: new input, old one becomes a deprecated alias. Largest item: hand-merge with angflow's `XYPanZoom.update()` changes, then touch testing. **D1 ✓** 768dbe548, cfb93c138, 3f34382f6 |
 | Default fit padding becomes `'5%'`; **numeric padding is read as pixels** (#5927) | `fitBounds` default `0.1`, `fit_view`/`fit_bounds` agent schemas, mcp snapshot. An agent sending `0.1` would get 0px. | `'5%'` default is safe now (0.1 ≈ 4.5%). Pixel semantics only in a breaking release. **D1 ✓** 61e01fa3b, 1c5560800 |
 | `setViewport` resolves `boolean` (#6064) | Direct `@angflow/system` users only | Yes **D1 ✓** B; 5dc910013 (`fitView` / `fitBounds`) |
-| `colorMode` → `forceColorMode`, default follows the system scheme, CSS `light-dark()` | Host classes, `ng-flow.css` dark rules, matchMedia listener | Breaking release → D2 |
-| Styles in `@layer xyflow` | Angflow's unlayered `ng-flow.css` would always override a layered theme | Breaking release (or ship angflow CSS in the same layer) → D2 |
+| `colorMode` → `forceColorMode`, default follows the system scheme, CSS `light-dark()` | Host classes, `ng-flow.css` dark rules, matchMedia listener | Breaking release → D2 **D2 ✓** 9ac83daed, 786f09a62, 93f9a8b81 |
+| Styles in `@layer xyflow` | Angflow's unlayered `ng-flow.css` would always override a layered theme | Breaking release (or ship angflow CSS in the same layer) → D2 **D2 ✓** 2cbf2cec4 |
 | `onNodesChange` / `onEdgesChange` receive a `NodeChangeset` / `EdgeChangeset` class | Every app using `applyNodeChanges(changes, nodes)` | Probably skip, or offer it opt-in → D3 |
 
 ## 4. Feature and quality opportunities
@@ -94,7 +94,7 @@ measurement-race, nodes-data-hooks, reconnect-edge, viewport).
 | B | Bug-fix release: §1 upstream fixes + §2 angflow-native bugs (except deletion) | Includes #6097. system 0.1.x / angular 0.3.x. Plan: [plan](../superpowers/plans/2026-11-25-bug-fix-release.md). Done: system 0.1.14 / angular 0.3.22 / mcp 0.0.4 |
 | C | Deletion via system `getElementsToRemove` (+ #6074/#6111) | Behaviour change, its own release note. Plan: [plan](../superpowers/plans/2026-11-25-deletion.md). Done (unpublished, in 0.1.14 / 0.3.22 / 0.0.4) |
 | D1 | Upstream 1.0 API and callback alignment (§3 rows 1–7) | Spec: [design](../superpowers/specs/2026-11-25-api-alignment-d1-design.md), plan: [plan](../superpowers/plans/2026-11-25-api-alignment-d1.md). Done (unpublished, in system 0.2.0 / angular 0.4.0 / mcp 0.1.0) |
-| D2 | `forceColorMode`, `light-dark()`, `@layer xyflow`; the 2 colour-mode known failures | |
+| D2 | `forceColorMode`, `light-dark()`, `@layer xyflow`; the 2 colour-mode known failures | Done. Spec: [design](../superpowers/specs/2026-11-26-theming-d2-design.md), plan: [plan](../superpowers/plans/2026-11-26-theming-d2.md). Unpublished, in system 0.2.0 / angular 0.4.0 / mcp 0.1.0 |
 | D3 | `NodeChangeset` / `EdgeChangeset` | |
 | E | Feature parity: `selectNode`/`selectEdge`, `changeParent`, `xy-theme.css`, DevTools panel, missing React examples (refresh `docs/examples-parity.md`), optional #5996 perf subset with #6109 | |
 | F | `@angflow/ui`: Angular port of the React Flow UI components, as a new package with no Tailwind/spartan dependency | Verify the upstream license first. Never port React Flow **Pro** examples (not open source). |
@@ -162,3 +162,16 @@ Touch matrix (#6115), emulated with Playwright and CDP touch on chromium:
 | 5 | Node drag identical at threshold 0 and 50 | pass |
 | 6 | Threshold 0 pans on the first move | pass |
 | 7 | Real touch device | pending (user) |
+
+### D2 — results
+
+Known failures 2 → 0: the two `props.spec` colorMode entries are removed (786f09a62). Full verdict: 0 NOT MATCHED, 0 WRONG FILE, 0 STALE, 0 chromium failures, `verdict: OK`. Commit range: `42b15702c..HEAD`.
+
+- **System styles end state.** `git diff HEAD upstream/main -- packages/system/src/styles` shows only angflow's deliberate `transform-origin` on `.xy-flow__viewport-portal`. Each upstream change is its own commit with a `Ported from` line: 997a67b16, 9ac83daed, 5bb87f807, 41abd847b, 58715e6ee, a3ef3c022 (`xy-theme.css`).
+- **Angular.** `forceColorMode` replaces `colorMode` (786f09a62); `'system'`, `ColorModeClass` and the matchMedia listener are gone, with no alias.
+- **CSS bundler (2cbf2cec4).** The regex pipeline became postcss-import, postcss-nested and autoprefixer, with everything in `@layer xyflow`. Compared against the old output from the same sources: 151 selectors in `style.css` and 142 in `base.css` on both sides, no declaration differences; the only additions are autoprefixer's `-webkit-`/`-moz-user-select`. The old bundler had left 32 (`style.css`) / 24 (`base.css`) selectors as un-flattened native `&` nesting, which browsers without CSS nesting dropped. An unlayered app reset now beats angflow's rules, so the examples app layers its reset (`@layer reset, xyflow;`); without it pane.spec "panning the pane moves it" failed by 1px.
+- **`ng-flow.css` audit (93f9a8b81).** Duplicates of system rules were deleted, divergent tokens now defer to system tokens, and Angular structural and colour rules were kept (colour rules in `ng-flow-theme.css`, `style.css` only). Visible default changes: edges `#b1b1b7`/1 (was `#999`/1.5), connection line `#b1b1b7`/1 (was `#555`/2), transparent light-mode background (was `#fafafa`), `CanvasText` for node, controls-button and edge-label text, 6px handles (was 8px). `base.css` now matches upstream's minimal one. The premise that the `ng-flow__edge-text*` fill selectors were dead was wrong: `edge-text.component.ts` renders both class names, so the fills always applied; they were renamed to `xy-flow__` with no visible change. Computed styles on `/examples/color-mode`: light edge `rgb(177, 177, 183)` 1px, node `rgb(255, 255, 255)`; dark edge `rgb(62, 62, 62)`, node `rgb(30, 30, 30)`; light page with `forceColorMode="dark"` matches dark.
+- **Two extra fixes found on the way.** MiniMap background follows the colour scheme and `bgColor` writes `--xy-minimap-background-color-props` (c5fdff34d); the built-in default, input and output nodes honour `sourcePosition` / `targetPosition` (ae29242ce).
+- **`xy-theme.css` (821c07e5f).** Ships as `@angflow/angular/xy-theme.css` (`base.css` plus upstream's theme); the `/xy-theme` example loads it for that page only.
+- **Left out of scope on purpose.** The in-browser agent chat (`src/lib/agent/chat/`) is not themed for dark mode, and neither is an angflow brand palette.
+- The D1 real-device touch check for `paneDragThreshold` (row 7 above) is still pending (user).

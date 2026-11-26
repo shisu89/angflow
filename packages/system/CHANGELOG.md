@@ -11,12 +11,16 @@
 - `fitViewport` resolves `boolean`; `FitViewResult` removed (#6064).
 - `defaultFitViewPadding` (`'5%'`); numeric padding is pixels; `getViewportForBounds` defaults `minZoom 0` / `maxZoom Infinity` / `padding 0`; `FitBoundsOptions.padding: Padding` (#5927).
 - The `toHandleBounds` fallback is removed from `getEdgePosition` (#5987).
+- `ColorMode` is `'light' | 'dark'`; `ColorModeClass` removed (#5843).
+- styles: colour tokens use `light-dark()` and `color-scheme`, with `[data-theme]` / `.dark` / `.light` on an ancestor or `.xy-flow.dark` / `.light` (forced, wins) selecting the scheme; the `.xy-flow.dark` token blocks are gone (#5843, a6ba7ca10, #6118).
+- Pane `touch-action` moves into `.xy-flow__pane` (afa495f7a).
 
 ### Added
 
 - `getConnectionLookupKey` / `getConnectionsFromLookup` (#6114).
 - `isLeftClickPan` exported (#6115).
 - `@internal` `getFitViewport` (#6064).
+- `styles/xy-theme.css`, upstream's optional full theme.
 
 ### Changed (type)
 

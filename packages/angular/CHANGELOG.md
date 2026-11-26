@@ -86,6 +86,66 @@ Behaviour notes for the same entry:
 - On a completing click, `isValid` / `toHandle` in the `(clickConnectEnd)` connection state come from angflow's click-to-connect preview line's nearest-handle snap. Upstream has no preview line, so its click-end state carries no such snap.
 - Agent tools: `fit_view` / `fit_bounds` still return `{ zoom, clamped, ended }`; `padding` units are described in the tool schema (see `@angflow/mcp`).
 
+#### Theming (D2)
+
+Upstream 1.0 theming: colour mode follows the system / page by default, all CSS is in `@layer xyflow`.
+
+**Silent change:** without `forceColorMode`, a flow on a dark-mode OS now renders dark.
+
+**Silent change:** angflow's CSS is now in `@layer xyflow`, so an app's **unlayered** global reset (e.g. `* { margin: 0; padding: 0; box-sizing: border-box }`) beats it and strips node padding, panel margins and control-button padding. It compiles fine and only shows up visually. Upstream behaves the same way. Put the reset in a layer declared before xyflow:
+
+```css
+@layer reset, xyflow;               /* declare the order first */
+@layer reset { * { margin: 0; padding: 0; box-sizing: border-box; } }
+@import '@angflow/angular/style.css';
+```
+
+The examples app does exactly this in `examples/angular/src/styles.css`.
+
+**Silent change:** the default look changed (set the variables below to restore the old one):
+
+| Default | Before | After |
+|---|---|---|
+| Edge stroke / width | `#999` / 1.5 | `#b1b1b7` / 1 |
+| Connection line stroke / width | `#555` / 2 | `#b1b1b7` / 1 |
+| Flow background, light mode | `#fafafa` | transparent |
+| Node, controls-button and edge-label text, light mode | `inherit` | `CanvasText` |
+| Handle size | 8px | 6px |
+
+Dark mode also gets its own attribution background (`rgba(150, 150, 150, 0.25)`) and selection colours.
+
+```html
+<!-- 1. colorMode input -->
+<ng-flow [colorMode]="'dark'" />             <!-- before -->
+<ng-flow forceColorMode="dark" />            <!-- after (also [forceColorMode]="'dark'") -->
+
+<!-- 2. 'system' is the default: omit the input -->
+<ng-flow [colorMode]="'system'" />           <!-- before -->
+<ng-flow />                                  <!-- after: follows prefers-color-scheme or <html data-theme> -->
+
+<!-- 3. The old default was 'light'. To keep it: -->
+<ng-flow forceColorMode="light" />
+<!-- or, for the whole page: <html data-theme="light"> -->
+```
+
+```css
+/* 4. Keep the old edge and connection-line look */
+.xy-flow {
+  --xy-edge-stroke: #999;
+  --xy-edge-stroke-width: 1.5;
+  --xy-connectionline-stroke: #555;
+  --xy-connectionline-stroke-width: 2;
+  --xy-background-color: #fafafa;   /* old light-mode flow background */
+}
+```
+
+- `@layer xyflow`: CSS overrides that only beat angflow by specificity or order still win, and now win more reliably, because unlayered CSS beats any layer. An app that put angflow's CSS in its own layer must order its layers (`@layer base, xyflow, overrides;`).
+- `base.css` now matches upstream's minimal `base.css`: no built-in node padding or width, no handle size or border, no control-button styling, no theme colours. Apps that imported `base.css` and relied on those styles should import `style.css` (or `xy-theme.css`) instead.
+- Short export paths: `@angflow/angular/style.css`, `base.css` and `xy-theme.css`. The old `@angflow/angular/dist/style.css` and `dist/base.css` keep working.
+- Browser floor: `light-dark()` needs Chrome/Edge 123, Firefox 120, Safari 17.5.
+
+Then, the `ColorModeClass` export is removed (`ColorMode` is `'light' | 'dark'`).
+
 ### Added (additive API)
 
 - `setViewport` resolves `boolean`; `setCenter` / `zoomIn` / `zoomOut` / `zoomTo` resolve
@@ -100,6 +160,9 @@ Behaviour notes for the same entry:
   (e.g. `'Meta+Backspace'`), with upstream `useKeyPress` semantics.
 - `ReconnectEdgeOptions.onError` / `AddEdgeOptions.onError` (from `@angflow/system`).
 - `HandleBounds`, `NodeHandle` exports.
+- `forceColorMode` input (`'light' | 'dark'`): forces one flow's scheme, overriding the page.
+- `@angflow/angular/style.css`, `@angflow/angular/base.css` and `@angflow/angular/xy-theme.css` export paths. `xy-theme.css` is `base.css` plus upstream's optional full theme (import it instead of `style.css`).
+- Examples: the `xy-theme` example (route `/xy-theme`, alias `/examples/xy-theme`), which loads `xy-theme.css` through a `<link>` for that page only.
 - `FlowStore.rawConnection` and `FlowStore.getFinalClickConnectionState()`.
 - Examples: the `drag-threshold` example (port of upstream DragThreshold), in the examples app.
 - `onBeforeDelete` may return `{ nodes, edges }` to delete exactly that set (the
@@ -219,6 +282,10 @@ Behaviour notes for the same entry:
   `deletedEdges`); the tool returns `deletedNodeIds` / `deletedEdgeIds`.
 - Shared-store unmount; MiniMap follows a new `panZoom` after remount;
   `selectNodesData` only emits when node data changes.
+- `base.css` no longer includes theme colours.
+- MiniMap: its background follows the colour scheme. `bgColor` now writes `--xy-minimap-background-color-props`, as upstream does; it used to paint an opaque `#f0f0f0` rect, so the minimap stayed light in dark mode.
+- Built-in default, input and output nodes honour `sourcePosition` / `targetPosition`; they were hard-coded to top / bottom.
+- The shipped CSS contained un-flattened native `&` nesting (32 selectors in `style.css`, 24 in `base.css`), which browsers without CSS nesting dropped. The CSS is now bundled with postcss (`postcss-import`, `postcss-nested`, `autoprefixer`), which flattens everything.
 
 
 ## 0.3.2

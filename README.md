@@ -28,7 +28,7 @@ Published on npm as [`@angflow/angular`](https://www.npmjs.com/package/@angflow/
 - Plugins: minimap, background, controls, node toolbar, edge toolbar, node resizer
 - Signal-based state management (Angular 17+ signals, no RxJS in the store)
 - OnPush change detection throughout
-- Dark mode support
+- Dark mode and CSS-variable theming (see [Theming](./packages/angular/README.md#theming))
 
 See the [Angular Flow README](./packages/angular/README.md) for detailed API documentation and usage examples.
 

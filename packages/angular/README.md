@@ -21,7 +21,7 @@ Angular port of [xyflow](https://github.com/xyflow/xyflow) — the library behin
 - **Edge toolbar** — context toolbars positioned on edges
 - **Node resizer** — drag handles to resize nodes
 - **Accessibility** — ARIA labels, keyboard navigation, screen reader announcements
-- **Dark mode** — light/dark/system color mode support
+- **Dark mode** — follows the system or page theme, or force one flow with `forceColorMode` (see [Theming](#theming))
 
 ## Requirements
 
@@ -97,6 +97,21 @@ export class App {
   }
 }
 ```
+
+## Theming
+
+Import one stylesheet in your global styles:
+
+```css
+@import '@angflow/angular/style.css';   /* structure + angflow's default look (dist/style.css still works) */
+```
+
+- `style.css`: everything. `base.css`: structure only (no node, handle or control chrome). `xy-theme.css`: `base.css` plus upstream's optional full theme; import it **instead of** `style.css`.
+- All styles are in `@layer xyflow`, so your unlayered CSS always wins. An unlayered global reset (`* { margin: 0; padding: 0 }`) also wins, so put it in an earlier layer: `@layer reset, xyflow;`.
+- The colour scheme follows the system (`prefers-color-scheme`) by default. For page-level theming set `<html data-theme="dark">` (or a `.dark` / `.light` class on an ancestor).
+- Force one flow with `<ng-flow forceColorMode="dark" />`.
+- Override the `--xy-*` variables to restyle, for example `.xy-flow { --xy-edge-stroke: #999; --xy-node-border-radius: 8px; }`.
+- Needs `light-dark()`: Chrome/Edge 123, Firefox 120, Safari 17.5.
 
 ## Example App
 
