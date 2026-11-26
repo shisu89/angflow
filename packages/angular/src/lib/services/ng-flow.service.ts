@@ -462,13 +462,25 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
    * it visually fixed. Caller must ensure no cycle (the agent bridge guards this).
    * Delegates to {@link changeParent}, so the reparent is one synchronous
    * changeset; the returned promise is already settled when it resolves.
+   * Detaching (`null`) a node with `extent: 'parent'` also clears `extent` in
+   * that changeset, as {@link dissolveGroup} does: a top-level node cannot use a
+   * parent extent (error 005 on every drag frame otherwise).
    * A missing node or a missing (non-null) group is a silent no-op.
    */
   async setNodeGroup(nodeId: string, groupId: string | null): Promise<void> {
-    if (!this.getNode(nodeId)) return;
+    const node = this.getNode(nodeId);
+    if (!node) return;
     // Don't orphan parentId against a non-existent group (corrupts absolute coords).
     if (groupId != null && !this.getNode(groupId)) return;
-    this.changeParent(nodeId, groupId);
+    if (groupId != null || node.extent !== 'parent') {
+      this.changeParent(nodeId, groupId);
+      return;
+    }
+    // changeParent stays verbatim with upstream React; the extent clear is
+    // angflow-only, so it rides on the same updateNode call here.
+    changeParentNode(nodeId, this.store.nodeLookup, null, this.store.nodeOrigin(), ({ nodeId: id, x, y }) => {
+      this.updateNode(id, { parentId: undefined, extent: undefined, position: { x, y } } as Partial<NodeType>);
+    });
   }
 
   /**

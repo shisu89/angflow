@@ -1877,6 +1877,37 @@ describe('setNodeGroup', () => {
     expect(service.getAbsolutePosition('a')).toEqual(before);
   });
 
+  it("detaching clears extent: 'parent' in the same changeset; reparenting into a group keeps it", async () => {
+    const store = TestBed.inject(FlowStore);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    onTestFinished(() => warn.mockRestore());
+    service.setNodes([
+      makeNode('g', { type: 'group', position: { x: 50, y: 50 }, width: 400, height: 400 }),
+      makeNode('h', { type: 'group', position: { x: 600, y: 50 }, width: 400, height: 400 }),
+      makeNode('a', { parentId: 'g', extent: 'parent', position: { x: 150, y: 150 }, width: 50, height: 50 }),
+    ]);
+    const before = { ...store.nodeLookup.get('a')!.internals.positionAbsolute };
+    const sets: unknown[][] = [];
+    store.onNodesChange = (c) => sets.push(c.toArray());
+    await service.setNodeGroup('a', null);
+    const a = service.getNode('a')!;
+    expect(a.parentId).toBeUndefined();
+    expect(a.extent).toBeUndefined();
+    expect(store.nodeLookup.get('a')!.internals.positionAbsolute).toEqual(before);
+    expect(sets).toEqual([
+      [
+        { id: 'a', type: 'position', position: { x: 200, y: 200 } },
+        { id: 'a', type: 'update', item: { parentId: undefined, extent: undefined } },
+      ],
+    ]);
+
+    service.updateNode('a', { parentId: 'g', extent: 'parent', position: { x: 10, y: 10 } });
+    await service.setNodeGroup('a', 'h');
+    expect(service.getNode('a')?.parentId).toBe('h');
+    expect(service.getNode('a')?.extent).toBe('parent');
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('reparents in one synchronous changeset (update + position), via changeParent', async () => {
     const store = TestBed.inject(FlowStore);
     service.setNodes([

@@ -158,7 +158,7 @@ Every tool takes an optional `flowId` (omit when only one flow is registered; re
 | Tool | Params | Returns |
 |---|---|---|
 | `group_nodes` | `nodeIds: string[]`, `label?`, `collapsed?`, `groupId?`, `padding?`, `headerHeight?` | `{ groupId }` — creates a group wrapping the nodes (visually pinned), mints groupId when omitted |
-| `set_node_group` | `nodeId: string`, `groupId: string \| null` | `{ nodeId, groupId }` — reparent into a group or detach (null); rejects cycles (`-32602`) |
+| `set_node_group` | `nodeId: string`, `groupId: string \| null` | `{ nodeId, groupId }` — reparent into a group or detach (null); detaching also clears `extent: 'parent'`; rejects cycles (`-32602`) |
 | `set_group_collapsed` | `groupId: string`, `collapsed: boolean` | `{ groupId, collapsed }` — fold/unfold a group's descendants |
 | `dissolve_group` | `groupId: string` | `{ dissolvedGroupId, memberIds }`: children are reparented to the group's parent (kept where drawn), then the group is deleted. If `onBeforeDelete` vetoes or keeps the group, or the group is `deletable: false`, the children are restored to their captured parent/position (they are already reparented while an async `onBeforeDelete` is pending, so a move made meanwhile is reverted) and `memberIds` is `[]`. Children stay where drawn, except an `extent: 'parent'` child overhanging a grandparent, which is clamped into it. |
 | `get_group_bounds` | `groupId: string` | `{ x, y, width, height } \| null` — current absolute box (read-only) |
