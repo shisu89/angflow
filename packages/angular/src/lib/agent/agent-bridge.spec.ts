@@ -498,7 +498,7 @@ describe('AngflowAgentBridge', () => {
     it('fit_bounds accepts a Rect', async () => {
       const res = await transport.call('fit_bounds', {
         bounds: { x: 0, y: 0, width: 200, height: 200 },
-        padding: 0.1,
+        padding: '10%',
       });
       expect('result' in res).toBe(true);
     });
