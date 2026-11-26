@@ -44,11 +44,9 @@ import {
   BackgroundComponent,
   ControlsComponent,
   MiniMapComponent,
-  applyNodeChanges,
-  applyEdgeChanges,
   Position,
 } from '@angflow/angular';
-import type { Node, Edge, Connection } from '@angflow/angular';
+import type { Node, Edge, Connection, NodeChangeset, EdgeChangeset } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 
 @Component({
@@ -84,12 +82,12 @@ export class App {
     { id: 'e2-3', source: '2', target: '3' },
   ];
 
-  onNodesChange(changes: any[]) {
-    this.nodes = applyNodeChanges(changes, this.nodes);
+  onNodesChange(changes: NodeChangeset) {
+    this.nodes = changes.applyTo(this.nodes);
   }
 
-  onEdgesChange(changes: any[]) {
-    this.edges = applyEdgeChanges(changes, this.edges);
+  onEdgesChange(changes: EdgeChangeset) {
+    this.edges = changes.applyTo(this.edges);
   }
 
   onConnect(connection: Connection) {
@@ -278,14 +276,38 @@ keeps `position` authority in a journal), forward dimension changes with
 `applyDimensionChanges` so `measured` stays current:
 
 ```ts
-import { applyDimensionChanges } from '@angflow/angular';
+import { applyDimensionChanges, type NodeChangeset } from '@angflow/angular';
 
-onNodesChange(changes: NodeChange[]) {
+onNodesChange(changes: NodeChangeset) {
   // keep measured flowing back: floating edges, fitView, layout stay correct
-  this.nodes.update((ns) => applyDimensionChanges(changes, ns));
+  this.nodes.update((ns) => applyDimensionChanges(ns, changes));
   // ...your own position/data handling on top...
 }
 ```
+
+## Changes
+
+`(nodesChange)` / `(edgesChange)` emit a `NodeChangeset` / `EdgeChangeset` (upstream 1.0's changes API). Apply it with `changes.applyTo(nodes)`; the methods below inspect or edit it.
+
+| Method | What it does |
+|---|---|
+| `applyTo(items)` | Returns the items with every change applied |
+| `getByType('position')` | The changes of one type, typed per type |
+| `getForNode(id)` / `getForEdge(id)` | The changes for one element |
+| `toArray()` | A plain `NodeChange[]` / `EdgeChange[]` |
+| `for (const c of changes)` | Iterates the changes, grouped by element |
+| `isEmpty()` | `true` when there are no changes |
+| `getNewNodes()` / `getNewEdges()` | The items from `'add'` changes |
+| `add(change)` / `remove(...)` / `removeForNode(id)` / `clear()` | Edit the changeset |
+
+```ts
+onNodesChange(changes: NodeChangeset<MyNode>) {
+  for (const p of changes.getByType('position')) { /* ... */ }
+  this.nodes = changes.applyTo(this.nodes);
+}
+```
+
+angflow applies changes before emitting, as React Flow does, so clearing or removing changes inside a handler does not cancel anything (that is Svelte Flow-only behaviour).
 
 ## Animations
 

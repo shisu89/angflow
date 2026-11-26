@@ -21,7 +21,7 @@ Kinds: BUG = bug fix, FEAT = feature, BRK = breaking, PERF = perf.
 | 14 | 13.0.0 | Type `Handle` -> `HandleBounds` rename | BRK | SYS | types/edges.ts:11,116,125 import `Handle`; public-api.ts:184 `Handle as SystemHandle`, :173 `NodeHandleBounds`. Compile break on system bump; mechanical rename | trivial |
 | 15 | 13.0.0 | BRK: fitViewOptions.padding numbers are pixels (0.1 ~ 4.5%) | BRK | SYS (see #8) | same as #8 | - |
 | 16 | 13.0.0 | Min React 18; UMD removal; style.css import path | BRK | N/A | n/a (Angular peer >=19, ESM only) | - |
-| 17 | 13.0.0 | BRK: `onNodesChange`/`onEdgesChange` receive `NodeChangeset`/`EdgeChangeset` class (not array) | BRK | ABSENT | Angular emits plain `NodeChange[]` (ng-flow.component.ts:903 `store.onNodesChange`, `(nodesChange)` output) and has its own utils/changes.ts (applyNodeChanges etc.) rather than system changes module. System 1.0 has `packages/system/src/changes/*` (Changeset, `.applyTo`, `getByType`, new `update`/`data` change types, `changeParentNode`). Matching = swap utils/changes.ts for system's and change output payload; very invasive for apps using `applyNodeChanges(changes, nodes)` | large (breaking) |
+| 17 | 13.0.0 | BRK: `onNodesChange`/`onEdgesChange` receive `NodeChangeset`/`EdgeChangeset` class (not array) | BRK | PRESENT (D3: 49c7d0700, cba6dc331, d7dc98c1e; #5944) | Was: Angular emitted plain `NodeChange[]` (ng-flow.component.ts:903 `store.onNodesChange`, `(nodesChange)` output) and has its own utils/changes.ts (applyNodeChanges etc.) rather than system changes module. System 1.0 has `packages/system/src/changes/*` (Changeset, `.applyTo`, `getByType`, new `update`/`data` change types, `changeParentNode`). Matching = swap utils/changes.ts for system's and change output payload; very invasive for apps using `applyNodeChanges(changes, nodes)` | large (breaking) |
 | 18 | 13.0.0 | `changeParent` on useReactFlow | FEAT | ABSENT | services/ng-flow.service.ts has `updateNode(id,{parentId})` (:381,:408) + setNodeGroup (:376) but no position-preserving re-parent helper; system `changeParentNode` (8843870d5) not in local system | small (after system bump; setNodeGroup partially covers) |
 | 19 | 13.0.0 | `elevateEdgesOnSelect` defaults true | BRK/FEAT | ABSENT (and a latent no-op) | ng-flow.component.ts:520 default false; flow-store :231 default true but overwritten by effect :807. container/edge-renderer/edge-renderer.component.ts:392 `getEdgeZIndex` = `edge.zIndex ?? max(sourceZ,targetZ)`; never uses elevateEdgesOnSelect/zIndexMode/`getElevatedEdgeZIndex`. So the input is documented but has no effect on edge rendering today (selected edges only elevated if CSS does it) | small |
 | 20 | 13.0.0 | Exported styles in `@layer xyflow` | FEAT/BRK | PARTIAL | styles/base.css imports system CSS verbatim (4 lines), so layering is inherited on a system bump, but angflow's own styles/ng-flow.css (461 lines) and inline styles stay un-layered and would always win over layered theme; consumers' override assumptions change | small |
@@ -70,9 +70,9 @@ Kinds: BUG = bug fix, FEAT = feature, BRK = breaking, PERF = perf.
 | 63 | 12.11.0 | Fix node resizing beyond absolute extents | BUG | SYS | inherited via XYResizer | - |
 
 ## Counts (63 rows; some rows merge several changelog bullets)
-- PRESENT: 7 (#1, 37, 43, 46, 52, 58, 60)
+- PRESENT: 8 (#1, 17 via D3, 37, 43, 46, 52, 58, 60)
 - PARTIAL: 14 (#3, 5, 8, 20, 26, 29, 33, 35, 39, 41, 48, 61, plus 46 partially, 20)
-- ABSENT: 11 (#2, 11, 12, 13, 17, 18, 19, 21, 22, 34, 49, 56 - plus 50 as feature gap)
+- ABSENT: 10 (#2, 11, 12, 13, 18, 19, 21, 22, 34, 49, 56 - plus 50 as feature gap)
 - SYS (inherited on system bump, little/no wrapper work): 11 (#6, 7, 14, 15, 27, 38, 45, 47, 54, 63 and bits of 8/29)
 - N/A (React-specific or not affected): ~21
 

@@ -147,6 +147,65 @@ Dark mode also gets its own attribution background (`rgba(150, 150, 150, 0.25)`)
 
 Then, the `ColorModeClass` export is removed (`ColorMode` is `'light' | 'dark'`).
 
+#### Changesets (D3)
+
+Upstream 1.0 changes API (#5944, 5ff09ef77, plus follow-ups): `(nodesChange)` / `(edgesChange)` emit a `NodeChangeset` / `EdgeChangeset` instead of an array. Renamed and removed APIs have no deprecated aliases.
+
+**Compiles loudly, behaves differently:** a handler typed `(changes: NodeChange[])` no longer type-checks, so the break is caught at build time. The apply-semantics differences below are silent.
+
+```ts
+// 1. Handlers
+onNodesChange(changes: NodeChange[]) {                     // before
+  this.nodes = applyNodeChanges(changes, this.nodes);
+}
+onNodesChange(changes: NodeChangeset<MyNode>) {            // after
+  this.nodes = changes.applyTo(this.nodes);
+}
+
+// 2. Inspecting changes
+for (const c of changes) { /* ... */ }                     // iterate (grouped per element)
+changes.getByType('position');                             // typed per-type lists
+changes.getForNode('a');                                   // EdgeChangeset: getForEdge(id)
+changes.toArray();                                         // NodeChange[] when you need the array
+
+// 3. Applying outside a handler
+import { applyNodeChanges } from '@angflow/system';
+nodes = applyNodeChanges(nodes, changeset);                // (nodes, changeset), not (changes, nodes)
+nodes = changes.applyTo(nodes);                            // same thing
+```
+
+- `@angflow/angular` no longer exports `applyNodeChanges` / `applyEdgeChanges`. Use `changes.applyTo(nodes)`, or `applyNodeChanges(nodes, changeset)` / `applyEdgeChanges(edges, changeset)` from `@angflow/system`. There is no array overload.
+- `OnNodesChange` / `OnEdgesChange` are `(changes: NodeChangeset<NodeType>) => void` (edges likewise), matching React. The store's `onNodesChange` / `onEdgesChange` take the changesets too.
+- `@angflow/angular` re-exports only the change type names, `NodeChangeset` / `EdgeChangeset` and `applyDimensionChanges`, matching React's export list. The creators (`selectionChange`, `removeChange`, `addChange`, `updateChange`, `dataChange`, ...) and `getSelectionChanges` / `getDeselectionChanges` are importable from `@angflow/system`.
+- The internal `createSelectionChange`, `getSelectionChanges`, `elementToRemoveChange` and `getElementsDiffChanges` helpers are gone and replaced by those system creators. (`getElementsDiffChanges` was never public and nothing called it, so it is deleted rather than rewritten.)
+- `applyDimensionChanges(nodes, changeset)`: arguments swapped to match `applyNodeChanges`, and it takes a `NodeChangeset`. Semantics are unchanged: the last change per node wins, only `measured` is written, and the input reference is returned when nothing applies.
+
+| Before | After |
+|---|---|
+| `NodeDimensionChange` | `DimensionChange` |
+| `NodePositionChange` | `PositionChange` |
+| `NodeSelectionChange` / `EdgeSelectionChange` | `SelectionChange` |
+| `NodeRemoveChange` / `EdgeRemoveChange` | `RemoveChange` |
+| `NodeAddChange<T>` / `EdgeAddChange<T>` | `AddChange<T>` |
+| `NodeReplaceChange<T>` / `EdgeReplaceChange<T>` | `ReplaceChange<T>` |
+
+`AddChange.id` is now required. `NodeChange` / `EdgeChange` also include the new `'update'` and `'data'` types.
+
+Apply-semantics differences (upstream's apply):
+
+- A `remove` wins wherever it sits in the batch.
+- A `replace` no longer short-circuits later changes for that element.
+- An `add` for an id that already exists is ignored.
+- `add` changes append; `index` is ignored.
+- Iteration groups changes by element (adds first), not in emission order.
+- Nodes and edges added through `addNodes` / `addEdges` are stored by reference (the apply pushes the item as-is) rather than shallow-copied.
+
+`updateNode` / `updateEdge` now emit an `'update'` change carrying only the partial (an updater function is resolved first), and `updateNodeData` / `updateEdgeData` emit a merging `'data'` change. They no longer emit a full `'replace'`. Journaling or undo consumers that matched `'replace'` from these APIs must handle `'update'` / `'data'`. A key set to `undefined` in `updateNode` still clears it (`Object.assign` copies own undefined properties), so `setNodeGroup(id, null)` still detaches. `setNodeCollapsed` and `dissolveGroup` still emit `'replace'`.
+
+**Clearing the changeset in a handler does nothing.** angflow applies the changes before emitting, as React does, so `changes.clear()` or `changes.remove(...)` inside a handler cannot cancel a change (that is Svelte Flow-only behaviour). Both store paths emit the same changeset instance they applied; the change middleware still sees arrays.
+
+No agent tool or schema change; the `@angflow/mcp` snapshot is unchanged. Ported from xyflow/xyflow#5944 (5ff09ef77).
+
 ### Added (additive API)
 
 - `setViewport` resolves `boolean`; `setCenter` / `zoomIn` / `zoomOut` / `zoomTo` resolve

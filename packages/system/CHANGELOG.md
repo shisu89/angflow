@@ -14,6 +14,10 @@
 - `ColorMode` is `'light' | 'dark'`; `ColorModeClass` removed (#5843).
 - styles: colour tokens use `light-dark()` and `color-scheme`, with `[data-theme]` / `.dark` / `.light` on an ancestor or `.xy-flow.dark` / `.light` (forced, wins) selecting the scheme; the `.xy-flow.dark` token blocks are gone (#5843, a6ba7ca10, #6118).
 - Pane `touch-action` moves into `.xy-flow__pane` (afa495f7a).
+- Changes API (#5944, 5ff09ef77, c3a844e62, 18c0bab21, 6f45fba0b, a97985ae8, b4a02ca02, 9b421bfc3, 1f951d99a, 446e0c2d0, b23c67914, ee44a8883): the new `changes/` module (`Changeset`, `NodeChangeset`, `EdgeChangeset`, `applyNodeChanges(nodes, changeset)`, `applyEdgeChanges`, the change creators, `getSelectionChanges`, `getDeselectionChanges`, `UpdateChange`, `DataChange`), identical to upstream apart from `DimensionChange.initial` (angflow divergence).
+- `types/changes.ts` is deleted and its names are renamed with no aliases: `NodeDimensionChange` -> `DimensionChange`, `NodePositionChange` -> `PositionChange`, `NodeSelectionChange` / `EdgeSelectionChange` -> `SelectionChange`, `NodeRemoveChange` / `EdgeRemoveChange` -> `RemoveChange`, `NodeAddChange<T>` / `EdgeAddChange<T>` -> `AddChange<T>`, `NodeReplaceChange<T>` / `EdgeReplaceChange<T>` -> `ReplaceChange<T>`. `AddChange.id` is required.
+- Apply semantics: a `remove` anywhere in the batch wins; `replace` does not short-circuit later changes; an `add` for an existing id is ignored; `index` on add is ignored (adds append); iteration groups changes by element, adds first. New `'update'` (Object.assign) and `'data'` (merge, or `replace: true`) change types.
+- `NodeBase.resizing?: boolean` added (c3a844e62).
 
 ### Added
 

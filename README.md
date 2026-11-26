@@ -49,10 +49,8 @@ import {
   BackgroundComponent,
   ControlsComponent,
   MiniMapComponent,
-  applyNodeChanges,
-  applyEdgeChanges,
 } from '@angflow/angular';
-import type { Node, Edge, Connection } from '@angflow/angular';
+import type { Node, Edge, Connection, NodeChangeset, EdgeChangeset } from '@angflow/angular';
 import { addEdge } from '@angflow/system';
 
 @Component({
@@ -88,12 +86,12 @@ export class App {
     { id: 'e2-3', source: '2', target: '3' },
   ];
 
-  onNodesChange(changes: any[]) {
-    this.nodes = applyNodeChanges(changes, this.nodes);
+  onNodesChange(changes: NodeChangeset) {
+    this.nodes = changes.applyTo(this.nodes);
   }
 
-  onEdgesChange(changes: any[]) {
-    this.edges = applyEdgeChanges(changes, this.edges);
+  onEdgesChange(changes: EdgeChangeset) {
+    this.edges = changes.applyTo(this.edges);
   }
 
   onConnect(connection: Connection) {
@@ -133,7 +131,7 @@ The app is organized into three sections, reachable from the sidebar:
 
 | Route | Source | Demonstrates |
 |-------|--------|--------------|
-| `/gallery/overview` | [overview/](./examples/angular/src/app/examples/overview) | Basic nodes, edges, plugins, `applyNodeChanges` / `applyEdgeChanges` |
+| `/gallery/overview` | [overview/](./examples/angular/src/app/examples/overview) | Basic nodes, edges, plugins, `changes.applyTo(...)` |
 | `/gallery/custom-node` | [custom-node/](./examples/angular/src/app/examples/custom-node) | Registering a custom Angular component as a node type |
 | `/gallery/custom-edge` | [custom-edge/](./examples/angular/src/app/examples/custom-edge) | Custom edge components with path generators |
 | `/gallery/edge-types` | [edge-types/](./examples/angular/src/app/examples/edge-types) | Built-in bezier, straight, step, and smooth-step edges |
@@ -180,12 +178,12 @@ If you already know React Flow, you know angflow. The public API is modeled on i
 | `<NodeToolbar>` / `<NodeResizer>` / `<EdgeToolbar>` | `<ng-flow-node-toolbar>` / `<ng-flow-node-resizer>` / `<ng-flow-edge-toolbar>` | Drop-in |
 | `useReactFlow()` | `inject(NgFlowService)` | `fitView()`, `zoomIn/Out()`, `setViewport()`, `addNodes/Edges()`, `screenToFlowPosition()`, `toObject()`, etc. |
 | `useNodes()` / `useEdges()` / `useViewport()` | `flowService.nodes` / `.edges` / `.viewport` | Signals instead of hooks |
-| `useNodesState()` / `useEdgesState()` | `applyNodeChanges()` / `applyEdgeChanges()` | Same change pipeline; wire via `(nodesChange)` / `(edgesChange)` |
+| `useNodesState()` / `useEdgesState()` | `changes.applyTo(nodes)` / `changes.applyTo(edges)` | Same change pipeline; `(nodesChange)` / `(edgesChange)` emit a `NodeChangeset` / `EdgeChangeset` |
 | `useNodeConnections()` | `flowService.selectNodeConnections({ nodeId, type?, handleId? })` | Returns a `Signal<…>` |
 | `onConnect`, `onNodeClick`, … (props) | `(connect)`, `(nodeClick)`, … (outputs) | Same payloads |
 | `nodeTypes={...}` | `[nodeTypes]="{ custom: MyComponent }"` | Angular standalone components |
 
-Use `applyNodeChanges` / `applyEdgeChanges` to mutate the arrays in your component in response to `(nodesChange)` / `(edgesChange)` — the same pattern as React Flow's `useNodesState`, without the hook.
+Use `changes.applyTo(nodes)` / `changes.applyTo(edges)` to update the arrays in your component in response to `(nodesChange)` / `(edgesChange)` — the same pattern as React Flow's `useNodesState`, without the hook.
 
 ## Credits
 

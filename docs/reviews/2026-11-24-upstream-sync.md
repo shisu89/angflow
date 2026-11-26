@@ -70,7 +70,7 @@ Each needs a decision: adopt now with a deprecated alias (non-breaking, 0.4.0), 
 | `setViewport` resolves `boolean` (#6064) | Direct `@angflow/system` users only | Yes **D1 ✓** B; 5dc910013 (`fitView` / `fitBounds`) |
 | `colorMode` → `forceColorMode`, default follows the system scheme, CSS `light-dark()` | Host classes, `ng-flow.css` dark rules, matchMedia listener | Breaking release → D2 **D2 ✓** 9ac83daed, 786f09a62, 93f9a8b81 |
 | Styles in `@layer xyflow` | Angflow's unlayered `ng-flow.css` would always override a layered theme | Breaking release (or ship angflow CSS in the same layer) → D2 **D2 ✓** 2cbf2cec4 |
-| `onNodesChange` / `onEdgesChange` receive a `NodeChangeset` / `EdgeChangeset` class | Every app using `applyNodeChanges(changes, nodes)` | Probably skip, or offer it opt-in → D3 |
+| `onNodesChange` / `onEdgesChange` receive a `NodeChangeset` / `EdgeChangeset` class | Every app using `applyNodeChanges(changes, nodes)` | Match upstream fully, no opt-in → D3 **D3 ✓** 49c7d0700, cba6dc331, d7dc98c1e |
 
 ## 4. Feature and quality opportunities
 
@@ -95,7 +95,7 @@ measurement-race, nodes-data-hooks, reconnect-edge, viewport).
 | C | Deletion via system `getElementsToRemove` (+ #6074/#6111) | Behaviour change, its own release note. Plan: [plan](../superpowers/plans/2026-11-25-deletion.md). Done (unpublished, in 0.1.14 / 0.3.22 / 0.0.4) |
 | D1 | Upstream 1.0 API and callback alignment (§3 rows 1–7) | Spec: [design](../superpowers/specs/2026-11-25-api-alignment-d1-design.md), plan: [plan](../superpowers/plans/2026-11-25-api-alignment-d1.md). Done (unpublished, in system 0.2.0 / angular 0.4.0 / mcp 0.1.0) |
 | D2 | `forceColorMode`, `light-dark()`, `@layer xyflow`; the 2 colour-mode known failures | Done. Spec: [design](../superpowers/specs/2026-11-26-theming-d2-design.md), plan: [plan](../superpowers/plans/2026-11-26-theming-d2.md). Unpublished, in system 0.2.0 / angular 0.4.0 / mcp 0.1.0 |
-| D3 | `NodeChangeset` / `EdgeChangeset` | |
+| D3 | `NodeChangeset` / `EdgeChangeset` (#5944 and follow-ups) | Done. Spec: [design](../superpowers/specs/2026-11-26-changesets-d3-design.md), plan: [plan](../superpowers/plans/2026-11-26-changesets-d3.md). Unpublished, in system 0.2.0 / angular 0.4.0 / mcp 0.1.0 |
 | E | Feature parity: `selectNode`/`selectEdge`, `changeParent`, DevTools panel, missing React examples (refresh `docs/examples-parity.md`), optional #5996 perf subset with #6109 | |
 | F | `@angflow/ui`: Angular port of the React Flow UI components, as a new package with no Tailwind/spartan dependency | Verify the upstream license first. Never port React Flow **Pro** examples (not open source). |
 | G | Monthly scheduled upstream triage (report only, no code changes) | Prevents drift from piling up again |
@@ -180,3 +180,23 @@ Known failures 2 → 0: the two `props.spec` colorMode entries are removed (786f
 - **`xy-theme.css` (821c07e5f).** Ships as `@angflow/angular/xy-theme.css` (`base.css` plus upstream's theme); the `/xy-theme` example loads it for that page only.
 - **Left out of scope on purpose.** The in-browser agent chat (`src/lib/agent/chat/`) is not themed for dark mode, and neither is an angflow brand palette.
 - The D1 real-device touch check for `paneDragThreshold` (row 7 above) is still pending (user).
+
+### D3 — results
+
+Known failures stay at 0. Full e2e verdict at the Task 3 checkpoint: 0 known failures, 0 NOT MATCHED, 0 WRONG FILE, 0 STALE, 0 chromium failures, `verdict: OK` (79 passed, 6 skipped). Tests: system 187, angular 1106, mcp 65, examples `ng test` 6. The mcp snapshot is unchanged (no agent tool change). Commit range: `1284ea381..HEAD`; commits: 49c7d0700 (system `changes/` module, #5944 5ff09ef77 plus 10 follow-ups, listed in its body), cba6dc331 (Angular emits changesets), d7dc98c1e (55 examples migrated).
+
+Deviations from the plan, as executed:
+
+1. `getElementsDiffChanges` was deleted, not rewritten: nothing called it and it was never in `public-api.ts`.
+2. The module lineage landed as one system commit (all follow-ups from c3a844e62 to ee44a8883, `packages/system` paths only). The only divergence from upstream is `DimensionChange.initial`.
+3. The type renames landed repo-wide in the system commit, because Angular `tsc` resolves `@angflow/system` to its source.
+4. The examples were broken between the Angular commit and the examples commit (55 files imported the removed helpers); the library, its specs and `tsc` stayed green.
+5. `@angflow/angular` re-exports only React's change-related list (the type names, `NodeChangeset`, `EdgeChangeset`) plus angflow's `applyDimensionChanges`; the creators and `applyNodeChanges(nodes, changeset)` stay importable from `@angflow/system`, as upstream.
+
+Found during execution:
+
+- `NodeBase.resizing` was added from upstream c3a844e62, because the ported `apply.ts` needs it.
+- An old middleware spec passed vacuously (it asserted nothing against the changeset path) and was fixed.
+- The `kitchen-sink` example's `any[]` handler was found only by the example build, not by the library's `tsc`.
+
+Behaviour notes: `setNodeCollapsed` and `dissolveGroup` still emit `'replace'`; `addNodes` / `addEdges` store items by reference; a key set to `undefined` in `updateNode` clears it; clearing a changeset inside a handler does nothing, as in React.
