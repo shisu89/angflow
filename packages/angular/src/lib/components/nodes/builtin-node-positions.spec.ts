@@ -2,7 +2,7 @@
  * Built-in nodes honour `sourcePosition` / `targetPosition` (upstream parity: React's
  * DefaultNode/InputNode/OutputNode take them as props, defaulting to Bottom / Top).
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { Position } from '@angflow/system';
@@ -64,5 +64,29 @@ describe('built-in nodes: handle positions', () => {
     expect(result['d'].sort()).toEqual(['source:bottom', 'target:top']);
     expect(result['i']).toEqual(['source:bottom']);
     expect(result['o']).toEqual(['target:top']);
+  });
+
+  it('re-measures a node with force when its sourcePosition / targetPosition / type changes (upstream NodeWrapper)', async () => {
+    await handleClasses([
+      { id: 'd', type: 'default', position: { x: 0, y: 0 }, data: {} },
+      { id: 'e', type: 'default', position: { x: 0, y: 100 }, data: {} },
+    ]);
+    const spy = vi.spyOn(store, 'updateNodeInternals');
+
+    store.setNodes([
+      { id: 'd', type: 'default', position: { x: 0, y: 0 }, data: {}, sourcePosition: Position.Right },
+      { id: 'e', type: 'default', position: { x: 0, y: 100 }, data: {} },
+    ]);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const forced = spy.mock.calls
+      .map(([updates]) => updates as Map<string, { id: string; nodeElement: HTMLElement; force?: boolean }>)
+      .flatMap((updates) => [...updates.values()])
+      .filter((u) => u.force);
+    expect(forced.map((u) => u.id)).toEqual(['d']);
+    expect(forced[0].nodeElement.getAttribute('data-id')).toBe('d');
+    expect(forced[0].nodeElement.querySelector('.xy-flow__handle.source')?.classList.contains('xy-flow__handle-right')).toBe(true);
   });
 });

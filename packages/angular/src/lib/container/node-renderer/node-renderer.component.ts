@@ -14,6 +14,7 @@ import {
   TemplateRef,
   signal,
   effect,
+  afterNextRender,
 } from '@angular/core';
 import { CommonModule, NgComponentOutlet, NgTemplateOutlet, NgStyle } from '@angular/common';
 import { FlowStore } from '../../services/flow-store.service';
@@ -160,8 +161,38 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
   /** Ids of nodes currently playing their entry animation. */
   readonly enteringNodeIds = signal<ReadonlySet<string>>(new Set());
   private previousNodeIds: Set<string> | null = null;
+  /** Per node: `type|sourcePosition|targetPosition`, to re-measure handles when one changes. */
+  private handleLayoutKeys = new Map<string, string>();
 
   constructor() {
+    // Upstream NodeWrapper parity: a change of type / sourcePosition / targetPosition moves the
+    // node's handles without resizing it, so the ResizeObserver never fires and the edges would
+    // keep the old handle bounds. Re-measure those nodes with `force` once the DOM has updated.
+    effect(() => {
+      const changed = new Set<string>();
+      const next = new Map<string, string>();
+      for (const node of this.store.nodes()) {
+        const key = `${node.type ?? 'default'}|${node.sourcePosition ?? ''}|${node.targetPosition ?? ''}`;
+        const prevKey = this.handleLayoutKeys.get(node.id);
+        if (prevKey !== undefined && prevKey !== key) changed.add(node.id);
+        next.set(node.id, key);
+      }
+      this.handleLayoutKeys = next;
+      if (changed.size === 0) return;
+      afterNextRender(
+        () => {
+          const updates = new Map<string, { id: string; nodeElement: HTMLDivElement; force: boolean }>();
+          const nodeElements = (this.el.nativeElement as HTMLElement).querySelectorAll<HTMLDivElement>('.xy-flow__node');
+          nodeElements.forEach((nodeElement) => {
+            const id = nodeElement.getAttribute('data-id');
+            if (id && changed.has(id)) updates.set(id, { id, nodeElement, force: true });
+          });
+          if (updates.size > 0) this.store.updateNodeInternals(updates);
+        },
+        { injector: this.parentInjector }
+      );
+    });
+
     // Entry-animation bookkeeping: diff node ids per render. The first
     // emission is the initial mount — never animated (no full-graph flash).
     effect(() => {
