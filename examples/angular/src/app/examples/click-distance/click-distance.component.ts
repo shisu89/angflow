@@ -16,12 +16,12 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
   template: `
     <app-example-card
       title="Click distance"
-      description="How far the pointer can drift during a pane click before the click is suppressed. Slide to increase the tolerance, then try panning the background — small drifts still count as clicks (watch the console)."
+      description="How far the pointer must move before a pane press becomes a pan. Below it the press is a click (watch the console)."
     >
       <ng-flow
         [nodes]="nodes"
         [edges]="edges"
-        [paneClickDistance]="paneClickDistance()"
+        [paneDragThreshold]="paneDragThreshold()"
         (nodesChange)="onNodesChange($event)"
         (edgesChange)="onEdgesChange($event)"
         (connect)="onConnect($event)"
@@ -29,14 +29,14 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
       >
         <ng-flow-panel position="top-right">
           <label class="cd-label">
-            <span>click distance: {{ paneClickDistance() }}px</span>
+            <span>pane drag threshold: {{ paneDragThreshold() }}px</span>
             <input
               type="range"
               min="0"
               max="100"
-              [value]="paneClickDistance()"
+              [value]="paneDragThreshold()"
               (input)="setDistance($event)"
-              aria-label="Pane click distance"
+              aria-label="Pane drag threshold"
             />
           </label>
         </ng-flow-panel>
@@ -60,7 +60,7 @@ import { ExampleCardComponent } from '@examples-shared/example-card.component';
   `],
 })
 export class ClickDistanceExampleComponent {
-  readonly paneClickDistance = signal(0);
+  readonly paneDragThreshold = signal(0);
 
   nodes: Node[] = [
     { id: '1a', type: 'input', data: { label: 'Node 1' }, position: { x: 250, y:   5 } },
@@ -78,5 +78,5 @@ export class ClickDistanceExampleComponent {
   onEdgesChange(changes: EdgeChange[]): void { this.edges = applyEdgeChanges(changes, this.edges); }
   onConnect(connection: Connection): void { this.edges = addEdge(connection, this.edges) as Edge[]; }
   onPaneClick(): void { console.log('pane click'); }
-  setDistance(event: Event): void { this.paneClickDistance.set(Number((event.target as HTMLInputElement).value)); }
+  setDistance(event: Event): void { this.paneDragThreshold.set(Number((event.target as HTMLInputElement).value)); }
 }

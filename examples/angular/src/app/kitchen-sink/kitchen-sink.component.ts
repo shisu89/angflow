@@ -89,7 +89,7 @@ interface KitchenSinkSettings {
   connectionLineType: ConnectionLineType;
   connectionRadius: number;
   reconnectRadius: number;
-  paneClickDistance: number;
+  paneDragThreshold: number;
   onlyRenderVisibleElements: boolean;
   nodeOriginPreset: NodeOriginPreset;
   isValidConnectionEnabled: boolean;
@@ -171,7 +171,7 @@ const DEFAULTS: KitchenSinkSettings = {
   connectionLineType: ConnectionLineType.Bezier,
   connectionRadius: 20,
   reconnectRadius: 10,
-  paneClickDistance: 0,
+  paneDragThreshold: 1,
   onlyRenderVisibleElements: false,
   nodeOriginPreset: 'top-left',
   isValidConnectionEnabled: false,
@@ -222,7 +222,7 @@ const CATEGORY_KEYS: Record<string, (keyof KitchenSinkSettings)[]> = {
   ],
   Behavior: [
     'connectionMode', 'connectionLineType', 'connectionRadius', 'reconnectRadius',
-    'paneClickDistance', 'onlyRenderVisibleElements',
+    'paneDragThreshold', 'onlyRenderVisibleElements',
     'nodeOriginPreset', 'isValidConnectionEnabled', 'debug',
   ],
   Appearance: [
@@ -301,7 +301,7 @@ function parseKeyCode(raw: string): string | string[] {
           [connectionLineType]="settings().connectionLineType"
           [connectionRadius]="settings().connectionRadius"
           [reconnectRadius]="settings().reconnectRadius"
-          [paneClickDistance]="settings().paneClickDistance"
+          [paneDragThreshold]="settings().paneDragThreshold"
           [onlyRenderVisibleElements]="settings().onlyRenderVisibleElements"
           [nodeOrigin]="computedNodeOrigin()"
           [isValidConnection]="computedIsValidConnection()"
@@ -600,8 +600,8 @@ function parseKeyCode(raw: string): string | string[] {
                   <input type="range" min="5" max="40" [value]="settings().reconnectRadius" (input)="set('reconnectRadius', +$any($event.target).value)" />
                 </div>
                 <div class="ctrl ctrl--slider">
-                  <span class="ctrl__label">paneClickDistance ({{ settings().paneClickDistance }})</span>
-                  <input type="range" min="0" max="20" [value]="settings().paneClickDistance" (input)="set('paneClickDistance', +$any($event.target).value)" />
+                  <span class="ctrl__label">paneDragThreshold ({{ settings().paneDragThreshold }})</span>
+                  <input type="range" min="0" max="20" [value]="settings().paneDragThreshold" (input)="set('paneDragThreshold', +$any($event.target).value)" />
                 </div>
                 <div class="ctrl ctrl--switch">
                   <span class="ctrl__label">onlyRenderVisibleElements</span>

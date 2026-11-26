@@ -37,15 +37,18 @@ export type ZoomOnScrollParams = {
 
 export type PanZoomStartParams = {
   zoomPanValues: ZoomPanValues;
+  paneDragThreshold: number;
   onDraggingChange: OnDraggingChange;
   onPanZoomStart?: OnPanZoom;
 };
 
 export type PanZoomParams = {
   zoomPanValues: ZoomPanValues;
-  panOnDrag: boolean | number[];
-  onPaneContextMenu: boolean;
+  d3Selection: D3SelectionInstance;
+  paneDragThreshold: number;
+  onDraggingChange: OnDraggingChange;
   onTransformChange: OnTransformChange;
+  onPanZoomStart?: OnPanZoom;
   onPanZoom?: OnPanZoom;
 };
 
@@ -170,46 +173,157 @@ export function createZoomOnScrollHandler({ noWheelClassName, preventScrolling, 
   };
 }
 
-export function createPanZoomStartHandler({ zoomPanValues, onDraggingChange, onPanZoomStart }: PanZoomStartParams) {
+function startMove(zoomPanValues: ZoomPanValues, sourceEvent: Event | null, onPanZoomStart?: OnPanZoom) {
+  const pointerDrag = zoomPanValues.pointerDrag;
+  if (!pointerDrag || pointerDrag.moveStarted) {
+    return;
+  }
+
+  pointerDrag.moveStarted = true;
+  onPanZoomStart?.(sourceEvent as MouseEvent | TouchEvent | null, zoomPanValues.prevViewport);
+}
+
+function startPointerDrag(
+  zoomPanValues: ZoomPanValues,
+  sourceEvent: Event,
+  onDraggingChange: OnDraggingChange,
+  onPanZoomStart?: OnPanZoom
+) {
+  const pointerDrag = zoomPanValues.pointerDrag;
+  if (!pointerDrag) {
+    return;
+  }
+
+  startMove(zoomPanValues, sourceEvent, onPanZoomStart);
+  pointerDrag.dragging = true;
+
+  // touch gestures never toggled the dragging state
+  if (!pointerDrag.isTouch) {
+    onDraggingChange(true);
+  }
+}
+
+function isPointerMove(sourceEvent: Event | null): sourceEvent is MouseEvent | TouchEvent {
+  return sourceEvent?.type === 'mousemove' || sourceEvent?.type === 'touchmove';
+}
+
+function getPointerPosition(sourceEvent: MouseEvent | TouchEvent, touchId: number | null) {
+  if (!('touches' in sourceEvent)) {
+    return sourceEvent;
+  }
+
+  return Array.from(sourceEvent.touches).find((touch) => touch.identifier === touchId) ?? null;
+}
+
+export function createPanZoomStartHandler({
+  zoomPanValues,
+  paneDragThreshold,
+  onDraggingChange,
+  onPanZoomStart,
+}: PanZoomStartParams) {
   return (event: D3ZoomEvent<HTMLDivElement, any>) => {
-    if (event.sourceEvent?.internal) {
+    const sourceEvent = event.sourceEvent;
+
+    // angflow: only internal events are skipped; a programmatic transition (null sourceEvent)
+    // still reports onPanZoomStart and sets isZoomingOrPanning
+    if (sourceEvent?.internal) {
       return;
     }
 
     const viewport = transformToViewport(event.transform);
 
     // we need to remember it here, because it's always 0 in the "zoom" event
-    zoomPanValues.mouseButton = event.sourceEvent?.button || 0;
+    zoomPanValues.mouseButton = sourceEvent?.button || 0;
     zoomPanValues.isZoomingOrPanning = true;
     zoomPanValues.prevViewport = viewport;
+    zoomPanValues.pointerDrag = null;
 
-    if (event.sourceEvent?.type === 'mousedown') {
-      onDraggingChange(true);
+    const isTouch = sourceEvent?.type === 'touchstart';
+
+    if (sourceEvent?.type === 'mousedown' || isTouch) {
+      const touch = isTouch ? (sourceEvent as TouchEvent).touches[0] : null;
+      const { clientX, clientY } = touch ?? (sourceEvent as MouseEvent);
+
+      zoomPanValues.pointerDrag = {
+        isTouch,
+        touchId: touch?.identifier ?? null,
+        startX: clientX,
+        startY: clientY,
+        startTransform: event.transform,
+        thresholdCrossed: false,
+        lastMove: null,
+        moveStarted: false,
+        dragging: false,
+      };
+
+      if (paneDragThreshold === 0) {
+        startPointerDrag(zoomPanValues, sourceEvent, onDraggingChange, onPanZoomStart);
+      }
+
+      return;
     }
 
-    if (onPanZoomStart) {
-      onPanZoomStart?.(event.sourceEvent as MouseEvent | TouchEvent, viewport);
-    }
+    onPanZoomStart?.(sourceEvent as MouseEvent | TouchEvent, viewport);
   };
 }
 
 export function createPanZoomHandler({
   zoomPanValues,
-  panOnDrag,
-  onPaneContextMenu,
+  d3Selection,
+  paneDragThreshold,
+  onDraggingChange,
   onTransformChange,
+  onPanZoomStart,
   onPanZoom,
 }: PanZoomParams) {
   return (event: D3ZoomEvent<HTMLDivElement, any>) => {
-    zoomPanValues.usedRightMouseButton = !!(
-      onPaneContextMenu && isRightClickPan(panOnDrag, zoomPanValues.mouseButton ?? 0)
-    );
+    const sourceEvent = event.sourceEvent;
+    const pointerDrag = zoomPanValues.pointerDrag;
 
-    if (!event.sourceEvent?.sync) {
+    if (pointerDrag) {
+      const isMove = isPointerMove(sourceEvent) && sourceEvent !== pointerDrag.lastMove;
+
+      if (isMove) {
+        pointerDrag.lastMove = sourceEvent;
+      }
+
+      if (isMove && !pointerDrag.thresholdCrossed) {
+        const position = getPointerPosition(sourceEvent, pointerDrag.touchId);
+        // a pinch (more than one touch) or a lost first touch always starts the gesture
+        const isMultiTouch = 'touches' in sourceEvent && sourceEvent.touches.length > 1;
+
+        if (!position || isMultiTouch) {
+          pointerDrag.thresholdCrossed = true;
+        } else {
+          const dx = position.clientX - pointerDrag.startX;
+          const dy = position.clientY - pointerDrag.startY;
+          // same check as d3-zoom's clickDistance, so a gesture is either a click or a drag
+          pointerDrag.thresholdCrossed = dx * dx + dy * dy > paneDragThreshold * paneDragThreshold;
+        }
+      }
+
+      if (!pointerDrag.dragging) {
+        if (!isMove) {
+          // e.g. wheel zoom or setViewport while the pointer is pressed: accept it as the new resting transform
+          pointerDrag.startTransform = event.transform;
+          if (!sourceEvent?.internal) {
+            startMove(zoomPanValues, sourceEvent, onPanZoomStart);
+          }
+        } else if (pointerDrag.thresholdCrossed) {
+          startPointerDrag(zoomPanValues, sourceEvent, onDraggingChange, onPanZoomStart);
+        } else {
+          // below the threshold: undo the transform d3-zoom already stored, so it stays in sync with the viewport
+          d3Selection.property('__zoom', pointerDrag.startTransform);
+          return;
+        }
+      }
+    }
+
+    if (!sourceEvent?.sync) {
       onTransformChange([event.transform.x, event.transform.y, event.transform.k]);
     }
 
-    if (onPanZoom && !event.sourceEvent?.internal) {
+    if (onPanZoom && !sourceEvent?.internal && (!pointerDrag || pointerDrag.moveStarted)) {
       onPanZoom?.(event.sourceEvent as MouseEvent | TouchEvent, transformToViewport(event.transform));
     }
   };
@@ -230,15 +344,23 @@ export function createPanZoomEndHandler({
 
     zoomPanValues.isZoomingOrPanning = false;
 
+    const pointerDrag = zoomPanValues.pointerDrag;
+    zoomPanValues.pointerDrag = null;
+
+    // with right-click panning the native contextmenu event is prevented by the pane, so we emit it here
     if (
       onPaneContextMenu &&
       isRightClickPan(panOnDrag, zoomPanValues.mouseButton ?? 0) &&
-      !zoomPanValues.usedRightMouseButton &&
+      !pointerDrag?.thresholdCrossed &&
       event.sourceEvent
     ) {
       onPaneContextMenu(event.sourceEvent);
     }
-    zoomPanValues.usedRightMouseButton = false;
+
+    // nothing moved during the mouse or touch gesture, so this was a click or tap
+    if (pointerDrag && !pointerDrag.moveStarted) {
+      return;
+    }
 
     onDraggingChange(false);
 

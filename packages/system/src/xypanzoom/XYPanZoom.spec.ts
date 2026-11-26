@@ -36,8 +36,7 @@ function updateOptions(
     zoomOnDoubleClick: true,
     lib: 'ng',
     onTransformChange,
-    paneClickDistance: 0,
-    selectionOnDrag: true,
+    paneDragThreshold: 1,
     ...overrides,
   };
 }
@@ -49,16 +48,17 @@ function setup() {
     width: 800, height: 600, toJSON: () => ({}),
   });
   const onTransformChange = vi.fn();
+  const onDraggingChange = vi.fn();
   const panZoom = XYPanZoom({
     domNode,
     minZoom: 0.5,
     maxZoom: 2,
     translateExtent: extent,
     viewport: { x: 0, y: 0, zoom: 1 },
-    onDraggingChange: vi.fn(),
+    onDraggingChange,
   });
   panZoom.update(updateOptions(onTransformChange));
-  return { domNode, onTransformChange, panZoom };
+  return { domNode, onTransformChange, onDraggingChange, panZoom };
 }
 
 describe('XYPanZoom selection lifecycle', () => {
@@ -282,5 +282,57 @@ describe('createFilter pan activation key (#5922)', () => {
       lib: 'ng',
     });
     expect(noPinch(wheel)).toBe(false);
+  });
+});
+
+describe('XYPanZoom paneDragThreshold (#6115)', () => {
+  let attached: HTMLElement | null = null;
+  function setupAttached() {
+    const s = setup();
+    document.body.appendChild(s.domNode);
+    attached = s.domNode;
+    s.onTransformChange.mockClear();
+    s.onDraggingChange.mockClear();
+    return s;
+  }
+  afterEach(() => {
+    attached?.remove();
+    attached = null;
+  });
+  // jsdom rejects `view: window` under vitest's global proxy, so the real Window is attached afterwards.
+  const view = document.defaultView as Window;
+  const mouse = (type: string, x: number) => {
+    const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: 100, button: 0 });
+    Object.defineProperty(event, 'view', { value: view });
+    return event;
+  };
+  function press(domNode: HTMLElement, dx: number) {
+    domNode.dispatchEvent(mouse('mousedown', 100));
+    view.dispatchEvent(mouse('mousemove', 100 + dx));
+    view.dispatchEvent(mouse('mouseup', 100 + dx));
+    const click = vi.fn();
+    domNode.addEventListener('click', click);
+    domNode.dispatchEvent(mouse('click', 100 + dx));
+    return click;
+  }
+
+  it('below the threshold: no transform, no dragging, __zoom unchanged, the click is kept', () => {
+    const { domNode, panZoom, onTransformChange, onDraggingChange } = setupAttached();
+    panZoom.update(updateOptions(onTransformChange, { paneDragThreshold: 5 }));
+    const click = press(domNode, 3);
+    expect(onTransformChange).not.toHaveBeenCalled();
+    expect(onDraggingChange).not.toHaveBeenCalled();
+    expect((domNode as unknown as { __zoom: { x: number; k: number } }).__zoom).toMatchObject({ x: 0, k: 1 });
+    expect(click).toHaveBeenCalledTimes(1);
+  });
+
+  it('past the threshold: pans, toggles dragging, and d3 suppresses the click', () => {
+    const { domNode, panZoom, onTransformChange, onDraggingChange } = setupAttached();
+    panZoom.update(updateOptions(onTransformChange, { paneDragThreshold: 5 }));
+    const click = press(domNode, 20);
+    expect(onTransformChange).toHaveBeenCalled();
+    expect(onDraggingChange).toHaveBeenNthCalledWith(1, true);
+    expect(onDraggingChange).toHaveBeenLastCalledWith(false);
+    expect(click).not.toHaveBeenCalled();
   });
 });

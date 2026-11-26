@@ -344,7 +344,7 @@ describe('NgFlowComponent interaction wiring', () => {
     expect(update).toHaveBeenLastCalledWith(expect.objectContaining({
       panOnDrag: true,
       panOnScroll: true,
-      selectionOnDrag: false,
+      panActivationKeyPressed: true,
     }));
   });
 

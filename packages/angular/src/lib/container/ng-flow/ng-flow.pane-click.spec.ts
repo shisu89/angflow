@@ -411,24 +411,34 @@ describe('NgFlowComponent onPaneClick — post-marquee guard', () => {
       expect(store.connectionClickStartHandle()).toEqual(armedHandle);
     });
 
-    it('with paneClickDistance > 0, the click after a connection drop consumes its flag even past the distance', () => {
+    it('the click after a connection drop consumes its flag, whatever paneDragThreshold is', () => {
       const { inst, store, paneClickSpy } = setup();
-      inst.fixtureRef.setInput('paneClickDistance', 5);
-      // A stale pointerdown position (the start of an earlier pan): the handle
-      // stops the connection drag's own pointerdown from reaching the pane.
-      inst.onPanePointerDown({ clientX: 0, clientY: 0 } as PointerEvent);
+      inst.fixtureRef.setInput('paneDragThreshold', 5);
       store.updateConnection({ ...makeInProgressConnection() });
-
       inst.onPanePointerUp(makePanePointerUp('mouse'));
       store.cancelConnection();
       inst.onPaneClick(makePaneClick(100, 100));
       expect(paneClickSpy).not.toHaveBeenCalled();
       expect((inst as any).connectionEndedOnPane).toBe(false);
-
-      // The next genuine pane click is not swallowed.
       inst.onPanePointerDown({ clientX: 200, clientY: 200 } as PointerEvent);
       inst.onPaneClick(makePaneClick(200, 200));
       expect(paneClickSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('onPaneClick measures no distance: a click that arrives is a pane click (d3-zoom suppresses post-pan clicks)', () => {
+      const { inst, paneClickSpy } = setup();
+      inst.fixtureRef.setInput('paneDragThreshold', 5);
+      inst.onPanePointerDown({ clientX: 0, clientY: 0 } as PointerEvent);
+      inst.onPaneClick(makePaneClick(100, 100));
+      expect(paneClickSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('paneDragThreshold defaults to 1 and reaches the store', () => {
+      const { inst, store } = setup();
+      expect(store.paneDragThreshold()).toBe(1);
+      inst.fixtureRef.setInput('paneDragThreshold', 7);
+      TestBed.tick();
+      expect(store.paneDragThreshold()).toBe(7);
     });
 
     it('a pane pointerdown resets stale swallow flags', () => {

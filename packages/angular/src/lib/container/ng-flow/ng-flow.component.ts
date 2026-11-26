@@ -503,8 +503,11 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   /** Minimum pixels the pointer must travel before a connection drag begins. */
   readonly connectionDragThreshold = input(1);
 
-  /** Maximum pixels between mousedown and mouseup that still count as a pane click. */
-  readonly paneClickDistance = input(0);
+  /**
+   * Pixels the pointer must move on the pane before a pan or a box selection starts
+   * (upstream `paneDragThreshold`). A press that moves less is a click. 0 starts at once.
+   */
+  readonly paneDragThreshold = input(1);
 
   // ── Appearance ────────────────────────────────────────────────────────
 
@@ -820,7 +823,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       this.store.connectionRadius.set(this.connectionRadius());
       this.store.connectionDragThreshold.set(this.connectionDragThreshold());
       this.store.nodeDragThreshold.set(this.nodeDragThreshold());
-      this.store.paneClickDistance.set(this.paneClickDistance());
+      this.store.paneDragThreshold.set(this.paneDragThreshold());
       this.store.autoPanOnConnect.set(this.autoPanOnConnect());
       this.store.autoPanOnNodeDrag.set(this.autoPanOnNodeDrag());
       this.store.autoPanOnSelection.set(this.autoPanOnSelection());
@@ -898,13 +901,12 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       this.zoomOnScroll();
       this.zoomOnPinch();
       this.zoomOnDoubleClick();
-      this.effectiveSelectionOnDrag();
       this.store.zoomActivationKeyActive();
       this.store.panActivationKeyActive();
       this.preventScrolling();
       this.noPanClassName();
       this.noWheelClassName();
-      this.paneClickDistance();
+      this.paneDragThreshold();
       // userSelectionActive is consumed inside updatePanZoomOptions(); read it
       // here explicitly — the method body short-circuits while panZoomInstance
       // is null on first run, so the inner read never registers a dependency.
@@ -1073,10 +1075,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     }
   }
 
-  private panePointerDownPos: { x: number; y: number } | null = null;
-
-  onPanePointerDown(event: PointerEvent): void {
-    this.panePointerDownPos = { x: event.clientX, y: event.clientY };
+  onPanePointerDown(_event: PointerEvent): void {
     // A new gesture starts: drop swallow flags whose click never arrived, so
     // they can't eat this gesture's click.
     this.connectionEndedOnPane = false;
@@ -1147,23 +1146,13 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
     // connection drag dropped on the pane, and any click while a connection drag is in
     // progress are swallowed — they must not cancel a pending click-to-connect or reset
     // the selection. The click-to-connect preview also reports inProgress, so only a
-    // connection *drag* counts. Consumed before the paneClickDistance check: a connection
-    // drag's pointerdown never reaches the pane, so the stored down position can be
-    // stale and fail the check, which would otherwise leave the flag set.
+    // connection *drag* counts. No distance check follows: as in upstream, d3-zoom's
+    // clickDistance(paneDragThreshold) already suppresses the click after a real pan.
     if (this.store.selectionInProgress() || this.connectionEndedOnPane || this.store.connectionDragInProgress()) {
       this.store.selectionInProgress.set(false);
       this.connectionEndedOnPane = false;
-      this.panePointerDownPos = null;
       return;
     }
-
-    const threshold = this.paneClickDistance();
-    if (threshold > 0 && this.panePointerDownPos) {
-      const dx = event.clientX - this.panePointerDownPos.x;
-      const dy = event.clientY - this.panePointerDownPos.y;
-      if (Math.sqrt(dx * dx + dy * dy) > threshold) return;
-    }
-    this.panePointerDownPos = null;
 
     // Don't deselect when clicking on nodes, edges, handles, or selection box (event bubbles up)
     const target = event.target as HTMLElement;
@@ -1256,7 +1245,6 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       zoomOnScroll: this.zoomOnScroll(),
       zoomOnPinch: this.zoomOnPinch(),
       zoomOnDoubleClick: this.zoomOnDoubleClick(),
-      selectionOnDrag: this.effectiveSelectionOnDrag(),
       zoomActivationKeyPressed: this.store.zoomActivationKeyActive(),
       panActivationKeyPressed: this.store.panActivationKeyActive(),
       preventScrolling: this.preventScrolling(),
@@ -1267,7 +1255,7 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
       onTransformChange: (transform: Transform) => {
         this.store.transform.set(transform);
       },
-      paneClickDistance: this.paneClickDistance(),
+      paneDragThreshold: this.paneDragThreshold(),
     });
   }
 }

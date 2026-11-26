@@ -17,6 +17,9 @@ export const viewportToTransform = ({ x, y, zoom }: Viewport): ZoomTransform =>
 
 export const isWrappedWithClass = (event: any, className: string | undefined) => event.target.closest(`.${className}`);
 
+export const isLeftClickPan = (panOnDrag: boolean | number[]) =>
+  panOnDrag === true || (Array.isArray(panOnDrag) && panOnDrag.includes(0));
+
 export const isRightClickPan = (panOnDrag: boolean | number[], usedButton: number) =>
   usedButton === 2 && Array.isArray(panOnDrag) && panOnDrag.includes(2);
 
