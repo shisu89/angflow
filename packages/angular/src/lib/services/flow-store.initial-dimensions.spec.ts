@@ -95,3 +95,45 @@ describe('initial dimensions flag reaches Angular consumers', () => {
     expect(second[0]).not.toMatchObject({ initial: true });
   });
 });
+
+describe('updateNodeInternals notifies edge consumers', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'DOMMatrixReadOnly',
+      class {
+        m22 = 1;
+        constructor(_transform?: string) {}
+      },
+    );
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), FlowStore] });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    document.body.innerHTML = '';
+  });
+
+  // A forced re-measure that only moves handles (same size: no dimension change, so
+  // no nodesChange round-trip) must still bump `version`, which displayEdges reads.
+  // Otherwise edges keep the old handle bounds until some unrelated update.
+  it('bumps version when a forced re-measure updates handle bounds without a size change', () => {
+    const store = TestBed.inject(FlowStore);
+    store.domNode.set(makeDom());
+    store.setNodes([node('a')]);
+    const nodeEl = makeNodeEl(200, 200);
+    store.updateNodeInternals(new Map<string, InternalNodeUpdate>([['a', { id: 'a', nodeElement: nodeEl }]]));
+    const firstBounds = store.nodeLookup.get('a')?.internals.handleBounds;
+    const edgesBefore = store.displayEdges();
+    const versionBefore = store.version();
+
+    store.updateNodeInternals(
+      new Map<string, InternalNodeUpdate>([['a', { id: 'a', nodeElement: nodeEl, force: true }]]),
+    );
+
+    expect(store.nodeLookup.get('a')?.internals.handleBounds).not.toBe(firstBounds);
+    expect(store.version()).toBeGreaterThan(versionBefore);
+    expect(store.displayEdges()).not.toBe(edgesBefore);
+  });
+});
+

@@ -542,8 +542,11 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
       this.fitViewOptions.set(undefined);
     }
 
-    // Trigger reactivity by touching the nodes signal
+    // Trigger reactivity by touching the nodes signal, and bump `version` so edge
+    // consumers (displayEdges) re-read handle bounds: a re-measure that only moves
+    // handles (no size change, so no nodesChange round-trip) must still re-route edges.
     this.nodes.update((n) => [...n]);
+    this.bumpVersion();
 
     if (changes?.length > 0) {
       this.triggerNodeChanges(changes);
