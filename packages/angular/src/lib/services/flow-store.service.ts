@@ -21,8 +21,7 @@ import {
   getNodesInside,
   type NodeChange,
   type EdgeChange,
-  type EdgeSelectionChange,
-  type NodeSelectionChange,
+  type SelectionChange,
   type ParentExpandChild,
   type Transform,
   type Viewport,
@@ -901,16 +900,16 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     const nodesToUnselect = params.nodes ?? this.nodes();
     const edgesToUnselect = params.edges ?? this.edges();
 
-    const nodeChanges: NodeSelectionChange[] = [];
+    const nodeChanges: SelectionChange[] = [];
     for (const node of nodesToUnselect) {
       if (!node.selected) continue;
-      nodeChanges.push(createSelectionChange(node.id, false) as NodeSelectionChange);
+      nodeChanges.push(createSelectionChange(node.id, false) as SelectionChange);
     }
 
-    const edgeChanges: EdgeSelectionChange[] = [];
+    const edgeChanges: SelectionChange[] = [];
     for (const edge of edgesToUnselect) {
       if (!edge.selected) continue;
-      edgeChanges.push(createSelectionChange(edge.id, false) as EdgeSelectionChange);
+      edgeChanges.push(createSelectionChange(edge.id, false) as SelectionChange);
     }
 
     this.triggerNodeChanges(nodeChanges as NodeChange<NodeType>[]);

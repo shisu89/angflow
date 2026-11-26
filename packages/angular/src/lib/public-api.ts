@@ -198,17 +198,13 @@ export type {
 
   // Change types
   NodeChange,
-  NodeDimensionChange,
-  NodePositionChange,
-  NodeSelectionChange,
-  NodeRemoveChange,
-  NodeAddChange,
-  NodeReplaceChange,
+  DimensionChange,
+  PositionChange,
+  SelectionChange,
+  RemoveChange,
+  AddChange,
+  ReplaceChange,
   EdgeChange,
-  EdgeSelectionChange,
-  EdgeRemoveChange,
-  EdgeAddChange,
-  EdgeReplaceChange,
 
   // Callback types
   OnMove,

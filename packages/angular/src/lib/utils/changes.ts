@@ -1,10 +1,8 @@
 import type {
   NodeChange,
   EdgeChange,
-  NodeSelectionChange,
-  EdgeSelectionChange,
-  NodeRemoveChange,
-  EdgeRemoveChange,
+  SelectionChange,
+  RemoveChange,
 } from '@angflow/system';
 import type { Node, Edge } from '../types';
 
@@ -187,7 +185,7 @@ export function applyDimensionChanges<NodeType extends Node = Node>(
   return changed ? next : nodes;
 }
 
-export function createSelectionChange(id: string, selected: boolean): NodeSelectionChange | EdgeSelectionChange {
+export function createSelectionChange(id: string, selected: boolean): SelectionChange {
   return { id, type: 'select', selected };
 }
 
@@ -195,7 +193,7 @@ export function getSelectionChanges(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   items: Map<string, any>, // change-applier mirrors xyflow's untyped element diffing
   selectedIds: Set<string> = new Set()
-): NodeSelectionChange[] | EdgeSelectionChange[] {
+): SelectionChange[] {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const changes: any[] = [];
 
@@ -224,7 +222,7 @@ export function getElementsDiffChanges({ items = [], lookup }: { items: any[] | 
       changes.push({ id: item.id, item, type: 'replace' });
     }
     if (storeItem === undefined) {
-      changes.push({ item, type: 'add', index });
+      changes.push({ id: item.id, item, type: 'add', index });
     }
   }
 
@@ -238,6 +236,6 @@ export function getElementsDiffChanges({ items = [], lookup }: { items: any[] | 
   return changes;
 }
 
-export function elementToRemoveChange<T extends Node | Edge>(item: T): NodeRemoveChange | EdgeRemoveChange {
+export function elementToRemoveChange<T extends Node | Edge>(item: T): RemoveChange {
   return { id: item.id, type: 'remove' };
 }

@@ -26,8 +26,8 @@ import {
   type ResizeDragEvent,
   type ResizeParams,
   type NodeChange,
-  type NodeDimensionChange,
-  type NodePositionChange,
+  type DimensionChange,
+  type PositionChange,
   type XYPosition,
 } from '@angflow/system';
 import { FlowStore } from '../../services/flow-store.service';
@@ -275,7 +275,7 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
               id: resolvedNodeId,
               type: 'position',
               position: { x: nextPosition.x, y: nextPosition.y },
-            } as NodePositionChange);
+            } as PositionChange);
           }
 
           if (change.width !== undefined && change.height !== undefined) {
@@ -285,7 +285,7 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
               resizing: true,
               setAttributes: true,
               dimensions: { width: change.width, height: change.height },
-            } as NodeDimensionChange);
+            } as DimensionChange);
           }
 
           for (const childChange of childChanges) {
@@ -293,7 +293,7 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
               id: childChange.id,
               type: 'position',
               position: childChange.position,
-            } as NodePositionChange);
+            } as PositionChange);
           }
 
           if (nodeChanges.length > 0) {
@@ -310,7 +310,7 @@ export class NodeResizerComponent implements AfterViewInit, OnDestroy {
               type: 'dimensions',
               resizing: false,
               dimensions: { width: change.width, height: change.height },
-            } as NodeDimensionChange,
+            } as DimensionChange,
           ]);
           // (resizeEnd) is emitted from onResizeEnd (see applyResizerConfig).
         },

@@ -261,7 +261,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   addNodes(nodes: NodeType | NodeType[]): void {
     const toAdd = Array.isArray(nodes) ? nodes : [nodes];
     if (!toAdd.length) return;
-    const changes: NodeChange<NodeType>[] = toAdd.map((item) => ({ type: 'add', item }));
+    const changes: NodeChange<NodeType>[] = toAdd.map((item) => ({ type: 'add', id: item.id, item }));
     this.store.triggerNodeChanges(changes);
   }
 
@@ -728,7 +728,7 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
   addEdges(edges: EdgeType | EdgeType[]): void {
     const toAdd = Array.isArray(edges) ? edges : [edges];
     if (!toAdd.length) return;
-    const changes: EdgeChange<EdgeType>[] = toAdd.map((item) => ({ type: 'add', item }));
+    const changes: EdgeChange<EdgeType>[] = toAdd.map((item) => ({ type: 'add', id: item.id, item }));
     this.store.triggerEdgeChanges(changes);
   }
 
