@@ -70,11 +70,12 @@ Kinds: BUG = bug fix, FEAT = feature, BRK = breaking, PERF = perf.
 | 63 | 12.11.0 | Fix node resizing beyond absolute extents | BUG | SYS | inherited via XYResizer | - |
 
 ## Counts (63 rows; some rows merge several changelog bullets)
-- PRESENT: 8 (#1, 17 via D3, 37, 43, 46, 52, 58, 60)
-- PARTIAL: 14 (#3, 5, 8, 20, 26, 29, 33, 35, 39, 41, 48, 61, plus 46 partially, 20)
-- ABSENT: 10 (#2, 11, 12, 13, 18, 19, 21, 22, 34, 49, 56 - plus 50 as feature gap)
-- SYS (inherited on system bump, little/no wrapper work): 11 (#6, 7, 14, 15, 27, 38, 45, 47, 54, 63 and bits of 8/29)
-- N/A (React-specific or not affected): ~21
+- PRESENT: 8 (#1, 17 via D3, 37, 43, 46, 52, 58, 60; #46 is PRESENT/SYS)
+- PARTIAL: 12 (#3, 5, 8, 20, 26, 29, 33, 35, 39, 41, 48, 61)
+- ABSENT: 11 (#2, 11, 12, 13, 18, 19, 21, 22, 34, 49, 56), plus #50, which is N/A / ABSENT (a feature gap)
+- SYS (inherited on system bump, little/no wrapper work): 10 (#6, 7, 14, 15, 27, 38, 45, 47, 54, 63), plus bits of 8/29
+- N/A (React-specific or not affected): 21
+- Total: 8 + 12 + 11 + 1 (#50) + 10 + 21 = 63
 
 ## Ranked work list (ABSENT/PARTIAL), by user impact
 

@@ -200,3 +200,5 @@ Found during execution:
 - The `kitchen-sink` example's `any[]` handler was found only by the example build, not by the library's `tsc`.
 
 Behaviour notes: `setNodeCollapsed` and `dissolveGroup` still emit `'replace'`; `addNodes` / `addEdges` store items by reference; a key set to `undefined` in `updateNode` clears it; clearing a changeset inside a handler does nothing, as in React.
+
+Final-review fixes (after the docs commit): the agent add tools (`add_node`, `add_nodes`, `add_edge`, `add_edges` and the matching `apply_changes` ops) reject ids that already exist, because changesets ignore an `'add'` for an existing id; `NgFlowService.groupNodes` throws when the group id exists; `recordOp` deep-clones params so a later fast-path move cannot rewrite a logged op; and doc corrections (README, changelog qualifiers, review-report counts and citations).

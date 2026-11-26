@@ -151,7 +151,7 @@ Then, the `ColorModeClass` export is removed (`ColorMode` is `'light' | 'dark'`)
 
 Upstream 1.0 changes API (#5944, 5ff09ef77, plus follow-ups): `(nodesChange)` / `(edgesChange)` emit a `NodeChangeset` / `EdgeChangeset` instead of an array. Renamed and removed APIs have no deprecated aliases.
 
-**Compiles loudly, behaves differently:** a handler typed `(changes: NodeChange[])` no longer type-checks, so the break is caught at build time. The apply-semantics differences below are silent.
+**Compiles loudly only under strict templates:** with `strictTemplates` (or `strictOutputEventTypes`) a handler typed `(changes: NodeChange[])` no longer type-checks. Without it, `$event` is `any`, so a handler that calls `changes.filter(...)` still compiles and throws at runtime. Grep your `(nodesChange)` / `(edgesChange)` handlers. The apply-semantics differences below are silent either way.
 
 ```ts
 // 1. Handlers
@@ -200,11 +200,13 @@ Apply-semantics differences (upstream's apply):
 - Iteration groups changes by element (adds first), not in emission order.
 - Nodes and edges added through `addNodes` / `addEdges` are stored by reference (the apply pushes the item as-is) rather than shallow-copied.
 
-`updateNode` / `updateEdge` now emit an `'update'` change carrying only the partial (an updater function is resolved first), and `updateNodeData` / `updateEdgeData` emit a merging `'data'` change. They no longer emit a full `'replace'`. Journaling or undo consumers that matched `'replace'` from these APIs must handle `'update'` / `'data'`. A key set to `undefined` in `updateNode` still clears it (`Object.assign` copies own undefined properties), so `setNodeGroup(id, null)` still detaches. `setNodeCollapsed` and `dissolveGroup` still emit `'replace'`.
+`updateNode` / `updateEdge` now emit an `'update'` change carrying only the partial (an updater function is resolved first), and `updateNodeData` / `updateEdgeData` emit a merging `'data'` change. They no longer emit a full `'replace'`. Journaling or undo consumers that matched `'replace'` from these APIs must handle `'update'` / `'data'`. A key set to `undefined` in `updateNode` still clears it (`Object.assign` copies own undefined properties), so `setNodeGroup(id, null)` still detaches. `setNodeCollapsed` and `dissolveGroup` still emit `'replace'`. Note that `updateNode(id, { position })` emits one `'update'` change, not a `'position'` change, so `getByType('position')` does not see moves made through `updateNode`.
 
-**Clearing the changeset in a handler does nothing.** angflow applies the changes before emitting, as React does, so `changes.clear()` or `changes.remove(...)` inside a handler cannot cancel a change (that is Svelte Flow-only behaviour). Both store paths emit the same changeset instance they applied; the change middleware still sees arrays.
+**Clearing the changeset in a handler does nothing.** angflow applies the changes before emitting, as React does, so `changes.clear()` or `changes.remove(...)` inside a handler cannot cancel a change (that is Svelte Flow-only behaviour). Both store paths emit a changeset built from exactly the changes that were applied; the change middleware still sees arrays.
 
-No agent tool or schema change; the `@angflow/mcp` snapshot is unchanged. Ported from xyflow/xyflow#5944 (5ff09ef77).
+**Behaviour change (agent tools and `groupNodes`):** because an `add` for an existing id is ignored, `add_node`, `add_nodes`, `add_edge`, `add_edges` and the matching `apply_changes` ops now fail with `InvalidParamsError` (`-32602`; the `apply_changes` batch rolls back with `-32603`) when the id already exists, including an id added earlier in the same batch, and reject duplicate ids within one bulk call. Before, they silently dropped the add and returned the old element. `NgFlowService.groupNodes` now throws when the group id already exists, as the agent `group_nodes` tool does, instead of re-parenting members into the existing node. The agent op-log also deep-clones recorded params, so a later move can no longer rewrite a logged `add_nodes` op.
+
+No agent tool schema change; the `@angflow/mcp` snapshot is unchanged. Ported from xyflow/xyflow#5944 (5ff09ef77).
 
 ### Added (additive API)
 

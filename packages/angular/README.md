@@ -383,7 +383,7 @@ for a childless group.
 
 ## Coming from React Flow?
 
-The public API is modeled on React Flow deliberately. `<ng-flow>` mirrors `<ReactFlow>`, `<ng-flow-handle>` mirrors `<Handle>`, `inject(NgFlowService)` replaces `useReactFlow()`, and state hooks (`useNodes`, `useEdges`, `useViewport`) become signals on the service (`flowService.nodes`, `.edges`, `.viewport`). Use `applyNodeChanges` / `applyEdgeChanges` with `(nodesChange)` / `(edgesChange)` outputs the same way you'd use `useNodesState` / `useEdgesState`. See the [root README](../../README.md#coming-from-react-flow) for a full mapping table.
+The public API is modeled on React Flow deliberately. `<ng-flow>` mirrors `<ReactFlow>`, `<ng-flow-handle>` mirrors `<Handle>`, `inject(NgFlowService)` replaces `useReactFlow()`, and state hooks (`useNodes`, `useEdges`, `useViewport`) become signals on the service (`flowService.nodes`, `.edges`, `.viewport`). Use `changes.applyTo(...)` on the `(nodesChange)` / `(edgesChange)` outputs (a `NodeChangeset` / `EdgeChangeset`) the same way you'd use `useNodesState` / `useEdgesState`. See the [root README](../../README.md#coming-from-react-flow) for a full mapping table.
 
 ## Credits
 
