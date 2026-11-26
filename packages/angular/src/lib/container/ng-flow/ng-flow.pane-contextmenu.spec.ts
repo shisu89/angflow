@@ -10,6 +10,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { NgFlowComponent } from './ng-flow.component';
 import { Position, type ConnectionInProgress } from '@angflow/system';
+import type { Node } from '../../types';
 
 class FakeResizeObserver {
   observe(): void {}
@@ -136,5 +137,88 @@ describe('NgFlowComponent pane context menu and pan/zoom options', () => {
     fixture.nativeElement.querySelector('.xy-flow__pane').dispatchEvent(ev);
     expect(ev.defaultPrevented).toBe(true);
     expect(emitted).toHaveBeenCalledTimes(1);
+  });
+
+  describe('React Pane parity: target check and nopan', () => {
+    async function setupWithElements(nodes: Node[], nodesDraggable = true) {
+      const fixture = TestBed.createComponent(NgFlowComponent);
+      fixture.componentRef.setInput('nodes', nodes);
+      fixture.componentRef.setInput('edges', [{ id: 'e1', source: 'a', target: 'b' }]);
+      fixture.componentRef.setInput('nodesDraggable', nodesDraggable);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const inst = fixture.componentInstance;
+      const paneEmitted = vi.fn();
+      const nodeEmitted = vi.fn();
+      const selectionEmitted = vi.fn();
+      inst.paneContextMenu.subscribe(paneEmitted);
+      inst.nodeContextMenu.subscribe(nodeEmitted);
+      inst.selectionContextMenu.subscribe(selectionEmitted);
+      const el = fixture.nativeElement as HTMLElement;
+      return { fixture, inst, el, paneEmitted, nodeEmitted, selectionEmitted };
+    }
+
+    const twoNodes = (): Node[] => [
+      { id: 'a', position: { x: 0, y: 0 }, data: {} },
+      { id: 'b', position: { x: 200, y: 0 }, data: {}, draggable: false },
+    ];
+
+    it('a native contextmenu on a node fires (nodeContextMenu) and not (paneContextMenu)', async () => {
+      const { el, paneEmitted, nodeEmitted } = await setupWithElements(twoNodes());
+      const node = el.querySelector('.xy-flow__node[data-id="a"]') as HTMLElement;
+      expect(node).not.toBeNull();
+      const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+      node.dispatchEvent(ev);
+      expect(nodeEmitted).toHaveBeenCalledTimes(1);
+      expect(paneEmitted).not.toHaveBeenCalled();
+      expect(ev.defaultPrevented).toBe(true);
+    });
+
+    it('a native contextmenu on the nodes-selection box does not fire (paneContextMenu)', async () => {
+      const { fixture, inst, el, paneEmitted, selectionEmitted } = await setupWithElements(twoNodes());
+      inst.store.nodesSelectionActive.set(true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const box = el.querySelector('.xy-flow__nodesselection') as HTMLElement;
+      expect(box).not.toBeNull();
+      box.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+      expect(selectionEmitted).toHaveBeenCalledTimes(1);
+      expect(paneEmitted).not.toHaveBeenCalled();
+    });
+
+    it('draggable nodes carry the nopan class, non-draggable ones do not', async () => {
+      const { el } = await setupWithElements(twoNodes());
+      expect(el.querySelector('.xy-flow__node[data-id="a"]')!.classList.contains('nopan')).toBe(true);
+      expect(el.querySelector('.xy-flow__node[data-id="b"]')!.classList.contains('nopan')).toBe(false);
+    });
+
+    it('no node carries nopan when nodesDraggable is off', async () => {
+      const { el } = await setupWithElements(twoNodes(), false);
+      expect(el.querySelector('.xy-flow__node[data-id="a"]')!.classList.contains('nopan')).toBe(false);
+    });
+
+    it('honours a custom noPanClassName', async () => {
+      const fixture = TestBed.createComponent(NgFlowComponent);
+      fixture.componentRef.setInput('nodes', twoNodes());
+      fixture.componentRef.setInput('noPanClassName', 'custom-nopan');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const node = (fixture.nativeElement as HTMLElement).querySelector('.xy-flow__node[data-id="a"]')!;
+      expect(node.classList.contains('custom-nopan')).toBe(true);
+      expect(node.classList.contains('nopan')).toBe(false);
+    });
+
+    it('edges and the nodes-selection box always carry the nopan class', async () => {
+      const { fixture, inst, el } = await setupWithElements(twoNodes());
+      inst.store.nodesSelectionActive.set(true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      const edge = el.querySelector('.xy-flow__edge');
+      expect(edge).not.toBeNull();
+      expect(edge!.classList.contains('nopan')).toBe(true);
+      const box = el.querySelector('.xy-flow__nodesselection')!;
+      expect(box.classList.contains('nopan')).toBe(true);
+      expect(box.classList.contains('xy-flow__selection')).toBe(true);
+    });
   });
 });

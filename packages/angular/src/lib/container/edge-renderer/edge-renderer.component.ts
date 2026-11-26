@@ -376,8 +376,9 @@ export class EdgeRendererComponent {
   }
 
   getEdgeClasses(edge: Edge): string {
-    const typeClass = 'xy-flow__edge-' + (edge.type || 'default');
-    return edge.className ? typeClass + ' ' + edge.className : typeClass;
+    // React's EdgeWrapper: every edge carries the nopan class.
+    const cls = 'xy-flow__edge-' + (edge.type || 'default') + ' ' + this.store.noPanClassName();
+    return edge.className ? cls + ' ' + edge.className : cls;
   }
 
   getEdgeGClasses(edge: Edge): string {

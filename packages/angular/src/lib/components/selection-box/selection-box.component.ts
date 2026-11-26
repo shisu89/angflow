@@ -49,6 +49,7 @@ const arrowKeyDiffs: Record<string, XYPosition> = {
       <div
         #nodesSelectionBox
         class="ng-flow__selection ng-flow__nodesselection xy-flow__selection xy-flow__nodesselection"
+        [class]="store.noPanClassName()"
         style="position: absolute; pointer-events: all; z-index: 10; transform-origin: left top;"
         [style.transform]="nodesSelectionTransform()"
         [style.width.px]="nodesSelectionBounds().width"

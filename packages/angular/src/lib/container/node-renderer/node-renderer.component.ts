@@ -483,8 +483,11 @@ export class NodeRendererComponent implements AfterViewInit, OnDestroy {
   }
 
   getNodeClasses(node: InternalNode): string {
-    const typeClass = 'xy-flow__node-' + (node.type || 'default');
-    return node.className ? typeClass + ' ' + node.className : typeClass;
+    let cls = 'xy-flow__node-' + (node.type || 'default');
+    // React's NodeWrapper: draggable nodes carry the nopan class, so a drag
+    // starting on them (any button panOnDrag allows) never pans the pane.
+    if (node.draggable !== false && this.store.nodesDraggable()) cls += ' ' + this.store.noPanClassName();
+    return node.className ? cls + ' ' + node.className : cls;
   }
 
   getNodeZ(node: InternalNode): number {

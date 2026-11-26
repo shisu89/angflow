@@ -1177,13 +1177,16 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
   }
 
   /**
-   * Native `contextmenu` on the pane. Always suppresses the browser menu. When right-drag panning
-   * is enabled (`panOnDrag` includes 2), XYPanZoom emits `(paneContextMenu)` itself on a
-   * right-click that did not drag, so this handler must not emit a second time. Mirrors React's
-   * `Pane.onContextMenu`.
+   * Native `contextmenu` on the pane. Always suppresses the browser menu. Emits only when the
+   * target is the `.xy-flow__pane` element itself, as React's `Pane` `invokeHandler` does: a
+   * right-click on a node, edge or the selection box bubbles here but is theirs alone. When
+   * right-drag panning is enabled (`panOnDrag` includes 2), XYPanZoom emits `(paneContextMenu)`
+   * itself on a right-click that did not drag, so this handler must not emit a second time.
+   * Mirrors React's `Pane.onContextMenu`.
    */
   onPaneContextMenu(event: MouseEvent): void {
     event.preventDefault();
+    if (event.target !== event.currentTarget) return;
     const panOnDrag = this.effectivePanOnDrag();
     if (Array.isArray(panOnDrag) && panOnDrag.includes(2)) {
       return;
