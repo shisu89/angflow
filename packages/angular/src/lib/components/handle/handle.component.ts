@@ -261,11 +261,6 @@ export class HandleComponent implements OnDestroy {
         handleId: this.handleId(),
         handleType: this.type(),
       });
-      store.onConnectStart?.(event, {
-        nodeId: this.nodeId,
-        handleId: this.handleId(),
-        handleType: this.type(),
-      });
     } else if (
       startHandle.nodeId === this.nodeId &&
       (startHandle.handleId ?? null) === this.handleId() &&
@@ -275,7 +270,6 @@ export class HandleComponent implements OnDestroy {
       // click-to-connect and its preview line) instead of self-connecting.
       store.connectionClickStartHandle.set(null);
       store.onClickConnectEnd?.(event);
-      store.onConnectEnd?.(event);
     } else {
       // Second click — validate target handle via XYHandle.isValid, which
       // inspects the handle's CSS classes (`connectable`, `connectableend`)
@@ -305,7 +299,6 @@ export class HandleComponent implements OnDestroy {
 
       store.connectionClickStartHandle.set(null);
       store.onClickConnectEnd?.(event);
-      store.onConnectEnd?.(event);
     }
   }
 }

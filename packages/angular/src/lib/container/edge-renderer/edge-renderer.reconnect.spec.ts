@@ -142,3 +142,52 @@ describe('EdgeRendererComponent reconnect — isNodeVisible wiring', () => {
     }
   });
 });
+
+describe('EdgeRendererComponent reconnect — event order (#6117)', () => {
+  let store: FlowStore;
+  let component: EdgeRendererComponent;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [EdgeRendererComponent],
+      providers: [provideZonelessChangeDetection(), FlowStore],
+    });
+    store = TestBed.inject(FlowStore);
+    const fixture = TestBed.createComponent(EdgeRendererComponent);
+    component = fixture.componentInstance;
+  });
+
+  it('fires reconnectStart → connectStart … connectEnd → reconnectEnd, and only after the drag starts', () => {
+    store.setNodes([{ id: 'src', position: { x: 0, y: 0 }, data: {} }, { id: 'tgt', position: { x: 200, y: 0 }, data: {} }] as any[]);
+    store.setEdges([makeEdge()]);
+    const order: string[] = [];
+    let startEvent: MouseEvent | undefined;
+    component.reconnectStart.subscribe((e) => { order.push('reconnectStart'); startEvent = e.event; });
+    component.reconnectEnd.subscribe(() => order.push('reconnectEnd'));
+    store.onConnectStart = () => order.push('connectStart');
+    store.onConnectEnd = () => order.push('connectEnd');
+    const spy = vi.spyOn(system.XYHandle, 'onPointerDown').mockImplementation(() => {});
+    try {
+      const down = new MouseEvent('mousedown', { button: 0, bubbles: true });
+      component.onReconnectSourceMouseDown(down, store.edges()[0]);
+      expect(order).toEqual([]); // nothing on pointerdown
+      expect(component.reconnectingEdgeId()).toBeNull(); // a sub-threshold press hides nothing
+
+      const params = spy.mock.calls[0][1] as any;
+      params.onConnectStart(new MouseEvent('pointermove'), { nodeId: 'tgt', handleId: null, handleType: 'target' });
+      expect(order).toEqual(['reconnectStart', 'connectStart']);
+      expect(startEvent).toBe(down); // the original pointerdown, as upstream
+      expect(component.reconnectingEdgeId()).toBe('e1');
+
+      const up = new MouseEvent('pointerup');
+      const state = { isValid: null, to: { x: 0, y: 0 } };
+      params.onConnectEnd(up, state);
+      params.onReconnectEnd(up, state);
+      expect(order).toEqual(['reconnectStart', 'connectStart', 'connectEnd', 'reconnectEnd']);
+      expect(component.reconnectingEdgeId()).toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});

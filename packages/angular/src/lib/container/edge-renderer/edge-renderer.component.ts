@@ -29,6 +29,7 @@ import {
   type Connection,
   type ConnectionState,
   type FinalConnectionState,
+  type OnConnectStartParams,
   type IsValidConnection,
   getElevatedEdgeZIndex,
 } from '@angflow/system';
@@ -775,9 +776,6 @@ export class EdgeRendererComponent {
     const store = this.store;
     const isTarget = oppositeHandle.type === 'target';
 
-    this.reconnectStart.emit({ event, edge, handleType: oppositeHandle.type });
-    this.reconnectingEdgeId.set(edge.id);
-
     XYHandle.onPointerDown(event, {
       autoPanOnConnect: store.autoPanOnConnect(),
       connectionMode: store.connectionMode(),
@@ -807,6 +805,14 @@ export class EdgeRendererComponent {
       onConnect: (connection: Connection) => {
         this.reconnect.emit({ edge, connection });
       },
+      // Upstream EdgeUpdateAnchors: the reconnect starts with the connection drag (after
+      // connectionDragThreshold). (reconnectStart) carries the original pointerdown event.
+      onConnectStart: (evt: MouseEvent | TouchEvent, params: OnConnectStartParams) => {
+        this.reconnectingEdgeId.set(edge.id);
+        this.reconnectStart.emit({ event, edge, handleType: oppositeHandle.type });
+        store.onConnectStart?.(evt, params);
+      },
+      onConnectEnd: (evt: MouseEvent | TouchEvent, _connectionState: FinalConnectionState) => store.onConnectEnd?.(evt),
       onReconnectEnd: (evt: MouseEvent | TouchEvent, connectionState: FinalConnectionState) => {
         this.reconnectingEdgeId.set(null);
         this.hoveredAnchorEdgeId.set(null);

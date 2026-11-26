@@ -421,3 +421,66 @@ describe('HandleComponent — connection-start gating', () => {
     }
   });
 });
+
+describe('HandleComponent — click-connect fires only click-connect events', () => {
+  let store: FlowStore;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [HandleComponent],
+      providers: [
+        provideZonelessChangeDetection(),
+        FlowStore,
+        { provide: NODE_ID, useValue: 'node-A' },
+      ],
+    });
+    store = TestBed.inject(FlowStore);
+    store.onConnectStart = vi.fn();
+    store.onConnectEnd = vi.fn();
+    store.onClickConnectStart = vi.fn();
+    store.onClickConnectEnd = vi.fn();
+  });
+
+  function mountSource() {
+    const fixture = TestBed.createComponent(HandleComponent);
+    setSignalInput(fixture.componentInstance, 'type', 'source' as HandleType);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  function click(fixture: ReturnType<typeof mountSource>): void {
+    (fixture.nativeElement as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  }
+
+  it('first click fires onClickConnectStart only', () => {
+    const fixture = mountSource();
+    click(fixture);
+    expect(store.connectionClickStartHandle()).toEqual({ nodeId: 'node-A', handleId: null, type: 'source' });
+    expect(store.onClickConnectStart).toHaveBeenCalledTimes(1);
+    expect(store.onConnectStart).not.toHaveBeenCalled();
+  });
+
+  it('re-click of the armed handle fires onClickConnectEnd only', () => {
+    const fixture = mountSource();
+    click(fixture);
+    click(fixture);
+    expect(store.connectionClickStartHandle()).toBeNull();
+    expect(store.onClickConnectEnd).toHaveBeenCalledTimes(1);
+    expect(store.onConnectEnd).not.toHaveBeenCalled();
+  });
+
+  it('second click completing on another handle fires onClickConnectEnd only', () => {
+    // jsdom does not implement elementFromPoint, which XYHandle.isValid calls.
+    if (!document.elementFromPoint) {
+      Object.defineProperty(document, 'elementFromPoint', { value: () => null, writable: true, configurable: true });
+    }
+    const fixture = mountSource();
+    store.connectionClickStartHandle.set({ nodeId: 'other', handleId: null, type: 'source' });
+    click(fixture);
+    expect(store.connectionClickStartHandle()).toBeNull();
+    expect(store.onClickConnectEnd).toHaveBeenCalledTimes(1);
+    expect(store.onConnectEnd).not.toHaveBeenCalled();
+    expect(store.onConnectStart).not.toHaveBeenCalled();
+  });
+});

@@ -637,9 +637,15 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
   /** A new connection was completed. Pair with `addEdge` to append it to `edges`. */
   readonly connect = output<Connection>({ alias: 'connect' });
-  /** A drag-to-connect started on a handle. */
+  /**
+   * A connection drag started on a handle or an edge's reconnect anchor (after
+   * `connectionDragThreshold`). Click-to-connect fires `(clickConnectStart)` instead.
+   */
   readonly connectStart = output<{ event: MouseEvent | TouchEvent; params: OnConnectStartParams }>({ alias: 'connectStart' });
-  /** A drag-to-connect ended (regardless of whether it produced a valid connection). */
+  /**
+   * A connection drag on a handle or an edge's reconnect anchor ended (valid or not).
+   * Click-to-connect fires `(clickConnectEnd)` instead.
+   */
   readonly connectEnd = output<MouseEvent | TouchEvent>({ alias: 'connectEnd' });
 
   /** The first click of a click-to-connect interaction landed on a handle. */
@@ -649,7 +655,10 @@ export class NgFlowComponent<NodeType extends Node = Node, EdgeType extends Edge
 
   /** An existing edge was dragged to a new endpoint. Pair with `reconnectEdge` to update `edges`. */
   readonly reconnect = output<{ edge: Edge; connection: Connection }>({ alias: 'reconnect' });
-  /** A reconnection drag on an edge endpoint started. */
+  /**
+   * A reconnection drag on an edge endpoint started, once the drag passes
+   * `connectionDragThreshold`. Carries the original pointerdown event; fires before `(connectStart)`.
+   */
   readonly reconnectStart = output<{ event: MouseEvent; edge: Edge; handleType: HandleType }>({ alias: 'reconnectStart' });
   /** A reconnection drag ended; includes the final `connectionState`. */
   readonly reconnectEnd = output<{ event: MouseEvent | TouchEvent; edge: Edge; handleType: HandleType; connectionState: FinalConnectionState }>({ alias: 'reconnectEnd' });
