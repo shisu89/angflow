@@ -546,9 +546,34 @@ describe('NgFlowService', () => {
     });
   });
 
-  // ── updateNode({ position }) takes the position fast path ─────────────
+  // ── updateNode({ position }) is applied immutably (full applyTo path) ──
 
-  describe('updateNode({ position }) on the position-only fast path', () => {
+  describe('updateNode({ position }) applies immutably', () => {
+    it('replaces the node object and leaves the host object untouched', () => {
+      const host = makeNode('a', { position: { x: 1, y: 2 } });
+      const hostPosition = host.position;
+      service.setNodes([host, makeNode('b')]);
+      const otherBefore = store.nodes()[1];
+      service.updateNode('a', { position: { x: 30, y: 40 } });
+      const next = store.nodes().find((n) => n.id === 'a')!;
+      expect(next).not.toBe(host);
+      expect(next.position).toEqual({ x: 30, y: 40 });
+      expect(host.position).toBe(hostPosition);
+      expect(host.position).toEqual({ x: 1, y: 2 });
+      expect(store.nodes()[1]).toBe(otherBefore);
+      expect(store.nodeLookup.get('a')!.internals.userNode).toBe(next);
+      expect(store.nodeLookup.get('a')!.internals.positionAbsolute).toEqual({ x: 30, y: 40 });
+    });
+
+    it('changeParent does not mutate the host object either', () => {
+      const group = makeNode('g', { type: 'group', position: { x: 100, y: 50 }, width: 300, height: 300 });
+      const host = makeNode('a', { position: { x: 150, y: 80 }, width: 20, height: 20 });
+      service.setNodes([group, host]);
+      service.changeParent('a', 'g');
+      expect(host.position).toEqual({ x: 150, y: 80 });
+      expect(host.parentId).toBeUndefined();
+      expect(store.nodes().find((n) => n.id === 'a')).not.toBe(host);
+    });
     it('moves a parented child: absolute = parent absolute + new position', () => {
       service.setNodes([
         makeNode('g', { type: 'group', position: { x: 100, y: 50 }, width: 300, height: 300 }),

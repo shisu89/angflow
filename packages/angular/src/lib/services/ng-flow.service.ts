@@ -308,7 +308,9 @@ export class NgFlowService<NodeType extends Node = Node, EdgeType extends Edge =
       }
     }
 
-    if (changes.length > 0) this.store.triggerNodeChanges(changes);
+    // Always the immutable full path: a position-only changeset would otherwise
+    // take the in-place fast path and mutate the host's own node object.
+    if (changes.length > 0) this.store.triggerNodeChanges(changes, { allowFastPath: false });
   }
 
   /**

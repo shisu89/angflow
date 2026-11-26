@@ -731,7 +731,16 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
     this.settlePendingFits();
   }
 
-  triggerNodeChanges(changes: NodeChange<NodeType>[]): void {
+  /**
+   * Apply and emit a node changeset.
+   *
+   * @param options.allowFastPath When `true` (default), an all-`'position'`
+   *   changeset is applied in place on the lookup and the user node objects
+   *   (drags, arrow keys, tweens, `setNodePositions`). Pass `false` to force the
+   *   immutable `applyTo` path, as `NgFlowService.updateNode` does: there the user
+   *   node may be the host's own `[nodes]` object, which must not be mutated.
+   */
+  triggerNodeChanges(changes: NodeChange<NodeType>[], { allowFastPath = true }: { allowFastPath?: boolean } = {}): void {
     if (!changes?.length) return;
 
     // Apply middleware pipeline
@@ -747,7 +756,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
     // Fast path: if all changes are position-only, update nodeLookup in-place
     // instead of rebuilding everything via setNodes
-    const allPosition = changes.every(c => c.type === 'position');
+    const allPosition = allowFastPath && changes.every(c => c.type === 'position');
 
     if (allPosition) {
       // Update user nodes array with new positions (cheap shallow copy)
