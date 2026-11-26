@@ -272,10 +272,9 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
   /**
    * True while a connection *drag* is in progress (XYHandle, edge reconnect); not for the
    * click-to-connect preview line, which must not block panning. A boolean `computed`, so it
-   * doesn't notify on every pointer move. `connectionIsClickPreview` is a plain field, but it is
-   * always written immediately before `rawConnection`, which re-evaluates this computed.
+   * doesn't notify on every pointer move.
    */
-  readonly connectionInProgress = computed(() => this.rawConnection().inProgress && !this.connectionIsClickPreview);
+  readonly connectionInProgress = computed(() => this.rawConnection().inProgress && !this.connectionIsClickPreview());
 
   /**
    * The current connection with `to` in flow coordinates, like upstream React's store
@@ -596,7 +595,7 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
         const updatedFrom = getHandlePosition(node, conn.fromHandle, Position.Left, true);
         // Keep whether this is a drag or the click-connect preview.
         const moved = { ...conn, from: updatedFrom };
-        if (this.connectionIsClickPreview) this.updateClickConnectPreview(moved);
+        if (this.connectionIsClickPreview()) this.updateClickConnectPreview(moved);
         else this.updateConnection(moved);
       }
 
@@ -1110,36 +1109,36 @@ export class FlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edg
 
   /**
    * True while `connection()` holds the click-to-connect preview line (written by
-   * `ClickConnectPreview`) rather than a real connection drag. Not reactive: it is
-   * read only from event handlers.
+   * `ClickConnectPreview`) rather than a real connection drag. A signal, so
+   * `connectionInProgress` tracks it directly.
    */
-  private connectionIsClickPreview = false;
+  private readonly connectionIsClickPreview = signal(false);
 
   cancelConnection(): void {
-    this.connectionIsClickPreview = false;
+    this.connectionIsClickPreview.set(false);
     this.rawConnection.set({ ...initialConnection });
   }
 
   /** Writes a connection drag's state (XYHandle, edge reconnect). */
   updateConnection(connectionState: ConnectionState): void {
-    this.connectionIsClickPreview = false;
+    this.connectionIsClickPreview.set(false);
     this.rawConnection.set(connectionState);
   }
 
   /** Writes the click-to-connect preview line's state (`ClickConnectPreview`). */
   updateClickConnectPreview(connectionState: ConnectionState): void {
-    this.connectionIsClickPreview = true;
+    this.connectionIsClickPreview.set(true);
     this.rawConnection.set(connectionState);
   }
 
   /** Whether `connection()` is an in-progress connection *drag*, not the click-to-connect preview. */
   connectionDragInProgress(): boolean {
-    return this.rawConnection().inProgress && !this.connectionIsClickPreview;
+    return this.rawConnection().inProgress && !this.connectionIsClickPreview();
   }
 
   /** Whether `connection()` currently holds the click-to-connect preview line. */
   isClickConnectPreview(): boolean {
-    return this.rawConnection().inProgress && this.connectionIsClickPreview;
+    return this.rawConnection().inProgress && this.connectionIsClickPreview();
   }
 
   /**

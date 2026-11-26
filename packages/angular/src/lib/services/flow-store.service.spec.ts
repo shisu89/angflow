@@ -867,6 +867,19 @@ describe('FlowStore', () => {
       expect(store.isClickConnectPreview()).toBe(false);
     });
 
+    it('connectionInProgress tracks the preview flag even when the raw state object is reused', () => {
+      const state = inProgressConnection({ x: 1, y: 1 });
+      store.updateClickConnectPreview(state);
+      expect(store.connectionInProgress()).toBe(false);
+      // Same object: rawConnection does not notify, only the flag changes.
+      store.updateConnection(state);
+      expect(store.connectionInProgress()).toBe(true);
+      store.updateClickConnectPreview(state);
+      expect(store.connectionInProgress()).toBe(false);
+      store.cancelConnection();
+      expect(store.connectionInProgress()).toBe(false);
+    });
+
     it('the from-node follow writes the raw state (no double conversion)', () => {
       store.setNodes([makeNode('n1', { position: { x: 0, y: 0 } })]);
       store.transform.set([100, 50, 2]);
